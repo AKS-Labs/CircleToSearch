@@ -82,16 +82,6 @@ fun SetupScreen() {
         Spacer(modifier = Modifier.height(32.dp))
         
         BubbleSwitch(context)
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        Button(onClick = {
-            val intent = Intent(context, OverlayActivity::class.java)
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            context.startActivity(intent)
-        }) {
-            Text("Test Overlay UI (No Screenshot)")
-        }
     }
 }
 

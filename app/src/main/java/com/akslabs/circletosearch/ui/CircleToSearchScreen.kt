@@ -120,16 +120,11 @@ fun CircleToSearchScreen(
                     colors = OverlayGradientColors
                 )
             )
-            .border(5.dp, Color.Red) // Debug border
     ) {
         // 1. Screenshot Layer
         if (screenshot != null) {
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(top = 80.dp, bottom = 120.dp, start = 20.dp, end = 20.dp) // Inset slightly
-                    .shadow(20.dp, RoundedCornerShape(24.dp))
-                    .clip(RoundedCornerShape(24.dp))
+                modifier = Modifier.fillMaxSize()
             ) {
                 Image(
                     bitmap = screenshot.asImageBitmap(),
@@ -337,13 +332,5 @@ fun CircleToSearchScreen(
             // Main content behind sheet (transparent)
             Box(modifier = Modifier.fillMaxSize())
         }
-
-        // Debug Text (Moved to top Z-order)
-        Text(
-            text = "Debug: UI Active. Screenshot: ${if (screenshot != null) "Yes (${screenshot.width}x${screenshot.height})" else "No"}",
-            color = Color.Red,
-            modifier = Modifier.align(Alignment.Center),
-            style = MaterialTheme.typography.headlineLarge
-        )
     }
 }

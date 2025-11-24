@@ -1,9 +1,50 @@
-    D  Skipping stats log for color mode
-2025-11-25 01:24:06.010 28912-29949 CircleToSearch          com.akslabs.circletosearch           D  Screenshot captured. Size: 1080x2340
-2025-11-25 01:24:06.047 28912-29949 CircleToSearch          com.akslabs.circletosearch           D  Center pixel color: ff10131c
-2025-11-25 01:24:06.372 28912-29949 CircleToSearch          com.akslabs.circletosearch           D  Screenshot saved to /data/user/0/com.akslabs.circletosearch/cache/screenshot.png
-2025-11-25 01:24:06.441 28912-28912 CircleToSearch          com.akslabs.circletosearch           D  OverlayActivity onCreate
-2025-11-25 01:24:06.441 28912-28912 CircleToSearch          com.akslabs.circletosearch           D  Loading screenshot from: /data/user/0/com.akslabs.circletosearch/cache/screenshot.png
-2025-11-25 01:24:06.490 28912-28912 CircleToSearch          com.akslabs.circletosearch           D  Bitmap loaded successfully. Size: 1080x2340
-2025-11-25 01:24:06.901 28912-28912 InsetsController        com.akslabs.circletosearch           D  hide(ime(), fromIme=false)
-2025-11-25 01:24:06.901 28912-28912 ImeTracker              com.akslabs.circletosearch           I  com.akslabs.circletosearch:488ee5db: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+e: file:///C:/Users/ashin/AndroidStudioProjects/CircleToSearch/app/src/main/java/com/akslabs/circletosearch/ui/CircleToSearchScreen.kt:115:5 None of the following candidates is applicable:
+fun Box(modifier: Modifier = ..., contentAlignment: Alignment = ..., propagateMinConstraints: Boolean = ..., content: @Composable() ComposableFunction1<BoxScope, Unit>): Unit
+fun Box(modifier: Modifier): Unit
+Fix with AI
+
+e: file:///C:/Users/ashin/AndroidStudioProjects/CircleToSearch/app/src/main/java/com/akslabs/circletosearch/ui/CircleToSearchScreen.kt:122:14 Syntax error: Expecting ','.
+Fix with AI
+
+e: file:///C:/Users/ashin/AndroidStudioProjects/CircleToSearch/app/src/main/java/com/akslabs/circletosearch/ui/CircleToSearchScreen.kt:124:9 'if' must have both main and 'else' branches when used as an expression.
+Fix with AI
+
+e: file:///C:/Users/ashin/AndroidStudioProjects/CircleToSearch/app/src/main/java/com/akslabs/circletosearch/ui/CircleToSearchScreen.kt:205:9 Unresolved reference 'Row'.
+Fix with AI
+
+e: file:///C:/Users/ashin/AndroidStudioProjects/CircleToSearch/app/src/main/java/com/akslabs/circletosearch/ui/CircleToSearchScreen.kt:206:13 Unresolved reference 'modifier'.
+Fix with AI
+
+e: file:///C:/Users/ashin/AndroidStudioProjects/CircleToSearch/app/src/main/java/com/akslabs/circletosearch/ui/CircleToSearchScreen.kt:206:13 Only expressions are allowed in this context.
+Fix with AI
+
+e: file:///C:/Users/ashin/AndroidStudioProjects/CircleToSearch/app/src/main/java/com/akslabs/circletosearch/ui/CircleToSearchScreen.kt:208:66 Syntax error: Expecting ')'.
+Fix with AI
+
+e: file:///C:/Users/ashin/AndroidStudioProjects/CircleToSearch/app/src/main/java/com/akslabs/circletosearch/ui/CircleToSearchScreen.kt:211:13 @Composable invocations can only happen from the context of a @Composable function
+Fix with AI
+
+e: file:///C:/Users/ashin/AndroidStudioProjects/CircleToSearch/app/src/main/java/com/akslabs/circletosearch/ui/CircleToSearchScreen.kt:219:13 @Composable invocations can only happen from the context of a @Composable function
+Fix with AI
+
+e: file:///C:/Users/ashin/AndroidStudioProjects/CircleToSearch/app/src/main/java/com/akslabs/circletosearch/ui/CircleToSearchScreen.kt:219:40 Unresolved reference 'weight'.
+Fix with AI
+
+e: file:///C:/Users/ashin/AndroidStudioProjects/CircleToSearch/app/src/main/java/com/akslabs/circletosearch/ui/CircleToSearchScreen.kt:220:13 @Composable invocations can only happen from the context of a @Composable function
+Fix with AI
+
+e: file:///C:/Users/ashin/AndroidStudioProjects/CircleToSearch/app/src/main/java/com/akslabs/circletosearch/ui/CircleToSearchScreen.kt:222:39 @Composable invocations can only happen from the context of a @Composable function
+Fix with AI
+
+e: file:///C:/Users/ashin/AndroidStudioProjects/CircleToSearch/app/src/main/java/com/akslabs/circletosearch/ui/CircleToSearchScreen.kt:227:13 @Composable invocations can only happen from the context of a @Composable function
+Fix with AI
+
+e: file:///C:/Users/ashin/AndroidStudioProjects/CircleToSearch/app/src/main/java/com/akslabs/circletosearch/ui/CircleToSearchScreen.kt:227:40 Unresolved reference 'weight'.
+Fix with AI
+
+e: file:///C:/Users/ashin/AndroidStudioProjects/CircleToSearch/app/src/main/java/com/akslabs/circletosearch/ui/CircleToSearchScreen.kt:228:13 @Composable invocations can only happen from the context of a @Composable function
+Fix with AI
+
+e: file:///C:/Users/ashin/AndroidStudioProjects/CircleToSearch/app/src/main/java/com/akslabs/circletosearch/ui/CircleToSearchScreen.kt:335:1 Syntax error: Expecting a top level declaration.
+Fix with AI
+
