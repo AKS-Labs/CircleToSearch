@@ -12,24 +12,50 @@ import com.akslabs.circletosearch.ui.theme.CircleToSearchTheme
 import com.akslabs.circletosearch.utils.ImageUtils
 
 class OverlayActivity : ComponentActivity() {
+    
+    private val screenshotBitmap = androidx.compose.runtime.mutableStateOf<android.graphics.Bitmap?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        android.util.Log.d("CircleToSearch", "OverlayActivity onCreate")
         
-        val screenshotPath = intent.getStringExtra("SCREENSHOT_PATH")
-        val bitmap = screenshotPath?.let { ImageUtils.loadBitmap(it) }
+        handleIntent(intent)
 
         setContent {
             CircleToSearchTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
-                    color = Color.Transparent // Important for the overlay effect
+                    color = Color.Transparent
                 ) {
                     CircleToSearchScreen(
-                        screenshot = bitmap,
+                        screenshot = screenshotBitmap.value,
                         onClose = { finish() }
                     )
                 }
             }
+        }
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        android.util.Log.d("CircleToSearch", "OverlayActivity onNewIntent")
+        setIntent(intent)
+        handleIntent(intent)
+    }
+
+    private fun handleIntent(intent: android.content.Intent) {
+        val screenshotPath = intent.getStringExtra("SCREENSHOT_PATH")
+        android.util.Log.d("CircleToSearch", "Loading screenshot from: $screenshotPath")
+        if (screenshotPath != null) {
+            val bitmap = ImageUtils.loadBitmap(screenshotPath)
+            if (bitmap != null) {
+                android.util.Log.d("CircleToSearch", "Bitmap loaded successfully. Size: ${bitmap.width}x${bitmap.height}")
+                screenshotBitmap.value = bitmap
+            } else {
+                android.util.Log.e("CircleToSearch", "Failed to load bitmap from path")
+            }
+        } else {
+            android.util.Log.e("CircleToSearch", "No screenshot path in intent")
         }
     }
 }

@@ -137,31 +137,56 @@ class CircleToSearchService : AccessibilityService() {
 
     private fun performCapture() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            takeScreenshot(
-                Display.DEFAULT_DISPLAY,
-                executor,
-                object : TakeScreenshotCallback {
-                    override fun onSuccess(screenshot: ScreenshotResult) {
-                        val bitmap = Bitmap.wrapHardwareBuffer(
-                            screenshot.hardwareBuffer,
-                            screenshot.colorSpace
-                        )
-                        bitmap?.let {
-                            // Hardware bitmaps are immutable and can't be easily saved sometimes without copy
-                            // But ImageUtils.saveBitmap compresses it, which should work.
-                            // We might need to copy if it fails.
-                            val copy = it.copy(Bitmap.Config.ARGB_8888, false)
-                            val path = ImageUtils.saveBitmap(this@CircleToSearchService, copy)
-                            launchOverlay(path)
-                            screenshot.hardwareBuffer.close()
+            // Add a slight delay to ensure UI is stable/ripple finished
+            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                takeScreenshot(
+                    Display.DEFAULT_DISPLAY,
+                    executor,
+                    object : TakeScreenshotCallback {
+                        override fun onSuccess(screenshot: ScreenshotResult) {
+                            try {
+                                val hardwareBuffer = screenshot.hardwareBuffer
+                                val colorSpace = screenshot.colorSpace
+                                
+                                android.util.Log.d("CircleToSearch", "Screenshot captured. Size: ${hardwareBuffer.width}x${hardwareBuffer.height}")
+
+                                val bitmap = Bitmap.wrapHardwareBuffer(hardwareBuffer, colorSpace)
+                                if (bitmap == null) {
+                                    android.util.Log.e("CircleToSearch", "Failed to wrap hardware buffer")
+                                    hardwareBuffer.close()
+                                    return
+                                }
+
+                                // Copy to software bitmap
+                                val copy = bitmap.copy(Bitmap.Config.ARGB_8888, false)
+                                hardwareBuffer.close() // Close buffer after copy
+
+                                if (copy == null) {
+                                    android.util.Log.e("CircleToSearch", "Failed to copy bitmap")
+                                    return
+                                }
+                                
+                                // Check center pixel
+                                val centerX = copy.width / 2
+                                val centerY = copy.height / 2
+                                val pixel = copy.getPixel(centerX, centerY)
+                                android.util.Log.d("CircleToSearch", "Center pixel color: ${Integer.toHexString(pixel)}")
+                                
+                                val path = ImageUtils.saveBitmap(this@CircleToSearchService, copy)
+                                android.util.Log.d("CircleToSearch", "Screenshot saved to $path")
+                                launchOverlay(path)
+                                
+                            } catch (e: Exception) {
+                                android.util.Log.e("CircleToSearch", "Error processing screenshot", e)
+                            }
+                        }
+
+                        override fun onFailure(errorCode: Int) {
+                            android.util.Log.e("CircleToSearch", "Screenshot failed with error code: $errorCode")
                         }
                     }
-
-                    override fun onFailure(errorCode: Int) {
-                        // Handle error
-                    }
-                }
-            )
+                )
+            }, 500)
         }
     }
 

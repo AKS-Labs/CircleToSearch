@@ -9,6 +9,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -119,6 +120,7 @@ fun CircleToSearchScreen(
                     colors = OverlayGradientColors
                 )
             )
+            .border(5.dp, Color.Red) // Debug border
     ) {
         // 1. Screenshot Layer
         if (screenshot != null) {
@@ -157,31 +159,6 @@ fun CircleToSearchScreen(
                                         paths.add(it to Color.White)
                                         // Calculate bounding box
                                         if (currentPathPoints.isNotEmpty()) {
-                                            var minX = Float.MAX_VALUE
-                                            var minY = Float.MAX_VALUE
-                                            var maxX = Float.MIN_VALUE
-                                            var maxY = Float.MIN_VALUE
-
-                                            currentPathPoints.forEach { p ->
-                                                minX = min(minX, p.x)
-                                                minY = min(minY, p.y)
-                                                maxX = max(maxX, p.x)
-                                                maxY = max(maxY, p.y)
-                                            }
-
-                                            // Convert to bitmap coordinates (simplified, assuming view fills bitmap)
-                                            // In reality, we need to map view coords to bitmap coords.
-                                            // For this demo, we assume the Image fills the Box exactly.
-                                            // We need the size of the Box.
-                                            
-                                            // Let's just take a crop from the original screenshot based on relative percentages if possible
-                                            // Or simpler: Just pass the rect.
-                                            
-                                            // Since we don't have the exact view size here easily without LayoutCoordinates,
-                                            // we will approximate or use a fixed aspect ratio assumption for the demo.
-                                            // Ideally we use onGloballyPositioned.
-                                            
-                                            // For now, let's just trigger the search UI.
                                             isSearching = true
                                             scope.launch {
                                                 scaffoldState.bottomSheetState.expand()
@@ -268,6 +245,7 @@ fun CircleToSearchScreen(
         BottomSheetScaffold(
             scaffoldState = scaffoldState,
             sheetPeekHeight = 0.dp,
+            containerColor = Color.Transparent, // Fix: Make transparent
             sheetContainerColor = Color.White,
             sheetShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
             sheetContent = {
@@ -359,5 +337,13 @@ fun CircleToSearchScreen(
             // Main content behind sheet (transparent)
             Box(modifier = Modifier.fillMaxSize())
         }
+
+        // Debug Text (Moved to top Z-order)
+        Text(
+            text = "Debug: UI Active. Screenshot: ${if (screenshot != null) "Yes (${screenshot.width}x${screenshot.height})" else "No"}",
+            color = Color.Red,
+            modifier = Modifier.align(Alignment.Center),
+            style = MaterialTheme.typography.headlineLarge
+        )
     }
 }
