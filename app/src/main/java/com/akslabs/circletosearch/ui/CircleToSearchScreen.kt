@@ -60,6 +60,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -88,8 +89,8 @@ fun CircleToSearchScreen(
     val scope = rememberCoroutineScope()
     val scaffoldState = rememberBottomSheetScaffoldState(
         bottomSheetState = rememberStandardBottomSheetState(
-            initialValue = SheetValue.Hidden,
-            skipHiddenState = false
+            initialValue = SheetValue.PartiallyExpanded,
+            skipHiddenState = true
         )
     )
 
@@ -120,18 +121,184 @@ fun CircleToSearchScreen(
                     colors = OverlayGradientColors
                 )
             )
+            .border(
+                width = 8.dp,
+                brush = Brush.verticalGradient(colors = OverlayGradientColors),
+                shape = RectangleShape
+            )
     ) {
-        // 1. Screenshot Layer
-        if (screenshot != null) {
+        // 4. Bottom Sheet
+        BottomSheetScaffold(
+            scaffoldState = scaffoldState,
+            sheetPeekHeight = 100.dp, // Show search bar initially
+            containerColor = Color.Transparent,
+            sheetContainerColor = Color.Transparent, // Transparent to allow floating pill look
+            sheetContent = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(800.dp) // Allow enough height
+                        .background(Color.Transparent)
+                ) {
+                    // Search Bar (Floating Pill)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 24.dp) // Floating margin
+                            .shadow(8.dp, CircleShape)
+                            .background(Color(0xFF1F1F1F), CircleShape) // Dark background like screenshot
+                            .height(64.dp)
+                            .padding(horizontal = 20.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.align(Alignment.CenterStart),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Selected Image Preview or G Logo
+                            if (selectedBitmap != null) {
+                                Image(
+                                    bitmap = selectedBitmap!!.asImageBitmap(),
+                                    contentDescription = "Selected",
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .border(1.dp, Color.Gray, RoundedCornerShape(12.dp))
+                                )
+                            } else {
+                                // G Logo
+                                Text(
+                                    text = "G",
+                                    style = MaterialTheme.typography.headlineMedium.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF4285F4) // Google Blue
+                                    )
+                                )
+                                Text(
+                                    text = "o",
+                                    style = MaterialTheme.typography.headlineMedium.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFFEA4335) // Red
+                                    )
+                                )
+                                Text(
+                                    text = "o",
+                                    style = MaterialTheme.typography.headlineMedium.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFFFBBC05) // Yellow
+                                    )
+                                )
+                                Text(
+                                    text = "g",
+                                    style = MaterialTheme.typography.headlineMedium.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF4285F4) // Blue
+                                    )
+                                )
+                                Text(
+                                    text = "l",
+                                    style = MaterialTheme.typography.headlineMedium.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF34A853) // Green
+                                    )
+                                )
+                                Text(
+                                    text = "e",
+                                    style = MaterialTheme.typography.headlineMedium.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFFEA4335) // Red
+                                    )
+                                )
+                            }
+                            
+                            if (selectedBitmap == null) {
+                                Spacer(modifier = Modifier.width(16.dp))
+                                // Placeholder text is usually hidden in the pill mode or just "Search"
+                            }
+                        }
+                        
+                        // Icons
+                        Row(
+                            modifier = Modifier.align(Alignment.CenterEnd),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Mic, "Mic", tint = Color.White)
+                            Spacer(modifier = Modifier.width(24.dp))
+                            Icon(Icons.Default.MusicNote, "Music", tint = Color.White)
+                            Spacer(modifier = Modifier.width(24.dp))
+                            Icon(Icons.Default.Translate, "Translate", tint = Color.White)
+                        }
+                    }
+
+                    // Content (Visible when expanded)
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .background(Color(0xFF131314), RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)) // Dark background for results
+                    ) {
+                         // Tabs
+                        ScrollableTabRow(
+                            selectedTabIndex = searchEngines.indexOf(selectedEngine),
+                            edgePadding = 16.dp,
+                            containerColor = Color.Transparent,
+                            contentColor = Color.White,
+                            indicator = {} 
+                        ) {
+                            searchEngines.forEach { engine ->
+                                Tab(
+                                    selected = selectedEngine == engine,
+                                    onClick = { selectedEngine = engine },
+                                    text = {
+                                        Text(
+                                            engine.name,
+                                            style = MaterialTheme.typography.labelLarge,
+                                            modifier = Modifier
+                                                .background(
+                                                    if (selectedEngine == engine) Color.White else Color.Transparent,
+                                                    RoundedCornerShape(16.dp)
+                                                )
+                                                .padding(horizontal = 12.dp, vertical = 6.dp),
+                                            color = if (selectedEngine == engine) Color.Black else Color.White
+                                        )
+                                    }
+                                )
+                            }
+                        }
+
+                        // Web View Content
+                        AndroidView(
+                            factory = { ctx ->
+                                WebView(ctx).apply {
+                                    webViewClient = WebViewClient()
+                                    settings.javaScriptEnabled = true
+                                    loadUrl(selectedEngine.queryUrl + "test") 
+                                }
+                            },
+                            update = { view ->
+                                view.loadUrl(selectedEngine.queryUrl + "test")
+                            },
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                }
+            }
+        ) { paddingValues ->
+            // Main content inside Scaffold Body to receive touches!
             Box(
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues) // Respect sheet peek? No, we want fullscreen.
             ) {
-                Image(
-                    bitmap = screenshot.asImageBitmap(),
-                    contentDescription = "Screenshot",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
+                // 1. Screenshot Layer
+                if (screenshot != null) {
+                    Image(
+                        bitmap = screenshot.asImageBitmap(),
+                        contentDescription = "Screenshot",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
 
                 // 2. Drawing Canvas
                 Canvas(
@@ -154,6 +321,26 @@ fun CircleToSearchScreen(
                                         paths.add(it to Color.White)
                                         // Calculate bounding box
                                         if (currentPathPoints.isNotEmpty()) {
+                                            var minX = Float.MAX_VALUE
+                                            var minY = Float.MAX_VALUE
+                                            var maxX = Float.MIN_VALUE
+                                            var maxY = Float.MIN_VALUE
+
+                                            currentPathPoints.forEach { p ->
+                                                minX = min(minX, p.x)
+                                                minY = min(minY, p.y)
+                                                maxX = max(maxX, p.x)
+                                                maxY = max(maxY, p.y)
+                                            }
+                                            
+                                            val rect = Rect(
+                                                minX.toInt(),
+                                                minY.toInt(),
+                                                maxX.toInt(),
+                                                maxY.toInt()
+                                            )
+                                            
+                                            selectedBitmap = ImageUtils.cropBitmap(screenshot!!, rect)
                                             isSearching = true
                                             scope.launch {
                                                 scaffoldState.bottomSheetState.expand()
@@ -199,138 +386,42 @@ fun CircleToSearchScreen(
                         )
                     }
                 }
-            }
-        }
 
-        // 3. Header
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 48.dp, start = 16.dp, end = 16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(
-                onClick = onClose,
-                modifier = Modifier
-                    .background(Color.Gray.copy(alpha = 0.5f), CircleShape)
-                    .size(40.dp)
-            ) {
-                Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
-            }
-            Spacer(modifier = Modifier.weight(1f))
-            Text(
-                text = "Google",
-                style = MaterialTheme.typography.headlineMedium.copy(
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-            )
-            Spacer(modifier = Modifier.weight(1f))
-            IconButton(
-                onClick = { /* Menu */ },
-                modifier = Modifier
-                    .background(Color.Gray.copy(alpha = 0.5f), CircleShape)
-                    .size(40.dp)
-            ) {
-                Icon(Icons.Default.MoreVert, contentDescription = "Menu", tint = Color.White)
-            }
-        }
-
-        // 4. Bottom Sheet
-        BottomSheetScaffold(
-            scaffoldState = scaffoldState,
-            sheetPeekHeight = 0.dp,
-            containerColor = Color.Transparent, // Fix: Make transparent
-            sheetContainerColor = Color.White,
-            sheetShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-            sheetContent = {
-                Column(
+                // 3. Header (Overlaying screenshot)
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(600.dp) // Fixed height for demo
+                        .padding(top = 48.dp, start = 16.dp, end = 16.dp)
+                        .align(Alignment.TopCenter),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Search Bar
-                    Box(
+                    IconButton(
+                        onClick = onClose,
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp)
-                            .background(Color(0xFFF1F3F4), RoundedCornerShape(32.dp))
-                            .height(56.dp)
-                            .padding(horizontal = 16.dp)
+                            .background(Color.Gray.copy(alpha = 0.5f), CircleShape)
+                            .size(40.dp)
                     ) {
-                        Row(
-                            modifier = Modifier.align(Alignment.CenterStart),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // G Logo Placeholder
-                            Box(
-                                modifier = Modifier
-                                    .size(24.dp)
-                                    .background(Color.Red, CircleShape) // Placeholder
-                            )
-                            Spacer(modifier = Modifier.width(16.dp))
-                            Text("Ask about this image", color = Color.Gray)
-                        }
-                        Row(
-                            modifier = Modifier.align(Alignment.CenterEnd),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(Icons.Default.Mic, "Mic", tint = Color.Gray)
-                            Spacer(modifier = Modifier.width(16.dp))
-                            Icon(Icons.Default.MusicNote, "Music", tint = Color.Gray)
-                            Spacer(modifier = Modifier.width(16.dp))
-                            Icon(Icons.Default.Translate, "Translate", tint = Color.Gray)
-                        }
+                        Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
                     }
-
-                    // Tabs
-                    ScrollableTabRow(
-                        selectedTabIndex = searchEngines.indexOf(selectedEngine),
-                        edgePadding = 16.dp,
-                        containerColor = Color.White,
-                        contentColor = Color.Black,
-                        indicator = {} // Hide default indicator for custom look if needed
-                    ) {
-                        searchEngines.forEach { engine ->
-                            Tab(
-                                selected = selectedEngine == engine,
-                                onClick = { selectedEngine = engine },
-                                text = {
-                                    Text(
-                                        engine.name,
-                                        style = MaterialTheme.typography.labelLarge,
-                                        modifier = Modifier
-                                            .background(
-                                                if (selectedEngine == engine) Color.Black else Color.Transparent,
-                                                RoundedCornerShape(16.dp)
-                                            )
-                                            .padding(horizontal = 12.dp, vertical = 6.dp),
-                                        color = if (selectedEngine == engine) Color.White else Color.Black
-                                    )
-                                }
-                            )
-                        }
-                    }
-
-                    // Web View Content
-                    AndroidView(
-                        factory = { ctx ->
-                            WebView(ctx).apply {
-                                webViewClient = WebViewClient()
-                                settings.javaScriptEnabled = true
-                                loadUrl(selectedEngine.queryUrl + "test") // Placeholder query
-                            }
-                        },
-                        update = { view ->
-                            view.loadUrl(selectedEngine.queryUrl + "test")
-                        },
-                        modifier = Modifier.fillMaxSize()
+                    Spacer(modifier = Modifier.weight(1f))
+                    Text(
+                        text = "Google",
+                        style = MaterialTheme.typography.headlineMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
                     )
+                    Spacer(modifier = Modifier.weight(1f))
+                    IconButton(
+                        onClick = { /* Menu */ },
+                        modifier = Modifier
+                            .background(Color.Gray.copy(alpha = 0.5f), CircleShape)
+                            .size(40.dp)
+                    ) {
+                        Icon(Icons.Default.MoreVert, contentDescription = "Menu", tint = Color.White)
+                    }
                 }
             }
-        ) {
-            // Main content behind sheet (transparent)
-            Box(modifier = Modifier.fillMaxSize())
         }
     }
 }
