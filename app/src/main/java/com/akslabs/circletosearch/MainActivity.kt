@@ -12,11 +12,16 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -73,5 +78,34 @@ fun SetupScreen() {
         }) {
             Text("Enable Overlay Permission")
         }
+        
+        Spacer(modifier = Modifier.height(32.dp))
+        
+        BubbleSwitch(context)
+    }
+}
+
+@Composable
+fun BubbleSwitch(context: android.content.Context) {
+    val prefs = context.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
+    val isBubbleEnabled = remember { mutableStateOf(prefs.getBoolean("bubble_enabled", false)) }
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 32.dp)
+    ) {
+        Text("Enable Floating Bubble")
+        Switch(
+            checked = isBubbleEnabled.value,
+            onCheckedChange = { enabled ->
+                isBubbleEnabled.value = enabled
+                prefs.edit().putBoolean("bubble_enabled", enabled).apply()
+                // Notify service if running? 
+                // The service will listen to preference changes.
+            }
+        )
     }
 }

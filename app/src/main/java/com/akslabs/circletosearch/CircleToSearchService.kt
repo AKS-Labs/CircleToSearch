@@ -22,10 +22,72 @@ class CircleToSearchService : AccessibilityService() {
     private var windowManager: WindowManager? = null
     private var triggerView: View? = null
     private val executor: Executor = Executors.newSingleThreadExecutor()
+    
+    private var bubbleView: View? = null
+    private val prefs by lazy { getSharedPreferences("app_prefs", Context.MODE_PRIVATE) }
+    private val prefsListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key == "bubble_enabled") {
+            updateBubbleState()
+        }
+    }
 
     override fun onServiceConnected() {
         super.onServiceConnected()
         setupTriggerOverlay()
+        prefs.registerOnSharedPreferenceChangeListener(prefsListener)
+        updateBubbleState()
+    }
+
+    private fun updateBubbleState() {
+        if (prefs.getBoolean("bubble_enabled", false)) {
+            showBubble()
+        } else {
+            hideBubble()
+        }
+    }
+
+    private fun showBubble() {
+        if (bubbleView != null) return // Already shown
+
+        bubbleView = View(this).apply {
+            background = android.graphics.drawable.GradientDrawable().apply {
+                shape = android.graphics.drawable.GradientDrawable.OVAL
+                setColor(android.graphics.Color.parseColor("#4285F4")) // Google Blue
+                setStroke(4, android.graphics.Color.WHITE)
+            }
+            elevation = 10f
+            setOnClickListener {
+                performCapture()
+            }
+        }
+
+        val params = WindowManager.LayoutParams(
+            150, 150,
+            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            PixelFormat.TRANSLUCENT
+        )
+        params.gravity = Gravity.CENTER_VERTICAL or Gravity.END
+        params.x = 0
+        params.y = 200 // Offset slightly
+
+        try {
+            windowManager?.addView(bubbleView, params)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun hideBubble() {
+        if (bubbleView != null) {
+            try {
+                windowManager?.removeView(bubbleView)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+            bubbleView = null
+        }
     }
 
     private fun setupTriggerOverlay() {
@@ -53,14 +115,16 @@ class CircleToSearchService : AccessibilityService() {
 
         triggerView?.setOnTouchListener { _, event ->
             gestureDetector.onTouchEvent(event)
-            false // Pass touch through so we don't block status bar interactions completely? 
-                  // Actually, if we want to intercept double tap, we might consume it.
-                  // But for status bar, we usually want clicks to pass through if it's not a double tap.
-                  // However, returning false here means the gesture detector might not get the full stream.
-                  // Let's try returning true if we want to consume, but for now we want to be "smart".
-                  // A simple overlay that consumes touches might block the status bar.
-                  // To avoid blocking, we might need a more complex setup or just accept that we block that thin strip.
-                  // For this demo, blocking the top 100px for double tap is acceptable as per requirements "smart invisible overlay".
+            // Pass touch through so we don't block status bar interactions completely
+            // But we need to return true to consume events for gesture detector to work?
+            // Actually, if we return false, the gesture detector might not see the full sequence.
+            // But if we return true, we block clicks.
+            // For a transparent overlay, usually we want to pass through.
+            // However, GestureDetector needs the stream.
+            // A common trick is to use FLAG_NOT_TOUCH_MODAL and let touches pass through *if* we don't consume them?
+            // But we are just an overlay.
+            // Let's stick to the previous logic which was 'true' but maybe refine it if user complains about blocked status bar.
+            // For now, keep it simple.
             true 
         }
 
@@ -115,8 +179,10 @@ class CircleToSearchService : AccessibilityService() {
 
     override fun onDestroy() {
         super.onDestroy()
+        prefs.unregisterOnSharedPreferenceChangeListener(prefsListener)
         if (triggerView != null && windowManager != null) {
             windowManager?.removeView(triggerView)
         }
+        hideBubble()
     }
 }

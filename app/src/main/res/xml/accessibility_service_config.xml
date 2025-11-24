@@ -6,5 +6,6 @@
     android:canRetrieveWindowContent="true"
     android:canRequestFilterKeyEvents="true"
     android:canPerformGestures="true"
+    android:canTakeScreenshot="true"
     android:description="@string/app_name"
     android:notificationTimeout="100" />
