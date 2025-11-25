@@ -17,7 +17,8 @@ import java.io.InputStreamReader
 object ImageSearchUploader {
     private const val TAG = "ImageSearchUploader"
     private const val TIMEOUT = 15000
-    private const val USER_AGENT = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+    // Use Desktop UA to force classic redirect behavior
+    private const val USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
     private suspend fun performUpload(
         urlString: String,
@@ -69,102 +70,107 @@ object ImageSearchUploader {
     }
 
     suspend fun uploadToGoogle(bitmap: Bitmap): String? {
-        val urlString = "https://lens.google.com/upload?ep=ccm&s=android&st=${System.currentTimeMillis()}"
+        // Use the classic endpoint which is more likely to redirect
+        val urlString = "https://www.google.com/searchbyimage/upload"
         return performUpload(urlString, bitmap, "encoded_image", parseResponse = { connection ->
             val responseCode = connection.responseCode
             Log.d(TAG, "Google Upload Response Code: $responseCode")
+            
             if (responseCode == HttpURLConnection.HTTP_OK) {
+                // Sometimes it returns 200 with a JS redirect
                 val reader = BufferedReader(InputStreamReader(connection.inputStream))
                 val response = reader.readText()
                 reader.close()
+                
+                // Regex for window.location.replace or href
+                val replaceMatch = """window\.location\.replace\(['"](.*?)['"]\)""".toRegex().find(response)
+                if (replaceMatch != null) return@performUpload replaceMatch.groupValues[1]
+                
+                val hrefMatch = """href="(/search\?tbs=sbi:[^"]+)""".toRegex().find(response)
+                if (hrefMatch != null) return@performUpload "https://www.google.com" + hrefMatch.groupValues[1]
 
-                // 1) Try explicit window.location.replace('URL')
-                val replaceRegex = """location\.replace\(['\"](.*?)['\"]\)""".toRegex()
-                val replaceMatch = replaceRegex.find(response)
-                val replaceUrl = replaceMatch?.groups?.get(1)?.value?.replace("&amp;", "&")
-                if (!replaceUrl.isNullOrBlank()) {
-                    Log.d(TAG, "Google Redirect URL via replace(): $replaceUrl")
-                    return@performUpload replaceUrl
-                }
-
-                // 2) Try noscript fallback link to enable JS or direct search
-                val hrefRegex = """<a\s+href=\"(/[^\"]+)\"\>here\<""".toRegex(RegexOption.IGNORE_CASE)
-                val hrefMatch = hrefRegex.find(response)
-                val hrefUrl = hrefMatch?.groups?.get(1)?.value?.replace("&amp;", "&")
-                if (!hrefUrl.isNullOrBlank()) {
-                    val absolute = if (hrefUrl.startsWith("http")) hrefUrl else "https://lens.google.com$hrefUrl"
-                    Log.d(TAG, "Google Fallback URL via noscript: $absolute")
-                    return@performUpload absolute
-                }
-
-                // 3) Try to find any URL-like string pointing to lens/search
-                val genericRegex = """https?://[^"]*lens\.google\.com[^"]*""".toRegex()
-                val genericMatch = genericRegex.find(response)
-                val genericUrl = genericMatch?.value
-                if (!genericUrl.isNullOrBlank()) {
-                    Log.d(TAG, "Google Generic URL: $genericUrl")
-                    return@performUpload genericUrl
-                }
-
-                Log.e(TAG, "Google: Could not parse redirect URL from response.")
+                Log.e(TAG, "Google: 200 OK but no redirect found.")
                 null
             } else if (responseCode == HttpURLConnection.HTTP_MOVED_TEMP || responseCode == HttpURLConnection.HTTP_MOVED_PERM) {
-                // Some regions may redirect directly
-                val redirectUrl = connection.getHeaderField("Location")
-                if (!redirectUrl.isNullOrBlank()) {
-                    Log.d(TAG, "Google Redirect via header: $redirectUrl")
-                    redirectUrl
-                } else {
-                    Log.e(TAG, "Google: Redirect without Location header")
-                    null
-                }
+                connection.getHeaderField("Location")
             } else {
-                Log.e(TAG, "Google: Invalid response code: $responseCode")
                 null
             }
         })
     }
 
     suspend fun uploadToBing(bitmap: Bitmap): String? {
-        val uploadUrl = "https://www.bing.com/images/visualsearch/upload"
-        return performUpload(uploadUrl, bitmap, "image", fileName = "image.jpg", parseResponse = { connection ->
+        val uploadUrl = "https://www.bing.com/images/search?view=detailv2&iss=sbi&form=SBIHMP"
+        return performUpload(uploadUrl, bitmap, "imageBin", fileName = "image.jpg", parseResponse = { connection ->
             val responseCode = connection.responseCode
             Log.d(TAG, "Bing Upload Response Code: $responseCode")
-            // Bing redirects to the results page. The URL is in the 'Location' header.
+            
             if (responseCode == HttpURLConnection.HTTP_MOVED_TEMP || responseCode == HttpURLConnection.HTTP_MOVED_PERM) {
-                val redirectUrl = connection.getHeaderField("Location")
-                if (redirectUrl != null) {
-                    val finalUrl = if (redirectUrl.startsWith("http")) redirectUrl else "https://www.bing.com$redirectUrl"
-                    Log.d(TAG, "Bing Redirect URL: $finalUrl")
-                    finalUrl
-                } else {
-                    Log.e(TAG, "Bing: Could not get redirect URL from header.")
-                    null
+                val loc = connection.getHeaderField("Location")
+                if (loc != null && !loc.startsWith("http")) "https://www.bing.com$loc" else loc
+            } else if (responseCode == HttpURLConnection.HTTP_OK) {
+                val reader = BufferedReader(InputStreamReader(connection.inputStream))
+                val response = reader.readText()
+                reader.close()
+                
+                Log.d(TAG, "Bing 200 OK Body (First 1000 chars): ${response.take(1000)}")
+
+                // 1. Try og:url
+                // <meta property="og:url" content="https://..." />
+                val ogUrlRegex = """<meta\s+property="og:url"\s+content="([^"]+)"""".toRegex(RegexOption.IGNORE_CASE)
+                val ogUrlMatch = ogUrlRegex.find(response)
+                if (ogUrlMatch != null) {
+                    val url = ogUrlMatch.groupValues[1].replace("&amp;", "&")
+                    Log.d(TAG, "Bing: Found URL in og:url: $url")
+                    return@performUpload url
                 }
+
+                // 2. Try refresh meta tag
+                // <meta http-equiv="refresh" content="0;url=..." />
+                val refreshRegex = """<meta\s+http-equiv="refresh"\s+content="[^;]+;url=([^"]+)"""".toRegex(RegexOption.IGNORE_CASE)
+                val refreshMatch = refreshRegex.find(response)
+                if (refreshMatch != null) {
+                    val url = refreshMatch.groupValues[1].replace("&amp;", "&")
+                    Log.d(TAG, "Bing: Found URL in refresh meta: $url")
+                    return@performUpload url
+                }
+                
+                // 3. Try window.location.replace
+                val jsRegex = """window\.location\.replace\(['"](.*?)['"]\)""".toRegex()
+                val jsMatch = jsRegex.find(response)
+                if (jsMatch != null) {
+                     val url = jsMatch.groupValues[1].replace("\\x3a", ":").replace("\\x2f", "/")
+                     Log.d(TAG, "Bing: Found URL in JS replace: $url")
+                     return@performUpload url
+                }
+
+                Log.w(TAG, "Bing returned 200. Cannot display result without a GET URL.")
+                null
             } else {
-                Log.e(TAG, "Bing: Invalid response code: $responseCode")
                 null
             }
         })
     }
 
     suspend fun uploadToYandex(bitmap: Bitmap): String? {
-        val urlString = "https://yandex.com/images-search"
+        val urlString = "https://yandex.com/images/search?rpt=imageview"
         return performUpload(urlString, bitmap, "upfile", parseResponse = { connection ->
             val responseCode = connection.responseCode
-            Log.d(TAG, "Yandex Upload Response Code: $responseCode")
             if (responseCode == HttpURLConnection.HTTP_MOVED_TEMP || responseCode == HttpURLConnection.HTTP_MOVED_PERM) {
-                val redirectUrl = connection.getHeaderField("Location")
-                if (redirectUrl != null) {
-                    // Yandex provides a full URL in the location header
-                    Log.d(TAG, "Yandex Redirect URL: $redirectUrl")
-                    redirectUrl
-                } else {
-                    Log.e(TAG, "Yandex: Could not get redirect URL from header.")
+                val loc = connection.getHeaderField("Location")
+                if (loc != null && !loc.startsWith("http")) "https://yandex.com$loc" else loc
+            } else if (responseCode == HttpURLConnection.HTTP_OK) {
+                // Yandex sometimes returns JSON
+                val reader = BufferedReader(InputStreamReader(connection.inputStream))
+                val response = reader.readText()
+                reader.close()
+                try {
+                    val json = JSONObject(response)
+                    // Check for blocks -> content -> ... -> url? 
+                    // Or sometimes it's just a redirect in HTML.
                     null
-                }
+                } catch (e: Exception) { null }
             } else {
-                Log.e(TAG, "Yandex: Invalid response code: $responseCode")
                 null
             }
         })
@@ -174,21 +180,31 @@ object ImageSearchUploader {
         val urlString = "https://tineye.com/search"
         return performUpload(urlString, bitmap, "image", fileName = "image.jpg", parseResponse = { connection ->
             val responseCode = connection.responseCode
-            Log.d(TAG, "TinEye Upload Response Code: $responseCode")
             if (responseCode == HttpURLConnection.HTTP_MOVED_TEMP || responseCode == HttpURLConnection.HTTP_MOVED_PERM || responseCode == 303) {
-                val redirectUrl = connection.getHeaderField("Location")
-                if (!redirectUrl.isNullOrBlank()) {
-                    val finalUrl = if (redirectUrl.startsWith("http")) redirectUrl else "https://tineye.com$redirectUrl"
-                    Log.d(TAG, "TinEye Redirect URL: $finalUrl")
-                    finalUrl
-                } else {
-                    Log.e(TAG, "TinEye: Could not get redirect URL from header.")
-                    null
-                }
+                val loc = connection.getHeaderField("Location")
+                if (loc != null && !loc.startsWith("http")) "https://tineye.com$loc" else loc
             } else {
-                Log.e(TAG, "TinEye: Invalid response code: $responseCode")
                 null
             }
+        })
+    }
+    
+    suspend fun uploadToBaidu(bitmap: Bitmap): String? {
+        val urlString = "https://graph.baidu.com/upload"
+        return performUpload(urlString, bitmap, "image", fileName = "image.jpg", parseResponse = { connection ->
+             val responseCode = connection.responseCode
+             if (responseCode == HttpURLConnection.HTTP_OK) {
+                 val reader = BufferedReader(InputStreamReader(connection.inputStream))
+                 val response = reader.readText()
+                 reader.close()
+                 try {
+                     val json = JSONObject(response)
+                     val data = json.optJSONObject("data")
+                     data?.optString("url")
+                 } catch (e: Exception) { null }
+             } else {
+                 null
+             }
         })
     }
 }

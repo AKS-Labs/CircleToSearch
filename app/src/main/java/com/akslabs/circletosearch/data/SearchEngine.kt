@@ -5,8 +5,9 @@ sealed class SearchEngine(val name: String) {
     object Bing : SearchEngine("Bing")
     object Yandex : SearchEngine("Yandex")
     object TinEye : SearchEngine("TinEye")
+    object Baidu : SearchEngine("Baidu")
 
     companion object {
-        fun getAll() = listOf(Google, Bing, Yandex, TinEye)
+        fun getAll() = listOf(Google, Bing, Yandex, TinEye, Baidu)
     }
 }

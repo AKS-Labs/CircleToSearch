@@ -172,27 +172,13 @@ fun CircleToSearchScreen(
                             SearchEngine.Bing -> com.akslabs.circletosearch.utils.ImageSearchUploader.uploadToBing(selectedBitmap!!)
                             SearchEngine.Yandex -> com.akslabs.circletosearch.utils.ImageSearchUploader.uploadToYandex(selectedBitmap!!)
                             SearchEngine.TinEye -> com.akslabs.circletosearch.utils.ImageSearchUploader.uploadToTinEye(selectedBitmap!!)
+                            SearchEngine.Baidu -> com.akslabs.circletosearch.utils.ImageSearchUploader.uploadToBaidu(selectedBitmap!!)
                         }
 
                         var url = primaryUrl
 
-                        // Fallback: try other engines if selected fails
-                        if (url.isNullOrBlank()) {
-                            android.util.Log.w("CircleToSearch", "Primary engine ${selectedEngine.name} failed. Trying fallbacks...")
-                            val others = searchEngines.filter { it != selectedEngine }
-                            for (engine in others) {
-                                url = when (engine) {
-                                    SearchEngine.Google -> com.akslabs.circletosearch.utils.ImageSearchUploader.uploadToGoogle(selectedBitmap!!)
-                                    SearchEngine.Bing -> com.akslabs.circletosearch.utils.ImageSearchUploader.uploadToBing(selectedBitmap!!)
-                                    SearchEngine.Yandex -> com.akslabs.circletosearch.utils.ImageSearchUploader.uploadToYandex(selectedBitmap!!)
-                                    SearchEngine.TinEye -> com.akslabs.circletosearch.utils.ImageSearchUploader.uploadToTinEye(selectedBitmap!!)
-                                }
-                                if (!url.isNullOrBlank()) {
-                                    android.util.Log.d("CircleToSearch", "Fallback succeeded with ${engine.name}")
-                                    break
-                                }
-                            }
-                        }
+                        // Fallback removed to avoid confusion
+                        // if (url.isNullOrBlank()) { ... }
 
                         searchUrl = url
                         isLoading = false
@@ -222,6 +208,10 @@ fun CircleToSearchScreen(
                             },
                             modifier = Modifier.fillMaxSize()
                         )
+                    } else {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Text("No results found. Try another area.", color = Color.White)
+                        }
                     }
                 }
             }
@@ -455,7 +445,7 @@ fun CircleToSearchScreen(
                 }
                 Spacer(modifier = Modifier.weight(1f))
                 Text(
-                    text = "Google",
+                    text = selectedEngine.name,
                     style = MaterialTheme.typography.headlineMedium.copy(
                         fontWeight = FontWeight.Bold,
                         color = Color.White
