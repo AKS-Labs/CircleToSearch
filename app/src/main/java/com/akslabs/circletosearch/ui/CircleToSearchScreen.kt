@@ -159,38 +159,20 @@ fun CircleToSearchScreen(
 
                 // Search Logic
                 var searchUrl by remember { mutableStateOf<String?>(null) }
-                var isLoading by remember { mutableStateOf(false) }
 
                 LaunchedEffect(selectedBitmap, selectedEngine) {
                     if (selectedBitmap != null) {
-                        isLoading = true
-                        searchUrl = null // Reset URL
-                        
-                        // Try selected engine first
-                        val primaryUrl = when (selectedEngine) {
-                            SearchEngine.Google -> com.akslabs.circletosearch.utils.ImageSearchUploader.uploadToGoogle(selectedBitmap!!)
-                            SearchEngine.Bing -> com.akslabs.circletosearch.utils.ImageSearchUploader.uploadToBing(selectedBitmap!!)
-                            SearchEngine.Yandex -> com.akslabs.circletosearch.utils.ImageSearchUploader.uploadToYandex(selectedBitmap!!)
-                            SearchEngine.TinEye -> com.akslabs.circletosearch.utils.ImageSearchUploader.uploadToTinEye(selectedBitmap!!)
-                            SearchEngine.Baidu -> com.akslabs.circletosearch.utils.ImageSearchUploader.uploadToBaidu(selectedBitmap!!)
-                        }
-
-                        var url = primaryUrl
-
-                        // Fallback removed to avoid confusion
-                        // if (url.isNullOrBlank()) { ... }
-
-                        searchUrl = url
-                        isLoading = false
+                        // Generate search URL instantly - no network calls needed
+                        searchUrl = com.akslabs.circletosearch.utils.ImageSearchHelper.getSearchUrl(
+                            selectedBitmap!!,
+                            selectedEngine
+                        )
+                        android.util.Log.d("CircleToSearch", "Generated search URL for ${selectedEngine.name}: $searchUrl")
                     }
                 }
 
                 Box(modifier = Modifier.fillMaxSize()) {
-                    if (isLoading) {
-                        androidx.compose.material3.CircularProgressIndicator(
-                            modifier = Modifier.align(Alignment.Center)
-                        )
-                    } else if (searchUrl != null) {
+                    if (searchUrl != null) {
                         AndroidView(
                             factory = { ctx ->
                                 WebView(ctx).apply {
