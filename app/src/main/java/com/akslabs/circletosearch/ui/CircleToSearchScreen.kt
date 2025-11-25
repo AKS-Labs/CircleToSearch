@@ -41,6 +41,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.material3.rememberStandardBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -90,10 +91,7 @@ fun CircleToSearchScreen(
     )
 
     // Drawing State
-    // We use a list of points to drive the drawing for real-time updates
     val currentPathPoints = remember { mutableStateListOf<Offset>() }
-    // We store completed paths if we wanted to keep them, but user asked to clear on new drag.
-    // So we effectively only need one active path.
     
     // Selection State
     var selectedBitmap by remember { mutableStateOf<Bitmap?>(null) }
@@ -146,11 +144,11 @@ fun CircleToSearchScreen(
                                     style = MaterialTheme.typography.labelLarge,
                                     modifier = Modifier
                                         .background(
-                                            if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                                            if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface,
                                             RoundedCornerShape(16.dp)
                                         )
-                                        .padding(horizontal = 12.dp, vertical = 6.dp),
-                                    color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                                    color = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface
                                 )
                             }
                         )
@@ -163,14 +161,23 @@ fun CircleToSearchScreen(
                         WebView(ctx).apply {
                             webViewClient = WebViewClient()
                             settings.javaScriptEnabled = true
-                            loadUrl(selectedEngine.queryUrl + "test") 
                         }
                     },
                     update = { view ->
-                        view.loadUrl(selectedEngine.queryUrl + "test")
+                        val url = selectedEngine.queryUrl
+                        if (view.url != url) {
+                             view.loadUrl(url)
+                        }
                     },
                     modifier = Modifier.fillMaxSize()
                 )
+                
+                // Trigger load on selection change
+                LaunchedEffect(selectedEngine, selectionRect) {
+                     // This effect ensures that if the selection changes (new search), we might want to reload
+                     // even if the URL string is the same (e.g. to refresh the "demo" page).
+                     // However, AndroidView update block handles the main URL load.
+                }
             }
         }
     ) { paddingValues ->
@@ -298,7 +305,7 @@ fun CircleToSearchScreen(
                     )
                 }
 
-                // Draw Lens Animation (Corner Brackets)
+                // Draw Lens Animation (Rounded Corner Brackets)
                 if (selectionRect != null && selectionAnim.value > 0f) {
                     val rect = selectionRect!!
                     val progress = selectionAnim.value
@@ -309,31 +316,56 @@ fun CircleToSearchScreen(
                     
                     val width = right - left
                     val height = bottom - top
-                    val cornerLength = min(width, height) * 0.2f // Length of the bracket arms
+                    val cornerRadius = 32f // Radius for the corner curve
+                    val armLength = min(width, height) * 0.2f // Length of the straight part
 
                     // Top Left
                     val tlPath = Path().apply {
-                        moveTo(left, top + cornerLength)
-                        lineTo(left, top)
-                        lineTo(left + cornerLength, top)
+                        moveTo(left, top + armLength)
+                        lineTo(left, top + cornerRadius)
+                        arcTo(
+                            rect = androidx.compose.ui.geometry.Rect(left, top, left + 2 * cornerRadius, top + 2 * cornerRadius),
+                            startAngleDegrees = 180f,
+                            sweepAngleDegrees = 90f,
+                            forceMoveTo = false
+                        )
+                        lineTo(left + armLength, top)
                     }
                     // Top Right
                     val trPath = Path().apply {
-                        moveTo(right - cornerLength, top)
-                        lineTo(right, top)
-                        lineTo(right, top + cornerLength)
+                        moveTo(right - armLength, top)
+                        lineTo(right - cornerRadius, top)
+                        arcTo(
+                            rect = androidx.compose.ui.geometry.Rect(right - 2 * cornerRadius, top, right, top + 2 * cornerRadius),
+                            startAngleDegrees = 270f,
+                            sweepAngleDegrees = 90f,
+                            forceMoveTo = false
+                        )
+                        lineTo(right, top + armLength)
                     }
                     // Bottom Right
                     val brPath = Path().apply {
-                        moveTo(right, bottom - cornerLength)
-                        lineTo(right, bottom)
-                        lineTo(right - cornerLength, bottom)
+                        moveTo(right, bottom - armLength)
+                        lineTo(right, bottom - cornerRadius)
+                        arcTo(
+                            rect = androidx.compose.ui.geometry.Rect(right - 2 * cornerRadius, bottom - 2 * cornerRadius, right, bottom),
+                            startAngleDegrees = 0f,
+                            sweepAngleDegrees = 90f,
+                            forceMoveTo = false
+                        )
+                        lineTo(right - armLength, bottom)
                     }
                     // Bottom Left
                     val blPath = Path().apply {
-                        moveTo(left + cornerLength, bottom)
-                        lineTo(left, bottom)
-                        lineTo(left, bottom - cornerLength)
+                        moveTo(left + armLength, bottom)
+                        lineTo(left + cornerRadius, bottom)
+                        arcTo(
+                            rect = androidx.compose.ui.geometry.Rect(left, bottom - 2 * cornerRadius, left + 2 * cornerRadius, bottom),
+                            startAngleDegrees = 90f,
+                            sweepAngleDegrees = 90f,
+                            forceMoveTo = false
+                        )
+                        lineTo(left, bottom - armLength)
                     }
 
                     val bracketAlpha = progress
