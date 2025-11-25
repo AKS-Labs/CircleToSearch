@@ -157,57 +157,73 @@ fun CircleToSearchScreen(
                     }
                 }
 
-                // Web View Content
-                AndroidView(
-                    factory = { ctx ->
-                        WebView(ctx).apply {
-                            webViewClient = WebViewClient()
-                            settings.javaScriptEnabled = true
-                            settings.domStorageEnabled = true
-                            settings.userAgentString = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+                // Search Logic
+                var searchUrl by remember { mutableStateOf<String?>(null) }
+                var isLoading by remember { mutableStateOf(false) }
+
+                LaunchedEffect(selectedBitmap, selectedEngine) {
+                    if (selectedBitmap != null) {
+                        isLoading = true
+                        searchUrl = null // Reset URL
+                        
+                        // Try selected engine first
+                        val primaryUrl = when (selectedEngine) {
+                            SearchEngine.Google -> com.akslabs.circletosearch.utils.ImageSearchUploader.uploadToGoogle(selectedBitmap!!)
+                            SearchEngine.Bing -> com.akslabs.circletosearch.utils.ImageSearchUploader.uploadToBing(selectedBitmap!!)
+                            SearchEngine.Yandex -> com.akslabs.circletosearch.utils.ImageSearchUploader.uploadToYandex(selectedBitmap!!)
+                            SearchEngine.TinEye -> com.akslabs.circletosearch.utils.ImageSearchUploader.uploadToTinEye(selectedBitmap!!)
                         }
-                    },
-                    update = { view ->
-                        if (selectedBitmap != null) {
-                            if (selectedEngine == SearchEngine.Google) {
-                                // Resize bitmap to avoid huge payload
-                                val resized = ImageUtils.resizeBitmap(selectedBitmap!!, 800)
-                                
-                                // Convert bitmap to base64
-                                val byteArrayOutputStream = ByteArrayOutputStream()
-                                resized.compress(Bitmap.CompressFormat.JPEG, 80, byteArrayOutputStream)
-                                val byteArray = byteArrayOutputStream.toByteArray()
-                                val base64Image = Base64.encodeToString(byteArray, Base64.DEFAULT)
-                                
-                                // Construct HTML form to auto-submit image to Google
-                                val html = """
-                                    <html>
-                                    <body onload="document.getElementById('f').submit()">
-                                    <form id="f" method="POST" action="https://www.google.com/searchbyimage/upload" enctype="multipart/form-data">
-                                        <input type="hidden" name="encoded_image" value="$base64Image">
-                                    </form>
-                                    </body>
-                                    </html>
-                                """.trimIndent()
-                                
-                                if (view.tag != selectedBitmap.hashCode()) {
-                                    // Use loadDataWithBaseURL to avoid cross-origin issues
-                                    view.loadDataWithBaseURL("https://www.google.com", html, "text/html", "UTF-8", null)
-                                    view.tag = selectedBitmap.hashCode()
+
+                        var url = primaryUrl
+
+                        // Fallback: try other engines if selected fails
+                        if (url.isNullOrBlank()) {
+                            android.util.Log.w("CircleToSearch", "Primary engine ${selectedEngine.name} failed. Trying fallbacks...")
+                            val others = searchEngines.filter { it != selectedEngine }
+                            for (engine in others) {
+                                url = when (engine) {
+                                    SearchEngine.Google -> com.akslabs.circletosearch.utils.ImageSearchUploader.uploadToGoogle(selectedBitmap!!)
+                                    SearchEngine.Bing -> com.akslabs.circletosearch.utils.ImageSearchUploader.uploadToBing(selectedBitmap!!)
+                                    SearchEngine.Yandex -> com.akslabs.circletosearch.utils.ImageSearchUploader.uploadToYandex(selectedBitmap!!)
+                                    SearchEngine.TinEye -> com.akslabs.circletosearch.utils.ImageSearchUploader.uploadToTinEye(selectedBitmap!!)
                                 }
-                            } else {
-                                // For other engines, we can't easily upload Base64 without their API.
-                                // We will load their Image Search landing page with a query.
-                                val url = selectedEngine.queryUrl
-                                if (view.url != url && view.tag != url) {
-                                    view.loadUrl(url)
-                                    view.tag = url
+                                if (!url.isNullOrBlank()) {
+                                    android.util.Log.d("CircleToSearch", "Fallback succeeded with ${engine.name}")
+                                    break
                                 }
                             }
                         }
-                    },
-                    modifier = Modifier.fillMaxSize()
-                )
+
+                        searchUrl = url
+                        isLoading = false
+                    }
+                }
+
+                Box(modifier = Modifier.fillMaxSize()) {
+                    if (isLoading) {
+                        androidx.compose.material3.CircularProgressIndicator(
+                            modifier = Modifier.align(Alignment.Center)
+                        )
+                    } else if (searchUrl != null) {
+                         AndroidView(
+                            factory = { ctx ->
+                                WebView(ctx).apply {
+                                    webViewClient = WebViewClient()
+                                    settings.javaScriptEnabled = true
+                                    settings.domStorageEnabled = true
+                                    settings.userAgentString = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+                                }
+                            },
+                            update = { view ->
+                                if (view.url != searchUrl && view.tag != searchUrl) {
+                                    view.loadUrl(searchUrl!!)
+                                    view.tag = searchUrl
+                                }
+                            },
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                }
             }
         }
     ) { paddingValues ->
@@ -302,7 +318,9 @@ fun CircleToSearchScreen(
                                             targetValue = 1f,
                                             animationSpec = tween(600)
                                         )
+                                        android.util.Log.d("CircleToSearch", "Selection rect: ${rect.left},${rect.top},${rect.right},${rect.bottom}")
                                         selectedBitmap = ImageUtils.cropBitmap(screenshot!!, rect)
+                                        android.util.Log.d("CircleToSearch", "Cropped bitmap size: ${selectedBitmap!!.width}x${selectedBitmap!!.height}")
                                         isSearching = true
                                         scaffoldState.bottomSheetState.expand()
                                     }

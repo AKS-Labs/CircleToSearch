@@ -129,13 +129,13 @@ class CircleToSearchService : AccessibilityService() {
 
     private fun performCapture() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            // Haptic Feedback (Click)
+            // Haptic Feedback (Crisp Click)
             val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK))
+                vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_HEAVY_CLICK))
             } else {
                 @Suppress("DEPRECATION")
-                vibrator.vibrate(15) // Short pulse for older devices
+                vibrator.vibrate(10) // Very short pulse for crisp feel
             }
 
             // Execute immediately for instant trigger
