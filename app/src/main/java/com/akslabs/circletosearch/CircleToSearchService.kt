@@ -6,6 +6,8 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.PixelFormat
 import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
 import android.view.Display
 import android.view.GestureDetector
 import android.view.Gravity
@@ -13,7 +15,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
-import com.akslabs.circletosearch.utils.ImageUtils
+import com.akslabs.circletosearch.data.BitmapRepository
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
 
@@ -127,6 +129,15 @@ class CircleToSearchService : AccessibilityService() {
 
     private fun performCapture() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            // Haptic Feedback (Click)
+            val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK))
+            } else {
+                @Suppress("DEPRECATION")
+                vibrator.vibrate(15) // Short pulse for older devices
+            }
+
             // Execute immediately for instant trigger
             takeScreenshot(
                 Display.DEFAULT_DISPLAY,
@@ -137,11 +148,8 @@ class CircleToSearchService : AccessibilityService() {
                             val hardwareBuffer = screenshot.hardwareBuffer
                             val colorSpace = screenshot.colorSpace
                             
-                            android.util.Log.d("CircleToSearch", "Screenshot captured. Size: ${hardwareBuffer.width}x${hardwareBuffer.height}")
-
                             val bitmap = Bitmap.wrapHardwareBuffer(hardwareBuffer, colorSpace)
                             if (bitmap == null) {
-                                android.util.Log.e("CircleToSearch", "Failed to wrap hardware buffer")
                                 hardwareBuffer.close()
                                 return
                             }
@@ -151,22 +159,17 @@ class CircleToSearchService : AccessibilityService() {
                             hardwareBuffer.close() // Close buffer after copy
 
                             if (copy == null) {
-                                android.util.Log.e("CircleToSearch", "Failed to copy bitmap")
                                 return
                             }
                             
-                            // Check center pixel
-                            val centerX = copy.width / 2
-                            val centerY = copy.height / 2
-                            val pixel = copy.getPixel(centerX, centerY)
-                            android.util.Log.d("CircleToSearch", "Center pixel color: ${Integer.toHexString(pixel)}")
+                            // Store in Repository (In-Memory)
+                            BitmapRepository.setScreenshot(copy)
                             
-                            val path = ImageUtils.saveBitmap(this@CircleToSearchService, copy)
-                            android.util.Log.d("CircleToSearch", "Screenshot saved to $path")
-                            launchOverlay(path)
+                            // Launch Overlay Immediately
+                            launchOverlay()
                             
                         } catch (e: Exception) {
-                            android.util.Log.e("CircleToSearch", "Error processing screenshot", e)
+                            e.printStackTrace()
                         }
                     }
 
@@ -178,10 +181,10 @@ class CircleToSearchService : AccessibilityService() {
         }
     }
 
-    private fun launchOverlay(screenshotPath: String) {
+    private fun launchOverlay() {
         val intent = Intent(this, OverlayActivity::class.java).apply {
-            putExtra("SCREENSHOT_PATH", screenshotPath)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION) // Disable animation for faster feel
         }
         startActivity(intent)
     }

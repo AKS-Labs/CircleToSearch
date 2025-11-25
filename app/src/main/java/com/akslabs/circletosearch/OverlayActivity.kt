@@ -7,9 +7,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import com.akslabs.circletosearch.data.BitmapRepository
 import com.akslabs.circletosearch.ui.CircleToSearchScreen
 import com.akslabs.circletosearch.ui.theme.CircleToSearchTheme
-import com.akslabs.circletosearch.utils.ImageUtils
 
 class OverlayActivity : ComponentActivity() {
     
@@ -19,7 +19,7 @@ class OverlayActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         android.util.Log.d("CircleToSearch", "OverlayActivity onCreate")
         
-        handleIntent(intent)
+        loadScreenshot()
 
         setContent {
             CircleToSearchTheme {
@@ -29,7 +29,10 @@ class OverlayActivity : ComponentActivity() {
                 ) {
                     CircleToSearchScreen(
                         screenshot = screenshotBitmap.value,
-                        onClose = { finish() }
+                        onClose = { 
+                            BitmapRepository.clear()
+                            finish() 
+                        }
                     )
                 }
             }
@@ -40,22 +43,24 @@ class OverlayActivity : ComponentActivity() {
         super.onNewIntent(intent)
         android.util.Log.d("CircleToSearch", "OverlayActivity onNewIntent")
         setIntent(intent)
-        handleIntent(intent)
+        loadScreenshot()
     }
 
-    private fun handleIntent(intent: android.content.Intent) {
-        val screenshotPath = intent.getStringExtra("SCREENSHOT_PATH")
-        android.util.Log.d("CircleToSearch", "Loading screenshot from: $screenshotPath")
-        if (screenshotPath != null) {
-            val bitmap = ImageUtils.loadBitmap(screenshotPath)
-            if (bitmap != null) {
-                android.util.Log.d("CircleToSearch", "Bitmap loaded successfully. Size: ${bitmap.width}x${bitmap.height}")
-                screenshotBitmap.value = bitmap
-            } else {
-                android.util.Log.e("CircleToSearch", "Failed to load bitmap from path")
-            }
+    private fun loadScreenshot() {
+        val bitmap = BitmapRepository.getScreenshot()
+        if (bitmap != null) {
+            android.util.Log.d("CircleToSearch", "Bitmap loaded from Repository. Size: ${bitmap.width}x${bitmap.height}")
+            screenshotBitmap.value = bitmap
         } else {
-            android.util.Log.e("CircleToSearch", "No screenshot path in intent")
+            android.util.Log.e("CircleToSearch", "No bitmap in Repository")
+            // Fallback or finish? For now just log.
+        }
+    }
+    
+    override fun onDestroy() {
+        super.onDestroy()
+        if (isFinishing) {
+             BitmapRepository.clear()
         }
     }
 }

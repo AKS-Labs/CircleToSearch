@@ -164,38 +164,45 @@ fun CircleToSearchScreen(
                             webViewClient = WebViewClient()
                             settings.javaScriptEnabled = true
                             settings.domStorageEnabled = true
+                            settings.userAgentString = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
                         }
                     },
                     update = { view ->
-                        if (selectedEngine == SearchEngine.Google && selectedBitmap != null) {
-                            // Convert bitmap to base64
-                            val byteArrayOutputStream = ByteArrayOutputStream()
-                            selectedBitmap!!.compress(Bitmap.CompressFormat.JPEG, 70, byteArrayOutputStream)
-                            val byteArray = byteArrayOutputStream.toByteArray()
-                            val base64Image = Base64.encodeToString(byteArray, Base64.DEFAULT)
-                            
-                            // Construct HTML form to auto-submit image to Google
-                            val html = """
-                                <html>
-                                <body onload="document.getElementById('f').submit()">
-                                <form id="f" method="POST" action="https://www.google.com/searchbyimage/upload" enctype="multipart/form-data">
-                                    <input type="hidden" name="encoded_image" value="$base64Image">
-                                </form>
-                                </body>
-                                </html>
-                            """.trimIndent()
-                            
-                            // Only load if content changed to avoid loop (simple check)
-                            // In a real app we'd use a more robust state check
-                            if (view.tag != selectedBitmap.hashCode()) {
-                                view.loadData(html, "text/html", "UTF-8")
-                                view.tag = selectedBitmap.hashCode()
-                            }
-                        } else {
-                            val url = selectedEngine.queryUrl
-                            if (view.url != url && view.tag != url) {
-                                view.loadUrl(url)
-                                view.tag = url
+                        if (selectedBitmap != null) {
+                            if (selectedEngine == SearchEngine.Google) {
+                                // Resize bitmap to avoid huge payload
+                                val resized = ImageUtils.resizeBitmap(selectedBitmap!!, 800)
+                                
+                                // Convert bitmap to base64
+                                val byteArrayOutputStream = ByteArrayOutputStream()
+                                resized.compress(Bitmap.CompressFormat.JPEG, 80, byteArrayOutputStream)
+                                val byteArray = byteArrayOutputStream.toByteArray()
+                                val base64Image = Base64.encodeToString(byteArray, Base64.DEFAULT)
+                                
+                                // Construct HTML form to auto-submit image to Google
+                                val html = """
+                                    <html>
+                                    <body onload="document.getElementById('f').submit()">
+                                    <form id="f" method="POST" action="https://www.google.com/searchbyimage/upload" enctype="multipart/form-data">
+                                        <input type="hidden" name="encoded_image" value="$base64Image">
+                                    </form>
+                                    </body>
+                                    </html>
+                                """.trimIndent()
+                                
+                                if (view.tag != selectedBitmap.hashCode()) {
+                                    // Use loadDataWithBaseURL to avoid cross-origin issues
+                                    view.loadDataWithBaseURL("https://www.google.com", html, "text/html", "UTF-8", null)
+                                    view.tag = selectedBitmap.hashCode()
+                                }
+                            } else {
+                                // For other engines, we can't easily upload Base64 without their API.
+                                // We will load their Image Search landing page with a query.
+                                val url = selectedEngine.queryUrl
+                                if (view.url != url && view.tag != url) {
+                                    view.loadUrl(url)
+                                    view.tag = url
+                                }
                             }
                         }
                     },

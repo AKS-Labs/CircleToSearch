@@ -35,4 +35,16 @@ object ImageUtils {
             source // Fallback or handle error
         }
     }
+
+    fun resizeBitmap(source: Bitmap, maxLength: Int): Bitmap {
+        try {
+            if (source.width <= maxLength && source.height <= maxLength) return source
+            val aspectRatio = source.width.toDouble() / source.height.toDouble()
+            val targetWidth = if (aspectRatio >= 1) maxLength else (maxLength * aspectRatio).toInt()
+            val targetHeight = if (aspectRatio < 1) maxLength else (maxLength / aspectRatio).toInt()
+            return Bitmap.createScaledBitmap(source, targetWidth, targetHeight, true)
+        } catch (e: Exception) {
+            return source
+        }
+    }
 }
