@@ -115,16 +115,6 @@ class CircleToSearchService : AccessibilityService() {
 
         triggerView?.setOnTouchListener { _, event ->
             gestureDetector.onTouchEvent(event)
-            // Pass touch through so we don't block status bar interactions completely
-            // But we need to return true to consume events for gesture detector to work?
-            // Actually, if we return false, the gesture detector might not see the full sequence.
-            // But if we return true, we block clicks.
-            // For a transparent overlay, usually we want to pass through.
-            // However, GestureDetector needs the stream.
-            // A common trick is to use FLAG_NOT_TOUCH_MODAL and let touches pass through *if* we don't consume them?
-            // But we are just an overlay.
-            // Let's stick to the previous logic which was 'true' but maybe refine it if user complains about blocked status bar.
-            // For now, keep it simple.
             true 
         }
 
@@ -137,56 +127,54 @@ class CircleToSearchService : AccessibilityService() {
 
     private fun performCapture() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            // Add a slight delay to ensure UI is stable/ripple finished
-            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                takeScreenshot(
-                    Display.DEFAULT_DISPLAY,
-                    executor,
-                    object : TakeScreenshotCallback {
-                        override fun onSuccess(screenshot: ScreenshotResult) {
-                            try {
-                                val hardwareBuffer = screenshot.hardwareBuffer
-                                val colorSpace = screenshot.colorSpace
-                                
-                                android.util.Log.d("CircleToSearch", "Screenshot captured. Size: ${hardwareBuffer.width}x${hardwareBuffer.height}")
+            // Execute immediately for instant trigger
+            takeScreenshot(
+                Display.DEFAULT_DISPLAY,
+                executor,
+                object : TakeScreenshotCallback {
+                    override fun onSuccess(screenshot: ScreenshotResult) {
+                        try {
+                            val hardwareBuffer = screenshot.hardwareBuffer
+                            val colorSpace = screenshot.colorSpace
+                            
+                            android.util.Log.d("CircleToSearch", "Screenshot captured. Size: ${hardwareBuffer.width}x${hardwareBuffer.height}")
 
-                                val bitmap = Bitmap.wrapHardwareBuffer(hardwareBuffer, colorSpace)
-                                if (bitmap == null) {
-                                    android.util.Log.e("CircleToSearch", "Failed to wrap hardware buffer")
-                                    hardwareBuffer.close()
-                                    return
-                                }
-
-                                // Copy to software bitmap
-                                val copy = bitmap.copy(Bitmap.Config.ARGB_8888, false)
-                                hardwareBuffer.close() // Close buffer after copy
-
-                                if (copy == null) {
-                                    android.util.Log.e("CircleToSearch", "Failed to copy bitmap")
-                                    return
-                                }
-                                
-                                // Check center pixel
-                                val centerX = copy.width / 2
-                                val centerY = copy.height / 2
-                                val pixel = copy.getPixel(centerX, centerY)
-                                android.util.Log.d("CircleToSearch", "Center pixel color: ${Integer.toHexString(pixel)}")
-                                
-                                val path = ImageUtils.saveBitmap(this@CircleToSearchService, copy)
-                                android.util.Log.d("CircleToSearch", "Screenshot saved to $path")
-                                launchOverlay(path)
-                                
-                            } catch (e: Exception) {
-                                android.util.Log.e("CircleToSearch", "Error processing screenshot", e)
+                            val bitmap = Bitmap.wrapHardwareBuffer(hardwareBuffer, colorSpace)
+                            if (bitmap == null) {
+                                android.util.Log.e("CircleToSearch", "Failed to wrap hardware buffer")
+                                hardwareBuffer.close()
+                                return
                             }
-                        }
 
-                        override fun onFailure(errorCode: Int) {
-                            android.util.Log.e("CircleToSearch", "Screenshot failed with error code: $errorCode")
+                            // Copy to software bitmap
+                            val copy = bitmap.copy(Bitmap.Config.ARGB_8888, false)
+                            hardwareBuffer.close() // Close buffer after copy
+
+                            if (copy == null) {
+                                android.util.Log.e("CircleToSearch", "Failed to copy bitmap")
+                                return
+                            }
+                            
+                            // Check center pixel
+                            val centerX = copy.width / 2
+                            val centerY = copy.height / 2
+                            val pixel = copy.getPixel(centerX, centerY)
+                            android.util.Log.d("CircleToSearch", "Center pixel color: ${Integer.toHexString(pixel)}")
+                            
+                            val path = ImageUtils.saveBitmap(this@CircleToSearchService, copy)
+                            android.util.Log.d("CircleToSearch", "Screenshot saved to $path")
+                            launchOverlay(path)
+                            
+                        } catch (e: Exception) {
+                            android.util.Log.e("CircleToSearch", "Error processing screenshot", e)
                         }
                     }
-                )
-            }, 500)
+
+                    override fun onFailure(errorCode: Int) {
+                        android.util.Log.e("CircleToSearch", "Screenshot failed with error code: $errorCode")
+                    }
+                }
+            )
         }
     }
 

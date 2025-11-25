@@ -2,6 +2,7 @@ package com.akslabs.circletosearch.ui
 
 import android.graphics.Bitmap
 import android.graphics.Rect
+import android.util.Base64
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.animation.core.animateFloatAsState
@@ -72,6 +73,7 @@ import com.akslabs.circletosearch.data.SearchEngine
 import com.akslabs.circletosearch.ui.theme.OverlayGradientColors
 import com.akslabs.circletosearch.utils.ImageUtils
 import kotlinx.coroutines.launch
+import java.io.ByteArrayOutputStream
 import kotlin.math.max
 import kotlin.math.min
 
@@ -161,23 +163,44 @@ fun CircleToSearchScreen(
                         WebView(ctx).apply {
                             webViewClient = WebViewClient()
                             settings.javaScriptEnabled = true
+                            settings.domStorageEnabled = true
                         }
                     },
                     update = { view ->
-                        val url = selectedEngine.queryUrl
-                        if (view.url != url) {
-                             view.loadUrl(url)
+                        if (selectedEngine == SearchEngine.Google && selectedBitmap != null) {
+                            // Convert bitmap to base64
+                            val byteArrayOutputStream = ByteArrayOutputStream()
+                            selectedBitmap!!.compress(Bitmap.CompressFormat.JPEG, 70, byteArrayOutputStream)
+                            val byteArray = byteArrayOutputStream.toByteArray()
+                            val base64Image = Base64.encodeToString(byteArray, Base64.DEFAULT)
+                            
+                            // Construct HTML form to auto-submit image to Google
+                            val html = """
+                                <html>
+                                <body onload="document.getElementById('f').submit()">
+                                <form id="f" method="POST" action="https://www.google.com/searchbyimage/upload" enctype="multipart/form-data">
+                                    <input type="hidden" name="encoded_image" value="$base64Image">
+                                </form>
+                                </body>
+                                </html>
+                            """.trimIndent()
+                            
+                            // Only load if content changed to avoid loop (simple check)
+                            // In a real app we'd use a more robust state check
+                            if (view.tag != selectedBitmap.hashCode()) {
+                                view.loadData(html, "text/html", "UTF-8")
+                                view.tag = selectedBitmap.hashCode()
+                            }
+                        } else {
+                            val url = selectedEngine.queryUrl
+                            if (view.url != url && view.tag != url) {
+                                view.loadUrl(url)
+                                view.tag = url
+                            }
                         }
                     },
                     modifier = Modifier.fillMaxSize()
                 )
-                
-                // Trigger load on selection change
-                LaunchedEffect(selectedEngine, selectionRect) {
-                     // This effect ensures that if the selection changes (new search), we might want to reload
-                     // even if the URL string is the same (e.g. to refresh the "demo" page).
-                     // However, AndroidView update block handles the main URL load.
-                }
             }
         }
     ) { paddingValues ->
@@ -316,7 +339,7 @@ fun CircleToSearchScreen(
                     
                     val width = right - left
                     val height = bottom - top
-                    val cornerRadius = 32f // Radius for the corner curve
+                    val cornerRadius = 64f // Increased radius for rounder look
                     val armLength = min(width, height) * 0.2f // Length of the straight part
 
                     // Top Left
@@ -382,7 +405,7 @@ fun CircleToSearchScreen(
                         color = Color.White,
                         topLeft = Offset(left, top),
                         size = Size(width, height),
-                        cornerRadius = CornerRadius(16f),
+                        cornerRadius = CornerRadius(32f),
                         style = Stroke(width = 4f),
                         alpha = (1f - progress) * 0.5f
                     )
