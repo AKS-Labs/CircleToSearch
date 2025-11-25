@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -37,13 +36,11 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.SheetValue
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.material3.rememberStandardBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -52,25 +49,22 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.akslabs.circletosearch.data.SearchEngine
 import com.akslabs.circletosearch.ui.theme.OverlayGradientColors
@@ -102,6 +96,8 @@ fun CircleToSearchScreen(
     // Selection State
     var selectedBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var isSearching by remember { mutableStateOf(false) }
+    var selectionRect by remember { mutableStateOf<Rect?>(null) }
+    val selectionAnim = remember { androidx.compose.animation.core.Animatable(0f) }
 
     // Search State
     var selectedEngine by remember { mutableStateOf<SearchEngine>(SearchEngine.Google) }
@@ -116,200 +112,117 @@ fun CircleToSearchScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = OverlayGradientColors
-                )
-            )
+            .background(Color.Black)
             .border(
                 width = 8.dp,
                 brush = Brush.verticalGradient(colors = OverlayGradientColors),
                 shape = RectangleShape
             )
     ) {
-        // 4. Bottom Sheet
+        // 1. Screenshot Layer (Background)
+        if (screenshot != null) {
+            Box(
+                modifier = Modifier.fillMaxSize()
+            ) {
+                Image(
+                    bitmap = screenshot.asImageBitmap(),
+                    contentDescription = "Screenshot",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+                
+                // Tint Overlay
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            brush = Brush.verticalGradient(
+                                colors = OverlayGradientColors.map { it.copy(alpha = 0.3f) }
+                            )
+                        )
+                )
+            }
+        }
+
+        // 2. Bottom Sheet (Results)
         BottomSheetScaffold(
             scaffoldState = scaffoldState,
-            sheetPeekHeight = 100.dp, // Show search bar initially
+            sheetPeekHeight = 0.dp, // Hidden initially, triggered by selection
             containerColor = Color.Transparent,
-            sheetContainerColor = Color.Transparent, // Transparent to allow floating pill look
+            sheetContainerColor = Color.Transparent,
             sheetContent = {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(800.dp) // Allow enough height
-                        .background(Color.Transparent)
+                        .height(800.dp)
+                        .background(Color(0xFF131314), RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
                 ) {
-                    // Search Bar (Floating Pill)
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 24.dp) // Floating margin
-                            .shadow(8.dp, CircleShape)
-                            .background(Color(0xFF1F1F1F), CircleShape) // Dark background like screenshot
-                            .height(64.dp)
-                            .padding(horizontal = 20.dp)
+                    Spacer(modifier = Modifier.height(16.dp)) // Spacing from top of sheet
+                    
+                    // Tabs
+                    ScrollableTabRow(
+                        selectedTabIndex = searchEngines.indexOf(selectedEngine),
+                        edgePadding = 16.dp,
+                        containerColor = Color.Transparent,
+                        contentColor = Color.White,
+                        indicator = {} 
                     ) {
-                        Row(
-                            modifier = Modifier.align(Alignment.CenterStart),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // Selected Image Preview or G Logo
-                            if (selectedBitmap != null) {
-                                Image(
-                                    bitmap = selectedBitmap!!.asImageBitmap(),
-                                    contentDescription = "Selected",
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier
-                                        .size(40.dp)
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .border(1.dp, Color.Gray, RoundedCornerShape(12.dp))
-                                )
-                            } else {
-                                // G Logo
-                                Text(
-                                    text = "G",
-                                    style = MaterialTheme.typography.headlineMedium.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF4285F4) // Google Blue
+                        searchEngines.forEach { engine ->
+                            Tab(
+                                selected = selectedEngine == engine,
+                                onClick = { selectedEngine = engine },
+                                text = {
+                                    Text(
+                                        engine.name,
+                                        style = MaterialTheme.typography.labelLarge,
+                                        modifier = Modifier
+                                            .background(
+                                                if (selectedEngine == engine) Color.White else Color.Transparent,
+                                                RoundedCornerShape(16.dp)
+                                            )
+                                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                                        color = if (selectedEngine == engine) Color.Black else Color.White
                                     )
-                                )
-                                Text(
-                                    text = "o",
-                                    style = MaterialTheme.typography.headlineMedium.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFFEA4335) // Red
-                                    )
-                                )
-                                Text(
-                                    text = "o",
-                                    style = MaterialTheme.typography.headlineMedium.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFFFBBC05) // Yellow
-                                    )
-                                )
-                                Text(
-                                    text = "g",
-                                    style = MaterialTheme.typography.headlineMedium.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF4285F4) // Blue
-                                    )
-                                )
-                                Text(
-                                    text = "l",
-                                    style = MaterialTheme.typography.headlineMedium.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF34A853) // Green
-                                    )
-                                )
-                                Text(
-                                    text = "e",
-                                    style = MaterialTheme.typography.headlineMedium.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFFEA4335) // Red
-                                    )
-                                )
-                            }
-                            
-                            if (selectedBitmap == null) {
-                                Spacer(modifier = Modifier.width(16.dp))
-                                // Placeholder text is usually hidden in the pill mode or just "Search"
-                            }
-                        }
-                        
-                        // Icons
-                        Row(
-                            modifier = Modifier.align(Alignment.CenterEnd),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(Icons.Default.Mic, "Mic", tint = Color.White)
-                            Spacer(modifier = Modifier.width(24.dp))
-                            Icon(Icons.Default.MusicNote, "Music", tint = Color.White)
-                            Spacer(modifier = Modifier.width(24.dp))
-                            Icon(Icons.Default.Translate, "Translate", tint = Color.White)
-                        }
-                    }
-
-                    // Content (Visible when expanded)
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f)
-                            .background(Color(0xFF131314), RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)) // Dark background for results
-                    ) {
-                         // Tabs
-                        ScrollableTabRow(
-                            selectedTabIndex = searchEngines.indexOf(selectedEngine),
-                            edgePadding = 16.dp,
-                            containerColor = Color.Transparent,
-                            contentColor = Color.White,
-                            indicator = {} 
-                        ) {
-                            searchEngines.forEach { engine ->
-                                Tab(
-                                    selected = selectedEngine == engine,
-                                    onClick = { selectedEngine = engine },
-                                    text = {
-                                        Text(
-                                            engine.name,
-                                            style = MaterialTheme.typography.labelLarge,
-                                            modifier = Modifier
-                                                .background(
-                                                    if (selectedEngine == engine) Color.White else Color.Transparent,
-                                                    RoundedCornerShape(16.dp)
-                                                )
-                                                .padding(horizontal = 12.dp, vertical = 6.dp),
-                                            color = if (selectedEngine == engine) Color.Black else Color.White
-                                        )
-                                    }
-                                )
-                            }
-                        }
-
-                        // Web View Content
-                        AndroidView(
-                            factory = { ctx ->
-                                WebView(ctx).apply {
-                                    webViewClient = WebViewClient()
-                                    settings.javaScriptEnabled = true
-                                    loadUrl(selectedEngine.queryUrl + "test") 
                                 }
-                            },
-                            update = { view ->
-                                view.loadUrl(selectedEngine.queryUrl + "test")
-                            },
-                            modifier = Modifier.fillMaxSize()
-                        )
+                            )
+                        }
                     }
-                }
-            }
-        ) { paddingValues ->
-            // Main content inside Scaffold Body to receive touches!
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues) // Respect sheet peek? No, we want fullscreen.
-            ) {
-                // 1. Screenshot Layer
-                if (screenshot != null) {
-                    Image(
-                        bitmap = screenshot.asImageBitmap(),
-                        contentDescription = "Screenshot",
-                        contentScale = ContentScale.Crop,
+
+                    // Web View Content
+                    AndroidView(
+                        factory = { ctx ->
+                            WebView(ctx).apply {
+                                webViewClient = WebViewClient()
+                                settings.javaScriptEnabled = true
+                                loadUrl(selectedEngine.queryUrl + "test") 
+                            }
+                        },
+                        update = { view ->
+                            view.loadUrl(selectedEngine.queryUrl + "test")
+                        },
                         modifier = Modifier.fillMaxSize()
                     )
                 }
-
-                // 2. Drawing Canvas
+            }
+        ) { paddingValues ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+            ) {
+                // 3. Drawing Canvas (Interactive Layer)
                 Canvas(
                     modifier = Modifier
                         .fillMaxSize()
                         .pointerInput(Unit) {
                             detectDragGestures(
                                 onDragStart = { offset ->
+                                    paths.clear()
                                     currentPath = Path().apply { moveTo(offset.x, offset.y) }
                                     currentPathPoints.clear()
                                     currentPathPoints.add(offset)
+                                    selectionRect = null
+                                    scope.launch { selectionAnim.snapTo(0f) }
                                 },
                                 onDrag = { change, _ ->
                                     val offset = change.position
@@ -319,7 +232,6 @@ fun CircleToSearchScreen(
                                 onDragEnd = {
                                     currentPath?.let {
                                         paths.add(it to Color.White)
-                                        // Calculate bounding box
                                         if (currentPathPoints.isNotEmpty()) {
                                             var minX = Float.MAX_VALUE
                                             var minY = Float.MAX_VALUE
@@ -340,9 +252,14 @@ fun CircleToSearchScreen(
                                                 maxY.toInt()
                                             )
                                             
-                                            selectedBitmap = ImageUtils.cropBitmap(screenshot!!, rect)
-                                            isSearching = true
+                                            selectionRect = rect
                                             scope.launch {
+                                                selectionAnim.animateTo(
+                                                    targetValue = 1f,
+                                                    animationSpec = tween(600)
+                                                )
+                                                selectedBitmap = ImageUtils.cropBitmap(screenshot!!, rect)
+                                                isSearching = true
                                                 scaffoldState.bottomSheetState.expand()
                                             }
                                         }
@@ -353,74 +270,145 @@ fun CircleToSearchScreen(
                             )
                         }
                 ) {
-                    paths.forEach { (path, color) ->
+                    paths.forEach { (path, _) ->
                         drawPath(
                             path = path,
-                            color = color,
-                            style = Stroke(
-                                width = 10f,
-                                cap = StrokeCap.Round,
-                                join = StrokeJoin.Round
-                            )
+                            brush = Brush.linearGradient(OverlayGradientColors),
+                            style = Stroke(width = 25f, cap = StrokeCap.Round, join = StrokeJoin.Round),
+                            alpha = 0.6f
                         )
-                        // Glow effect
                         drawPath(
                             path = path,
-                            color = Color.Blue.copy(alpha = 0.3f),
-                            style = Stroke(
-                                width = 20f,
-                                cap = StrokeCap.Round,
-                                join = StrokeJoin.Round
-                            )
+                            color = Color.White,
+                            style = Stroke(width = 12f, cap = StrokeCap.Round, join = StrokeJoin.Round)
                         )
                     }
                     currentPath?.let {
                         drawPath(
                             path = it,
+                            brush = Brush.linearGradient(OverlayGradientColors),
+                            style = Stroke(width = 25f, cap = StrokeCap.Round, join = StrokeJoin.Round),
+                            alpha = 0.6f
+                        )
+                        drawPath(
+                            path = it,
                             color = Color.White,
-                            style = Stroke(
-                                width = 10f,
-                                cap = StrokeCap.Round,
-                                join = StrokeJoin.Round
-                            )
+                            style = Stroke(width = 12f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+                        )
+                    }
+                    
+                    if (selectionRect != null && selectionAnim.value > 0f) {
+                        val rect = selectionRect!!
+                        val progress = selectionAnim.value
+                        val left = rect.left.toFloat()
+                        val top = rect.top.toFloat()
+                        val right = rect.right.toFloat()
+                        val bottom = rect.bottom.toFloat()
+                        
+                        drawRoundRect(
+                            brush = Brush.linearGradient(OverlayGradientColors),
+                            topLeft = Offset(left, top),
+                            size = androidx.compose.ui.geometry.Size(right - left, bottom - top),
+                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(32f * progress),
+                            style = Stroke(width = 8f),
+                            alpha = progress
+                        )
+                        
+                         drawRoundRect(
+                            color = Color.White,
+                            topLeft = Offset(left, top),
+                            size = androidx.compose.ui.geometry.Size(right - left, bottom - top),
+                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(32f * progress),
+                            style = Stroke(width = 4f),
+                            alpha = (1f - progress) * 0.8f
                         )
                     }
                 }
+            }
+        }
 
-                // 3. Header (Overlaying screenshot)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 48.dp, start = 16.dp, end = 16.dp)
-                        .align(Alignment.TopCenter),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(
-                        onClick = onClose,
+        // 4. Header (Top)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 48.dp, start = 16.dp, end = 16.dp)
+                .align(Alignment.TopCenter),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(
+                onClick = onClose,
+                modifier = Modifier
+                    .background(Color.Gray.copy(alpha = 0.5f), CircleShape)
+                    .size(40.dp)
+            ) {
+                Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
+            }
+            Spacer(modifier = Modifier.weight(1f))
+            Text(
+                text = "Google",
+                style = MaterialTheme.typography.headlineMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+            )
+            Spacer(modifier = Modifier.weight(1f))
+            IconButton(
+                onClick = { /* Menu */ },
+                modifier = Modifier
+                    .background(Color.Gray.copy(alpha = 0.5f), CircleShape)
+                    .size(40.dp)
+            ) {
+                Icon(Icons.Default.MoreVert, contentDescription = "Menu", tint = Color.White)
+            }
+        }
+
+        // 5. Search Bar / Pill (Bottom Fixed)
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 24.dp)
+                .shadow(8.dp, CircleShape)
+                .background(Color(0xFF1F1F1F), CircleShape)
+                .height(64.dp)
+                .padding(horizontal = 20.dp)
+        ) {
+            Row(
+                modifier = Modifier.align(Alignment.CenterStart),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (selectedBitmap != null) {
+                    Image(
+                        bitmap = selectedBitmap!!.asImageBitmap(),
+                        contentDescription = "Selected",
+                        contentScale = ContentScale.Crop,
                         modifier = Modifier
-                            .background(Color.Gray.copy(alpha = 0.5f), CircleShape)
                             .size(40.dp)
-                    ) {
-                        Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
-                    }
-                    Spacer(modifier = Modifier.weight(1f))
-                    Text(
-                        text = "Google",
-                        style = MaterialTheme.typography.headlineMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
+                            .clip(RoundedCornerShape(12.dp))
+                            .border(1.dp, Color.Gray, RoundedCornerShape(12.dp))
                     )
-                    Spacer(modifier = Modifier.weight(1f))
-                    IconButton(
-                        onClick = { /* Menu */ },
-                        modifier = Modifier
-                            .background(Color.Gray.copy(alpha = 0.5f), CircleShape)
-                            .size(40.dp)
-                    ) {
-                        Icon(Icons.Default.MoreVert, contentDescription = "Menu", tint = Color.White)
+                } else {
+                    // G Logo
+                    Row {
+                        Text("G", style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold, color = Color(0xFF4285F4)))
+                        Text("o", style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold, color = Color(0xFFEA4335)))
+                        Text("o", style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold, color = Color(0xFFFBBC05)))
+                        Text("g", style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold, color = Color(0xFF4285F4)))
+                        Text("l", style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold, color = Color(0xFF34A853)))
+                        Text("e", style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold, color = Color(0xFFEA4335)))
                     }
                 }
+            }
+            
+            Row(
+                modifier = Modifier.align(Alignment.CenterEnd),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Default.Mic, "Mic", tint = Color.White)
+                Spacer(modifier = Modifier.width(24.dp))
+                Icon(Icons.Default.MusicNote, "Music", tint = Color.White)
+                Spacer(modifier = Modifier.width(24.dp))
+                Icon(Icons.Default.Translate, "Translate", tint = Color.White)
             }
         }
     }

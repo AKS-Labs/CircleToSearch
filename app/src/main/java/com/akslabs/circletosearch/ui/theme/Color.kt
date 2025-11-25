@@ -22,10 +22,11 @@ val GoogleYellow = Color(0xFFFBBC05)
 val GoogleGreen = Color(0xFF34A853)
 
 val OverlayGradientColors = listOf(
-    Color(0xFFD6E4FF), // Soft Blue
-    Color(0xFFD7F8E7), // Soft Green
-    Color(0xFFFFEAD1), // Soft Peach
-    Color(0xFFFFFBD6)  // Soft Yellow
+    GoogleBlue,
+    GoogleRed,
+    GoogleYellow,
+    GoogleGreen,
+    GoogleBlue // Repeat first to close loop smoothly if needed
 )
 
 val ScrimColor = Color(0x99000000) // Dimmed background for bottom sheet
