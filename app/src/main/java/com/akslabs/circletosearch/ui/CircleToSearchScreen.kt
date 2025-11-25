@@ -191,19 +191,47 @@ fun CircleToSearchScreen(
                             modifier = Modifier.align(Alignment.Center)
                         )
                     } else if (searchUrl != null) {
-                         AndroidView(
+                        AndroidView(
                             factory = { ctx ->
                                 WebView(ctx).apply {
-                                    webViewClient = WebViewClient()
-                                    settings.javaScriptEnabled = true
-                                    settings.domStorageEnabled = true
-                                    settings.userAgentString = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+                                    // Hardware acceleration is crucial for performance.
+                                    // It was previously disabled, likely causing crashes on modern sites.
+                                    setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
+
+                                    settings.apply {
+                                        javaScriptEnabled = true
+                                        domStorageEnabled = true
+                                        databaseEnabled = true
+                                        allowFileAccess = true // Important for uploads/downloads
+                                        allowContentAccess = true
+                                        mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                                        cacheMode = android.webkit.WebSettings.LOAD_DEFAULT
+                                        setSupportMultipleWindows(false)
+                                        
+                                        // A more common user agent to avoid being served weird mobile versions
+                                        userAgentString = "Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+                                    }
+                                    
+                                    webViewClient = object : WebViewClient() {
+                                        override fun onRenderProcessGone(view: WebView?, detail: android.webkit.RenderProcessGoneDetail?): Boolean {
+                                            val message = "WebView Render Process Gone. Did it crash? ${detail?.didCrash()}"
+                                            android.util.Log.e("CircleToSearch", message)
+                                            // Returning true prevents the app from crashing, but the WebView is unusable.
+                                            // TODO: We should show an error UI to the user here.
+                                            return true 
+                                        }
+                                        
+                                        override fun onReceivedError(view: WebView?, request: android.webkit.WebResourceRequest?, error: android.webkit.WebResourceError?) {
+                                            super.onReceivedError(view, request, error)
+                                            android.util.Log.e("CircleToSearch", "WebView Error: ${error?.errorCode} - ${error?.description}")
+                                        }
+                                    }
                                 }
                             },
                             update = { view ->
-                                if (view.url != searchUrl && view.tag != searchUrl) {
-                                    view.loadUrl(searchUrl!!)
-                                    view.tag = searchUrl
+                                // Check prevents re-loading on every recomposition
+                                if (view.url != searchUrl) {
+                                     view.loadUrl(searchUrl!!)
                                 }
                             },
                             modifier = Modifier.fillMaxSize()

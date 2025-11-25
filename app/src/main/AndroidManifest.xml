@@ -51,6 +51,13 @@
             android:excludeFromRecents="true"
             android:launchMode="singleInstance" />
 
+        <activity
+            android:name=".WebViewActivity"
+            android:exported="false"
+            android:theme="@style/Theme.CircleToSearch.Transparent"
+            android:excludeFromRecents="true"
+            android:launchMode="singleInstance" />
+
     </application>
 
 </manifest>

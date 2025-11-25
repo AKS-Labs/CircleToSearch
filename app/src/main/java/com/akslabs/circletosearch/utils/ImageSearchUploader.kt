@@ -92,7 +92,9 @@ object ImageSearchUploader {
                 Log.e(TAG, "Google: 200 OK but no redirect found.")
                 null
             } else if (responseCode == HttpURLConnection.HTTP_MOVED_TEMP || responseCode == HttpURLConnection.HTTP_MOVED_PERM) {
-                connection.getHeaderField("Location")
+                val redirectUrl = connection.getHeaderField("Location")
+                Log.d(TAG, "Google Redirect URL: $redirectUrl")
+                redirectUrl
             } else {
                 null
             }
@@ -191,7 +193,10 @@ object ImageSearchUploader {
     
     suspend fun uploadToBaidu(bitmap: Bitmap): String? {
         val urlString = "https://graph.baidu.com/upload"
-        return performUpload(urlString, bitmap, "image", fileName = "image.jpg", parseResponse = { connection ->
+        return performUpload(urlString, bitmap, "image", fileName = "image.jpg", onConnection = { connection ->
+             connection.setRequestProperty("Referer", "https://graph.baidu.com/pcpage/index?tpl_from=pc")
+             connection.setRequestProperty("Origin", "https://graph.baidu.com")
+        }, parseResponse = { connection ->
              val responseCode = connection.responseCode
              if (responseCode == HttpURLConnection.HTTP_OK) {
                  val reader = BufferedReader(InputStreamReader(connection.inputStream))
