@@ -89,12 +89,29 @@ object ImageSearchUploader {
 
     fun getBingUrl(imageUrl: String): String {
         val encodedUrl = URLEncoder.encode(imageUrl, "UTF-8")
-        return "https://www.bing.com/images/search?view=detailv2&iss=sbi&form=SBIHMP&sbisrc=UrlPaste&q=imgurl:$encodedUrl"
+        // Simplified Bing URL
+        return "https://www.bing.com/images/search?view=detailv2&iss=sbi&q=imgurl:$encodedUrl"
     }
 
     fun getYandexUrl(imageUrl: String): String {
         val encodedUrl = URLEncoder.encode(imageUrl, "UTF-8")
         return "https://yandex.com/images/search?rpt=imageview&url=$encodedUrl"
+    }
+
+    fun getYahooUrl(imageUrl: String): String {
+        val encodedUrl = URLEncoder.encode(imageUrl, "UTF-8")
+        // Yahoo uses Bing's index, but we can try this format
+        return "https://images.search.yahoo.com/search/images?p=imgurl:$encodedUrl"
+    }
+
+    fun getTinEyeUrl(imageUrl: String): String {
+        val encodedUrl = URLEncoder.encode(imageUrl, "UTF-8")
+        return "https://tineye.com/search?url=$encodedUrl"
+    }
+
+    fun getBaiduUrl(imageUrl: String): String {
+        val encodedUrl = URLEncoder.encode(imageUrl, "UTF-8")
+        return "https://graph.baidu.com/details?isfromtoybox=1&searchtype=searchSimple&objurl=$encodedUrl"
     }
 
     fun getSauceNAOUrl(imageUrl: String): String {
@@ -114,6 +131,7 @@ object ImageSearchUploader {
     
     fun getLensoUrl(imageUrl: String): String {
         val encodedUrl = URLEncoder.encode(imageUrl, "UTF-8")
-        return "https://lenso.ai/en/results/$encodedUrl"
+        // Try passing URL as query param, though Lenso usually requires upload
+        return "https://lenso.ai/en/results?url=$encodedUrl"
     }
 }

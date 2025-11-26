@@ -86,10 +86,27 @@ fun CircleToSearchScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    
+    // Search State
+    var selectedEngine by remember { mutableStateOf<SearchEngine>(SearchEngine.Google) }
+    var searchUrl by remember { mutableStateOf<String?>(null) }
+    var hostedImageUrl by remember { mutableStateOf<String?>(null) }
+    var isLoading by remember { mutableStateOf(false) }
+    var isDesktopMode by remember { mutableStateOf(false) }
+    
+    // Bottom Sheet State - Lock to Expanded when searching to fix scrolling conflict
     val scaffoldState = rememberBottomSheetScaffoldState(
         bottomSheetState = rememberStandardBottomSheetState(
             initialValue = SheetValue.PartiallyExpanded,
-            skipHiddenState = true
+            skipHiddenState = true,
+            confirmValueChange = { newState ->
+                // If showing results, lock to Expanded so WebView can scroll
+                if (searchUrl != null) {
+                    newState == SheetValue.Expanded
+                } else {
+                    true
+                }
+            }
         )
     )
 
@@ -102,8 +119,6 @@ fun CircleToSearchScreen(
     var selectionRect by remember { mutableStateOf<Rect?>(null) }
     val selectionAnim = remember { androidx.compose.animation.core.Animatable(0f) }
 
-    // Search State
-    var selectedEngine by remember { mutableStateOf<SearchEngine>(SearchEngine.Google) }
     val searchEngines = SearchEngine.values()
 
     // Gradient Animation
@@ -158,20 +173,13 @@ fun CircleToSearchScreen(
                     }
                 }
 
-                // Search Logic
-                var searchUrl by remember { mutableStateOf<String?>(null) }
-                var hostedImageUrl by remember { mutableStateOf<String?>(null) }
-                var isLoading by remember { mutableStateOf(false) }
-                var uploadError by remember { mutableStateOf<String?>(null) }
-
                 // Reset hosted URL when bitmap changes
                 LaunchedEffect(selectedBitmap) {
                     hostedImageUrl = null
                     searchUrl = null
-                    uploadError = null
                 }
 
-                LaunchedEffect(selectedBitmap, selectedEngine, hostedImageUrl) {
+                LaunchedEffect(selectedBitmap, selectedEngine, hostedImageUrl, isDesktopMode) {
                     if (selectedBitmap != null) {
                         isLoading = true
                         
@@ -182,7 +190,6 @@ fun CircleToSearchScreen(
                                 hostedImageUrl = url
                                 android.util.Log.d("CircleToSearch", "Hosted image URL: $url")
                             } else {
-                                uploadError = "Failed to upload image"
                                 isLoading = false
                                 return@LaunchedEffect
                             }
@@ -194,6 +201,9 @@ fun CircleToSearchScreen(
                                 SearchEngine.Google -> ImageSearchUploader.getGoogleLensUrl(hostedImageUrl!!)
                                 SearchEngine.Bing -> ImageSearchUploader.getBingUrl(hostedImageUrl!!)
                                 SearchEngine.Yandex -> ImageSearchUploader.getYandexUrl(hostedImageUrl!!)
+                                SearchEngine.Yahoo -> ImageSearchUploader.getYahooUrl(hostedImageUrl!!)
+                                SearchEngine.TinEye -> ImageSearchUploader.getTinEyeUrl(hostedImageUrl!!)
+                                SearchEngine.Baidu -> ImageSearchUploader.getBaiduUrl(hostedImageUrl!!)
                                 SearchEngine.SauceNAO -> ImageSearchUploader.getSauceNAOUrl(hostedImageUrl!!)
                                 SearchEngine.IQDB -> ImageSearchUploader.getIQDBUrl(hostedImageUrl!!)
                                 SearchEngine.ASCII2D -> ImageSearchUploader.getASCII2DUrl(hostedImageUrl!!)
@@ -224,7 +234,6 @@ fun CircleToSearchScreen(
                                         settings.setSupportZoom(true)
                                         settings.builtInZoomControls = true
                                         settings.displayZoomControls = false
-                                        settings.userAgentString = "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
                                         
                                         webViewClient = object : WebViewClient() {
                                             override fun onPageFinished(view: WebView?, url: String?) {
@@ -240,6 +249,18 @@ fun CircleToSearchScreen(
                                     }
                                 },
                                 update = { view ->
+                                    // Update User Agent based on Desktop Mode
+                                    val newUserAgent = if (isDesktopMode) {
+                                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                                    } else {
+                                        "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+                                    }
+                                    
+                                    if (view.settings.userAgentString != newUserAgent) {
+                                        view.settings.userAgentString = newUserAgent
+                                        view.reload()
+                                    }
+
                                     if (view.url != searchUrl) {
                                         view.loadUrl(searchUrl!!)
                                     }
@@ -492,13 +513,56 @@ fun CircleToSearchScreen(
                     )
                 )
                 Spacer(modifier = Modifier.weight(1f))
-                IconButton(
-                    onClick = { /* Menu */ },
-                    modifier = Modifier
-                        .background(Color.Gray.copy(alpha = 0.5f), CircleShape)
-                        .size(40.dp)
-                ) {
-                    Icon(Icons.Default.MoreVert, contentDescription = "Menu", tint = Color.White)
+                
+                // Menu
+                Box {
+                    var showMenu by remember { mutableStateOf(false) }
+                    IconButton(
+                        onClick = { showMenu = true },
+                        modifier = Modifier
+                            .background(Color.Gray.copy(alpha = 0.5f), CircleShape)
+                            .size(40.dp)
+                    ) {
+                        Icon(Icons.Default.MoreVert, contentDescription = "Menu", tint = Color.White)
+                    }
+                    
+                    androidx.compose.material3.DropdownMenu(
+                        expanded = showMenu,
+                        onDismissRequest = { showMenu = false }
+                    ) {
+                        androidx.compose.material3.DropdownMenuItem(
+                            text = { Text(if (isDesktopMode) "Mobile Mode" else "Desktop Mode") },
+                            onClick = { 
+                                isDesktopMode = !isDesktopMode 
+                                showMenu = false
+                            }
+                        )
+                        androidx.compose.material3.DropdownMenuItem(
+                            text = { Text("Copy URL") },
+                            onClick = {
+                                if (searchUrl != null) {
+                                    val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                    val clip = android.content.ClipData.newPlainText("Search URL", searchUrl)
+                                    clipboard.setPrimaryClip(clip)
+                                }
+                                showMenu = false
+                            }
+                        )
+                        androidx.compose.material3.DropdownMenuItem(
+                            text = { Text("Open in Browser") },
+                            onClick = {
+                                if (searchUrl != null) {
+                                    try {
+                                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(searchUrl))
+                                        context.startActivity(intent)
+                                    } catch (e: Exception) {
+                                        android.util.Log.e("CircleToSearch", "Failed to open browser", e)
+                                    }
+                                }
+                                showMenu = false
+                            }
+                        )
+                    }
                 }
             }
 
