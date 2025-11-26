@@ -71,6 +71,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.akslabs.circletosearch.data.SearchEngine
 import com.akslabs.circletosearch.ui.theme.OverlayGradientColors
+import com.akslabs.circletosearch.utils.ImageSearchUploader
 import com.akslabs.circletosearch.utils.ImageUtils
 import kotlinx.coroutines.launch
 import java.io.ByteArrayOutputStream
@@ -103,7 +104,7 @@ fun CircleToSearchScreen(
 
     // Search State
     var selectedEngine by remember { mutableStateOf<SearchEngine>(SearchEngine.Google) }
-    val searchEngines = SearchEngine.getAll()
+    val searchEngines = SearchEngine.values()
 
     // Gradient Animation
     val alphaAnim by animateFloatAsState(
@@ -159,68 +160,97 @@ fun CircleToSearchScreen(
 
                 // Search Logic
                 var searchUrl by remember { mutableStateOf<String?>(null) }
+                var hostedImageUrl by remember { mutableStateOf<String?>(null) }
+                var isLoading by remember { mutableStateOf(false) }
+                var uploadError by remember { mutableStateOf<String?>(null) }
 
-                LaunchedEffect(selectedBitmap, selectedEngine) {
+                // Reset hosted URL when bitmap changes
+                LaunchedEffect(selectedBitmap) {
+                    hostedImageUrl = null
+                    searchUrl = null
+                    uploadError = null
+                }
+
+                LaunchedEffect(selectedBitmap, selectedEngine, hostedImageUrl) {
                     if (selectedBitmap != null) {
-                        // Generate search URL instantly - no network calls needed
-                        searchUrl = com.akslabs.circletosearch.utils.ImageSearchHelper.getSearchUrl(
-                            selectedBitmap!!,
-                            selectedEngine
-                        )
-                        android.util.Log.d("CircleToSearch", "Generated search URL for ${selectedEngine.name}: $searchUrl")
+                        isLoading = true
+                        
+                        // Step 1: Upload to host if not already done
+                        if (hostedImageUrl == null) {
+                            val url = ImageSearchUploader.uploadToImageHost(selectedBitmap!!)
+                            if (url != null) {
+                                hostedImageUrl = url
+                                android.util.Log.d("CircleToSearch", "Hosted image URL: $url")
+                            } else {
+                                uploadError = "Failed to upload image"
+                                isLoading = false
+                                return@LaunchedEffect
+                            }
+                        }
+                        
+                        // Step 2: Generate search URL using hosted image
+                        if (hostedImageUrl != null) {
+                            searchUrl = when (selectedEngine) {
+                                SearchEngine.Google -> ImageSearchUploader.getGoogleLensUrl(hostedImageUrl!!)
+                                SearchEngine.Bing -> ImageSearchUploader.getBingUrl(hostedImageUrl!!)
+                                SearchEngine.Yandex -> ImageSearchUploader.getYandexUrl(hostedImageUrl!!)
+                                SearchEngine.SauceNAO -> ImageSearchUploader.getSauceNAOUrl(hostedImageUrl!!)
+                                SearchEngine.IQDB -> ImageSearchUploader.getIQDBUrl(hostedImageUrl!!)
+                                SearchEngine.ASCII2D -> ImageSearchUploader.getASCII2DUrl(hostedImageUrl!!)
+                                SearchEngine.Lenso -> ImageSearchUploader.getLensoUrl(hostedImageUrl!!)
+                            }
+                            android.util.Log.d("CircleToSearch", "Search URL: $searchUrl")
+                        }
+                        
+                        isLoading = false
                     }
                 }
 
                 Box(modifier = Modifier.fillMaxSize()) {
-                    if (searchUrl != null) {
-                        AndroidView(
-                            factory = { ctx ->
-                                WebView(ctx).apply {
-                                    // Hardware acceleration is crucial for performance.
-                                    // It was previously disabled, likely causing crashes on modern sites.
-                                    setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
-
-                                    settings.apply {
-                                        javaScriptEnabled = true
-                                        domStorageEnabled = true
-                                        databaseEnabled = true
-                                        allowFileAccess = true // Important for uploads/downloads
-                                        allowContentAccess = true
-                                        mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
-                                        cacheMode = android.webkit.WebSettings.LOAD_DEFAULT
-                                        setSupportMultipleWindows(false)
+                    when {
+                        isLoading -> {
+                            androidx.compose.material3.CircularProgressIndicator(
+                                modifier = Modifier.align(Alignment.Center)
+                            )
+                        }
+                        searchUrl != null -> {
+                            AndroidView(
+                                factory = { ctx ->
+                                    WebView(ctx).apply {
+                                        settings.javaScriptEnabled = true
+                                        settings.domStorageEnabled = true
+                                        settings.loadWithOverviewMode = true
+                                        settings.useWideViewPort = true
+                                        settings.setSupportZoom(true)
+                                        settings.builtInZoomControls = true
+                                        settings.displayZoomControls = false
+                                        settings.userAgentString = "Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
                                         
-                                        // A more common user agent to avoid being served weird mobile versions
-                                        userAgentString = "Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
-                                    }
-                                    
-                                    webViewClient = object : WebViewClient() {
-                                        override fun onRenderProcessGone(view: WebView?, detail: android.webkit.RenderProcessGoneDetail?): Boolean {
-                                            val message = "WebView Render Process Gone. Did it crash? ${detail?.didCrash()}"
-                                            android.util.Log.e("CircleToSearch", message)
-                                            // Returning true prevents the app from crashing, but the WebView is unusable.
-                                            // TODO: We should show an error UI to the user here.
-                                            return true 
-                                        }
-                                        
-                                        override fun onReceivedError(view: WebView?, request: android.webkit.WebResourceRequest?, error: android.webkit.WebResourceError?) {
-                                            super.onReceivedError(view, request, error)
-                                            android.util.Log.e("CircleToSearch", "WebView Error: ${error?.errorCode} - ${error?.description}")
+                                        webViewClient = object : WebViewClient() {
+                                            override fun onPageFinished(view: WebView?, url: String?) {
+                                                super.onPageFinished(view, url)
+                                                android.util.Log.d("CircleToSearch", "Page loaded: $url")
+                                            }
+                                            
+                                            override fun onReceivedError(view: WebView?, request: android.webkit.WebResourceRequest?, error: android.webkit.WebResourceError?) {
+                                                super.onReceivedError(view, request, error)
+                                                android.util.Log.e("CircleToSearch", "WebView Error: ${error?.errorCode} - ${error?.description}")
+                                            }
                                         }
                                     }
-                                }
-                            },
-                            update = { view ->
-                                // Check prevents re-loading on every recomposition
-                                if (view.url != searchUrl) {
-                                     view.loadUrl(searchUrl!!)
-                                }
-                            },
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    } else {
-                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            Text("No results found. Try another area.", color = Color.White)
+                                },
+                                update = { view ->
+                                    if (view.url != searchUrl) {
+                                        view.loadUrl(searchUrl!!)
+                                    }
+                                },
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+                        else -> {
+                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Text("Draw a selection to search", color = Color.White)
+                            }
                         }
                     }
                 }
