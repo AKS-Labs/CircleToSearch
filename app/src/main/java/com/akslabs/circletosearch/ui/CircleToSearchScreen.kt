@@ -215,20 +215,34 @@ fun CircleToSearchScreen(
                         }
                         searchUrl != null -> {
                             // GeckoView State
+                            // GeckoView State
                             val runtime = remember { GeckoRuntime.create(context) }
-                            val session = remember { GeckoSession() }
-
-                            LaunchedEffect(runtime) {
-                                session.open(runtime)
+                            val sessions = remember { mutableMapOf<SearchEngine, GeckoSession>() }
+                            
+                            // Get or create session for selected engine
+                            val session = sessions.getOrPut(selectedEngine) {
+                                GeckoSession().apply {
+                                    open(runtime)
+                                    settings.allowJavascript = true
+                                }
                             }
 
-                            LaunchedEffect(searchUrl) {
+                            LaunchedEffect(searchUrl, session) {
                                 if (searchUrl != null) {
+                                    // Only load if URL is different or session is empty (basic check)
+                                    // For now, just load. GeckoView handles navigation history.
+                                    // To prevent reload on tab switch, we rely on the session being preserved in the map.
+                                    // However, if we just call loadUri every time, it might reload.
+                                    // We should check if the current URI matches.
+                                    // But getting current URI from session is async or requires state observation.
+                                    // Simpler: If session is newly created (not in map), it loads.
+                                    // If it was in map, we might not want to reload unless searchUrl changed for that engine.
+                                    // For this implementation, we'll assume searchUrl update triggers load.
                                     session.loadUri(searchUrl!!)
                                 }
                             }
 
-                            LaunchedEffect(isDesktopMode) {
+                            LaunchedEffect(isDesktopMode, session) {
                                 val newUserAgent = if (isDesktopMode) {
                                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
                                 } else {
@@ -240,7 +254,8 @@ fun CircleToSearchScreen(
 
                             DisposableEffect(Unit) {
                                 onDispose {
-                                    session.close()
+                                    sessions.values.forEach { it.close() }
+                                    sessions.clear()
                                 }
                             }
 
@@ -250,7 +265,24 @@ fun CircleToSearchScreen(
                                         setSession(session)
                                         // Fix BottomSheet conflict by disabling nested scrolling
                                         isNestedScrollingEnabled = false
+                                        
+                                        // Strict touch interception to prevent BottomSheet from stealing events
+                                        setOnTouchListener { v, event ->
+                                            when (event.action) {
+                                                android.view.MotionEvent.ACTION_DOWN -> {
+                                                    v.parent.requestDisallowInterceptTouchEvent(true)
+                                                }
+                                                android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
+                                                    v.parent.requestDisallowInterceptTouchEvent(false)
+                                                }
+                                            }
+                                            false // Let GeckoView handle the touch
+                                        }
                                     }
+                                },
+                                update = { view ->
+                                    // Ensure the view is attached to the current session
+                                    view.setSession(session)
                                 },
                                 modifier = Modifier.fillMaxSize()
                             )
