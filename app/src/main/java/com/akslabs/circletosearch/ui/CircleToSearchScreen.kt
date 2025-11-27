@@ -3,9 +3,11 @@ package com.akslabs.circletosearch.ui
 import android.graphics.Bitmap
 import android.graphics.Rect
 import android.util.Base64
-import org.mozilla.geckoview.GeckoRuntime
-import org.mozilla.geckoview.GeckoSession
-import org.mozilla.geckoview.GeckoView
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import android.webkit.WebSettings
+import android.widget.FrameLayout
+import android.view.ViewGroup
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -124,7 +126,7 @@ fun CircleToSearchScreen(
     // Root: BottomSheetScaffold handles the sheet layering automatically
     BottomSheetScaffold(
         scaffoldState = scaffoldState,
-        sheetPeekHeight = 0.dp, // Hidden initially
+        sheetPeekHeight = 120.dp, // Visible peek height to prevent collapse
         containerColor = Color.Transparent,
         sheetContainerColor = Color.Transparent,
         sheetContent = {
@@ -216,73 +218,101 @@ fun CircleToSearchScreen(
                         searchUrl != null -> {
                             // GeckoView State
                             // GeckoView State
-                            val runtime = remember { GeckoRuntime.create(context) }
-                            val sessions = remember { mutableMapOf<SearchEngine, GeckoSession>() }
+                            // WebView Caching State
+                            val webViews = remember { mutableMapOf<SearchEngine, WebView>() }
                             
-                            // Get or create session for selected engine
-                            val session = sessions.getOrPut(selectedEngine) {
-                                GeckoSession().apply {
-                                    open(runtime)
-                                    settings.allowJavascript = true
+                            // Helper to create and configure WebView
+                            fun createWebView(ctx: android.content.Context): WebView {
+                                return WebView(ctx).apply {
+                                    layoutParams = ViewGroup.LayoutParams(
+                                        ViewGroup.LayoutParams.MATCH_PARENT,
+                                        ViewGroup.LayoutParams.MATCH_PARENT
+                                    )
+                                    settings.apply {
+                                        javaScriptEnabled = true
+                                        domStorageEnabled = true
+                                        databaseEnabled = true
+                                        useWideViewPort = true
+                                        loadWithOverviewMode = true
+                                        setSupportZoom(true)
+                                        builtInZoomControls = true
+                                        displayZoomControls = false
+                                        userAgentString = if (isDesktopMode) {
+                                            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                                        } else {
+                                            "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+                                        }
+                                    }
+                                    webViewClient = object : WebViewClient() {
+                                        override fun shouldOverrideUrlLoading(view: WebView?, request: android.webkit.WebResourceRequest?): Boolean {
+                                            return false // Load in WebView
+                                        }
+                                    }
+                                    // Fix BottomSheet conflict
+                                    isNestedScrollingEnabled = true // WebView handles nested scrolling better than GeckoView usually, but we might need the intercept hack
+                                    setOnTouchListener { v, event ->
+                                        when (event.action) {
+                                            android.view.MotionEvent.ACTION_DOWN -> {
+                                                v.parent.requestDisallowInterceptTouchEvent(true)
+                                            }
+                                            android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
+                                                v.parent.requestDisallowInterceptTouchEvent(false)
+                                            }
+                                        }
+                                        false
+                                    }
                                 }
                             }
 
-                            LaunchedEffect(searchUrl, session) {
+                            // Load URL if needed
+                            LaunchedEffect(searchUrl, selectedEngine) {
                                 if (searchUrl != null) {
-                                    // Only load if URL is different or session is empty (basic check)
-                                    // For now, just load. GeckoView handles navigation history.
-                                    // To prevent reload on tab switch, we rely on the session being preserved in the map.
-                                    // However, if we just call loadUri every time, it might reload.
-                                    // We should check if the current URI matches.
-                                    // But getting current URI from session is async or requires state observation.
-                                    // Simpler: If session is newly created (not in map), it loads.
-                                    // If it was in map, we might not want to reload unless searchUrl changed for that engine.
-                                    // For this implementation, we'll assume searchUrl update triggers load.
-                                    session.loadUri(searchUrl!!)
+                                    val webView = webViews.getOrPut(selectedEngine) { createWebView(context) }
+                                    if (webView.url != searchUrl) {
+                                        webView.loadUrl(searchUrl!!)
+                                    }
                                 }
                             }
 
-                            LaunchedEffect(isDesktopMode, session) {
+                            // Update User Agent dynamically
+                            LaunchedEffect(isDesktopMode) {
                                 val newUserAgent = if (isDesktopMode) {
                                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
                                 } else {
                                     "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
                                 }
-                                session.settings.userAgentOverride = newUserAgent
-                                session.reload()
+                                webViews.values.forEach { wv ->
+                                    if (wv.settings.userAgentString != newUserAgent) {
+                                        wv.settings.userAgentString = newUserAgent
+                                        wv.reload()
+                                    }
+                                }
                             }
 
                             DisposableEffect(Unit) {
                                 onDispose {
-                                    sessions.values.forEach { it.close() }
-                                    sessions.clear()
+                                    webViews.values.forEach { it.destroy() }
+                                    webViews.clear()
                                 }
                             }
 
                             AndroidView(
                                 factory = { ctx ->
-                                    GeckoView(ctx).apply {
-                                        setSession(session)
-                                        // Fix BottomSheet conflict by disabling nested scrolling
-                                        isNestedScrollingEnabled = false
-                                        
-                                        // Strict touch interception to prevent BottomSheet from stealing events
-                                        setOnTouchListener { v, event ->
-                                            when (event.action) {
-                                                android.view.MotionEvent.ACTION_DOWN -> {
-                                                    v.parent.requestDisallowInterceptTouchEvent(true)
-                                                }
-                                                android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
-                                                    v.parent.requestDisallowInterceptTouchEvent(false)
-                                                }
-                                            }
-                                            false // Let GeckoView handle the touch
-                                        }
+                                    FrameLayout(ctx).apply {
+                                        layoutParams = ViewGroup.LayoutParams(
+                                            ViewGroup.LayoutParams.MATCH_PARENT,
+                                            ViewGroup.LayoutParams.MATCH_PARENT
+                                        )
                                     }
                                 },
-                                update = { view ->
-                                    // Ensure the view is attached to the current session
-                                    view.setSession(session)
+                                update = { container ->
+                                    container.removeAllViews()
+                                    val webView = webViews.getOrPut(selectedEngine) { createWebView(context) }
+                                    // Ensure WebView has a parent before adding (it shouldn't, but good to check)
+                                    if (webView.parent != null) {
+                                        (webView.parent as ViewGroup).removeView(webView)
+                                    }
+                                    container.addView(webView)
                                 },
                                 modifier = Modifier.fillMaxSize()
                             )

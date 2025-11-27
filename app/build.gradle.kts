@@ -18,10 +18,6 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-
-        ndk {
-            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
-        }
     }
 
     buildTypes {
@@ -62,5 +58,4 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     implementation("androidx.compose.material:material-icons-extended")
-    implementation(libs.geckoview)
 }
