@@ -3,8 +3,9 @@ package com.akslabs.circletosearch.ui
 import android.graphics.Bitmap
 import android.graphics.Rect
 import android.util.Base64
-import android.webkit.WebView
-import android.webkit.WebViewClient
+import org.mozilla.geckoview.GeckoRuntime
+import org.mozilla.geckoview.GeckoSession
+import org.mozilla.geckoview.GeckoView
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -42,6 +43,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.material3.rememberStandardBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -98,15 +100,7 @@ fun CircleToSearchScreen(
     val scaffoldState = rememberBottomSheetScaffoldState(
         bottomSheetState = rememberStandardBottomSheetState(
             initialValue = SheetValue.PartiallyExpanded,
-            skipHiddenState = true,
-            confirmValueChange = { newState ->
-                // If showing results, lock to Expanded so WebView can scroll
-                if (searchUrl != null) {
-                    newState == SheetValue.Expanded
-                } else {
-                    true
-                }
-            }
+            skipHiddenState = true
         )
     )
 
@@ -224,45 +218,42 @@ fun CircleToSearchScreen(
                             )
                         }
                         searchUrl != null -> {
+                            // GeckoView State
+                            val runtime = remember { GeckoRuntime.create(context) }
+                            val session = remember { GeckoSession() }
+
+                            LaunchedEffect(runtime) {
+                                session.open(runtime)
+                            }
+
+                            LaunchedEffect(searchUrl) {
+                                if (searchUrl != null) {
+                                    session.loadUri(searchUrl!!)
+                                }
+                            }
+
+                            LaunchedEffect(isDesktopMode) {
+                                val newUserAgent = if (isDesktopMode) {
+                                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                                } else {
+                                    "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+                                }
+                                session.settings.userAgentOverride = newUserAgent
+                                session.reload()
+                            }
+
+                            DisposableEffect(Unit) {
+                                onDispose {
+                                    session.close()
+                                }
+                            }
+
                             AndroidView(
                                 factory = { ctx ->
-                                    WebView(ctx).apply {
-                                        settings.javaScriptEnabled = true
-                                        settings.domStorageEnabled = true
-                                        settings.loadWithOverviewMode = true
-                                        settings.useWideViewPort = true
-                                        settings.setSupportZoom(true)
-                                        settings.builtInZoomControls = true
-                                        settings.displayZoomControls = false
-                                        
-                                        webViewClient = object : WebViewClient() {
-                                            override fun onPageFinished(view: WebView?, url: String?) {
-                                                super.onPageFinished(view, url)
-                                                android.util.Log.d("CircleToSearch", "Page loaded: $url")
-                                            }
-                                            
-                                            override fun onReceivedError(view: WebView?, request: android.webkit.WebResourceRequest?, error: android.webkit.WebResourceError?) {
-                                                super.onReceivedError(view, request, error)
-                                                android.util.Log.e("CircleToSearch", "WebView Error: ${error?.errorCode} - ${error?.description}")
-                                            }
-                                        }
-                                    }
-                                },
-                                update = { view ->
-                                    // Update User Agent based on Desktop Mode
-                                    val newUserAgent = if (isDesktopMode) {
-                                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-                                    } else {
-                                        "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
-                                    }
-                                    
-                                    if (view.settings.userAgentString != newUserAgent) {
-                                        view.settings.userAgentString = newUserAgent
-                                        view.reload()
-                                    }
-
-                                    if (view.url != searchUrl) {
-                                        view.loadUrl(searchUrl!!)
+                                    GeckoView(ctx).apply {
+                                        setSession(session)
+                                        // Fix BottomSheet conflict by disabling nested scrolling
+                                        isNestedScrollingEnabled = false
                                     }
                                 },
                                 modifier = Modifier.fillMaxSize()
