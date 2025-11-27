@@ -195,12 +195,8 @@ fun CircleToSearchScreen(
                                 SearchEngine.Google -> ImageSearchUploader.getGoogleLensUrl(hostedImageUrl!!)
                                 SearchEngine.Bing -> ImageSearchUploader.getBingUrl(hostedImageUrl!!)
                                 SearchEngine.Yandex -> ImageSearchUploader.getYandexUrl(hostedImageUrl!!)
-                                SearchEngine.Yahoo -> ImageSearchUploader.getYahooUrl(hostedImageUrl!!)
                                 SearchEngine.TinEye -> ImageSearchUploader.getTinEyeUrl(hostedImageUrl!!)
                                 SearchEngine.Baidu -> ImageSearchUploader.getBaiduUrl(hostedImageUrl!!)
-                                SearchEngine.SauceNAO -> ImageSearchUploader.getSauceNAOUrl(hostedImageUrl!!)
-                                SearchEngine.IQDB -> ImageSearchUploader.getIQDBUrl(hostedImageUrl!!)
-                                SearchEngine.ASCII2D -> ImageSearchUploader.getASCII2DUrl(hostedImageUrl!!)
                                 SearchEngine.Lenso -> ImageSearchUploader.getLensoUrl(hostedImageUrl!!)
                             }
                             android.util.Log.d("CircleToSearch", "Search URL: $searchUrl")
