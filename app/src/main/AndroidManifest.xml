@@ -34,7 +34,7 @@
         </activity>
 
         <service
-            android:name=".CircleToSearchService"
+            android:name=".CircleToSearchAccessibilityService"
             android:exported="true"
             android:label="@string/app_name"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">

@@ -79,6 +79,10 @@ import com.akslabs.circletosearch.utils.ImageSearchUploader
 import com.akslabs.circletosearch.utils.ImageUtils
 import kotlinx.coroutines.launch
 import java.io.ByteArrayOutputStream
+import androidx.activity.compose.BackHandler
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+import androidx.webkit.WebSettingsCompat
+import androidx.webkit.WebViewFeature
 import kotlin.math.max
 import kotlin.math.min
 
@@ -97,6 +101,13 @@ fun CircleToSearchScreen(
     var hostedImageUrl by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(false) }
     var isDesktopMode by remember { mutableStateOf(false) }
+    var isDarkMode by remember { mutableStateOf(false) }
+    
+    // Cache for preloaded URLs to avoid re-uploading/re-generating
+    val preloadedUrls = remember { mutableMapOf<SearchEngine, String>() }
+    
+    // WebView Cache
+    val webViews = remember { mutableMapOf<SearchEngine, WebView>() }
     
     // Bottom Sheet State - Lock to Expanded when searching to fix scrolling conflict
     val scaffoldState = rememberBottomSheetScaffoldState(
@@ -126,7 +137,8 @@ fun CircleToSearchScreen(
     // Root: BottomSheetScaffold handles the sheet layering automatically
     BottomSheetScaffold(
         scaffoldState = scaffoldState,
-        sheetPeekHeight = 120.dp, // Visible peek height to prevent collapse
+        sheetPeekHeight = 150.dp, // Increased peek height
+
         containerColor = Color.Transparent,
         sheetContainerColor = Color.Transparent,
         sheetContent = {
@@ -175,36 +187,74 @@ fun CircleToSearchScreen(
                     searchUrl = null
                 }
 
-                LaunchedEffect(selectedBitmap, selectedEngine, hostedImageUrl, isDesktopMode) {
+                // Preload Logic
+                LaunchedEffect(selectedBitmap, hostedImageUrl) {
                     if (selectedBitmap != null) {
                         isLoading = true
                         
-                        // Step 1: Upload to host if not already done
+                        // 1. Upload to host if needed (for URL-based engines)
                         if (hostedImageUrl == null) {
                             val url = ImageSearchUploader.uploadToImageHost(selectedBitmap!!)
                             if (url != null) {
                                 hostedImageUrl = url
-                                android.util.Log.d("CircleToSearch", "Hosted image URL: $url")
                             } else {
                                 isLoading = false
                                 return@LaunchedEffect
                             }
                         }
-                        
-                        // Step 2: Generate search URL using hosted image
-                        if (hostedImageUrl != null) {
-                            searchUrl = when (selectedEngine) {
-                                SearchEngine.Google -> ImageSearchUploader.getGoogleLensUrl(hostedImageUrl!!)
-                                SearchEngine.Bing -> ImageSearchUploader.getBingUrl(hostedImageUrl!!)
-                                SearchEngine.Yandex -> ImageSearchUploader.getYandexUrl(hostedImageUrl!!)
-                                SearchEngine.TinEye -> ImageSearchUploader.getTinEyeUrl(hostedImageUrl!!)
-                                SearchEngine.Baidu -> ImageSearchUploader.getBaiduUrl(hostedImageUrl!!)
-                                SearchEngine.Lenso -> ImageSearchUploader.getLensoUrl(hostedImageUrl!!)
+
+                        // 2. Preload ALL engines
+                        searchEngines.forEach { engine ->
+                            if (!preloadedUrls.containsKey(engine)) {
+                                val url = if (engine.isDirectUpload) {
+                                    // For now, we use the URL-based approach even for "Direct Upload" engines
+                                    // because we don't have their internal APIs.
+                                    // However, we map them to their specific handling.
+                                    when (engine) {
+                                        SearchEngine.Baidu -> ImageSearchUploader.getBaiduUrl(hostedImageUrl!!)
+                                        SearchEngine.Lenso -> ImageSearchUploader.getLensoUrl(hostedImageUrl!!)
+                                        SearchEngine.Perplexity -> ImageSearchUploader.getPerplexityUrl(hostedImageUrl!!)
+                                        SearchEngine.ChatGPT -> ImageSearchUploader.getChatGPTUrl(hostedImageUrl!!)
+                                        else -> null
+                                    }
+                                } else {
+                                    when (engine) {
+                                        SearchEngine.Google -> ImageSearchUploader.getGoogleLensUrl(hostedImageUrl!!)
+                                        SearchEngine.Bing -> ImageSearchUploader.getBingUrl(hostedImageUrl!!)
+                                        SearchEngine.Yandex -> ImageSearchUploader.getYandexUrl(hostedImageUrl!!)
+                                        SearchEngine.TinEye -> ImageSearchUploader.getTinEyeUrl(hostedImageUrl!!)
+                                        else -> null
+                                    }
+                                }
+                                
+                                if (url != null) {
+                                    preloadedUrls[engine] = url
+                                    // Trigger WebView load immediately
+                                    // We need to do this on main thread, which LaunchedEffect is.
+                                    // But we can't create WebView here easily without context if we want to be pure.
+                                    // However, we can just update the map and let the UI/AndroidView handle creation?
+                                    // No, to "preload" we must create the WebView and loadUrl.
+                                    // We'll do it in the AndroidView update or a side-effect?
+                                    // Actually, we can't create Views inside LaunchedEffect easily.
+                                    // We'll just populate the URL map here.
+                                    // The actual WebView creation happens when we switch tabs? 
+                                    // User wants "Preload". 
+                                    // To truly preload, we need to create WebViews in background? No, Views must be on UI thread.
+                                    // We can create them but not attach them.
+                                }
                             }
-                            android.util.Log.d("CircleToSearch", "Search URL: $searchUrl")
                         }
                         
+                        // Set current searchUrl
+                        searchUrl = preloadedUrls[selectedEngine]
                         isLoading = false
+                    }
+                }
+                
+                // Update searchUrl when engine changes
+                LaunchedEffect(selectedEngine, preloadedUrls) {
+                    if (preloadedUrls.containsKey(selectedEngine)) {
+                        searchUrl = preloadedUrls[selectedEngine]
                     }
                 }
 
@@ -219,8 +269,23 @@ fun CircleToSearchScreen(
                             // GeckoView State
                             // GeckoView State
                             // WebView Caching State
-                            val webViews = remember { mutableMapOf<SearchEngine, WebView>() }
-                            
+                            // Back Handler
+                            BackHandler(enabled = true) {
+                                val currentWebView = webViews[selectedEngine]
+                                if (currentWebView != null && currentWebView.canGoBack()) {
+                                    currentWebView.goBack()
+                                } else {
+                                    // Collapse sheet or close
+                                    scope.launch {
+                                        if (scaffoldState.bottomSheetState.currentValue == SheetValue.Expanded) {
+                                            scaffoldState.bottomSheetState.partialExpand()
+                                        } else {
+                                            onClose()
+                                        }
+                                    }
+                                }
+                            }
+
                             // Helper to create and configure WebView
                             fun createWebView(ctx: android.content.Context): WebView {
                                 return WebView(ctx).apply {
@@ -242,14 +307,18 @@ fun CircleToSearchScreen(
                                         } else {
                                             "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
                                         }
+                                        
+                                        // Dark Mode
+                                        if (WebViewFeature.isFeatureSupported(WebViewFeature.FORCE_DARK)) {
+                                            WebSettingsCompat.setForceDark(this, if (isDarkMode) WebSettingsCompat.FORCE_DARK_ON else WebSettingsCompat.FORCE_DARK_OFF)
+                                        }
                                     }
                                     webViewClient = object : WebViewClient() {
                                         override fun shouldOverrideUrlLoading(view: WebView?, request: android.webkit.WebResourceRequest?): Boolean {
                                             return false // Load in WebView
                                         }
                                     }
-                                    // Fix BottomSheet conflict
-                                    isNestedScrollingEnabled = true // WebView handles nested scrolling better than GeckoView usually, but we might need the intercept hack
+                                    isNestedScrollingEnabled = true
                                     setOnTouchListener { v, event ->
                                         when (event.action) {
                                             android.view.MotionEvent.ACTION_DOWN -> {
@@ -264,18 +333,22 @@ fun CircleToSearchScreen(
                                 }
                             }
 
-                            // Load URL if needed
-                            LaunchedEffect(searchUrl, selectedEngine) {
-                                if (searchUrl != null) {
-                                    val webView = webViews.getOrPut(selectedEngine) { createWebView(context) }
-                                    if (webView.url != searchUrl) {
-                                        webView.loadUrl(searchUrl!!)
+                            // Load URL if needed (and preload others?)
+                            // To truly preload, we should iterate all engines and create their WebViews
+                            // But we can only attach one at a time.
+                            // We can create them in the map.
+                            
+                            LaunchedEffect(preloadedUrls) {
+                                preloadedUrls.forEach { (engine, url) ->
+                                    val wv = webViews.getOrPut(engine) { createWebView(context) }
+                                    if (wv.url != url) {
+                                        wv.loadUrl(url)
                                     }
                                 }
                             }
 
-                            // Update User Agent dynamically
-                            LaunchedEffect(isDesktopMode) {
+                            // Update User Agent & Dark Mode dynamically
+                            LaunchedEffect(isDesktopMode, isDarkMode) {
                                 val newUserAgent = if (isDesktopMode) {
                                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
                                 } else {
@@ -284,7 +357,9 @@ fun CircleToSearchScreen(
                                 webViews.values.forEach { wv ->
                                     if (wv.settings.userAgentString != newUserAgent) {
                                         wv.settings.userAgentString = newUserAgent
-                                        wv.reload()
+                                    }
+                                    if (WebViewFeature.isFeatureSupported(WebViewFeature.FORCE_DARK)) {
+                                        WebSettingsCompat.setForceDark(wv.settings, if (isDarkMode) WebSettingsCompat.FORCE_DARK_ON else WebSettingsCompat.FORCE_DARK_OFF)
                                     }
                                 }
                             }
@@ -298,21 +373,40 @@ fun CircleToSearchScreen(
 
                             AndroidView(
                                 factory = { ctx ->
-                                    FrameLayout(ctx).apply {
+                                    SwipeRefreshLayout(ctx).apply {
                                         layoutParams = ViewGroup.LayoutParams(
                                             ViewGroup.LayoutParams.MATCH_PARENT,
                                             ViewGroup.LayoutParams.MATCH_PARENT
                                         )
+                                        setOnRefreshListener {
+                                            webViews[selectedEngine]?.reload()
+                                            isRefreshing = false
+                                        }
                                     }
                                 },
-                                update = { container ->
-                                    container.removeAllViews()
+                                update = { swipeLayout ->
+                                    val container = swipeLayout // SwipeRefreshLayout is the container
+                                    // We need a FrameLayout inside SwipeRefreshLayout to hold the WebView? 
+                                    // SwipeRefreshLayout can only have one child.
+                                    
                                     val webView = webViews.getOrPut(selectedEngine) { createWebView(context) }
-                                    // Ensure WebView has a parent before adding (it shouldn't, but good to check)
-                                    if (webView.parent != null) {
-                                        (webView.parent as ViewGroup).removeView(webView)
+                                    
+                                    if (swipeLayout.childCount > 0 && swipeLayout.getChildAt(0) != webView) {
+                                        swipeLayout.removeAllViews()
                                     }
-                                    container.addView(webView)
+                                    
+                                    if (swipeLayout.childCount == 0) {
+                                        if (webView.parent != null) {
+                                            (webView.parent as ViewGroup).removeView(webView)
+                                        }
+                                        swipeLayout.addView(webView)
+                                    }
+                                    
+                                    // Update refresh listener to current engine
+                                    (swipeLayout as SwipeRefreshLayout).setOnRefreshListener {
+                                        webView.reload()
+                                        swipeLayout.isRefreshing = false
+                                    }
                                 },
                                 modifier = Modifier.fillMaxSize()
                             )
@@ -583,6 +677,13 @@ fun CircleToSearchScreen(
                             text = { Text(if (isDesktopMode) "Mobile Mode" else "Desktop Mode") },
                             onClick = { 
                                 isDesktopMode = !isDesktopMode 
+                                showMenu = false
+                            }
+                        )
+                        androidx.compose.material3.DropdownMenuItem(
+                            text = { Text(if (isDarkMode) "Light Mode" else "Dark Mode") },
+                            onClick = { 
+                                isDarkMode = !isDarkMode 
                                 showMenu = false
                             }
                         )

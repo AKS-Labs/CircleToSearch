@@ -19,7 +19,7 @@ import com.akslabs.circletosearch.data.BitmapRepository
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
 
-class CircleToSearchService : AccessibilityService() {
+class CircleToSearchAccessibilityService : AccessibilityService() {
 
     private var windowManager: WindowManager? = null
     private var triggerView: View? = null
@@ -51,18 +51,6 @@ class CircleToSearchService : AccessibilityService() {
     private fun showBubble() {
         if (bubbleView != null) return // Already shown
 
-        bubbleView = View(this).apply {
-            background = android.graphics.drawable.GradientDrawable().apply {
-                shape = android.graphics.drawable.GradientDrawable.OVAL
-                setColor(android.graphics.Color.parseColor("#4285F4")) // Google Blue
-                setStroke(4, android.graphics.Color.WHITE)
-            }
-            elevation = 10f
-            setOnClickListener {
-                performCapture()
-            }
-        }
-
         val params = WindowManager.LayoutParams(
             150, 150,
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
@@ -70,9 +58,44 @@ class CircleToSearchService : AccessibilityService() {
                     WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT
         )
-        params.gravity = Gravity.CENTER_VERTICAL or Gravity.END
+        params.gravity = Gravity.TOP or Gravity.START
         params.x = 0
-        params.y = 200 // Offset slightly
+        params.y = 200
+
+        bubbleView = View(this).apply {
+            setBackgroundResource(R.mipmap.ic_launcher)
+            elevation = 10f
+            
+            var initialX = 0
+            var initialY = 0
+            var initialTouchX = 0f
+            var initialTouchY = 0f
+            
+            setOnTouchListener { v, event ->
+                when (event.action) {
+                    MotionEvent.ACTION_DOWN -> {
+                        initialX = params.x
+                        initialY = params.y
+                        initialTouchX = event.rawX
+                        initialTouchY = event.rawY
+                        true
+                    }
+                    MotionEvent.ACTION_MOVE -> {
+                        params.x = initialX + (event.rawX - initialTouchX).toInt()
+                        params.y = initialY + (event.rawY - initialTouchY).toInt()
+                        windowManager?.updateViewLayout(this, params)
+                        true
+                    }
+                    MotionEvent.ACTION_UP -> {
+                        if (Math.abs(event.rawX - initialTouchX) < 10 && Math.abs(event.rawY - initialTouchY) < 10) {
+                            performCapture()
+                        }
+                        true
+                    }
+                    else -> false
+                }
+            }
+        }
 
         try {
             windowManager?.addView(bubbleView, params)

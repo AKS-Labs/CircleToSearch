@@ -98,11 +98,7 @@ object ImageSearchUploader {
         return "https://yandex.com/images/search?rpt=imageview&url=$encodedUrl"
     }
 
-    fun getYahooUrl(imageUrl: String): String {
-        val encodedUrl = URLEncoder.encode(imageUrl, "UTF-8")
-        // Yahoo uses Bing's index, but we can try this format
-        return "https://images.search.yahoo.com/search/images?p=imgurl:$encodedUrl"
-    }
+
 
     fun getTinEyeUrl(imageUrl: String): String {
         val encodedUrl = URLEncoder.encode(imageUrl, "UTF-8")
@@ -114,19 +110,14 @@ object ImageSearchUploader {
         return "https://graph.baidu.com/details?isfromtoybox=1&searchtype=searchSimple&objurl=$encodedUrl"
     }
 
-    fun getSauceNAOUrl(imageUrl: String): String {
-        val encodedUrl = URLEncoder.encode(imageUrl, "UTF-8")
-        return "https://saucenao.com/search.php?db=999&url=$encodedUrl"
+    fun getPerplexityUrl(imageUrl: String): String {
+        // Perplexity doesn't support URL params for image search directly yet
+        return "https://www.perplexity.ai/"
     }
 
-    fun getIQDBUrl(imageUrl: String): String {
-        val encodedUrl = URLEncoder.encode(imageUrl, "UTF-8")
-        return "https://iqdb.org/?url=$encodedUrl"
-    }
-
-    fun getASCII2DUrl(imageUrl: String): String {
-        val encodedUrl = URLEncoder.encode(imageUrl, "UTF-8")
-        return "https://ascii2d.net/search/url/$encodedUrl"
+    fun getChatGPTUrl(imageUrl: String): String {
+        // ChatGPT doesn't support URL params for image search directly yet
+        return "https://chatgpt.com/"
     }
     
     fun getLensoUrl(imageUrl: String): String {

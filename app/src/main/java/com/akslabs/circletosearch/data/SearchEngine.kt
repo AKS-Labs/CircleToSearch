@@ -8,9 +8,17 @@ sealed class SearchEngine(val displayName: String) {
     object Baidu : SearchEngine("Baidu")
     object Lenso : SearchEngine("Lenso.ai")
 
+    object Perplexity : SearchEngine("Perplexity")
+    object ChatGPT : SearchEngine("ChatGPT")
+
     companion object {
-        fun values(): List<SearchEngine> = listOf(Google, Bing, Yandex, TinEye, Baidu, Lenso)
+        fun values(): List<SearchEngine> = listOf(Google, Bing, Yandex, TinEye, Baidu, Lenso, Perplexity, ChatGPT)
     }
     
     val name: String get() = displayName
+    
+    val isDirectUpload: Boolean get() = when(this) {
+        Baidu, Lenso, Perplexity, ChatGPT -> true
+        else -> false
+    }
 }
