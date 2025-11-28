@@ -33,17 +33,17 @@ import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Translate
-import androidx.compose.material3.BottomSheetScaffold
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberBottomSheetScaffoldState
-import androidx.compose.material3.rememberStandardBottomSheetState
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -109,13 +109,11 @@ fun CircleToSearchScreen(
     // WebView Cache
     val webViews = remember { mutableMapOf<SearchEngine, WebView>() }
     
-    // Bottom Sheet State - Lock to Expanded when searching to fix scrolling conflict
-    val scaffoldState = rememberBottomSheetScaffoldState(
-        bottomSheetState = rememberStandardBottomSheetState(
-            initialValue = SheetValue.PartiallyExpanded,
-            skipHiddenState = true
-        )
+    // Bottom Sheet State
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = false // Allow half-expanded state
     )
+    var showBottomSheet by remember { mutableStateOf(false) }
 
     // Drawing State
     val currentPathPoints = remember { mutableStateListOf<Offset>() }
@@ -134,635 +132,602 @@ fun CircleToSearchScreen(
         animationSpec = tween(1000), label = "alpha"
     )
 
-    // Root: BottomSheetScaffold handles the sheet layering automatically
-    BottomSheetScaffold(
-        scaffoldState = scaffoldState,
-        sheetPeekHeight = 150.dp, // Increased peek height
-
-        containerColor = Color.Transparent,
-        sheetContainerColor = Color.Transparent,
-        sheetContent = {
-            // Bottom Sheet Content (Results)
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(800.dp)
-                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
+    // Root Box
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+    ) {
+        // 1. Screenshot Layer
+        if (screenshot != null) {
+            Box(
+                modifier = Modifier.fillMaxSize()
             ) {
-                Spacer(modifier = Modifier.height(16.dp))
+                Image(
+                    bitmap = screenshot.asImageBitmap(),
+                    contentDescription = "Screenshot",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
                 
-                // Tabs
-                ScrollableTabRow(
-                    selectedTabIndex = searchEngines.indexOf(selectedEngine),
-                    edgePadding = 16.dp,
-                    containerColor = Color.Transparent,
-                    contentColor = MaterialTheme.colorScheme.onSurface,
-                    indicator = {} 
-                ) {
-                    searchEngines.forEach { engine ->
-                        val selected = selectedEngine == engine
-                        Tab(
-                            selected = selected,
-                            onClick = { selectedEngine = engine },
-                            text = {
-                                Text(
-                                    engine.name,
-                                    style = MaterialTheme.typography.labelLarge,
-                                    modifier = Modifier
-                                        .background(
-                                            if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface,
-                                            RoundedCornerShape(16.dp)
-                                        )
-                                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                                    color = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface
-                                )
-                            }
+                // Tint Overlay
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            brush = Brush.verticalGradient(
+                                colors = OverlayGradientColors.map { it.copy(alpha = 0.3f) }
+                            )
                         )
-                    }
-                }
-
-                // Reset hosted URL when bitmap changes
-                LaunchedEffect(selectedBitmap) {
-                    hostedImageUrl = null
-                    searchUrl = null
-                }
-
-                // Preload Logic
-                LaunchedEffect(selectedBitmap, hostedImageUrl) {
-                    if (selectedBitmap != null) {
-                        isLoading = true
-                        
-                        // 1. Upload to host if needed (for URL-based engines)
-                        if (hostedImageUrl == null) {
-                            val url = ImageSearchUploader.uploadToImageHost(selectedBitmap!!)
-                            if (url != null) {
-                                hostedImageUrl = url
-                            } else {
-                                isLoading = false
-                                return@LaunchedEffect
-                            }
-                        }
-
-                        // 2. Preload ALL engines
-                        searchEngines.forEach { engine ->
-                            if (!preloadedUrls.containsKey(engine)) {
-                                val url = if (engine.isDirectUpload) {
-                                    // For now, we use the URL-based approach even for "Direct Upload" engines
-                                    // because we don't have their internal APIs.
-                                    // However, we map them to their specific handling.
-                                    when (engine) {
-                                        SearchEngine.Baidu -> ImageSearchUploader.getBaiduUrl(hostedImageUrl!!)
-                                        SearchEngine.Lenso -> ImageSearchUploader.getLensoUrl(hostedImageUrl!!)
-                                        SearchEngine.Perplexity -> ImageSearchUploader.getPerplexityUrl(hostedImageUrl!!)
-                                        SearchEngine.ChatGPT -> ImageSearchUploader.getChatGPTUrl(hostedImageUrl!!)
-                                        else -> null
-                                    }
-                                } else {
-                                    when (engine) {
-                                        SearchEngine.Google -> ImageSearchUploader.getGoogleLensUrl(hostedImageUrl!!)
-                                        SearchEngine.Bing -> ImageSearchUploader.getBingUrl(hostedImageUrl!!)
-                                        SearchEngine.Yandex -> ImageSearchUploader.getYandexUrl(hostedImageUrl!!)
-                                        SearchEngine.TinEye -> ImageSearchUploader.getTinEyeUrl(hostedImageUrl!!)
-                                        else -> null
-                                    }
-                                }
-                                
-                                if (url != null) {
-                                    preloadedUrls[engine] = url
-                                    // Trigger WebView load immediately
-                                    // We need to do this on main thread, which LaunchedEffect is.
-                                    // But we can't create WebView here easily without context if we want to be pure.
-                                    // However, we can just update the map and let the UI/AndroidView handle creation?
-                                    // No, to "preload" we must create the WebView and loadUrl.
-                                    // We'll do it in the AndroidView update or a side-effect?
-                                    // Actually, we can't create Views inside LaunchedEffect easily.
-                                    // We'll just populate the URL map here.
-                                    // The actual WebView creation happens when we switch tabs? 
-                                    // User wants "Preload". 
-                                    // To truly preload, we need to create WebViews in background? No, Views must be on UI thread.
-                                    // We can create them but not attach them.
-                                }
-                            }
-                        }
-                        
-                        // Set current searchUrl
-                        searchUrl = preloadedUrls[selectedEngine]
-                        isLoading = false
-                    }
-                }
-                
-                // Update searchUrl when engine changes
-                LaunchedEffect(selectedEngine, preloadedUrls) {
-                    if (preloadedUrls.containsKey(selectedEngine)) {
-                        searchUrl = preloadedUrls[selectedEngine]
-                    }
-                }
-
-                Box(modifier = Modifier.fillMaxSize()) {
-                    when {
-                        isLoading -> {
-                            androidx.compose.material3.CircularProgressIndicator(
-                                modifier = Modifier.align(Alignment.Center)
-                            )
-                        }
-                        searchUrl != null -> {
-                            // GeckoView State
-                            // GeckoView State
-                            // WebView Caching State
-                            // Back Handler
-                            BackHandler(enabled = true) {
-                                val currentWebView = webViews[selectedEngine]
-                                if (currentWebView != null && currentWebView.canGoBack()) {
-                                    currentWebView.goBack()
-                                } else {
-                                    // Collapse sheet or close
-                                    scope.launch {
-                                        if (scaffoldState.bottomSheetState.currentValue == SheetValue.Expanded) {
-                                            scaffoldState.bottomSheetState.partialExpand()
-                                        } else {
-                                            onClose()
-                                        }
-                                    }
-                                }
-                            }
-
-                            // Helper to create and configure WebView
-                            fun createWebView(ctx: android.content.Context): WebView {
-                                return WebView(ctx).apply {
-                                    layoutParams = ViewGroup.LayoutParams(
-                                        ViewGroup.LayoutParams.MATCH_PARENT,
-                                        ViewGroup.LayoutParams.MATCH_PARENT
-                                    )
-                                    settings.apply {
-                                        javaScriptEnabled = true
-                                        domStorageEnabled = true
-                                        databaseEnabled = true
-                                        useWideViewPort = true
-                                        loadWithOverviewMode = true
-                                        setSupportZoom(true)
-                                        builtInZoomControls = true
-                                        displayZoomControls = false
-                                        userAgentString = if (isDesktopMode) {
-                                            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-                                        } else {
-                                            "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
-                                        }
-                                        
-                                        // Dark Mode
-                                        if (WebViewFeature.isFeatureSupported(WebViewFeature.FORCE_DARK)) {
-                                            WebSettingsCompat.setForceDark(this, if (isDarkMode) WebSettingsCompat.FORCE_DARK_ON else WebSettingsCompat.FORCE_DARK_OFF)
-                                        }
-                                    }
-                                    webViewClient = object : WebViewClient() {
-                                        override fun shouldOverrideUrlLoading(view: WebView?, request: android.webkit.WebResourceRequest?): Boolean {
-                                            return false // Load in WebView
-                                        }
-                                    }
-                                    isNestedScrollingEnabled = true
-                                    setOnTouchListener { v, event ->
-                                        when (event.action) {
-                                            android.view.MotionEvent.ACTION_DOWN -> {
-                                                v.parent.requestDisallowInterceptTouchEvent(true)
-                                            }
-                                            android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
-                                                v.parent.requestDisallowInterceptTouchEvent(false)
-                                            }
-                                        }
-                                        false
-                                    }
-                                }
-                            }
-
-                            // Load URL if needed (and preload others?)
-                            // To truly preload, we should iterate all engines and create their WebViews
-                            // But we can only attach one at a time.
-                            // We can create them in the map.
-                            
-                            LaunchedEffect(preloadedUrls) {
-                                preloadedUrls.forEach { (engine, url) ->
-                                    val wv = webViews.getOrPut(engine) { createWebView(context) }
-                                    if (wv.url != url) {
-                                        wv.loadUrl(url)
-                                    }
-                                }
-                            }
-
-                            // Update User Agent & Dark Mode dynamically
-                            LaunchedEffect(isDesktopMode, isDarkMode) {
-                                val newUserAgent = if (isDesktopMode) {
-                                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-                                } else {
-                                    "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
-                                }
-                                webViews.values.forEach { wv ->
-                                    if (wv.settings.userAgentString != newUserAgent) {
-                                        wv.settings.userAgentString = newUserAgent
-                                    }
-                                    if (WebViewFeature.isFeatureSupported(WebViewFeature.FORCE_DARK)) {
-                                        WebSettingsCompat.setForceDark(wv.settings, if (isDarkMode) WebSettingsCompat.FORCE_DARK_ON else WebSettingsCompat.FORCE_DARK_OFF)
-                                    }
-                                }
-                            }
-
-                            DisposableEffect(Unit) {
-                                onDispose {
-                                    webViews.values.forEach { it.destroy() }
-                                    webViews.clear()
-                                }
-                            }
-
-                            AndroidView(
-                                factory = { ctx ->
-                                    SwipeRefreshLayout(ctx).apply {
-                                        layoutParams = ViewGroup.LayoutParams(
-                                            ViewGroup.LayoutParams.MATCH_PARENT,
-                                            ViewGroup.LayoutParams.MATCH_PARENT
-                                        )
-                                        setOnRefreshListener {
-                                            webViews[selectedEngine]?.reload()
-                                            isRefreshing = false
-                                        }
-                                    }
-                                },
-                                update = { swipeLayout ->
-                                    val container = swipeLayout // SwipeRefreshLayout is the container
-                                    // We need a FrameLayout inside SwipeRefreshLayout to hold the WebView? 
-                                    // SwipeRefreshLayout can only have one child.
-                                    
-                                    val webView = webViews.getOrPut(selectedEngine) { createWebView(context) }
-                                    
-                                    if (swipeLayout.childCount > 0 && swipeLayout.getChildAt(0) != webView) {
-                                        swipeLayout.removeAllViews()
-                                    }
-                                    
-                                    if (swipeLayout.childCount == 0) {
-                                        if (webView.parent != null) {
-                                            (webView.parent as ViewGroup).removeView(webView)
-                                        }
-                                        swipeLayout.addView(webView)
-                                    }
-                                    
-                                    // Update refresh listener to current engine
-                                    (swipeLayout as SwipeRefreshLayout).setOnRefreshListener {
-                                        webView.reload()
-                                        swipeLayout.isRefreshing = false
-                                    }
-                                },
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        }
-                        else -> {
-                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text("Draw a selection to search", color = Color.White)
-                            }
-                        }
-                    }
-                }
+                )
             }
         }
-    ) { paddingValues ->
-        // Main Content (Screenshot + Overlay + Drawing)
+
+        // 2. Gradient Border Layer (Overlaying screenshot, clipped to rounded corners)
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
-                .background(Color.Black)
-        ) {
-            // 1. Screenshot Layer
-            if (screenshot != null) {
-                Box(
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    Image(
-                        bitmap = screenshot.asImageBitmap(),
-                        contentDescription = "Screenshot",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                    
-                    // Tint Overlay
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(
-                                brush = Brush.verticalGradient(
-                                    colors = OverlayGradientColors.map { it.copy(alpha = 0.3f) }
+                .border(
+                    width = 8.dp,
+                    brush = Brush.verticalGradient(colors = OverlayGradientColors),
+                    shape = RoundedCornerShape(24.dp) // Rounded corners for device
+                )
+                .clip(RoundedCornerShape(24.dp))
+        )
+
+        // 3. Drawing Canvas (Interactive Layer)
+        Canvas(
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(Unit) {
+                    detectDragGestures(
+                        onDragStart = { offset ->
+                            // Clear previous state
+                            currentPathPoints.clear()
+                            currentPathPoints.add(offset)
+                            selectionRect = null
+                            scope.launch { selectionAnim.snapTo(0f) }
+                        },
+                        onDrag = { change, _ ->
+                            val offset = change.position
+                            currentPathPoints.add(offset)
+                        },
+                        onDragEnd = {
+                            if (currentPathPoints.isNotEmpty()) {
+                                var minX = Float.MAX_VALUE
+                                var minY = Float.MAX_VALUE
+                                var maxX = Float.MIN_VALUE
+                                var maxY = Float.MIN_VALUE
+
+                                currentPathPoints.forEach { p ->
+                                    minX = min(minX, p.x)
+                                    minY = min(minY, p.y)
+                                    maxX = max(maxX, p.x)
+                                    maxY = max(maxY, p.y)
+                                }
+                                
+                                val rect = Rect(
+                                    minX.toInt(),
+                                    minY.toInt(),
+                                    maxX.toInt(),
+                                    maxY.toInt()
                                 )
-                            )
-                    )
-                }
-            }
-
-            // 2. Gradient Border Layer (Overlaying screenshot, clipped to rounded corners)
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .border(
-                        width = 8.dp,
-                        brush = Brush.verticalGradient(colors = OverlayGradientColors),
-                        shape = RoundedCornerShape(24.dp) // Rounded corners for device
-                    )
-                    .clip(RoundedCornerShape(24.dp))
-            )
-
-            // 3. Drawing Canvas (Interactive Layer)
-            Canvas(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .pointerInput(Unit) {
-                        detectDragGestures(
-                            onDragStart = { offset ->
-                                // Clear previous state
-                                currentPathPoints.clear()
-                                currentPathPoints.add(offset)
-                                selectionRect = null
-                                scope.launch { selectionAnim.snapTo(0f) }
-                            },
-                            onDrag = { change, _ ->
-                                val offset = change.position
-                                currentPathPoints.add(offset)
-                            },
-                            onDragEnd = {
-                                if (currentPathPoints.isNotEmpty()) {
-                                    var minX = Float.MAX_VALUE
-                                    var minY = Float.MAX_VALUE
-                                    var maxX = Float.MIN_VALUE
-                                    var maxY = Float.MIN_VALUE
-
-                                    currentPathPoints.forEach { p ->
-                                        minX = min(minX, p.x)
-                                        minY = min(minY, p.y)
-                                        maxX = max(maxX, p.x)
-                                        maxY = max(maxY, p.y)
-                                    }
-                                    
-                                    val rect = Rect(
-                                        minX.toInt(),
-                                        minY.toInt(),
-                                        maxX.toInt(),
-                                        maxY.toInt()
+                                
+                                selectionRect = rect
+                                // Clear points to remove the drawn line and show the lens rect
+                                currentPathPoints.clear() 
+                                
+                                scope.launch {
+                                    selectionAnim.animateTo(
+                                        targetValue = 1f,
+                                        animationSpec = tween(600)
                                     )
-                                    
-                                    selectionRect = rect
-                                    // Clear points to remove the drawn line and show the lens rect
-                                    currentPathPoints.clear() 
-                                    
-                                    scope.launch {
-                                        selectionAnim.animateTo(
-                                            targetValue = 1f,
-                                            animationSpec = tween(600)
-                                        )
-                                        android.util.Log.d("CircleToSearch", "Selection rect: ${rect.left},${rect.top},${rect.right},${rect.bottom}")
-                                        selectedBitmap = ImageUtils.cropBitmap(screenshot!!, rect)
-                                        android.util.Log.d("CircleToSearch", "Cropped bitmap size: ${selectedBitmap!!.width}x${selectedBitmap!!.height}")
-                                        isSearching = true
-                                        scaffoldState.bottomSheetState.expand()
-                                    }
+                                    android.util.Log.d("CircleToSearch", "Selection rect: ${rect.left},${rect.top},${rect.right},${rect.bottom}")
+                                    selectedBitmap = ImageUtils.cropBitmap(screenshot!!, rect)
+                                    android.util.Log.d("CircleToSearch", "Cropped bitmap size: ${selectedBitmap!!.width}x${selectedBitmap!!.height}")
+                                    isSearching = true
+                                    showBottomSheet = true // Show the bottom sheet
                                 }
                             }
-                        )
-                    }
-            ) {
-                // Draw current path (Real-time)
-                if (currentPathPoints.size > 1) {
-                    val path = Path().apply {
-                        moveTo(currentPathPoints.first().x, currentPathPoints.first().y)
-                        for (i in 1 until currentPathPoints.size) {
-                            lineTo(currentPathPoints[i].x, currentPathPoints[i].y)
                         }
-                    }
-                    
-                    // Glow
-                    drawPath(
-                        path = path,
-                        brush = Brush.linearGradient(OverlayGradientColors),
-                        style = Stroke(width = 30f, cap = StrokeCap.Round, join = StrokeJoin.Round),
-                        alpha = 0.6f
-                    )
-                    // Core
-                    drawPath(
-                        path = path,
-                        color = Color.White,
-                        style = Stroke(width = 12f, cap = StrokeCap.Round, join = StrokeJoin.Round)
                     )
                 }
-
-                // Draw Lens Animation (Rounded Corner Brackets)
-                if (selectionRect != null && selectionAnim.value > 0f) {
-                    val rect = selectionRect!!
-                    val progress = selectionAnim.value
-                    val left = rect.left.toFloat()
-                    val top = rect.top.toFloat()
-                    val right = rect.right.toFloat()
-                    val bottom = rect.bottom.toFloat()
-                    
-                    val width = right - left
-                    val height = bottom - top
-                    val cornerRadius = 64f // Increased radius for rounder look
-                    val armLength = min(width, height) * 0.2f // Length of the straight part
-
-                    // Top Left
-                    val tlPath = Path().apply {
-                        moveTo(left, top + armLength)
-                        lineTo(left, top + cornerRadius)
-                        arcTo(
-                            rect = androidx.compose.ui.geometry.Rect(left, top, left + 2 * cornerRadius, top + 2 * cornerRadius),
-                            startAngleDegrees = 180f,
-                            sweepAngleDegrees = 90f,
-                            forceMoveTo = false
-                        )
-                        lineTo(left + armLength, top)
+        ) {
+            // Draw current path (Real-time)
+            if (currentPathPoints.size > 1) {
+                val path = Path().apply {
+                    moveTo(currentPathPoints.first().x, currentPathPoints.first().y)
+                    for (i in 1 until currentPathPoints.size) {
+                        lineTo(currentPathPoints[i].x, currentPathPoints[i].y)
                     }
-                    // Top Right
-                    val trPath = Path().apply {
-                        moveTo(right - armLength, top)
-                        lineTo(right - cornerRadius, top)
-                        arcTo(
-                            rect = androidx.compose.ui.geometry.Rect(right - 2 * cornerRadius, top, right, top + 2 * cornerRadius),
-                            startAngleDegrees = 270f,
-                            sweepAngleDegrees = 90f,
-                            forceMoveTo = false
-                        )
-                        lineTo(right, top + armLength)
-                    }
-                    // Bottom Right
-                    val brPath = Path().apply {
-                        moveTo(right, bottom - armLength)
-                        lineTo(right, bottom - cornerRadius)
-                        arcTo(
-                            rect = androidx.compose.ui.geometry.Rect(right - 2 * cornerRadius, bottom - 2 * cornerRadius, right, bottom),
-                            startAngleDegrees = 0f,
-                            sweepAngleDegrees = 90f,
-                            forceMoveTo = false
-                        )
-                        lineTo(right - armLength, bottom)
-                    }
-                    // Bottom Left
-                    val blPath = Path().apply {
-                        moveTo(left + armLength, bottom)
-                        lineTo(left + cornerRadius, bottom)
-                        arcTo(
-                            rect = androidx.compose.ui.geometry.Rect(left, bottom - 2 * cornerRadius, left + 2 * cornerRadius, bottom),
-                            startAngleDegrees = 90f,
-                            sweepAngleDegrees = 90f,
-                            forceMoveTo = false
-                        )
-                        lineTo(left, bottom - armLength)
-                    }
-
-                    val bracketAlpha = progress
-                    val bracketStroke = Stroke(width = 12f, cap = StrokeCap.Round, join = StrokeJoin.Round)
-                    
-                    // Draw Brackets with Glow
-                    listOf(tlPath, trPath, brPath, blPath).forEach { p ->
-                        drawPath(p, Color.White, style = bracketStroke, alpha = bracketAlpha)
-                        drawPath(p, Brush.linearGradient(OverlayGradientColors), style = Stroke(width = 20f, cap = StrokeCap.Round), alpha = bracketAlpha * 0.5f)
-                    }
-                    
-                    // Optional: Flash effect inside
-                     drawRoundRect(
-                        color = Color.White,
-                        topLeft = Offset(left, top),
-                        size = Size(width, height),
-                        cornerRadius = CornerRadius(32f),
-                        style = Stroke(width = 4f),
-                        alpha = (1f - progress) * 0.5f
-                    )
                 }
+                
+                // Glow
+                drawPath(
+                    path = path,
+                    brush = Brush.linearGradient(OverlayGradientColors),
+                    style = Stroke(width = 30f, cap = StrokeCap.Round, join = StrokeJoin.Round),
+                    alpha = 0.6f
+                )
+                // Core
+                drawPath(
+                    path = path,
+                    color = Color.White,
+                    style = Stroke(width = 12f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+                )
             }
 
-            // 4. Header (Top)
-            Row(
+            // Draw Lens Animation (Rounded Corner Brackets)
+            if (selectionRect != null && selectionAnim.value > 0f) {
+                val rect = selectionRect!!
+                val progress = selectionAnim.value
+                val left = rect.left.toFloat()
+                val top = rect.top.toFloat()
+                val right = rect.right.toFloat()
+                val bottom = rect.bottom.toFloat()
+                
+                val width = right - left
+                val height = bottom - top
+                val cornerRadius = 64f // Increased radius for rounder look
+                val armLength = min(width, height) * 0.2f // Length of the straight part
+
+                // Top Left
+                val tlPath = Path().apply {
+                    moveTo(left, top + armLength)
+                    lineTo(left, top + cornerRadius)
+                    arcTo(
+                        rect = androidx.compose.ui.geometry.Rect(left, top, left + 2 * cornerRadius, top + 2 * cornerRadius),
+                        startAngleDegrees = 180f,
+                        sweepAngleDegrees = 90f,
+                        forceMoveTo = false
+                    )
+                    lineTo(left + armLength, top)
+                }
+                // Top Right
+                val trPath = Path().apply {
+                    moveTo(right - armLength, top)
+                    lineTo(right - cornerRadius, top)
+                    arcTo(
+                        rect = androidx.compose.ui.geometry.Rect(right - 2 * cornerRadius, top, right, top + 2 * cornerRadius),
+                        startAngleDegrees = 270f,
+                        sweepAngleDegrees = 90f,
+                        forceMoveTo = false
+                    )
+                    lineTo(right, top + armLength)
+                }
+                // Bottom Right
+                val brPath = Path().apply {
+                    moveTo(right, bottom - armLength)
+                    lineTo(right, bottom - cornerRadius)
+                    arcTo(
+                        rect = androidx.compose.ui.geometry.Rect(right - 2 * cornerRadius, bottom - 2 * cornerRadius, right, bottom),
+                        startAngleDegrees = 0f,
+                        sweepAngleDegrees = 90f,
+                        forceMoveTo = false
+                    )
+                    lineTo(right - armLength, bottom)
+                }
+                // Bottom Left
+                val blPath = Path().apply {
+                    moveTo(left + armLength, bottom)
+                    lineTo(left + cornerRadius, bottom)
+                    arcTo(
+                        rect = androidx.compose.ui.geometry.Rect(left, bottom - 2 * cornerRadius, left + 2 * cornerRadius, bottom),
+                        startAngleDegrees = 90f,
+                        sweepAngleDegrees = 90f,
+                        forceMoveTo = false
+                    )
+                    lineTo(left, bottom - armLength)
+                }
+
+                val bracketAlpha = progress
+                val bracketStroke = Stroke(width = 12f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+                
+                // Draw Brackets with Glow
+                listOf(tlPath, trPath, brPath, blPath).forEach { p ->
+                    drawPath(p, Color.White, style = bracketStroke, alpha = bracketAlpha)
+                    drawPath(p, Brush.linearGradient(OverlayGradientColors), style = Stroke(width = 20f, cap = StrokeCap.Round), alpha = bracketAlpha * 0.5f)
+                }
+                
+                // Optional: Flash effect inside
+                 drawRoundRect(
+                    color = Color.White,
+                    topLeft = Offset(left, top),
+                    size = Size(width, height),
+                    cornerRadius = CornerRadius(32f),
+                    style = Stroke(width = 4f),
+                    alpha = (1f - progress) * 0.5f
+                )
+            }
+        }
+
+        // 4. Header (Top)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 48.dp, start = 16.dp, end = 16.dp)
+                .align(Alignment.TopCenter),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(
+                onClick = onClose,
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 48.dp, start = 16.dp, end = 16.dp)
-                    .align(Alignment.TopCenter),
-                verticalAlignment = Alignment.CenterVertically
+                    .background(Color.Gray.copy(alpha = 0.5f), CircleShape)
+                    .size(40.dp)
             ) {
+                Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
+            }
+            Spacer(modifier = Modifier.weight(1f))
+            Text(
+                text = selectedEngine.name,
+                style = MaterialTheme.typography.headlineMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+            )
+            Spacer(modifier = Modifier.weight(1f))
+            
+            // Menu
+            Box {
+                var showMenu by remember { mutableStateOf(false) }
                 IconButton(
-                    onClick = onClose,
+                    onClick = { showMenu = true },
                     modifier = Modifier
                         .background(Color.Gray.copy(alpha = 0.5f), CircleShape)
                         .size(40.dp)
                 ) {
-                    Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
+                    Icon(Icons.Default.MoreVert, contentDescription = "Menu", tint = Color.White)
                 }
-                Spacer(modifier = Modifier.weight(1f))
-                Text(
-                    text = selectedEngine.name,
-                    style = MaterialTheme.typography.headlineMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                )
-                Spacer(modifier = Modifier.weight(1f))
                 
-                // Menu
-                Box {
-                    var showMenu by remember { mutableStateOf(false) }
-                    IconButton(
-                        onClick = { showMenu = true },
+                androidx.compose.material3.DropdownMenu(
+                    expanded = showMenu,
+                    onDismissRequest = { showMenu = false }
+                ) {
+                    androidx.compose.material3.DropdownMenuItem(
+                        text = { Text(if (isDesktopMode) "Mobile Mode" else "Desktop Mode") },
+                        onClick = { 
+                            isDesktopMode = !isDesktopMode 
+                            showMenu = false
+                        }
+                    )
+                    androidx.compose.material3.DropdownMenuItem(
+                        text = { Text(if (isDarkMode) "Light Mode" else "Dark Mode") },
+                        onClick = { 
+                            isDarkMode = !isDarkMode 
+                            showMenu = false
+                        }
+                    )
+                    androidx.compose.material3.DropdownMenuItem(
+                        text = { Text("Copy URL") },
+                        onClick = {
+                            if (searchUrl != null) {
+                                val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                val clip = android.content.ClipData.newPlainText("Search URL", searchUrl)
+                                clipboard.setPrimaryClip(clip)
+                            }
+                            showMenu = false
+                        }
+                    )
+                    androidx.compose.material3.DropdownMenuItem(
+                        text = { Text("Open in Browser") },
+                        onClick = {
+                            if (searchUrl != null) {
+                                try {
+                                    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(searchUrl))
+                                    context.startActivity(intent)
+                                } catch (e: Exception) {
+                                    android.util.Log.e("CircleToSearch", "Failed to open browser", e)
+                                }
+                            }
+                            showMenu = false
+                        }
+                    )
+                }
+            }
+        }
+
+        // 5. Search Bar / Pill (Bottom Fixed)
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 24.dp)
+                .shadow(8.dp, CircleShape)
+                .background(Color(0xFF1F1F1F), CircleShape)
+                .height(64.dp)
+                .padding(horizontal = 20.dp)
+        ) {
+            Row(
+                modifier = Modifier.align(Alignment.CenterStart),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (selectedBitmap != null) {
+                    Image(
+                        bitmap = selectedBitmap!!.asImageBitmap(),
+                        contentDescription = "Selected",
+                        contentScale = ContentScale.Crop,
                         modifier = Modifier
-                            .background(Color.Gray.copy(alpha = 0.5f), CircleShape)
                             .size(40.dp)
-                    ) {
-                        Icon(Icons.Default.MoreVert, contentDescription = "Menu", tint = Color.White)
-                    }
-                    
-                    androidx.compose.material3.DropdownMenu(
-                        expanded = showMenu,
-                        onDismissRequest = { showMenu = false }
-                    ) {
-                        androidx.compose.material3.DropdownMenuItem(
-                            text = { Text(if (isDesktopMode) "Mobile Mode" else "Desktop Mode") },
-                            onClick = { 
-                                isDesktopMode = !isDesktopMode 
-                                showMenu = false
-                            }
-                        )
-                        androidx.compose.material3.DropdownMenuItem(
-                            text = { Text(if (isDarkMode) "Light Mode" else "Dark Mode") },
-                            onClick = { 
-                                isDarkMode = !isDarkMode 
-                                showMenu = false
-                            }
-                        )
-                        androidx.compose.material3.DropdownMenuItem(
-                            text = { Text("Copy URL") },
-                            onClick = {
-                                if (searchUrl != null) {
-                                    val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                                    val clip = android.content.ClipData.newPlainText("Search URL", searchUrl)
-                                    clipboard.setPrimaryClip(clip)
-                                }
-                                showMenu = false
-                            }
-                        )
-                        androidx.compose.material3.DropdownMenuItem(
-                            text = { Text("Open in Browser") },
-                            onClick = {
-                                if (searchUrl != null) {
-                                    try {
-                                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(searchUrl))
-                                        context.startActivity(intent)
-                                    } catch (e: Exception) {
-                                        android.util.Log.e("CircleToSearch", "Failed to open browser", e)
-                                    }
-                                }
-                                showMenu = false
-                            }
-                        )
+                            .clip(RoundedCornerShape(12.dp))
+                            .border(1.dp, Color.Gray, RoundedCornerShape(12.dp))
+                    )
+                } else {
+                    // G Logo
+                    Row {
+                        Text("G", style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold, color = Color(0xFF4285F4)))
+                        Text("o", style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold, color = Color(0xFFEA4335)))
+                        Text("o", style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold, color = Color(0xFFFBBC05)))
+                        Text("g", style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold, color = Color(0xFF4285F4)))
+                        Text("l", style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold, color = Color(0xFF34A853)))
+                        Text("e", style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold, color = Color(0xFFEA4335)))
                     }
                 }
             }
-
-            // 5. Search Bar / Pill (Bottom Fixed)
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 24.dp)
-                    .shadow(8.dp, CircleShape)
-                    .background(Color(0xFF1F1F1F), CircleShape)
-                    .height(64.dp)
-                    .padding(horizontal = 20.dp)
+            
+            Row(
+                modifier = Modifier.align(Alignment.CenterEnd),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    modifier = Modifier.align(Alignment.CenterStart),
-                    verticalAlignment = Alignment.CenterVertically
+                Icon(Icons.Default.Mic, "Mic", tint = Color.White)
+                Spacer(modifier = Modifier.width(24.dp))
+                Icon(Icons.Default.MusicNote, "Music", tint = Color.White)
+                Spacer(modifier = Modifier.width(24.dp))
+                Icon(Icons.Default.Translate, "Translate", tint = Color.White)
+            }
+        }
+
+        // 6. Modal Bottom Sheet
+        if (showBottomSheet) {
+            ModalBottomSheet(
+                onDismissRequest = { showBottomSheet = false },
+                sheetState = sheetState,
+                dragHandle = { BottomSheetDefaults.DragHandle() },
+                containerColor = Color.Transparent,
+                scrimColor = Color.Black.copy(alpha = 0.3f)
+            ) {
+                // Bottom Sheet Content (Results)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(800.dp)
+                        .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
                 ) {
-                    if (selectedBitmap != null) {
-                        Image(
-                            bitmap = selectedBitmap!!.asImageBitmap(),
-                            contentDescription = "Selected",
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .border(1.dp, Color.Gray, RoundedCornerShape(12.dp))
-                        )
-                    } else {
-                        // G Logo
-                        Row {
-                            Text("G", style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold, color = Color(0xFF4285F4)))
-                            Text("o", style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold, color = Color(0xFFEA4335)))
-                            Text("o", style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold, color = Color(0xFFFBBC05)))
-                            Text("g", style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold, color = Color(0xFF4285F4)))
-                            Text("l", style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold, color = Color(0xFF34A853)))
-                            Text("e", style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold, color = Color(0xFFEA4335)))
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    // Tabs
+                    ScrollableTabRow(
+                        selectedTabIndex = searchEngines.indexOf(selectedEngine),
+                        edgePadding = 16.dp,
+                        containerColor = Color.Transparent,
+                        contentColor = MaterialTheme.colorScheme.onSurface,
+                        indicator = {} 
+                    ) {
+                        searchEngines.forEach { engine ->
+                            val selected = selectedEngine == engine
+                            Tab(
+                                selected = selected,
+                                onClick = { selectedEngine = engine },
+                                text = {
+                                    Text(
+                                        engine.name,
+                                        style = MaterialTheme.typography.labelLarge,
+                                        modifier = Modifier
+                                            .background(
+                                                if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface,
+                                                RoundedCornerShape(16.dp)
+                                            )
+                                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                                        color = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            )
                         }
                     }
-                }
-                
-                Row(
-                    modifier = Modifier.align(Alignment.CenterEnd),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Default.Mic, "Mic", tint = Color.White)
-                    Spacer(modifier = Modifier.width(24.dp))
-                    Icon(Icons.Default.MusicNote, "Music", tint = Color.White)
-                    Spacer(modifier = Modifier.width(24.dp))
-                    Icon(Icons.Default.Translate, "Translate", tint = Color.White)
+
+                    // Reset hosted URL when bitmap changes
+                    LaunchedEffect(selectedBitmap) {
+                        hostedImageUrl = null
+                        searchUrl = null
+                    }
+
+                    // Preload Logic
+                    LaunchedEffect(selectedBitmap, hostedImageUrl) {
+                        if (selectedBitmap != null) {
+                            isLoading = true
+                            
+                            // 1. Upload to host if needed (for URL-based engines)
+                            if (hostedImageUrl == null) {
+                                val url = ImageSearchUploader.uploadToImageHost(selectedBitmap!!)
+                                if (url != null) {
+                                    hostedImageUrl = url
+                                } else {
+                                    isLoading = false
+                                    return@LaunchedEffect
+                                }
+                            }
+
+                            // 2. Preload ALL engines
+                            searchEngines.forEach { engine ->
+                                if (!preloadedUrls.containsKey(engine)) {
+                                    val url = if (engine.isDirectUpload) {
+                                        when (engine) {
+                                            SearchEngine.Baidu -> ImageSearchUploader.getBaiduUrl(hostedImageUrl!!)
+                                            SearchEngine.Lenso -> ImageSearchUploader.getLensoUrl(hostedImageUrl!!)
+                                            SearchEngine.Perplexity -> ImageSearchUploader.getPerplexityUrl(hostedImageUrl!!)
+                                            SearchEngine.ChatGPT -> ImageSearchUploader.getChatGPTUrl(hostedImageUrl!!)
+                                            else -> null
+                                        }
+                                    } else {
+                                        when (engine) {
+                                            SearchEngine.Google -> ImageSearchUploader.getGoogleLensUrl(hostedImageUrl!!)
+                                            SearchEngine.Bing -> ImageSearchUploader.getBingUrl(hostedImageUrl!!)
+                                            SearchEngine.Yandex -> ImageSearchUploader.getYandexUrl(hostedImageUrl!!)
+                                            SearchEngine.TinEye -> ImageSearchUploader.getTinEyeUrl(hostedImageUrl!!)
+                                            else -> null
+                                        }
+                                    }
+                                    
+                                    if (url != null) {
+                                        preloadedUrls[engine] = url
+                                    }
+                                }
+                            }
+                            
+                            // Set current searchUrl
+                            searchUrl = preloadedUrls[selectedEngine]
+                            isLoading = false
+                        }
+                    }
+                    
+                    // Update searchUrl when engine changes
+                    LaunchedEffect(selectedEngine, preloadedUrls) {
+                        if (preloadedUrls.containsKey(selectedEngine)) {
+                            searchUrl = preloadedUrls[selectedEngine]
+                        }
+                    }
+
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        when {
+                            isLoading -> {
+                                androidx.compose.material3.CircularProgressIndicator(
+                                    modifier = Modifier.align(Alignment.Center)
+                                )
+                            }
+                            searchUrl != null -> {
+                                // Back Handler
+                                BackHandler(enabled = true) {
+                                    val currentWebView = webViews[selectedEngine]
+                                    if (currentWebView != null && currentWebView.canGoBack()) {
+                                        currentWebView.goBack()
+                                    } else {
+                                        // Dismiss sheet
+                                        showBottomSheet = false
+                                    }
+                                }
+
+                                // Helper to create and configure WebView
+                                fun createWebView(ctx: android.content.Context): WebView {
+                                    return WebView(ctx).apply {
+                                        layoutParams = ViewGroup.LayoutParams(
+                                            ViewGroup.LayoutParams.MATCH_PARENT,
+                                            ViewGroup.LayoutParams.MATCH_PARENT
+                                        )
+                                        settings.apply {
+                                            javaScriptEnabled = true
+                                            domStorageEnabled = true
+                                            databaseEnabled = true
+                                            useWideViewPort = true
+                                            loadWithOverviewMode = true
+                                            setSupportZoom(true)
+                                            builtInZoomControls = true
+                                            displayZoomControls = false
+                                            userAgentString = if (isDesktopMode) {
+                                                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                                            } else {
+                                                "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+                                            }
+                                            
+                                            // Dark Mode
+                                            if (WebViewFeature.isFeatureSupported(WebViewFeature.FORCE_DARK)) {
+                                                WebSettingsCompat.setForceDark(this, if (isDarkMode) WebSettingsCompat.FORCE_DARK_ON else WebSettingsCompat.FORCE_DARK_OFF)
+                                            }
+                                        }
+                                        webViewClient = object : WebViewClient() {
+                                            override fun shouldOverrideUrlLoading(view: WebView?, request: android.webkit.WebResourceRequest?): Boolean {
+                                                return false // Load in WebView
+                                            }
+                                        }
+                                        isNestedScrollingEnabled = true
+                                        setOnTouchListener { v, event ->
+                                            when (event.action) {
+                                                android.view.MotionEvent.ACTION_DOWN -> {
+                                                    v.parent.requestDisallowInterceptTouchEvent(true)
+                                                }
+                                                android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
+                                                    v.parent.requestDisallowInterceptTouchEvent(false)
+                                                }
+                                            }
+                                            false
+                                        }
+                                    }
+                                }
+
+                                // Load URL if needed
+                                LaunchedEffect(preloadedUrls) {
+                                    preloadedUrls.forEach { (engine, url) ->
+                                        val wv = webViews.getOrPut(engine) { createWebView(context) }
+                                        if (wv.url != url) {
+                                            wv.loadUrl(url)
+                                        }
+                                    }
+                                }
+
+                                // Update User Agent & Dark Mode dynamically
+                                LaunchedEffect(isDesktopMode, isDarkMode) {
+                                    val newUserAgent = if (isDesktopMode) {
+                                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                                    } else {
+                                        "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+                                    }
+                                    webViews.values.forEach { wv ->
+                                        if (wv.settings.userAgentString != newUserAgent) {
+                                            wv.settings.userAgentString = newUserAgent
+                                        }
+                                        if (WebViewFeature.isFeatureSupported(WebViewFeature.FORCE_DARK)) {
+                                            WebSettingsCompat.setForceDark(wv.settings, if (isDarkMode) WebSettingsCompat.FORCE_DARK_ON else WebSettingsCompat.FORCE_DARK_OFF)
+                                        }
+                                    }
+                                }
+
+                                DisposableEffect(Unit) {
+                                    onDispose {
+                                        webViews.values.forEach { it.destroy() }
+                                        webViews.clear()
+                                    }
+                                }
+
+                                AndroidView(
+                                    factory = { ctx ->
+                                        SwipeRefreshLayout(ctx).apply {
+                                            layoutParams = ViewGroup.LayoutParams(
+                                                ViewGroup.LayoutParams.MATCH_PARENT,
+                                                ViewGroup.LayoutParams.MATCH_PARENT
+                                            )
+                                            setOnRefreshListener {
+                                                webViews[selectedEngine]?.reload()
+                                                isRefreshing = false
+                                            }
+                                        }
+                                    },
+                                    update = { swipeLayout ->
+                                        val webView = webViews.getOrPut(selectedEngine) { createWebView(context) }
+                                        
+                                        if (swipeLayout.childCount > 0 && swipeLayout.getChildAt(0) != webView) {
+                                            swipeLayout.removeAllViews()
+                                        }
+                                        
+                                        if (swipeLayout.childCount == 0) {
+                                            if (webView.parent != null) {
+                                                (webView.parent as ViewGroup).removeView(webView)
+                                            }
+                                            swipeLayout.addView(webView)
+                                        }
+                                        
+                                        (swipeLayout as SwipeRefreshLayout).setOnRefreshListener {
+                                            webView.reload()
+                                            swipeLayout.isRefreshing = false
+                                        }
+                                    },
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
+                            else -> {
+                                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                    Text("Loading...", color = Color.Black)
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
