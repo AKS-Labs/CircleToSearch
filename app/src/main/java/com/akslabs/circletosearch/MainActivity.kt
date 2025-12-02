@@ -63,7 +63,7 @@ fun SetupScreen() {
         )
         Spacer(modifier = Modifier.height(24.dp))
         Text(
-            text = "To use this app, you need to grant two permissions:\n\n1. Accessibility Service: To detect the double-tap gesture and take screenshots.\n2. Display over other apps: To show the search overlay.",
+            text = "To use this app, enable the Accessibility Service.\n\nThis allows the app to:\n• Detect double-tap on status bar\n• Take screenshots\n• Show floating bubble\n\nNo other permissions needed!",
             textAlign = TextAlign.Center
         )
         Spacer(modifier = Modifier.height(32.dp))
@@ -73,13 +73,7 @@ fun SetupScreen() {
         }) {
             Text("Enable Accessibility Service")
         }
-        Spacer(modifier = Modifier.height(16.dp))
-        Button(onClick = {
-            val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${context.packageName}"))
-            context.startActivity(intent)
-        }) {
-            Text("Enable Overlay Permission")
-        }
+        Spacer(modifier = Modifier.height(32.dp))
         
         Spacer(modifier = Modifier.height(32.dp))
         
