@@ -89,6 +89,7 @@ import androidx.activity.compose.BackHandler
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewFeature
+import com.akslabs.circletosearch.data.isDirectUpload
 import kotlin.math.max
 import kotlin.math.min
 
@@ -319,8 +320,6 @@ fun CircleToSearchScreen(
                             if (!preloadedUrls.containsKey(engine)) {
                                 val url = if (engine.isDirectUpload) {
                                     when (engine) {
-                                        SearchEngine.Baidu -> ImageSearchUploader.getBaiduUrl(hostedImageUrl!!)
-                                        SearchEngine.Lenso -> ImageSearchUploader.getLensoUrl(hostedImageUrl!!)
                                         SearchEngine.Perplexity -> ImageSearchUploader.getPerplexityUrl(hostedImageUrl!!)
                                         SearchEngine.ChatGPT -> ImageSearchUploader.getChatGPTUrl(hostedImageUrl!!)
                                         else -> null
@@ -824,19 +823,19 @@ fun CircleToSearchScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(onClick = {
-                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/akslabs"))
+                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/aks-labs"))
                         context.startActivity(intent)
                     }) {
                         Icon(Icons.Default.Code, "Github", tint = Color.White)
                     }
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
                     IconButton(onClick = {
                         val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/sponsors/akslabs"))
                         context.startActivity(intent)
                     }) {
                         Icon(Icons.Default.Favorite, "Donate", tint = Color.White)
                     }
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
                     IconButton(onClick = {
                         val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://t.me/akslabs"))
                         context.startActivity(intent)

@@ -98,16 +98,9 @@ object ImageSearchUploader {
         return "https://yandex.com/images/search?rpt=imageview&url=$encodedUrl"
     }
 
-
-
     fun getTinEyeUrl(imageUrl: String): String {
         val encodedUrl = URLEncoder.encode(imageUrl, "UTF-8")
         return "https://tineye.com/search?url=$encodedUrl"
-    }
-
-    fun getBaiduUrl(imageUrl: String): String {
-        val encodedUrl = URLEncoder.encode(imageUrl, "UTF-8")
-        return "https://graph.baidu.com/details?isfromtoybox=1&searchtype=searchSimple&objurl=$encodedUrl"
     }
 
     fun getPerplexityUrl(imageUrl: String): String {
@@ -118,11 +111,5 @@ object ImageSearchUploader {
     fun getChatGPTUrl(imageUrl: String): String {
         // ChatGPT doesn't support URL params for image search directly yet
         return "https://chatgpt.com/"
-    }
-    
-    fun getLensoUrl(imageUrl: String): String {
-        val encodedUrl = URLEncoder.encode(imageUrl, "UTF-8")
-        // Try passing URL as query param, though Lenso usually requires upload
-        return "https://lenso.ai/en/results?url=$encodedUrl"
     }
 }
