@@ -30,9 +30,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -104,7 +107,8 @@ fun CircleToSearchScreen(
     var hostedImageUrl by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(false) }
     var isDesktopMode by remember { mutableStateOf(false) }
-    var isDarkMode by remember { mutableStateOf(true) }
+    var isDarkMode by remember { mutableStateOf(false) } // Default to light mode
+    var showGradientBorder by remember { mutableStateOf(true) }
     
     // Cache for preloaded URLs to avoid re-uploading/re-generating
     val preloadedUrls = remember { mutableMapOf<SearchEngine, String>() }
@@ -152,21 +156,22 @@ fun CircleToSearchScreen(
                 javaScriptEnabled = true
                 domStorageEnabled = true
                 databaseEnabled = true
-                useWideViewPort = true
-                loadWithOverviewMode = true
-                setSupportZoom(true)
-                builtInZoomControls = true
-                displayZoomControls = false
-                
-                // Caching
-                cacheMode = WebSettings.LOAD_DEFAULT
-                
-                // Enhanced settings for "Normal" browser behavior
                 allowFileAccess = true
                 allowContentAccess = true
                 allowFileAccessFromFileURLs = true
                 allowUniversalAccessFromFileURLs = true
                 mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                
+                // Performance & UI
+                setRenderPriority(WebSettings.RenderPriority.HIGH)
+                
+                // Zoom support
+                setSupportZoom(true)
+                builtInZoomControls = true
+                displayZoomControls = false
+                
+                useWideViewPort = true
+                loadWithOverviewMode = true
                 
                 userAgentString = if (isDesktopMode) {
                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -178,14 +183,15 @@ fun CircleToSearchScreen(
                 // Algorithmic darkening alone doesn't work on many websites
                 android.util.Log.d("CircleToSearch", "Dark mode enabled: $isDarkMode")
             }
+            
+            // UI Tweaks
+            isVerticalScrollBarEnabled = false
+            isHorizontalScrollBarEnabled = false
 
             // Enable Third-Party Cookies
             android.webkit.CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
 
             webViewClient = object : WebViewClient() {
-                override fun shouldOverrideUrlLoading(view: WebView?, request: android.webkit.WebResourceRequest?): Boolean {
-                    return false // Load in WebView
-                }
                 
                 override fun onPageFinished(view: WebView?, url: String?) {
                     super.onPageFinished(view, url)
@@ -497,16 +503,18 @@ fun CircleToSearchScreen(
             }
 
             // 2. Gradient Border Layer (Overlaying screenshot, clipped to rounded corners)
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .border(
-                        width = 8.dp,
-                        brush = Brush.verticalGradient(colors = OverlayGradientColors),
-                        shape = RoundedCornerShape(24.dp) // Rounded corners for device
-                    )
-                    .clip(RoundedCornerShape(24.dp))
-            )
+            if (showGradientBorder) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .border(
+                            width = 8.dp,
+                            brush = Brush.verticalGradient(colors = OverlayGradientColors),
+                            shape = RoundedCornerShape(24.dp) // Rounded corners for device
+                        )
+                        .clip(RoundedCornerShape(24.dp))
+                )
+            }
 
             // 3. Drawing Canvas (Interactive Layer)
             Canvas(
@@ -731,6 +739,13 @@ fun CircleToSearchScreen(
                             }
                         )
                         androidx.compose.material3.DropdownMenuItem(
+                            text = { Text(if (showGradientBorder) "Hide Border" else "Show Border") },
+                            onClick = { 
+                                showGradientBorder = !showGradientBorder 
+                                showMenu = false
+                            }
+                        )
+                        androidx.compose.material3.DropdownMenuItem(
                             text = { Text("Copy URL") },
                             onClick = {
                                 if (searchUrl != null) {
@@ -808,11 +823,26 @@ fun CircleToSearchScreen(
                     modifier = Modifier.align(Alignment.CenterEnd),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Default.Mic, "Mic", tint = Color.White)
-                    Spacer(modifier = Modifier.width(24.dp))
-                    Icon(Icons.Default.MusicNote, "Music", tint = Color.White)
-                    Spacer(modifier = Modifier.width(24.dp))
-                    Icon(Icons.Default.Translate, "Translate", tint = Color.White)
+                    IconButton(onClick = {
+                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/akslabs"))
+                        context.startActivity(intent)
+                    }) {
+                        Icon(Icons.Default.Code, "Github", tint = Color.White)
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    IconButton(onClick = {
+                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/sponsors/akslabs"))
+                        context.startActivity(intent)
+                    }) {
+                        Icon(Icons.Default.Favorite, "Donate", tint = Color.White)
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    IconButton(onClick = {
+                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://t.me/akslabs"))
+                        context.startActivity(intent)
+                    }) {
+                        Icon(Icons.Default.Send, "Telegram", tint = Color.White)
+                    }
                 }
             }
         }
