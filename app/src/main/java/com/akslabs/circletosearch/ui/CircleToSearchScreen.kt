@@ -104,7 +104,7 @@ fun CircleToSearchScreen(
     var hostedImageUrl by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(false) }
     var isDesktopMode by remember { mutableStateOf(false) }
-    var isDarkMode by remember { mutableStateOf(false) }
+    var isDarkMode by remember { mutableStateOf(true) }
     
     // Cache for preloaded URLs to avoid re-uploading/re-generating
     val preloadedUrls = remember { mutableMapOf<SearchEngine, String>() }
@@ -174,10 +174,9 @@ fun CircleToSearchScreen(
                     "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
                 }
                 
-                // Dark Mode
-                if (WebViewFeature.isFeatureSupported(WebViewFeature.FORCE_DARK)) {
-                    WebSettingsCompat.setForceDark(this, if (isDarkMode) WebSettingsCompat.FORCE_DARK_ON else WebSettingsCompat.FORCE_DARK_OFF)
-                }
+                // Dark Mode - Use CSS injection for universal compatibility
+                // Algorithmic darkening alone doesn't work on many websites
+                android.util.Log.d("CircleToSearch", "Dark mode enabled: $isDarkMode")
             }
 
             // Enable Third-Party Cookies
@@ -186,6 +185,25 @@ fun CircleToSearchScreen(
             webViewClient = object : WebViewClient() {
                 override fun shouldOverrideUrlLoading(view: WebView?, request: android.webkit.WebResourceRequest?): Boolean {
                     return false // Load in WebView
+                }
+                
+                override fun onPageFinished(view: WebView?, url: String?) {
+                    super.onPageFinished(view, url)
+                    // Inject dark mode CSS if enabled
+                    if (isDarkMode) {
+                        val darkModeCSS = """
+                            javascript:(function() {
+                                var style = document.createElement('style');
+                                style.innerHTML = `
+                                    html { filter: invert(1) hue-rotate(180deg) !important; background: #000 !important; }
+                                    img, video, [style*="background-image"] { filter: invert(1) hue-rotate(180deg) !important; }
+                                `;
+                                document.head.appendChild(style);
+                            })()
+                        """.trimIndent()
+                        view?.loadUrl(darkModeCSS)
+                        android.util.Log.d("CircleToSearch", "Dark mode CSS injected for: $url")
+                    }
                 }
             }
             isNestedScrollingEnabled = true
@@ -219,7 +237,7 @@ fun CircleToSearchScreen(
 
     androidx.compose.material3.BottomSheetScaffold(
         scaffoldState = scaffoldState,
-        sheetPeekHeight = 150.dp, // Peek height when collapsed
+        sheetPeekHeight = 500.dp, // Peek height when collapsed
         sheetContainerColor = Color.Transparent,
         sheetContentColor = MaterialTheme.colorScheme.onSurface,
         sheetDragHandle = { BottomSheetDefaults.DragHandle() },
@@ -346,12 +364,36 @@ fun CircleToSearchScreen(
                             "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
                         }
                         webViews.values.forEach { wv ->
-                            if (wv.settings.userAgentString != newUserAgent) {
+                            val needsReload = wv.settings.userAgentString != newUserAgent
+                            if (needsReload) {
                                 wv.settings.userAgentString = newUserAgent
                             }
-                            if (WebViewFeature.isFeatureSupported(WebViewFeature.FORCE_DARK)) {
-                                WebSettingsCompat.setForceDark(wv.settings, if (isDarkMode) WebSettingsCompat.FORCE_DARK_ON else WebSettingsCompat.FORCE_DARK_OFF)
+                            
+                            // Update WebViewClient for dark mode CSS injection
+                            if (isDarkMode) {
+                                wv.webViewClient = object : android.webkit.WebViewClient() {
+                                    override fun onPageFinished(view: android.webkit.WebView?, url: String?) {
+                                        super.onPageFinished(view, url)
+                                        val darkModeCSS = """
+                                            javascript:(function() {
+                                                var style = document.createElement('style');
+                                                style.innerHTML = `
+                                                    html { filter: invert(1) hue-rotate(180deg) !important; background: #000 !important; }
+                                                    img, video, [style*="background-image"] { filter: invert(1) hue-rotate(180deg) !important; }
+                                                `;
+                                                document.head.appendChild(style);
+                                            })()
+                                        """.trimIndent()
+                                        view?.loadUrl(darkModeCSS)
+                                    }
+                                }
+                            } else {
+                                wv.webViewClient = android.webkit.WebViewClient()
                             }
+                            
+                            android.util.Log.d("CircleToSearch", "Updated dark mode to: $isDarkMode for WebView")
+                            // Reload to apply dark mode setting
+                            wv.reload()
                         }
                     }
                     
