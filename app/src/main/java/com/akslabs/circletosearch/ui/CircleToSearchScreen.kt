@@ -66,6 +66,8 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -586,144 +588,162 @@ fun CircleToSearchScreen(
                         }
                     }
 
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        when {
-                            isLoading -> {
-                                androidx.compose.material3.CircularProgressIndicator(
-                                    modifier = Modifier.align(Alignment.Center)
-                                )
+                    // Helper to create and configure WebView
+                    fun createWebView(ctx: android.content.Context): WebView {
+                        return WebView(ctx).apply {
+                            layoutParams = ViewGroup.LayoutParams(
+                                ViewGroup.LayoutParams.MATCH_PARENT,
+                                ViewGroup.LayoutParams.MATCH_PARENT
+                            )
+                            settings.apply {
+                                javaScriptEnabled = true
+                                domStorageEnabled = true
+                                databaseEnabled = true
+                                useWideViewPort = true
+                                loadWithOverviewMode = true
+                                setSupportZoom(true)
+                                builtInZoomControls = true
+                                displayZoomControls = false
+                                
+                                // Enhanced settings for "Normal" browser behavior
+                                allowFileAccess = true
+                                allowContentAccess = true
+                                allowFileAccessFromFileURLs = true
+                                allowUniversalAccessFromFileURLs = true
+                                mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                                
+                                userAgentString = if (isDesktopMode) {
+                                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                                } else {
+                                    "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+                                }
+                                
+                                // Dark Mode
+                                if (WebViewFeature.isFeatureSupported(WebViewFeature.FORCE_DARK)) {
+                                    WebSettingsCompat.setForceDark(this, if (isDarkMode) WebSettingsCompat.FORCE_DARK_ON else WebSettingsCompat.FORCE_DARK_OFF)
+                                }
                             }
-                            searchUrl != null -> {
-                                // Back Handler
-                                BackHandler(enabled = true) {
-                                    val currentWebView = webViews[selectedEngine]
-                                    if (currentWebView != null && currentWebView.canGoBack()) {
-                                        currentWebView.goBack()
-                                    } else {
-                                        // Dismiss sheet
-                                        showBottomSheet = false
+
+                            // Enable Third-Party Cookies
+                            android.webkit.CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
+
+                            webViewClient = object : WebViewClient() {
+                                override fun shouldOverrideUrlLoading(view: WebView?, request: android.webkit.WebResourceRequest?): Boolean {
+                                    return false // Load in WebView
+                                }
+                            }
+                            isNestedScrollingEnabled = true
+                            setOnTouchListener { v, event ->
+                                when (event.action) {
+                                    android.view.MotionEvent.ACTION_DOWN -> {
+                                        v.parent.requestDisallowInterceptTouchEvent(true)
+                                    }
+                                    android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
+                                        v.parent.requestDisallowInterceptTouchEvent(false)
                                     }
                                 }
+                                false
+                            }
+                        }
+                    }
 
-                                // Helper to create and configure WebView
-                                fun createWebView(ctx: android.content.Context): WebView {
-                                    return WebView(ctx).apply {
-                                        layoutParams = ViewGroup.LayoutParams(
-                                            ViewGroup.LayoutParams.MATCH_PARENT,
-                                            ViewGroup.LayoutParams.MATCH_PARENT
-                                        )
-                                        settings.apply {
-                                            javaScriptEnabled = true
-                                            domStorageEnabled = true
-                                            databaseEnabled = true
-                                            useWideViewPort = true
-                                            loadWithOverviewMode = true
-                                            setSupportZoom(true)
-                                            builtInZoomControls = true
-                                            displayZoomControls = false
-                                            userAgentString = if (isDesktopMode) {
-                                                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-                                            } else {
-                                                "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        // Show loading only if the SELECTED engine isn't ready
+                        if (isLoading || preloadedUrls[selectedEngine] == null) {
+                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                androidx.compose.material3.CircularProgressIndicator()
+                            }
+                        }
+
+                        // Back Handler
+                        BackHandler(enabled = true) {
+                            val currentWebView = webViews[selectedEngine]
+                            if (currentWebView != null && currentWebView.canGoBack()) {
+                                currentWebView.goBack()
+                            } else {
+                                // Dismiss sheet
+                                showBottomSheet = false
+                            }
+                        }
+                        
+                        // Dynamic Settings Update
+                        LaunchedEffect(isDesktopMode, isDarkMode) {
+                            val newUserAgent = if (isDesktopMode) {
+                                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                            } else {
+                                "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+                            }
+                            webViews.values.forEach { wv ->
+                                if (wv.settings.userAgentString != newUserAgent) {
+                                    wv.settings.userAgentString = newUserAgent
+                                }
+                                if (WebViewFeature.isFeatureSupported(WebViewFeature.FORCE_DARK)) {
+                                    WebSettingsCompat.setForceDark(wv.settings, if (isDarkMode) WebSettingsCompat.FORCE_DARK_ON else WebSettingsCompat.FORCE_DARK_OFF)
+                                }
+                            }
+                        }
+                        
+                        // Cleanup
+                        DisposableEffect(Unit) {
+                            onDispose {
+                                webViews.values.forEach { it.destroy() }
+                                webViews.clear()
+                            }
+                        }
+
+                        // Render ALL WebViews that have URLs
+                        searchEngines.forEach { engine ->
+                            val url = preloadedUrls[engine]
+                            if (url != null) {
+                                val isSelected = (engine == selectedEngine)
+                                
+                                androidx.compose.runtime.key(engine) {
+                                    AndroidView(
+                                        factory = { ctx ->
+                                            val swipeRefresh = SwipeRefreshLayout(ctx).apply {
+                                                layoutParams = ViewGroup.LayoutParams(
+                                                    ViewGroup.LayoutParams.MATCH_PARENT,
+                                                    ViewGroup.LayoutParams.MATCH_PARENT
+                                                )
                                             }
                                             
-                                            // Dark Mode
-                                            if (WebViewFeature.isFeatureSupported(WebViewFeature.FORCE_DARK)) {
-                                                WebSettingsCompat.setForceDark(this, if (isDarkMode) WebSettingsCompat.FORCE_DARK_ON else WebSettingsCompat.FORCE_DARK_OFF)
+                                            val webView = createWebView(ctx)
+                                            webViews[engine] = webView
+                                            webView.loadUrl(url)
+                                            
+                                            swipeRefresh.addView(webView)
+                                            
+                                            swipeRefresh.setOnRefreshListener {
+                                                webView.reload()
+                                                swipeRefresh.isRefreshing = false
                                             }
-                                        }
-                                        webViewClient = object : WebViewClient() {
-                                            override fun shouldOverrideUrlLoading(view: WebView?, request: android.webkit.WebResourceRequest?): Boolean {
-                                                return false // Load in WebView
-                                            }
-                                        }
-                                        isNestedScrollingEnabled = true
-                                        setOnTouchListener { v, event ->
-                                            when (event.action) {
-                                                android.view.MotionEvent.ACTION_DOWN -> {
-                                                    v.parent.requestDisallowInterceptTouchEvent(true)
+                                            
+                                            swipeRefresh
+                                        },
+                                        update = { swipeRefresh ->
+                                            var webView: WebView? = null
+                                            for (i in 0 until swipeRefresh.childCount) {
+                                                val child = swipeRefresh.getChildAt(i)
+                                                if (child is WebView) {
+                                                    webView = child
+                                                    break
                                                 }
-                                                android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
-                                                    v.parent.requestDisallowInterceptTouchEvent(false)
+                                            }
+                                            
+                                            if (webView != null) {
+                                                // Update URL if changed (e.g. new search)
+                                                if (webView.url != url && url != webView.originalUrl) {
+                                                    webView.loadUrl(url)
                                                 }
                                             }
-                                            false
-                                        }
-                                    }
-                                }
-
-                                // Load URL if needed
-                                LaunchedEffect(preloadedUrls) {
-                                    preloadedUrls.forEach { (engine, url) ->
-                                        val wv = webViews.getOrPut(engine) { createWebView(context) }
-                                        if (wv.url != url) {
-                                            wv.loadUrl(url)
-                                        }
-                                    }
-                                }
-
-                                // Update User Agent & Dark Mode dynamically
-                                LaunchedEffect(isDesktopMode, isDarkMode) {
-                                    val newUserAgent = if (isDesktopMode) {
-                                        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-                                    } else {
-                                        "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
-                                    }
-                                    webViews.values.forEach { wv ->
-                                        if (wv.settings.userAgentString != newUserAgent) {
-                                            wv.settings.userAgentString = newUserAgent
-                                        }
-                                        if (WebViewFeature.isFeatureSupported(WebViewFeature.FORCE_DARK)) {
-                                            WebSettingsCompat.setForceDark(wv.settings, if (isDarkMode) WebSettingsCompat.FORCE_DARK_ON else WebSettingsCompat.FORCE_DARK_OFF)
-                                        }
-                                    }
-                                }
-
-                                DisposableEffect(Unit) {
-                                    onDispose {
-                                        webViews.values.forEach { it.destroy() }
-                                        webViews.clear()
-                                    }
-                                }
-
-                                AndroidView(
-                                    factory = { ctx ->
-                                        SwipeRefreshLayout(ctx).apply {
-                                            layoutParams = ViewGroup.LayoutParams(
-                                                ViewGroup.LayoutParams.MATCH_PARENT,
-                                                ViewGroup.LayoutParams.MATCH_PARENT
-                                            )
-                                            setOnRefreshListener {
-                                                webViews[selectedEngine]?.reload()
-                                                isRefreshing = false
+                                        },
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .zIndex(if (isSelected) 1f else 0f)
+                                            .graphicsLayer { 
+                                                alpha = if (isSelected) 1f else 0f 
                                             }
-                                        }
-                                    },
-                                    update = { swipeLayout ->
-                                        val webView = webViews.getOrPut(selectedEngine) { createWebView(context) }
-                                        
-                                        if (swipeLayout.childCount > 0 && swipeLayout.getChildAt(0) != webView) {
-                                            swipeLayout.removeAllViews()
-                                        }
-                                        
-                                        if (swipeLayout.childCount == 0) {
-                                            if (webView.parent != null) {
-                                                (webView.parent as ViewGroup).removeView(webView)
-                                            }
-                                            swipeLayout.addView(webView)
-                                        }
-                                        
-                                        (swipeLayout as SwipeRefreshLayout).setOnRefreshListener {
-                                            webView.reload()
-                                            swipeLayout.isRefreshing = false
-                                        }
-                                    },
-                                    modifier = Modifier.fillMaxSize()
-                                )
-                            }
-                            else -> {
-                                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                    Text("Loading...", color = Color.Black)
+                                    )
                                 }
                             }
                         }
