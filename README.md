@@ -1,6 +1,6 @@
 <!-- ---------- Header ---------- -->
 <div align="center">
-  <img src="app/src/main/res/drawable/chitralaya.png" width="200" height="200">
+  <img src="app/src/main/res/drawable/circletosearch.png" width="200" height="200">
   <h1>Circle To Search</h1>
   <h3>Circle To Search: Multi-Engine Reverse Image Search</h3>
   <p>🔒 <em>Google • Bing • Yandex • Tineye</em></p>
