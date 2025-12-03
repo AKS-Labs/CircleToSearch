@@ -75,7 +75,7 @@ fun SupportSheet(
                 }
             ),
             OptionItem(
-                text = "UPI / Crypto",
+                text = "UPI",
                 onClick = {
                     showCryptoOptions = true
                 }
@@ -89,20 +89,8 @@ fun SupportSheet(
     
     val cryptoOptions = remember {
         mapOf(
-            "ETH" to "0x707eF0E95e814E05efadFD3d3783401cfbE8D11E",
-            "POLYGON" to "0x707eF0E95e814E05efadFD3d3783401cfbE8D11E",
-            "AVALANCHE" to "0x707eF0E95e814E05efadFD3d3783401cfbE8D11E",
-            "BNB" to "0x707eF0E95e814E05efadFD3d3783401cfbE8D11E",
-            "XDC" to "0x707eF0E95e814E05efadFD3d3783401cfbE8D11E",
-            "XMR" to "48JMiDR8mZiEis8V5pWtxv3r121K6fqqZfhajiewCbff27GnucdyLfkQ12Fr6ZM1eR9Botdu3Rx1bidmHyLTZBWnJ4AJKot",
-            "EPIC" to "esWaroB8AQXZuaEJWtraPomNH3Lg1JRP3EVxr6batoFuqvf3hrHP@epicbox.epic.tech",
-            "XRP" to "rPjYh6XMMra3zHFqDn6ZnYFCmPWPnbTHkc",
-            "ADA" to "addr1q978p8x80z2d4je5gutav0ypplgtpw0mhmwky8k5mscds9ru9nma366mryl0ln8ump7ysj5wa9sg20c4x7ywjyzvacxseapv0y",
-            "XLM" to "GAHXB7JI4QEZW2ZM4CA6PQ37Y3636UXWWXDHAZLHCJV5HGXYWQJBIE5Q",
-            "INJ" to "inj1wpl0p627s98qtmadl57n0q6qrna735g72dner7",
-            "SUI" to "0xe135452c381f3298e0ddb17c3e1ede8e1d6aaefb3bc3734219dd6d14ce2177ce",
-            "SEI" to "sei1t5c9dmjdempk7hklw0mm4wkxwzauncvqsgs3l4",
-            "HBAR" to "0.0.4688681-szsjz"
+            "UPI" to "AKSLabs@upi",
+
         ).map { (coin, address) ->
             OptionItem(
                 text = coin,

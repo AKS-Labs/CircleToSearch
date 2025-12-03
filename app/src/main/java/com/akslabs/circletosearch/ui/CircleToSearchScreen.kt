@@ -835,7 +835,7 @@ fun CircleToSearchScreen(
                             painter = painterResource(id = com.akslabs.circletosearch.R.drawable.donation),
                             contentDescription = "Donate",
                             tint = Color.White,
-                            modifier = Modifier.size(25.dp)
+                            modifier = Modifier.size(22.dp)
                         )
                     }
                     Spacer(modifier = Modifier.width(3.dp))

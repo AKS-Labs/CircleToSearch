@@ -221,9 +221,9 @@ fun SupportDialog(
         onDismissRequest = onDismiss,
         icon = {
             Icon(
-                Icons.Default.Favorite,
+                painter = painterResource(id = com.akslabs.circletosearch.R.drawable.donation),
                 contentDescription = null,
-                tint = Color(0xFFFF6B6B),
+                tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(48.dp)
             )
         },
@@ -237,8 +237,17 @@ fun SupportDialog(
         text = {
             Column {
                 Text(
-                    text = "If my open-source work has ever made your day easier, smoother, or even a little calmer… consider supporting my journey. Your sponsorship keeps my projects alive, my motivation strong, and my chai hot. ☕✨",
+                    text = "If anything I’ve made has ever made your day a little easier or smoother,\n" +
+                            "\n" +
+                            "I’d be grateful if you considered supporting my work ☺\uFE0F.\n" +
+                            "\n" +
+                            "Your support helps me keep improving these apps\n" +
+                            "and stay motivated,\n" +
+
+                            "\n" +
+                            "Thank you for supporting independent developers.",
                     style = MaterialTheme.typography.bodyMedium,
+//                    fontWeight = FontWeight.Black,
                     lineHeight = 20.sp
                 )
                 
@@ -263,7 +272,7 @@ fun SupportDialog(
         },
         confirmButton = {
             TextButton(onClick = onDonate) {
-                Text("Donate", color = Color(0xFFFF6B6B))
+                Text("Donate", color = MaterialTheme.colorScheme.primary)
             }
         },
         dismissButton = {
