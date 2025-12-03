@@ -1,17 +1,25 @@
 package com.akslabs.circletosearch
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SheetState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -25,25 +33,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalUriHandler
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
-import com.dot.gallery.R
-import com.dot.gallery.core.presentation.components.DragHandle
-import com.dot.gallery.feature_node.presentation.common.components.OptionItem
-import com.dot.gallery.feature_node.presentation.common.components.OptionLayout
-import com.dot.gallery.feature_node.presentation.util.AppBottomSheetState
 import kotlinx.coroutines.launch
 
-@Suppress("DEPRECATION")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SupportSheet(
-    state: AppBottomSheetState
+    sheetState: SheetState,
+    onDismissRequest: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
     val uriHandler = LocalUriHandler.current
@@ -51,6 +53,13 @@ fun SupportSheet(
         mutableStateOf(false)
     }
     val clipboard = LocalClipboardManager.current
+    
+    data class OptionItem(
+        val text: String,
+        val summary: String? = null,
+        val onClick: (String) -> Unit
+    )
+
     val mainOptions = remember {
         listOf(
             OptionItem(
@@ -66,16 +75,18 @@ fun SupportSheet(
                 }
             ),
             OptionItem(
-                text = "UPI",
+                text = "UPI / Crypto",
                 onClick = {
                     showCryptoOptions = true
                 }
             )
         )
     }
+    
     val cryptoOnClick: (String) -> Unit = {
         clipboard.setText(AnnotatedString(it))
     }
+    
     val cryptoOptions = remember {
         mapOf(
             "ETH" to "0x707eF0E95e814E05efadFD3d3783401cfbE8D11E",
@@ -100,72 +111,83 @@ fun SupportSheet(
             )
         }
     }
-    if (state.isVisible) {
-        BackHandler(showCryptoOptions) {
+
+    if (showCryptoOptions) {
+        BackHandler {
             showCryptoOptions = false
         }
-        ModalBottomSheet(
-            sheetState = state.sheetState,
-            onDismissRequest = {
-                scope.launch {
-                    showCryptoOptions = false
-                    state.hide()
-                }
-            },
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
-            tonalElevation = 0.dp,
-            dragHandle = { DragHandle() },
-            contentWindowInsets = { WindowInsets(0, 0, 0, 0) }
+    }
+
+    ModalBottomSheet(
+        sheetState = sheetState,
+        onDismissRequest = {
+            if (showCryptoOptions) {
+                showCryptoOptions = false
+            } else {
+                onDismissRequest()
+            }
+        },
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+        tonalElevation = 0.dp,
+        dragHandle = { BottomSheetDefaults.DragHandle() },
+        contentWindowInsets = { WindowInsets(0, 0, 0, 0) }
+    ) {
+        Column(
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 32.dp, vertical = 16.dp)
+                .navigationBarsPadding()
         ) {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 32.dp, vertical = 16.dp)
-                    .navigationBarsPadding()
-            ) {
-                Text(
-                    text = buildAnnotatedString {
+            Text(
+                text = buildAnnotatedString {
+                    withStyle(
+                        style = SpanStyle(
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontStyle = MaterialTheme.typography.titleLarge.fontStyle,
+                            fontSize = MaterialTheme.typography.titleLarge.fontSize,
+                            letterSpacing = MaterialTheme.typography.titleLarge.letterSpacing
+                        )
+                    ) {
+                        append("Support the project")
+                    }
+                    if (showCryptoOptions) {
+                        append("\n")
                         withStyle(
                             style = SpanStyle(
-                                color = MaterialTheme.colorScheme.onSurface,
-                                fontStyle = MaterialTheme.typography.titleLarge.fontStyle,
-                                fontSize = MaterialTheme.typography.titleLarge.fontSize,
-                                letterSpacing = MaterialTheme.typography.titleLarge.letterSpacing
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontStyle = MaterialTheme.typography.bodyMedium.fontStyle,
+                                fontSize = MaterialTheme.typography.bodyMedium.fontSize,
+                                letterSpacing = MaterialTheme.typography.bodyMedium.letterSpacing
                             )
                         ) {
-                            append(stringResource(R.string.support_the_project))
+                            append("Click to copy")
                         }
-                        if (showCryptoOptions) {
-                            append("\n")
-                            withStyle(
-                                style = SpanStyle(
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    fontStyle = MaterialTheme.typography.bodyMedium.fontStyle,
-                                    fontSize = MaterialTheme.typography.bodyMedium.fontSize,
-                                    letterSpacing = MaterialTheme.typography.bodyMedium.letterSpacing
-                                )
-                            ) {
-                                append(stringResource(R.string.click_to_copy))
-                            }
-                        }
-                    },
-                    textAlign = TextAlign.Center,
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier
-                        .padding(bottom = 16.dp)
-                        .fillMaxWidth()
-                )
-                val options = remember(showCryptoOptions) {
-                    (if (showCryptoOptions) cryptoOptions else mainOptions).toMutableStateList()
+                    }
+                },
+                textAlign = TextAlign.Center,
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier
+                    .padding(bottom = 16.dp)
+                    .fillMaxWidth()
+            )
+            
+            val options = remember(showCryptoOptions) {
+                (if (showCryptoOptions) cryptoOptions else mainOptions).toMutableStateList()
+            }
+            
+            Column(modifier = Modifier.fillMaxWidth()) {
+                options.forEach { option ->
+                    ListItem(
+                        headlineContent = { Text(option.text) },
+                        supportingContent = option.summary?.let { { Text(it) } },
+                        modifier = Modifier.clickable { option.onClick(option.summary ?: "") }
+                    )
+                    HorizontalDivider()
                 }
-                OptionLayout(
-                    modifier = Modifier.fillMaxWidth(),
-                    optionList = options
-                )
             }
         }
     }

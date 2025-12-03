@@ -103,6 +103,10 @@ fun CircleToSearchScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     
+    // Support Sheet State
+    var showSupportSheet by remember { mutableStateOf(false) }
+    val supportSheetState = rememberModalBottomSheetState()
+
     // Search State
     var selectedEngine by remember { mutableStateOf<SearchEngine>(SearchEngine.Google) }
     var searchUrl by remember { mutableStateOf<String?>(null) }
@@ -825,8 +829,7 @@ fun CircleToSearchScreen(
                 ) {
 
                     IconButton(onClick = {
-                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/sponsors/aks-labs"))
-                        context.startActivity(intent)
+                        showSupportSheet = true
                     }, modifier = Modifier.size(32.dp)) {
                         Icon(
                             painter = painterResource(id = com.akslabs.circletosearch.R.drawable.donation),
@@ -862,6 +865,21 @@ fun CircleToSearchScreen(
                     }
                 }
             }
+        }
+        
+        if (showSupportSheet) {
+            com.akslabs.circletosearch.SupportSheet(
+                sheetState = supportSheetState,
+                onDismissRequest = {
+                    scope.launch {
+                        supportSheetState.hide()
+                    }.invokeOnCompletion {
+                        if (!supportSheetState.isVisible) {
+                            showSupportSheet = false
+                        }
+                    }
+                }
+            )
         }
     }
 }
