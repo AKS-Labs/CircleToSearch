@@ -25,10 +25,13 @@
 </div>
 
 ---
-# CircleToSearch
+## 🎯 What is Circle To Search?
 
-**CircleToSearch** is an open-source Android application that brings the powerful "Circle to Search" feature to any Android device. It allows you to search for anything on your screen by simply drawing a circle around it.
+Ever wanted to search for something you see on your phone screen? **Circle To Search** brings that power to your fingertips on *any* Android device. Simply draw a circle around what you're looking for, and instantly get results from your favorite search engine.
 
+Think of it as having Google Lens, Bing Visual Search, Yandex, and TinEye all in one place—and it works everywhere.
+
+---
 ## ✨ Features
 
 -   **Universal Compatibility**: Works on any Android device (Android 10+).

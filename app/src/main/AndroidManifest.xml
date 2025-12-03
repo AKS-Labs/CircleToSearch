@@ -53,12 +53,7 @@
             android:excludeFromRecents="true"
             android:launchMode="singleInstance" />
 
-        <activity
-            android:name=".WebViewActivity"
-            android:exported="false"
-            android:theme="@style/Theme.CircleToSearch.Transparent"
-            android:excludeFromRecents="true"
-            android:launchMode="singleInstance" />
+        <!-- WebViewActivity removed - not implemented -->
 
     </application>
 
