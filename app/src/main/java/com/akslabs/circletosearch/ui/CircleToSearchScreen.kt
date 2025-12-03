@@ -76,6 +76,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -822,25 +823,42 @@ fun CircleToSearchScreen(
                     modifier = Modifier.align(Alignment.CenterEnd),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+
+                    IconButton(onClick = {
+                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/sponsors/aks-labs"))
+                        context.startActivity(intent)
+                    }, modifier = Modifier.size(32.dp)) {
+                        Icon(
+                            painter = painterResource(id = com.akslabs.circletosearch.R.drawable.donation),
+                            contentDescription = "Donate",
+                            tint = Color.White,
+                            modifier = Modifier.size(25.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(3.dp))
                     IconButton(onClick = {
                         val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/aks-labs"))
                         context.startActivity(intent)
-                    }) {
-                        Icon(Icons.Default.Code, "Github", tint = Color.White)
+                    }, modifier = Modifier.size(32.dp)) {
+                        Icon(
+                            painter = painterResource(id = com.akslabs.circletosearch.R.drawable.github),
+                            contentDescription = "Github",
+                            tint = Color.White,
+                            modifier = Modifier.size(23.dp)
+                        )
                     }
-                    Spacer(modifier = Modifier.width(4.dp))
-                    IconButton(onClick = {
-                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/sponsors/akslabs"))
-                        context.startActivity(intent)
-                    }) {
-                        Icon(Icons.Default.Favorite, "Donate", tint = Color.White)
-                    }
-                    Spacer(modifier = Modifier.width(4.dp))
+
+                    Spacer(modifier = Modifier.width(3.dp))
                     IconButton(onClick = {
                         val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://t.me/akslabs"))
                         context.startActivity(intent)
-                    }) {
-                        Icon(Icons.Default.Send, "Telegram", tint = Color.White)
+                    }, modifier = Modifier.size(32.dp)) {
+                        Icon(
+                            painter = painterResource(id = com.akslabs.circletosearch.R.drawable.telegram),
+                            contentDescription = "Telegram",
+                            tint = Color.White,
+                            modifier = Modifier.size(23.dp)
+                        )
                     }
                 }
             }
