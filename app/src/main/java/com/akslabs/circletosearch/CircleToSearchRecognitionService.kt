@@ -5,14 +5,14 @@ import android.speech.RecognitionService
 
 class CircleToSearchRecognitionService : RecognitionService() {
     override fun onStartListening(intent: Intent?, callback: Callback?) {
-        // Not implemented - strictly for system compliance
+        android.util.Log.d("CircleToSearchRecog", "onStartListening")
     }
 
     override fun onStopListening(callback: Callback?) {
-        // Not implemented
+        android.util.Log.d("CircleToSearchRecog", "onStopListening")
     }
 
     override fun onCancel(callback: Callback?) {
-        // Not implemented
+        android.util.Log.d("CircleToSearchRecog", "onCancel")
     }
 }

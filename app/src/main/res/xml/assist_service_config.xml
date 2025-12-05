@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <voice-interaction-service xmlns:android="http://schemas.android.com/apk/res/android"
-    android:sessionService=".AssistSessionService"
-    android:recognitionService=".CircleToSearchRecognitionService"
-    android:settingsActivity=".MainActivity"
+    android:sessionService="com.akslabs.circletosearch.AssistSessionService"
+    android:recognitionService="com.akslabs.circletosearch.CircleToSearchRecognitionService"
+    android:settingsActivity="com.akslabs.circletosearch.MainActivity"
     android:supportsAssist="true"
     android:supportsLaunchVoiceAssistFromKeyguard="true"
     android:supportsLocalInteraction="true" />

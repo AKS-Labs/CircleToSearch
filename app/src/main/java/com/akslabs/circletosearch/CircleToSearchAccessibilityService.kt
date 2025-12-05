@@ -219,6 +219,7 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
     }
 
     private fun launchOverlay() {
+        android.util.Log.d("CircleToSearchAccess", "AccessibilityService launching OverlayActivity")
         val intent = Intent(this, OverlayActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION) // Disable animation for faster feel
