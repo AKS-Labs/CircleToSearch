@@ -231,8 +231,22 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
 
     override fun onInterrupt() {}
 
+companion object {
+        private var instance: CircleToSearchAccessibilityService? = null
+
+        fun triggerCapture() {
+            instance?.performCapture()
+        }
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+        instance = this
+    }
+
     override fun onDestroy() {
         super.onDestroy()
+        instance = null
         prefs.unregisterOnSharedPreferenceChangeListener(prefsListener)
         if (triggerView != null && windowManager != null) {
             windowManager?.removeView(triggerView)
