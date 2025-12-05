@@ -110,6 +110,12 @@ fun SetupScreen() {
         
         BubbleSwitch(context)
 
+
+        Spacer(modifier = Modifier.height(32.dp))
+        
+        AssistantSwitch(context)
+
+
         // Support Icons Row
         Spacer(modifier = Modifier.height(48.dp))
         SocialLinksRow(
@@ -303,5 +309,51 @@ fun BubbleSwitch(context: android.content.Context) {
                 prefs.edit().putBoolean("bubble_enabled", enabled).apply()
             }
         )
+    }
+}
+
+@Composable
+fun AssistantSwitch(context: android.content.Context) {
+    val prefs = context.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
+    val isAssistantEnabled = remember { mutableStateOf(prefs.getBoolean("assistant_enabled", false)) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 32.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Enable Assistant Integration")
+            Switch(
+                checked = isAssistantEnabled.value,
+                onCheckedChange = { enabled ->
+                    isAssistantEnabled.value = enabled
+                    prefs.edit().putBoolean("assistant_enabled", enabled).apply()
+                }
+            )
+        }
+        
+        if (isAssistantEnabled.value) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Long-press home button to launch Circle to Search",
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.Gray
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Button(
+                onClick = {
+                    val intent = Intent(Settings.ACTION_VOICE_INPUT_SETTINGS)
+                    context.startActivity(intent)
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Set as Default Assistant")
+            }
+        }
     }
 }

@@ -5,7 +5,7 @@ import android.graphics.Bitmap
 object BitmapRepository {
     private var screenshot: Bitmap? = null
 
-    fun setScreenshot(bitmap: Bitmap) {
+    fun setScreenshot(bitmap: Bitmap?) {
         screenshot = bitmap
     }
 

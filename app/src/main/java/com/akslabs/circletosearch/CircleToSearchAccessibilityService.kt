@@ -136,6 +136,20 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
                 performCapture()
                 return true
             }
+            
+            override fun onFling(
+                e1: MotionEvent?,
+                e2: MotionEvent,
+                velocityX: Float,
+                velocityY: Float
+            ): Boolean {
+                // Detect downward swipe to open notifications
+                if (e1 != null && velocityY > 1000) { // Swipe down with sufficient velocity
+                    performGlobalAction(GLOBAL_ACTION_NOTIFICATIONS)
+                    return true
+                }
+                return false
+            }
         })
 
         triggerView?.setOnTouchListener { _, event ->
