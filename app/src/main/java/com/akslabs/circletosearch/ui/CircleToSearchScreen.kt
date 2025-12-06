@@ -1,5 +1,9 @@
 package com.akslabs.circletosearch.ui
 
+import com.akslabs.circletosearch.utils.FriendlyMessageManager
+import com.akslabs.circletosearch.ui.components.FriendlyMessageBubble
+import kotlinx.coroutines.delay
+
 import android.graphics.Bitmap
 import android.graphics.Rect
 import android.util.Base64
@@ -23,6 +27,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -109,6 +114,19 @@ fun CircleToSearchScreen(
     // Support Sheet State
     var showSupportSheet by remember { mutableStateOf(false) }
     val supportSheetState = rememberModalBottomSheetState()
+    
+    // Friendly Message State
+    var friendlyMessage by remember { mutableStateOf("") }
+    var isMessageVisible by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        val manager = FriendlyMessageManager(context)
+        friendlyMessage = manager.getNextMessage()
+        delay(500) // Small delay for smooth entrance
+        isMessageVisible = true
+        delay(4000) // Show for 4 seconds
+        isMessageVisible = false
+    }
 
     // Search State
     var selectedEngine by remember { mutableStateOf<SearchEngine>(SearchEngine.Google) }
@@ -574,7 +592,22 @@ fun CircleToSearchScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black)
+                .background(Color.Black)
         ) {
+            // Friendly Message Overlay (Top Center)
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .offset(y = 100.dp) // Offset to not cover potential top icons
+                    .zIndex(100f), // Ensure on top
+                contentAlignment = Alignment.TopCenter
+            ) {
+                FriendlyMessageBubble(
+                    message = friendlyMessage,
+                    visible = isMessageVisible
+                )
+            }
+
             // 1. Screenshot Layer
             if (screenshot != null) {
                 Box(
