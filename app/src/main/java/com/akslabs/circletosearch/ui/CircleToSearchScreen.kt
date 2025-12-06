@@ -174,6 +174,9 @@ fun CircleToSearchScreen(
                 // Performance & UI
                 setRenderPriority(WebSettings.RenderPriority.HIGH)
                 
+                // Caching for Speed
+                cacheMode = WebSettings.LOAD_CACHE_ELSE_NETWORK
+                
                 // Zoom support
                 setSupportZoom(true)
                 builtInZoomControls = true
@@ -416,7 +419,7 @@ fun CircleToSearchScreen(
                         
                         if (showLoader || isLoading) {
                              Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                com.akslabs.circletosearch.ui.components.PulsingSearchLoader()
+                                ContainedLoadingIndicatorSample()
                              }
                         }
                     }
@@ -978,7 +981,10 @@ fun CircleToSearchScreen(
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
+@androidx.compose.ui.tooling.preview.Preview
+@androidx.compose.runtime.Composable
 fun ContainedLoadingIndicatorSample() {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) { androidx.compose.material3.CircularProgressIndicator() }
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        androidx.compose.material3.ContainedLoadingIndicator()
+    }
 }
