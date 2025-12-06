@@ -3,7 +3,9 @@ package com.akslabs.circletosearch.ui.components
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -39,8 +41,8 @@ fun FriendlyMessageBubble(
 ) {
     AnimatedVisibility(
         visible = visible,
-        enter = slideInVertically { -it } + fadeIn(), // Slide down from top
-        exit = slideOutVertically { -it } + fadeOut(),
+        enter = slideInHorizontally { -it } + fadeIn(), // Slide down from top
+        exit = slideOutHorizontally { -it } + fadeOut(),
         modifier = modifier
     ) {
         Row(
@@ -79,8 +81,8 @@ fun FriendlyMessageBubble(
                     .background(
                         brush = Brush.verticalGradient(
                             colors = listOf(
-                                MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.9f),
-                                MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.7f)
+                                Color(0xFFFFFFFF),
+                                Color(0xFFEDECEC)
                             )
                         )
                     )

@@ -27,7 +27,7 @@ fun PulsingSearchLoader(
         initialValue = 0f,
         targetValue = 360f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1500, easing = LinearEasing),
+            animation = tween(1800, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
         label = "Rotation"
