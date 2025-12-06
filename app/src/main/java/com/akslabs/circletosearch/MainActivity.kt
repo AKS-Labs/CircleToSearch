@@ -13,6 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -46,11 +47,28 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun SetupScreen() {
     val context = LocalContext.current
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     val prefs = context.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
+    
+    // Permission States
+    var isAccessibilityEnabled by remember { mutableStateOf(isAccessibilityServiceEnabled(context)) }
+    var isDefaultAssistant by remember { mutableStateOf(isDefaultAssistant(context)) }
+    
+    // Check permissions on Resume
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                isAccessibilityEnabled = isAccessibilityServiceEnabled(context)
+                isDefaultAssistant = isDefaultAssistant(context)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     val showSupportDialog = remember { mutableStateOf(!prefs.getBoolean("support_dialog_dismissed", false)) }
     val dontShowAgain = remember { mutableStateOf(false) }
     
-    // Support Sheet State
     var showSupportSheet by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState()
     val scope = rememberCoroutineScope()
@@ -65,7 +83,7 @@ fun SetupScreen() {
                 .padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.height(48.dp))
+            Spacer(modifier = Modifier.height(32.dp))
             
             // 1. Header
             Text(
@@ -81,89 +99,188 @@ fun SetupScreen() {
                 textAlign = TextAlign.Center
             )
             
-            Spacer(modifier = Modifier.height(48.dp))
+            Spacer(modifier = Modifier.height(32.dp))
 
-            // 2. Main Action: Set as Default
-            Card(
-                onClick = {
-                    val intent = Intent(Settings.ACTION_VOICE_INPUT_SETTINGS)
-                    context.startActivity(intent)
-                },
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer
-                ),
-                shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier.padding(24.dp),
-                    verticalAlignment = Alignment.CenterVertically
+            // 2. REQUIRED: Accessibility Service
+            Text(
+                text = "REQUIRED",
+                style = MaterialTheme.typography.labelSmall,
+                color = if (isAccessibilityEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                modifier = Modifier.align(Alignment.Start).padding(bottom = 8.dp)
+            )
+            
+            if (isAccessibilityEnabled) {
+                // Granted State
+                Card(
+                     colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
+                    ),
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.TouchApp,
-                        contentDescription = null,
-                        modifier = Modifier.size(32.dp),
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column {
-                        Text(
-                            text = "Set as Default Assistant",
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CheckCircle,
+                            contentDescription = "Granted",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp)
                         )
-                        Text(
-                            text = "Required to trigger search",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column {
+                            Text(
+                                text = "Accessibility Service Active",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                            Text(
+                                text = "Double tap status bar to trigger",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                            )
+                        }
+                    }
+                }
+            } else {
+                 // Action Needed State
+                Card(
+                    onClick = {
+                        val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                        context.startActivity(intent)
+                    },
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer
+                    ),
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Accessibility,
+                            contentDescription = null,
+                            modifier = Modifier.size(24.dp),
+                            tint = MaterialTheme.colorScheme.onErrorContainer
                         )
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column {
+                            Text(
+                                text = "Enable Accessibility",
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                             Text(
+                                text = "Required for screen capture",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f)
+                            )
+                        }
                     }
                 }
             }
             
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
-            // 3. Secondary Action: Accessibility
-            OutlinedCard(
-                onClick = {
-                    val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
-                    context.startActivity(intent)
-                },
-                shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                 Row(
-                    modifier = Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
+            // 3. OPTIONAL: Default Assistant
+            Text(
+                text = "OPTIONAL: For Home Button Trigger",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.secondary,
+                modifier = Modifier.align(Alignment.Start).padding(bottom = 8.dp)
+            )
+
+            if (isDefaultAssistant) {
+                 // Granted State
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f)
+                    ),
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Accessibility,
-                        contentDescription = null,
-                        modifier = Modifier.size(24.dp),
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.width(16.dp))
-                     Text(
-                        text = "Enable Accessibility Service",
-                        style = MaterialTheme.typography.titleMedium,
-                         color = MaterialTheme.colorScheme.onSurface
-                    )
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CheckCircle,
+                            contentDescription = "Active",
+                            tint = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                         Text(
+                            text = "Default Assistant Set",
+                            style = MaterialTheme.typography.titleMedium,
+                             color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    }
+                }
+            } else {
+                 // Action State
+                Card(
+                    onClick = {
+                        val intent = Intent(Settings.ACTION_VOICE_INPUT_SETTINGS)
+                        context.startActivity(intent)
+                    },
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer
+                    ),
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.TouchApp,
+                            contentDescription = null,
+                            modifier = Modifier.size(24.dp),
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Set as Default Assistant",
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                            Text(
+                                text = "Long-press home to search",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                            )
+                        }
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
             // 4. Settings (Bubble)
             Text(
-                text = "Settings",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
+                text = "OPTIONAL",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.secondary,
                 modifier = Modifier.align(Alignment.Start)
             )
-            Spacer(modifier = Modifier.height(8.dp))
             BubbleSwitch(context)
 
             Spacer(modifier = Modifier.weight(1f))
+            
+            // Privacy Note
+            Text(
+                text = "No other permissions needed.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                textAlign = TextAlign.Center
+            )
+             Spacer(modifier = Modifier.height(16.dp))
 
             // 5. Footer
             SocialLinksRow(
@@ -174,7 +291,7 @@ fun SetupScreen() {
         }
     }
 
-    // Support Dialog
+    // Support Dialog & Sheet
     if (showSupportDialog.value) {
         SupportDialog(
             onDismiss = {
@@ -194,7 +311,6 @@ fun SetupScreen() {
         )
     }
     
-    // Support Sheet
     if (showSupportSheet) {
         SupportSheet(
             sheetState = sheetState,
@@ -211,6 +327,42 @@ fun SetupScreen() {
     }
 }
 
+// Helper Functions
+fun isAccessibilityServiceEnabled(context: android.content.Context): Boolean {
+    val expectedComponentName = android.content.ComponentName(context, CircleToSearchAccessibilityService::class.java)
+    val enabledServicesSetting = Settings.Secure.getString(
+        context.contentResolver,
+        Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+    ) ?: return false
+    
+    val colonSplitter = android.text.TextUtils.SimpleStringSplitter(':')
+    colonSplitter.setString(enabledServicesSetting)
+    
+    while (colonSplitter.hasNext()) {
+        val componentNameString = colonSplitter.next()
+        val enabledComponent = android.content.ComponentName.unflattenFromString(componentNameString)
+        if (enabledComponent != null && enabledComponent == expectedComponentName)
+            return true
+    }
+    return false
+}
+
+fun isDefaultAssistant(context: android.content.Context): Boolean {
+    // Basic check: triggers the settings intent, but actual "is default" check is complex
+    // on some Android versions. For simplified UI, we might relay on user return, 
+    // or use RoleManager on Android 10+. 
+    // For now, let's keep it simple or check specific secure settings if possible.
+    // A reliable check is to see if we are arguably the voice interaction service.
+    
+    val assistant = Settings.Secure.getString(context.contentResolver, "voice_interaction_service")
+    val component = android.content.ComponentName(context, CircleToSearchRecognitionService::class.java)
+    val myComponentString = component.flattenToString()
+    
+    // Fallback: Checks if our service is the one set.
+    return assistant == myComponentString
+}
+
+// ... SocialLinksRow, SupportDialog, BubbleSwitch same as before ...
 @Composable
 fun SocialLinksRow(
     context: android.content.Context,
