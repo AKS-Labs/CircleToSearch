@@ -16,6 +16,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -136,7 +137,7 @@ fun SetupScreen() {
                                 color = MaterialTheme.colorScheme.onPrimaryContainer
                             )
                             Text(
-                                text = "Double tap status bar to trigger",
+                                text = "Double tap status bar to launch CircleToSearch",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                             )
@@ -174,7 +175,8 @@ fun SetupScreen() {
                                 color = MaterialTheme.colorScheme.onErrorContainer
                             )
                              Text(
-                                text = "Required for screen capture",
+                                text = "To do its job properly, the app needs this permission.\n" +
+                                        "Tap allow and we’re good to go! \uD83D\uDC4D",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f)
                             )
@@ -251,7 +253,7 @@ fun SetupScreen() {
                                 color = MaterialTheme.colorScheme.onPrimaryContainer
                             )
                             Text(
-                                text = "Long-press home to search",
+                                text = "Hold the Home button or edge-swipe up to summon CircleToSearch — like calling your Pokémon. \uD83D\uDD0D\uD83D\uDE06",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                             )
@@ -271,23 +273,44 @@ fun SetupScreen() {
             )
             BubbleSwitch(context)
 
-            Spacer(modifier = Modifier.weight(1f))
-            
+            Spacer(modifier = Modifier.height(25.dp))
+
             // Privacy Note
             Text(
-                text = "No other permissions needed.",
+                text = "That’s it. No more permissions.\n We’re not trying to adopt your phone. \uD83D\uDE02.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                 textAlign = TextAlign.Center
             )
-             Spacer(modifier = Modifier.height(16.dp))
+
+            Spacer(modifier = Modifier.weight(1f))
+
 
             // 5. Footer
             SocialLinksRow(
                 context = context,
                 onDonateClick = { showSupportSheet = true }
             )
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(20.dp))
+            Box(
+                modifier = Modifier
+                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                    .clickable {
+                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/aks-labs"))
+                        context.startActivity(intent)
+                    }
+                    .padding(8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "From AKS-Labs With ❤️",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                    textAlign = TextAlign.Center,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Spacer(modifier = Modifier.height(2.dp))
         }
     }
 
@@ -438,7 +461,7 @@ fun SupportDialog(
         },
         title = {
             Text(
-                text = "Support This Project",
+                text = "Support App Developer",
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold
             )
@@ -461,21 +484,21 @@ fun SupportDialog(
                 
                 Spacer(modifier = Modifier.height(16.dp))
                 
-                // Don't show again checkbox
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth().clickable { dontShowAgain.value = !dontShowAgain.value }
-                ) {
-                    Checkbox(
-                        checked = dontShowAgain.value,
-                        onCheckedChange = { dontShowAgain.value = it }
-                    )
-                    Text(
-                        text = "Don't show this again",
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(start = 8.dp)
-                    )
-                }
+//                 Don't show again checkbox
+//                Row(
+//                    verticalAlignment = Alignment.CenterVertically,
+//                    modifier = Modifier.fillMaxWidth().clickable { dontShowAgain.value = !dontShowAgain.value }
+//                ) {
+//                    Checkbox(
+//                        checked = dontShowAgain.value,
+//                        onCheckedChange = { dontShowAgain.value = it }
+//                    )
+//                    Text(
+//                        text = "Don't show this again",
+//                        style = MaterialTheme.typography.bodySmall,
+//                        modifier = Modifier.padding(start = 8.dp)
+//                    )
+//                }
             }
         },
         confirmButton = {
