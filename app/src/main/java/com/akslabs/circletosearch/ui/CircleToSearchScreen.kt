@@ -39,8 +39,10 @@ import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.ScrollableTabRow
@@ -87,6 +89,7 @@ import com.akslabs.circletosearch.utils.ImageUtils
 import kotlinx.coroutines.launch
 import java.io.ByteArrayOutputStream
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.animateFloat
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewFeature
@@ -249,7 +252,7 @@ fun CircleToSearchScreen(
 
     androidx.compose.material3.BottomSheetScaffold(
         scaffoldState = scaffoldState,
-        sheetPeekHeight = 500.dp, // Peek height when collapsed
+        sheetPeekHeight = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp * 0.55f), // Dynamic 55% peek
         sheetContainerColor = Color.Transparent,
         sheetContentColor = MaterialTheme.colorScheme.onSurface,
         sheetDragHandle = { BottomSheetDefaults.DragHandle() },
@@ -264,30 +267,47 @@ fun CircleToSearchScreen(
             ) {
                 Spacer(modifier = Modifier.height(16.dp))
                 
-                // Tabs
+                // Tabs - Polished UI
                 ScrollableTabRow(
                     selectedTabIndex = searchEngines.indexOf(selectedEngine),
                     edgePadding = 16.dp,
                     containerColor = Color.Transparent,
                     contentColor = MaterialTheme.colorScheme.onSurface,
-                    indicator = {} 
+                    divider = {},
+                    indicator = {}
                 ) {
                     searchEngines.forEach { engine ->
                         val selected = selectedEngine == engine
+                        val transition = androidx.compose.animation.core.updateTransition(targetState = selected, label = "TabSelect")
+                        val scale by transition.animateFloat(label = "Scale") { if (it) 1.05f else 1f }
+                        val alpha by transition.animateFloat(label = "Alpha") { if (it) 1f else 0.7f }
+
                         Tab(
                             selected = selected,
                             onClick = { selectedEngine = engine },
+                            modifier = Modifier.graphicsLayer { 
+                                scaleX = scale
+                                scaleY = scale
+                                this.alpha = alpha
+                            },
                             text = {
                                 Text(
                                     engine.name,
-                                    style = MaterialTheme.typography.labelLarge,
+                                    style = MaterialTheme.typography.labelLarge.copy(
+                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
+                                    ),
                                     modifier = Modifier
                                         .background(
-                                            if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface,
+                                            if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha=0.5f),
                                             RoundedCornerShape(16.dp)
                                         )
+                                        .border(
+                                             width = 1.dp,
+                                             color = if(selected) MaterialTheme.colorScheme.primary.copy(alpha=0.5f) else Color.Transparent,
+                                             shape = RoundedCornerShape(16.dp)
+                                        )
                                         .padding(horizontal = 16.dp, vertical = 8.dp),
-                                    color = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface
+                                    color = if (selected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         )
@@ -303,13 +323,13 @@ fun CircleToSearchScreen(
                     webViews.clear()
                 }
 
-                // Preload Logic
+                // Main Loading & Search Logic
                 LaunchedEffect(selectedBitmap, hostedImageUrl) {
                     if (selectedBitmap != null) {
                         isLoading = true
                         scope.launch { scaffoldState.bottomSheetState.expand() }
                         
-                        // 1. Upload to host if needed (for URL-based engines)
+                        // 1. Upload to host if needed
                         if (hostedImageUrl == null) {
                             val url = ImageSearchUploader.uploadToImageHost(selectedBitmap!!)
                             if (url != null) {
@@ -320,17 +340,17 @@ fun CircleToSearchScreen(
                             }
                         }
 
-                        // 2. Preload ALL engines
+                        // 2. Generate URLs for ALL engines (lightweight string op)
                         searchEngines.forEach { engine ->
                             if (!preloadedUrls.containsKey(engine)) {
                                 val url = if (engine.isDirectUpload) {
-                                    when (engine) {
+                                     when (engine) {
                                         SearchEngine.Perplexity -> ImageSearchUploader.getPerplexityUrl(hostedImageUrl!!)
                                         SearchEngine.ChatGPT -> ImageSearchUploader.getChatGPTUrl(hostedImageUrl!!)
                                         else -> null
                                     }
                                 } else {
-                                    when (engine) {
+                                     when (engine) {
                                         SearchEngine.Google -> ImageSearchUploader.getGoogleLensUrl(hostedImageUrl!!)
                                         SearchEngine.Bing -> ImageSearchUploader.getBingUrl(hostedImageUrl!!)
                                         SearchEngine.Yandex -> ImageSearchUploader.getYandexUrl(hostedImageUrl!!)
@@ -338,15 +358,15 @@ fun CircleToSearchScreen(
                                         else -> null
                                     }
                                 }
-                                
-                                if (url != null) {
-                                    preloadedUrls[engine] = url
-                                }
+                                if (url != null) preloadedUrls[engine] = url
                             }
                         }
+
+                        // 3. Set initial URL
+                        if (preloadedUrls.containsKey(selectedEngine)) {
+                             searchUrl = preloadedUrls[selectedEngine]
+                        }
                         
-                        // Set current searchUrl
-                        searchUrl = preloadedUrls[selectedEngine]
                         isLoading = false
                     }
                 }
@@ -358,28 +378,64 @@ fun CircleToSearchScreen(
                     }
                 }
 
+                // Memory Optimization: Clean up distant WebViews
+                LaunchedEffect(selectedEngine) {
+                    val currentIndex = searchEngines.indexOf(selectedEngine)
+                    val enginesToKeep = mutableSetOf<SearchEngine>()
+                    
+                    // Keep Current
+                    enginesToKeep.add(selectedEngine)
+                    
+                    // Keep Neighbors (Immediate usage likely)
+                    if (currentIndex > 0) enginesToKeep.add(searchEngines[currentIndex - 1])
+                    if (currentIndex < searchEngines.size - 1) enginesToKeep.add(searchEngines[currentIndex + 1])
+                    
+                    // Remove others
+                    val iterator = webViews.iterator()
+                    while (iterator.hasNext()) {
+                        val entry = iterator.next()
+                        if (!enginesToKeep.contains(entry.key)) {
+                            // Destroy and remove
+                            entry.value.loadUrl("about:blank") // Clear content first
+                            entry.value.destroy()
+                            iterator.remove()
+                            android.util.Log.d("CircleToSearch", "Cleaned up WebView for: ${entry.key}")
+                        }
+                    }
+                }
+
                 Box(modifier = Modifier.fillMaxSize()) {
-                    // Show loading only if the SELECTED engine isn't ready
-                    if (isLoading || preloadedUrls[selectedEngine] == null) {
-                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            androidx.compose.material3.CircularProgressIndicator()
+                    // Show loading only if the SELECTED engine isn't ready or just starting
+                    if (isLoading || (preloadedUrls.containsKey(selectedEngine) && !webViews.containsKey(selectedEngine))) {
+                         // We delay showing the loader slightly to avoid flicker if WebView attaches instantly
+                        var showLoader by remember { mutableStateOf(false) }
+                        LaunchedEffect(Unit) {
+                            kotlinx.coroutines.delay(100)
+                            showLoader = true
+                        }
+                        
+                        if (showLoader || isLoading) {
+                             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                com.akslabs.circletosearch.ui.components.PulsingSearchLoader()
+                             }
                         }
                     }
 
-                    // Dynamic Settings Update
+                    // Dynamic Settings Update (User Agent etc)
                     LaunchedEffect(isDesktopMode, isDarkMode) {
-                        val newUserAgent = if (isDesktopMode) {
-                            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-                        } else {
-                            "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
-                        }
-                        webViews.values.forEach { wv ->
-                            val needsReload = wv.settings.userAgentString != newUserAgent
-                            if (needsReload) {
-                                wv.settings.userAgentString = newUserAgent
+                         webViews.values.forEach { wv ->
+                            val newUserAgent = if (isDesktopMode) {
+                                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                            } else {
+                                "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
                             }
-                            
-                            // Update WebViewClient for dark mode CSS injection
+                             
+                             if (wv.settings.userAgentString != newUserAgent) {
+                                wv.settings.userAgentString = newUserAgent
+                                wv.reload()
+                            }
+
+                            // Update WebViewClient for dark mode
                             if (isDarkMode) {
                                 wv.webViewClient = object : android.webkit.WebViewClient() {
                                     override fun onPageFinished(view: android.webkit.WebView?, url: String?) {
@@ -397,17 +453,15 @@ fun CircleToSearchScreen(
                                         view?.loadUrl(darkModeCSS)
                                     }
                                 }
+                                // If already loaded, re-inject? reload() handles it.
                             } else {
                                 wv.webViewClient = android.webkit.WebViewClient()
                             }
-                            
-                            android.util.Log.d("CircleToSearch", "Updated dark mode to: $isDarkMode for WebView")
-                            // Reload to apply dark mode setting
                             wv.reload()
-                        }
+                         }
                     }
                     
-                    // Cleanup
+                    // Cleanup on Dispose
                     DisposableEffect(Unit) {
                         onDispose {
                             webViews.values.forEach { it.destroy() }
@@ -415,34 +469,72 @@ fun CircleToSearchScreen(
                         }
                     }
 
-                    // Render ALL WebViews that have URLs
+                    // Render WebViews
                     searchEngines.forEach { engine ->
-                        val url = preloadedUrls[engine]
-                        if (url != null) {
-                            val isSelected = (engine == selectedEngine)
-                            
-                            androidx.compose.runtime.key(engine) {
+                         // Logic: Only create/render if it's the selected one OR a neighbor we want to preload
+                         val currentIndex = searchEngines.indexOf(selectedEngine)
+                         val engineIndex = searchEngines.indexOf(engine)
+                         val isNeighbor = kotlin.math.abs(currentIndex - engineIndex) <= 1
+                         
+                         // We render it if it's a neighbor AND we have a URL for it.
+                         if (isNeighbor && preloadedUrls.containsKey(engine)) {
+                             val url = preloadedUrls[engine]!!
+                             val isSelected = (engine == selectedEngine)
+                             
+                             androidx.compose.runtime.key(engine) {
                                 AndroidView(
                                     factory = { ctx ->
-                                        val swipeRefresh = SwipeRefreshLayout(ctx).apply {
-                                            layoutParams = ViewGroup.LayoutParams(
-                                                ViewGroup.LayoutParams.MATCH_PARENT,
-                                                ViewGroup.LayoutParams.MATCH_PARENT
-                                            )
+                                        if (webViews.containsKey(engine)) {
+                                            // Should not happen with key(), but safety check
+                                            // Actually, if we recompose, we might get here.
+                                            // But standard AndroidView factory is called once per key.
+                                            // If key changes, it reconstructs.
+                                            // If we already have it in map, reuse it? 
+                                            // No, standard AndroidView expects to return a View. 
+                                            // If we return an already attached view, it crashes.
+                                            // So we must handle detachment if reusing.
+                                            // Given our cleanup logic, we destroy ones not in neighbor set.
+                                            // So valid ones in map are likely safe.
+                                            // BUT: They might be attached to previous AndroidView wrapper (SwipeRefreshLayout).
+                                            // So we should remove from parent if exists.
+                                            val v = webViews[engine]!!
+                                            (v.parent as? ViewGroup)?.removeView(v)
+                                            
+                                            val swipeRefresh = SwipeRefreshLayout(ctx).apply {
+                                                layoutParams = ViewGroup.LayoutParams(
+                                                    ViewGroup.LayoutParams.MATCH_PARENT,
+                                                    ViewGroup.LayoutParams.MATCH_PARENT
+                                                )
+                                            }
+                                            swipeRefresh.addView(v)
+                                            swipeRefresh.setOnRefreshListener {
+                                                v.reload()
+                                                swipeRefresh.isRefreshing = false
+                                            }
+                                            swipeRefresh
+                                        } else {
+                                            val swipeRefresh = SwipeRefreshLayout(ctx).apply {
+                                                layoutParams = ViewGroup.LayoutParams(
+                                                    ViewGroup.LayoutParams.MATCH_PARENT,
+                                                    ViewGroup.LayoutParams.MATCH_PARENT
+                                                )
+                                            }
+                                            val webView = createWebView(ctx)
+                                            // Apply current settings
+                                             if (isDesktopMode) {
+                                                 webView.settings.userAgentString = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                                             }
+                                            
+                                            webViews[engine] = webView
+                                            webView.loadUrl(url)
+                                            
+                                            swipeRefresh.addView(webView)
+                                            swipeRefresh.setOnRefreshListener {
+                                                webView.reload()
+                                                swipeRefresh.isRefreshing = false
+                                            }
+                                            swipeRefresh
                                         }
-                                        
-                                        val webView = createWebView(ctx)
-                                        webViews[engine] = webView
-                                        webView.loadUrl(url)
-                                        
-                                        swipeRefresh.addView(webView)
-                                        
-                                        swipeRefresh.setOnRefreshListener {
-                                            webView.reload()
-                                            swipeRefresh.isRefreshing = false
-                                        }
-                                        
-                                        swipeRefresh
                                     },
                                     update = { swipeRefresh ->
                                         var webView: WebView? = null
@@ -455,7 +547,6 @@ fun CircleToSearchScreen(
                                         }
                                         
                                         if (webView != null) {
-                                            // Update URL if changed (e.g. new search)
                                             if (webView.url != url && url != webView.originalUrl) {
                                                 webView.loadUrl(url)
                                             }
@@ -468,7 +559,7 @@ fun CircleToSearchScreen(
                                             alpha = if (isSelected) 1f else 0f 
                                         }
                                 )
-                            }
+                             }
                         }
                     }
                 }
@@ -865,7 +956,7 @@ fun CircleToSearchScreen(
                     }
                 }
             }
-        }
+
         
         if (showSupportSheet) {
             com.akslabs.circletosearch.SupportSheet(
@@ -881,5 +972,13 @@ fun CircleToSearchScreen(
                 }
             )
         }
+
     }
+}
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+fun ContainedLoadingIndicatorSample() {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) { androidx.compose.material3.CircularProgressIndicator() }
 }

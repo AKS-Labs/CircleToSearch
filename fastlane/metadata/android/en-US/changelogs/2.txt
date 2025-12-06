@@ -1,0 +1,10 @@
+🚀 Initial F-Droid Release
+
+• 📸 Unlimited photo backup via Telegram
+• 🔒 100% private - no telemetry or tracking
+• 🎨 Beautiful Material Design 3 interface
+• 🖼️ Customizable photo grid (3-6 columns)
+• 🔄 Smart sync with change detection
+• 📱 Cross-device access via Telegram
+• 🛡️ AES-256 encryption for security
+• ⚡ Battery-friendly background sync
