@@ -166,7 +166,10 @@ fun SupportSheet(
             val options = remember(showCryptoOptions) {
                 (if (showCryptoOptions) cryptoOptions else mainOptions).toMutableStateList()
             }
-            
+//            OptionLayout(
+//                modifier = Modifier.fillMaxWidth(),
+//                optionList = options
+//            )
             Column(modifier = Modifier.fillMaxWidth()) {
                 options.forEach { option ->
                     ListItem(
