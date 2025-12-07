@@ -1,0 +1,29 @@
+AntiFeatures:
+  NonFreeNet:
+    en-US: This app relies on third-party proprietary services to upload images and perform image searches.
+Categories:
+  - Browser
+  - Internet
+License: GPL-3.0 license
+AuthorName: AKS Labs
+AuthorEmail: akslabs.tech@gmail.com
+SourceCode: https://github.com/AKS-Labs/CircleToSearch
+IssueTracker: https://github.com/AKS-Labs/CircleToSearch/issues
+
+AutoName: CircleToSearch
+
+RepoType: git
+Repo: https://github.com/AKS-Labs/CircleToSearch
+
+Builds:
+  - versionName: '0.2'
+    versionCode: 2
+    commit: v0.2
+    subdir: app
+    gradle:
+      - yes
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags
+CurrentVersion: '0.2'
+CurrentVersionCode: 2
