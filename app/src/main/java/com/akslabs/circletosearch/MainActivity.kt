@@ -24,7 +24,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.DialogProperties
+import com.akslabs.circletosearch.ui.components.PrivacyDialog
 import com.akslabs.circletosearch.ui.theme.CircleToSearchTheme
+import com.akslabs.circletosearch.utils.PrivacyPreferences
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -51,6 +54,10 @@ fun SetupScreen() {
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     val prefs = context.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
     
+    // Privacy Dialog State
+    val privacyPreferences = remember { PrivacyPreferences(context) }
+    var showPrivacyDialog by remember { mutableStateOf(!privacyPreferences.hasAcceptedPrivacyPolicy()) }
+    
     // Permission States
     var isAccessibilityEnabled by remember { mutableStateOf(isAccessibilityServiceEnabled(context)) }
     var isDefaultAssistant by remember { mutableStateOf(isDefaultAssistant(context)) }
@@ -73,6 +80,17 @@ fun SetupScreen() {
     var showSupportSheet by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState()
     val scope = rememberCoroutineScope()
+    
+    // Show Privacy Dialog First - User must accept before seeing main UI
+    if (showPrivacyDialog) {
+        PrivacyDialog(
+            onAccept = {
+                privacyPreferences.setPrivacyAccepted()
+                showPrivacyDialog = false
+            }
+        )
+        return // Don't show main UI until accepted
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background
@@ -451,6 +469,10 @@ fun SupportDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            dismissOnBackPress = true,
+            dismissOnClickOutside = true
+        ),
         icon = {
             Icon(
                 painter = painterResource(id = com.akslabs.circletosearch.R.drawable.donation),
