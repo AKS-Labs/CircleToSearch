@@ -4,7 +4,7 @@ AntiFeatures:
 Categories:
   - Browser
   - Internet
-License: GPL-3.0 license
+License: GPL-3.0-or-later
 AuthorName: AKS Labs
 AuthorEmail: akslabs.tech@gmail.com
 SourceCode: https://github.com/AKS-Labs/CircleToSearch
