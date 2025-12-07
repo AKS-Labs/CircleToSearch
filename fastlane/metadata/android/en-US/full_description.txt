@@ -1,0 +1,18 @@
+🎯 What is Circle To Search?
+Ever wanted to search for something you see on your phone screen? Circle To Search brings that power to your fingertips on any Android device. Simply draw a circle around what you're looking for, and instantly get results from your favorite search engine.
+
+Think of it as having Google Lens, Bing Visual Search, Yandex, and TinEye all in one place—and it works everywhere.
+
+✨ Features
+•Universal Compatibility: Works on any Android device (Android 10+).
+•Instant Search: Double-tap the status bar or use the floating bubble to trigger.
+•Multi-Engine Support: Search using Google Lens, Bing, Yandex, TinEye.
+•Set As Default Assistant: Use As Default Assistant to Search Images Using Circle To Search.
+•It Can Talk With Humour: Show Friendly Playful Message Every Time User Uses Circle To Search.
+•Desktop Mode: See Results In Desktop Mode.
+•Dark Mode: Browse Search Results in Dark Mode.
+•Copy Url: Copy Url Of Search Results.
+•Open In Browser: Open Search Results In Favourite Browser.
+•Smart Selection: Draw a circle, scribble to select.
+•Beautiful UI: Modern Material 3 design with dark mode support and smooth animations.
+•Customizable: Toggle dark mode, desktop mode, and UI elements like the gradient border.
