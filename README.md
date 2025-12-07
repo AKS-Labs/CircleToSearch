@@ -31,38 +31,24 @@ Ever wanted to search for something you see on your phone screen? **Circle To Se
 
 Think of it as having Google Lens, Bing Visual Search, Yandex, and TinEye all in one place—and it works everywhere.
 
+
 ---
 ## ✨ Features
 
 -   **Universal Compatibility**: Works on any Android device (Android 10+).
 -   **Instant Search**: Double-tap the status bar or use the floating bubble to trigger.
 -   **Multi-Engine Support**: Search using Google Lens, Bing, Yandex, TinEye.
+-   **Set As Default Assistant**: Use As Default Assistant to Search Images Using Circle To Search.
+-   **It Can Talk With Humour**: Show Friendly Playful Message Every Time User Uses Circle To Search.
+-   **Desktop Mode**: See Results In Desktop Mode.
+-   **Dark Mode**: Browse Search Results in Dark Mode.
+-   **Copy Url**: Copy Url Of Search Results.
+-   **Open In Browser**: Open Search Results In Favourite Browser.
 -   **Smart Selection**: Draw a circle, scribble to select.
 -   **Beautiful UI**: Modern Material 3 design with dark mode support and smooth animations.
 -   **Customizable**: Toggle dark mode, desktop mode, and UI elements like the gradient border.
 
-## 🚀 Getting Started
-
-
-
-### Permissions
-
-The app requires the following permissions to function:
-
-1.  **Accessibility Service**: To detect the trigger gesture (double-tap on status bar) and capture the screen content.
-2.  **Internet**: To perform image searches.
-
-
-## 📱 Usage
-
-1.  **Enable Service**: Open the app and tap "Enable Accessibility Service".
-2.  **Trigger**:
-    -   **Double-tap** the top status bar area.
-    -   Or tap the **Floating Bubble** (if enabled).
-3.  **Search**:
-    -   The screen will freeze.
-    -   Draw a circle around any object or text.
-    -   Select your preferred search engine from the bottom sheet.
+---
 
 ## 🛠️ Built With
 
@@ -72,15 +58,59 @@ The app requires the following permissions to function:
 -   **Retrofit** - Type-safe HTTP client for Android.
 -   **Coil** - Image loading library for Android backed by Kotlin Coroutines.
 
-## 🤝 Contributing
+---
 
-Contributions are welcome! Please feel free to submit a Pull Request.
 
-1.  Fork the project
-2.  Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3.  Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4.  Push to the branch (`git push origin feature/AmazingFeature`)
-5.  Open a Pull Request
+
+## 📥 **Get Circle To Search**
+
+<div align="center">
+    <!-- <p align="center">
+  <a href="https://f-droid.org/packages/com.akslabs.cloudgallery/">
+    <img src="https://fdroid.gitlab.io/artwork/badge/get-it-on.png"
+         alt="Get it on F-Droid"
+         height="80">
+  </a> -->
+  <a href="https://github.com/AKS-Labs/CircleToSearch/releases">
+    <img alt="Get it on GitHub" src="https://user-images.githubusercontent.com/69304392/148696068-0cfea65d-b18f-4685-82b5-329a330b1c0d.png" height="80px">
+  </a>
+  <br>
+  <p><strong>• 🔓 Open Source    • 🚀 Ready to Use</strong></p>
+</div>
+
+---
+
+
+## 📱 **Screenshots**
+
+<table align="center">
+  <tr>
+    <td><img src="fastlane/metadata/android/en-US/images/phoneScreenshots/1.png" width="200"/></td>
+    <td><img src="fastlane/metadata/android/en-US/images/phoneScreenshots/2.png" width="200"/></td>
+    <td><img src="fastlane/metadata/android/en-US/images/phoneScreenshots/3.png" width="200"/></td>
+    <td><img src="fastlane/metadata/android/en-US/images/phoneScreenshots/4.png" width="200"/></td>
+  </tr>
+  <tr>
+    <td><img src="fastlane/metadata/android/en-US/images/phoneScreenshots/5.png" width="200"/></td>
+    <td><img src="fastlane/metadata/android/en-US/images/phoneScreenshots/6.png" width="200"/></td>
+    <td><img src="fastlane/metadata/android/en-US/images/phoneScreenshots/7.png" width="200"/></td>
+    <td><img src="fastlane/metadata/android/en-US/images/phoneScreenshots/8.png" width="200"/></td>
+  </tr>
+</table>
+
+---
+
+## 🤝 **Community**
+
+- 🐛 **Bug reports:** [GitHub Issues](https://github.com/AKS-Labs/CircleToSearch/issues)
+- 💡 **Feature requests:** [GitHub Issues](https://github.com/AKS-Labs/CircleToSearch/issues)
+- 👨‍💻 **Contribute:** Fork and submit pull requests
+- ⭐ Star the repo
+* 💬 Join the [AKS-Labs Telegram group](https://t.me/AKSLabs)
+* ☕ Maybe [**Donate**](https://github.com/sponsors/AKS-Labs), if you can.
+
+---
+
 
 
 ## 🙏 Acknowledgments
