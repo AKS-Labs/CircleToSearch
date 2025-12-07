@@ -17,9 +17,97 @@ object ImageSearchUploader {
     private const val TIMEOUT = 30000
 
     /**
-     * Uploads the bitmap to Catbox.moe and returns the public URL
+     * Uploads the bitmap to Litterbox (1-hour temporary storage) with Catbox as fallback.
+     * Litterbox is used for privacy as images auto-delete after 1 hour.
      */
     suspend fun uploadToImageHost(bitmap: Bitmap): String? = withContext(Dispatchers.IO) {
+        // Try Litterbox first (temporary, privacy-focused)
+        val litterboxUrl = uploadToLitterbox(bitmap)
+        if (litterboxUrl != null) {
+            Log.d(TAG, "Successfully uploaded to Litterbox (1h expiration)")
+            return@withContext litterboxUrl
+        }
+        
+        // Fallback to Catbox if Litterbox fails
+        Log.w(TAG, "Litterbox failed, falling back to Catbox")
+        val catboxUrl = uploadToCatbox(bitmap)
+        if (catboxUrl != null) {
+            Log.d(TAG, "Successfully uploaded to Catbox (fallback)")
+            return@withContext catboxUrl
+        }
+        
+        Log.e(TAG, "Both Litterbox and Catbox uploads failed")
+        null
+    }
+    
+    /**
+     * Uploads to Litterbox.catbox.moe with 1-hour expiration for privacy
+     */
+    private suspend fun uploadToLitterbox(bitmap: Bitmap): String? = withContext(Dispatchers.IO) {
+        try {
+            val boundary = "----WebKitFormBoundary" + UUID.randomUUID().toString().replace("-", "")
+            val url = URL("https://litterbox.catbox.moe/resources/internals/api.php")
+            
+            val connection = (url.openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
+                doOutput = true
+                doInput = true
+                useCaches = false
+                connectTimeout = TIMEOUT
+                readTimeout = TIMEOUT
+                setRequestProperty("User-Agent", USER_AGENT)
+                setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
+            }
+            
+            // Resize and compress image
+            val resized = ImageUtils.resizeBitmap(bitmap, 1280)
+            val outputStream = ByteArrayOutputStream()
+            resized.compress(Bitmap.CompressFormat.JPEG, 90, outputStream)
+            val imageBytes = outputStream.toByteArray()
+            
+            Log.d(TAG, "Uploading to Litterbox: ${imageBytes.size} bytes")
+            
+            DataOutputStream(connection.outputStream).use { dos ->
+                // reqtype=fileupload
+                dos.writeBytes("--$boundary\r\n")
+                dos.writeBytes("Content-Disposition: form-data; name=\"reqtype\"\r\n\r\n")
+                dos.writeBytes("fileupload\r\n")
+                
+                // time=1h (1 hour expiration)
+                dos.writeBytes("--$boundary\r\n")
+                dos.writeBytes("Content-Disposition: form-data; name=\"time\"\r\n\r\n")
+                dos.writeBytes("1h\r\n")
+                
+                // fileToUpload
+                dos.writeBytes("--$boundary\r\n")
+                dos.writeBytes("Content-Disposition: form-data; name=\"fileToUpload\"; filename=\"image.jpg\"\r\n")
+                dos.writeBytes("Content-Type: image/jpeg\r\n\r\n")
+                dos.write(imageBytes)
+                dos.writeBytes("\r\n")
+                
+                dos.writeBytes("--$boundary--\r\n")
+                dos.flush()
+            }
+            
+            val responseCode = connection.responseCode
+            if (responseCode == 200) {
+                val imageUrl = connection.inputStream.bufferedReader().use { it.readText() }
+                Log.d(TAG, "Litterbox URL: $imageUrl (expires in 1h)")
+                imageUrl
+            } else {
+                Log.e(TAG, "Litterbox upload failed: $responseCode")
+                null
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Litterbox upload error", e)
+            null
+        }
+    }
+    
+    /**
+     * Fallback: Uploads to Catbox.moe (permanent storage)
+     */
+    private suspend fun uploadToCatbox(bitmap: Bitmap): String? = withContext(Dispatchers.IO) {
         try {
             val boundary = "----WebKitFormBoundary" + UUID.randomUUID().toString().replace("-", "")
             val url = URL("https://catbox.moe/user/api.php")
@@ -36,7 +124,7 @@ object ImageSearchUploader {
             }
             
             // Resize and compress image
-            val resized = ImageUtils.resizeBitmap(bitmap, 1280) // Good quality for search
+            val resized = ImageUtils.resizeBitmap(bitmap, 1280)
             val outputStream = ByteArrayOutputStream()
             resized.compress(Bitmap.CompressFormat.JPEG, 90, outputStream)
             val imageBytes = outputStream.toByteArray()
@@ -70,7 +158,7 @@ object ImageSearchUploader {
                 null
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Host upload failed", e)
+            Log.e(TAG, "Catbox upload error", e)
             null
         }
     }
