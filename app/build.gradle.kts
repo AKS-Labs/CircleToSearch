@@ -29,6 +29,7 @@ android {
         version = release(36)
     }
 
+
     defaultConfig {
         applicationId = "com.akslabs.circletosearch"
         minSdk = 29
@@ -55,6 +56,13 @@ android {
     }
     kotlinOptions {
         jvmTarget = "11"
+    }
+    // Fixed dependenciesInfo block
+    dependenciesInfo {
+        @Suppress("UnstableApiUsage")
+        includeInApk = false
+        @Suppress("UnstableApiUsage")
+        includeInBundle = false
     }
     buildFeatures {
         compose = true
