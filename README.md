@@ -7,11 +7,11 @@
 
 <!-- ---------- Badges ---------- -->
   <div align="center">
-    <img alt="License" src="https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=flat-square">
-    <img alt="Downloads" src="https://img.shields.io/github/downloads/AKS-Labs/CircleToSearch/total?color=c3e7ff&style=flat-square">
+    <!-- <img alt="License" src="https://img.shields.io/badge/License-Apache%202.0-blue.svg?style=flat-square"> -->
+    <!-- <img alt="Downloads" src="https://img.shields.io/github/downloads/AKS-Labs/CircleToSearch/total?color=c3e7ff&style=flat-square"> -->
     <img alt="Last commit" src="https://img.shields.io/github/last-commit/AKS-Labs/CircleToSearch?color=c3e7ff&style=flat-square">
     <img alt="Repo size" src="https://img.shields.io/github/repo-size/AKS-Labs/CircleToSearch?color=c3e7ff&style=flat-square">
-    <img alt="Stars" src="https://img.shields.io/github/stars/AKS-Labs/CircleToSearch?color=c3e7ff&style=flat-square">
+    <!-- <img alt="Stars" src="https://img.shields.io/github/stars/AKS-Labs/CircleToSearch?color=c3e7ff&style=flat-square"> -->
     <br>
 
 
