@@ -138,6 +138,10 @@ fun CircleToSearchScreen(
     var showSupportSheet by remember { mutableStateOf(false) }
     val supportSheetState = rememberModalBottomSheetState()
     
+
+    // Search Engines Definition (Moved top for scope access)
+    val searchEngines = SearchEngine.values()
+
     // Friendly Message State
     var friendlyMessage by remember { mutableStateOf("") }
     var isMessageVisible by remember { mutableStateOf(false) }
@@ -156,14 +160,28 @@ fun CircleToSearchScreen(
     var searchUrl by remember { mutableStateOf<String?>(null) }
     var hostedImageUrl by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(false) }
-    var isDesktopMode by remember { mutableStateOf(uiPreferences.isDesktopMode()) }
+    
+    // Desktop Mode - Per Tab
+    // We use a set to track which engines are in desktop mode
+    val initialDesktopMode = uiPreferences.isDesktopMode() // Global default
+    var desktopModeEngines by remember { mutableStateOf<Set<SearchEngine>>(if(initialDesktopMode) searchEngines.toSet() else emptySet()) }
+    
     var isDarkMode by remember { mutableStateOf(uiPreferences.isDarkMode()) }
     var showGradientBorder by remember { mutableStateOf(uiPreferences.isShowGradientBorder()) }
     
-    // Save preferences whenever UI settings change
-    LaunchedEffect(isDesktopMode) {
-        uiPreferences.setDesktopMode(isDesktopMode)
-    }
+    // Track initialized engines for Smart Loading
+    val initializedEngines = remember { mutableStateListOf<SearchEngine>() }
+    
+    // Save global preference if user toggles it for the MAIN engine (Google) - Optional choice, 
+    // or we just keep it per session. Let's keep it simple: no auto-save of per-tab state to verify complex persistence yet.
+    // simpler: If user toggles, we just update the state.
+    
+    // Helper to check desktop mode
+    fun isDesktop(engine: SearchEngine) = desktopModeEngines.contains(engine)
+    
+    // Removed auto-save of isDesktopMode for now as it is complex with per-tab
+    // We could save "If ALL are desktop" or just the active one? 
+    // User requested "depending on opened tab", so per-session state is safer.
     
     LaunchedEffect(isDarkMode) {
         uiPreferences.setDarkMode(isDarkMode)
@@ -179,21 +197,22 @@ fun CircleToSearchScreen(
     // WebView Cache
     val webViews = remember { mutableMapOf<SearchEngine, WebView>() }
     
-    // Update WebViews when desktop mode changes
-    LaunchedEffect(isDesktopMode) {
-        val newUserAgent = if (isDesktopMode) {
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-        } else {
-            "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
-        }
-        
-        webViews.values.forEach { wv ->
-            try {
+    // Update User Agent dynamically when desktop mode changes for a specific engine
+    // This is now handled in the AndroidView update block or individual engine effects
+    // BUT we need to force reload if the state changes.
+    LaunchedEffect(desktopModeEngines) {
+        webViews.forEach { (engine, wv) ->
+             val isDesktop = desktopModeEngines.contains(engine)
+             val newUserAgent = if (isDesktop) {
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            } else {
+                "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+            }
+            
+            if (wv.settings.userAgentString != newUserAgent) {
                 wv.settings.userAgentString = newUserAgent
                 wv.reload()
-                android.util.Log.d("CircleToSearch", "Desktop mode changed - Updated user agent and reloaded: $newUserAgent")
-            } catch (e: Exception) {
-                android.util.Log.e("CircleToSearch", "Error updating user agent on desktop mode change", e)
+                android.util.Log.d("CircleToSearch", "Desktop mode changed for $engine - Reloaded")
             }
         }
     }
@@ -247,8 +266,9 @@ fun CircleToSearchScreen(
     var isSearching by remember { mutableStateOf(false) }
     var selectionRect by remember { mutableStateOf<Rect?>(null) }
     val selectionAnim = remember { androidx.compose.animation.core.Animatable(0f) }
-
-    val searchEngines = SearchEngine.values()
+    
+    // searchEngines moved to top
+    // val searchEngines = SearchEngine.values()
 
     // Gradient Animation
     val alphaAnim by animateFloatAsState(
@@ -257,7 +277,7 @@ fun CircleToSearchScreen(
     )
 
     // Helper to create and configure WebView
-    fun createWebView(ctx: android.content.Context): WebView {
+    fun createWebView(ctx: android.content.Context, engine: SearchEngine): WebView {
         return WebView(ctx).apply {
             layoutParams = ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -281,7 +301,7 @@ fun CircleToSearchScreen(
                 setRenderPriority(WebSettings.RenderPriority.HIGH)
                 
                 // Caching for Speed
-                cacheMode = WebSettings.LOAD_CACHE_ELSE_NETWORK
+                cacheMode = WebSettings.LOAD_DEFAULT // Was LOAD_CACHE_ELSE_NETWORK - caused refresh issues
                 
                 // Zoom support
                 setSupportZoom(true)
@@ -291,7 +311,7 @@ fun CircleToSearchScreen(
                 useWideViewPort = true
                 loadWithOverviewMode = true
                 
-                userAgentString = if (isDesktopMode) {
+                userAgentString = if (isDesktop(engine)) {
                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
                 } else {
                     "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
@@ -428,6 +448,9 @@ fun CircleToSearchScreen(
                     hostedImageUrl = null
                     searchUrl = null
                     preloadedUrls.clear()
+                    initializedEngines.clear() // Reset smart loading
+                    // Do NOT destroy webviews here to keep them cached if possible? 
+                    // PROBABLY safer to destroy to avoid stale state from previous searches.
                     webViews.values.forEach { it.destroy() }
                     webViews.clear()
                 }
@@ -476,7 +499,25 @@ fun CircleToSearchScreen(
                              searchUrl = preloadedUrls[selectedEngine]
                         }
                         
+                        // 4. SMART LOADING SEQUENCE
+                        // First, ensure selected engine is initialized
+                        if (!initializedEngines.contains(selectedEngine)) {
+                            initializedEngines.add(selectedEngine)
+                        }
+                        
                         isLoading = false
+                        
+                        // Then, load others sequentially
+                        scope.launch {
+                            searchEngines.forEach { engine ->
+                                if (engine != selectedEngine) {
+                                    delay(300) // Reduced from 800ms for faster loading
+                                    if (!initializedEngines.contains(engine)) {
+                                        initializedEngines.add(engine)
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
                 
@@ -487,31 +528,14 @@ fun CircleToSearchScreen(
                     }
                 }
 
-                // Memory Optimization: Clean up distant WebViews
+                // Memory Optimization: REMOVED Aggressive Cleanup
+                // User Requirement: "dont refresh tabs when user switch tabs keep them in background"
+                // We keep them alive.
+                /* 
                 LaunchedEffect(selectedEngine) {
-                    val currentIndex = searchEngines.indexOf(selectedEngine)
-                    val enginesToKeep = mutableSetOf<SearchEngine>()
-                    
-                    // Keep Current
-                    enginesToKeep.add(selectedEngine)
-                    
-                    // Keep Neighbors (Immediate usage likely)
-                    if (currentIndex > 0) enginesToKeep.add(searchEngines[currentIndex - 1])
-                    if (currentIndex < searchEngines.size - 1) enginesToKeep.add(searchEngines[currentIndex + 1])
-                    
-                    // Remove others
-                    val iterator = webViews.iterator()
-                    while (iterator.hasNext()) {
-                        val entry = iterator.next()
-                        if (!enginesToKeep.contains(entry.key)) {
-                            // Destroy and remove
-                            entry.value.loadUrl("about:blank") // Clear content first
-                            entry.value.destroy()
-                            iterator.remove()
-                            android.util.Log.d("CircleToSearch", "Cleaned up WebView for: ${entry.key}")
-                        }
-                    }
+                     // ... (Cleanup logic removed)
                 }
+                */
 
                 Box(modifier = Modifier.fillMaxSize()) {
                     // Show loading only if the SELECTED engine isn't ready or just starting
@@ -541,13 +565,9 @@ fun CircleToSearchScreen(
 
                     // Render WebViews
                     searchEngines.forEach { engine ->
-                         // Logic: Only create/render if it's the selected one OR a neighbor we want to preload
-                         val currentIndex = searchEngines.indexOf(selectedEngine)
-                         val engineIndex = searchEngines.indexOf(engine)
-                         val isNeighbor = kotlin.math.abs(currentIndex - engineIndex) <= 1
-                         
-                         // We render it if it's a neighbor AND we have a URL for it.
-                         if (isNeighbor && preloadedUrls.containsKey(engine)) {
+                         // Logic: Render if it's in the initialized set (Smart Loading)
+                         // This ensures we don't load everything at once, but once loaded, we keep it.
+                         if (initializedEngines.contains(engine) && preloadedUrls.containsKey(engine)) {
                              val url = preloadedUrls[engine]!!
                              val isSelected = (engine == selectedEngine)
                              
@@ -556,17 +576,6 @@ fun CircleToSearchScreen(
                                     factory = { ctx ->
                                         if (webViews.containsKey(engine)) {
                                             // Should not happen with key(), but safety check
-                                            // Actually, if we recompose, we might get here.
-                                            // But standard AndroidView factory is called once per key.
-                                            // If key changes, it reconstructs.
-                                            // If we already have it in map, reuse it? 
-                                            // No, standard AndroidView expects to return a View. 
-                                            // If we return an already attached view, it crashes.
-                                            // So we must handle detachment if reusing.
-                                            // Given our cleanup logic, we destroy ones not in neighbor set.
-                                            // So valid ones in map are likely safe.
-                                            // BUT: They might be attached to previous AndroidView wrapper (SwipeRefreshLayout).
-                                            // So we should remove from parent if exists.
                                             val v = webViews[engine]!!
                                             (v.parent as? ViewGroup)?.removeView(v)
                                             
@@ -589,9 +598,9 @@ fun CircleToSearchScreen(
                                                     ViewGroup.LayoutParams.MATCH_PARENT
                                                 )
                                             }
-                                            val webView = createWebView(ctx)
+                                            val webView = createWebView(ctx, engine)
                                             // Apply current settings
-                                             if (isDesktopMode) {
+                                             if (isDesktop(engine)) {
                                                  webView.settings.userAgentString = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
                                              }
                                             
@@ -905,9 +914,15 @@ fun CircleToSearchScreen(
                         onDismissRequest = { showMenu = false }
                     ) {
                         androidx.compose.material3.DropdownMenuItem(
-                            text = { Text(if (isDesktopMode) "Mobile Mode" else "Desktop Mode") },
+                            text = { Text(if (isDesktop(selectedEngine)) "Mobile Mode" else "Desktop Mode") },
                             onClick = { 
-                                isDesktopMode = !isDesktopMode 
+                                val newSet = desktopModeEngines.toMutableSet()
+                                if (newSet.contains(selectedEngine)) {
+                                    newSet.remove(selectedEngine)
+                                } else {
+                                    newSet.add(selectedEngine)
+                                }
+                                desktopModeEngines = newSet
                                 showMenu = false
                             }
                         )
@@ -926,6 +941,13 @@ fun CircleToSearchScreen(
                             }
                         )
                         androidx.compose.material3.DropdownMenuItem(
+                            text = { Text("Refresh") },
+                            onClick = { 
+                                webViews[selectedEngine]?.reload()
+                                showMenu = false
+                            }
+                        )
+                        androidx.compose.material3.DropdownMenuItem(
                             text = { Text("Copy URL") },
                             onClick = {
                                 if (searchUrl != null) {
@@ -939,9 +961,10 @@ fun CircleToSearchScreen(
                         androidx.compose.material3.DropdownMenuItem(
                             text = { Text("Open in Browser") },
                             onClick = {
-                                if (searchUrl != null) {
+                                val currentUrl = webViews[selectedEngine]?.url ?: searchUrl
+                                if (currentUrl != null) {
                                     try {
-                                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(searchUrl))
+                                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(currentUrl))
                                         context.startActivity(intent)
                                     } catch (e: Exception) {
                                         android.util.Log.e("CircleToSearch", "Failed to open browser", e)
