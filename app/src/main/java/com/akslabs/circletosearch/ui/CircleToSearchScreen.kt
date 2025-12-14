@@ -21,6 +21,7 @@ package com.akslabs.circletosearch.ui
 
 import com.akslabs.circletosearch.utils.FriendlyMessageManager
 import com.akslabs.circletosearch.ui.components.FriendlyMessageBubble
+import com.akslabs.circletosearch.utils.UIPreferences
 import kotlinx.coroutines.delay
 
 import android.graphics.Bitmap
@@ -130,6 +131,9 @@ fun CircleToSearchScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     
+    // Initialize preferences
+    val uiPreferences = remember { UIPreferences(context) }
+    
     // Support Sheet State
     var showSupportSheet by remember { mutableStateOf(false) }
     val supportSheetState = rememberModalBottomSheetState()
@@ -152,15 +156,80 @@ fun CircleToSearchScreen(
     var searchUrl by remember { mutableStateOf<String?>(null) }
     var hostedImageUrl by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(false) }
-    var isDesktopMode by remember { mutableStateOf(false) }
-    var isDarkMode by remember { mutableStateOf(false) } // Default to light mode
-    var showGradientBorder by remember { mutableStateOf(true) }
+    var isDesktopMode by remember { mutableStateOf(uiPreferences.isDesktopMode()) }
+    var isDarkMode by remember { mutableStateOf(uiPreferences.isDarkMode()) }
+    var showGradientBorder by remember { mutableStateOf(uiPreferences.isShowGradientBorder()) }
+    
+    // Save preferences whenever UI settings change
+    LaunchedEffect(isDesktopMode) {
+        uiPreferences.setDesktopMode(isDesktopMode)
+    }
+    
+    LaunchedEffect(isDarkMode) {
+        uiPreferences.setDarkMode(isDarkMode)
+    }
+    
+    LaunchedEffect(showGradientBorder) {
+        uiPreferences.setShowGradientBorder(showGradientBorder)
+    }
     
     // Cache for preloaded URLs to avoid re-uploading/re-generating
     val preloadedUrls = remember { mutableMapOf<SearchEngine, String>() }
     
     // WebView Cache
     val webViews = remember { mutableMapOf<SearchEngine, WebView>() }
+    
+    // Update WebViews when desktop mode changes
+    LaunchedEffect(isDesktopMode) {
+        val newUserAgent = if (isDesktopMode) {
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        } else {
+            "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+        }
+        
+        webViews.values.forEach { wv ->
+            try {
+                wv.settings.userAgentString = newUserAgent
+                wv.reload()
+                android.util.Log.d("CircleToSearch", "Desktop mode changed - Updated user agent and reloaded: $newUserAgent")
+            } catch (e: Exception) {
+                android.util.Log.e("CircleToSearch", "Error updating user agent on desktop mode change", e)
+            }
+        }
+    }
+    
+    // Update WebViews when dark mode changes
+    LaunchedEffect(isDarkMode) {
+        webViews.values.forEach { wv ->
+            try {
+                // Update WebViewClient for dark mode
+                if (isDarkMode) {
+                    wv.webViewClient = object : android.webkit.WebViewClient() {
+                        override fun onPageFinished(view: android.webkit.WebView?, url: String?) {
+                            super.onPageFinished(view, url)
+                            val darkModeCSS = """
+                                javascript:(function() {
+                                    var style = document.createElement('style');
+                                    style.innerHTML = `
+                                        html { filter: invert(1) hue-rotate(180deg) !important; background: #000 !important; }
+                                        img, video, [style*="background-image"] { filter: invert(1) hue-rotate(180deg) !important; }
+                                    `;
+                                    document.head.appendChild(style);
+                                })()
+                            """.trimIndent()
+                            view?.loadUrl(darkModeCSS)
+                        }
+                    }
+                } else {
+                    wv.webViewClient = android.webkit.WebViewClient()
+                }
+                wv.reload()
+                android.util.Log.d("CircleToSearch", "Dark mode changed to: $isDarkMode - Reloaded WebViews")
+            } catch (e: Exception) {
+                android.util.Log.e("CircleToSearch", "Error updating dark mode", e)
+            }
+        }
+    }
     
     // Bottom Sheet State
     val scaffoldState = androidx.compose.material3.rememberBottomSheetScaffoldState(
@@ -461,46 +530,7 @@ fun CircleToSearchScreen(
                         }
                     }
 
-                    // Dynamic Settings Update (User Agent etc)
-                    LaunchedEffect(isDesktopMode, isDarkMode) {
-                         webViews.values.forEach { wv ->
-                            val newUserAgent = if (isDesktopMode) {
-                                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-                            } else {
-                                "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
-                            }
-                             
-                             if (wv.settings.userAgentString != newUserAgent) {
-                                wv.settings.userAgentString = newUserAgent
-                                wv.reload()
-                            }
-
-                            // Update WebViewClient for dark mode
-                            if (isDarkMode) {
-                                wv.webViewClient = object : android.webkit.WebViewClient() {
-                                    override fun onPageFinished(view: android.webkit.WebView?, url: String?) {
-                                        super.onPageFinished(view, url)
-                                        val darkModeCSS = """
-                                            javascript:(function() {
-                                                var style = document.createElement('style');
-                                                style.innerHTML = `
-                                                    html { filter: invert(1) hue-rotate(180deg) !important; background: #000 !important; }
-                                                    img, video, [style*="background-image"] { filter: invert(1) hue-rotate(180deg) !important; }
-                                                `;
-                                                document.head.appendChild(style);
-                                            })()
-                                        """.trimIndent()
-                                        view?.loadUrl(darkModeCSS)
-                                    }
-                                }
-                                // If already loaded, re-inject? reload() handles it.
-                            } else {
-                                wv.webViewClient = android.webkit.WebViewClient()
-                            }
-                            wv.reload()
-                         }
-                    }
-                    
+                    // Dynamic Settings Update (User Agent etc) - Now handled at top level
                     // Cleanup on Dispose
                     DisposableEffect(Unit) {
                         onDispose {
