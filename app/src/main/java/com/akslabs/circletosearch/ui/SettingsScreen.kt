@@ -49,6 +49,7 @@ fun SettingsScreen(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     
     var showFriendlyMessages by remember { mutableStateOf(uiPreferences.isShowFriendlyMessages()) }
+    var useGoogleLensOnly by remember { mutableStateOf(uiPreferences.isUseGoogleLensOnly()) }
     val initialOrderString = uiPreferences.getSearchEngineOrder()
     val allEngines = SearchEngine.values()
     
@@ -71,6 +72,10 @@ fun SettingsScreen(
 
     LaunchedEffect(showFriendlyMessages) {
         uiPreferences.setShowFriendlyMessages(showFriendlyMessages)
+    }
+
+    LaunchedEffect(useGoogleLensOnly) {
+        uiPreferences.setUseGoogleLensOnly(useGoogleLensOnly)
     }
 
     LaunchedEffect(engineOrder.toList()) {
@@ -109,6 +114,14 @@ fun SettingsScreen(
                 icon = Icons.Default.ChatBubbleOutline,
                 checked = showFriendlyMessages,
                 onCheckedChange = { showFriendlyMessages = it }
+            )
+
+            SettingsToggleItem(
+                title = "Use Google Lens only",
+                subtitle = "Always bypass multi-search and use Lens directamente",
+                icon = Icons.Default.AutoFixHigh,
+                checked = useGoogleLensOnly,
+                onCheckedChange = { useGoogleLensOnly = it }
             )
 
             Spacer(modifier = Modifier.height(24.dp))

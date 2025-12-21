@@ -310,6 +310,7 @@ fun SetupScreen() {
                 modifier = Modifier.align(Alignment.Start)
             )
             BubbleSwitch(context)
+            LensOnlySwitch(context)
 
             Spacer(modifier = Modifier.height(25.dp))
 
@@ -570,6 +571,29 @@ fun BubbleSwitch(context: android.content.Context) {
                 onCheckedChange = { enabled ->
                     isBubbleEnabled.value = enabled
                     prefs.edit().putBoolean("bubble_enabled", enabled).apply()
+                }
+            )
+        },
+        colors = ListItemDefaults.colors(
+            containerColor = Color.Transparent
+        )
+    )
+}
+
+@Composable
+fun LensOnlySwitch(context: android.content.Context) {
+    val uiPreferences = remember { com.akslabs.circletosearch.utils.UIPreferences(context) }
+    var isLensOnlyEnabled by remember { mutableStateOf(uiPreferences.isUseGoogleLensOnly()) }
+
+    ListItem(
+        headlineContent = { Text("Search with Google Lens Only") },
+        supportingContent = { Text("Bypass multi-engine and launch Lens directly") },
+        trailingContent = {
+            Switch(
+                checked = isLensOnlyEnabled,
+                onCheckedChange = { enabled ->
+                    isLensOnlyEnabled = enabled
+                    uiPreferences.setUseGoogleLensOnly(enabled)
                 }
             )
         },

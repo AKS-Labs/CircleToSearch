@@ -12,7 +12,7 @@ import android.widget.Toast
 import androidx.core.content.FileProvider
 import java.io.File
 
-//searchWithGoogleLens(mediaItem.uri, context)
+
 
 /**
  * Helper class for Google Lens integration
@@ -44,7 +44,7 @@ fun searchWithGoogleLens(uri: Uri, context: Context): Boolean {
 
                 FileProvider.getUriForFile(
                     context,
-                    "com.aks_labs.tulsi.fileprovider",
+                    "com.akslabs.circletosearch.fileprovider",
                     file
                 )
             } catch (e: Exception) {

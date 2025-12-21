@@ -31,6 +31,15 @@ class UIPreferences(context: Context) {
         private const val KEY_SHOW_GRADIENT_BORDER = "show_gradient_border"
         private const val KEY_SHOW_FRIENDLY_MESSAGES = "show_friendly_messages"
         private const val KEY_SEARCH_ENGINE_ORDER = "search_engine_order"
+        private const val KEY_USE_GOOGLE_LENS_ONLY = "use_google_lens_only"
+    }
+
+    fun isUseGoogleLensOnly(): Boolean {
+        return prefs.getBoolean(KEY_USE_GOOGLE_LENS_ONLY, false)
+    }
+
+    fun setUseGoogleLensOnly(isEnabled: Boolean) {
+        prefs.edit().putBoolean(KEY_USE_GOOGLE_LENS_ONLY, isEnabled).apply()
     }
     
     fun isDesktopMode(): Boolean {

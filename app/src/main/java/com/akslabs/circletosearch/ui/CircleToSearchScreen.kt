@@ -120,6 +120,7 @@ import com.akslabs.circletosearch.data.SearchEngine
 import com.akslabs.circletosearch.ui.theme.OverlayGradientColors
 import com.akslabs.circletosearch.utils.ImageSearchUploader
 import com.akslabs.circletosearch.utils.ImageUtils
+import com.akslabs.circletosearch.ui.components.searchWithGoogleLens
 import kotlinx.coroutines.launch
 import java.io.ByteArrayOutputStream
 import androidx.activity.compose.BackHandler
@@ -489,7 +490,26 @@ fun CircleToSearchScreen(
                         isLoading = true
                         scope.launch { scaffoldState.bottomSheetState.expand() }
                         
-                        // 1. Upload to host if needed
+                        // 1. Google Lens Only Mode Check
+                        if (uiPreferences.isUseGoogleLensOnly()) {
+                            // Save to cache and launch Lens
+                            val path = ImageUtils.saveBitmap(context, selectedBitmap!!)
+                            val uri = android.net.Uri.fromFile(java.io.File(path))
+                            
+                            // Prepare content URI for Lens (using existing FileProvider logic in helper)
+                            val success = searchWithGoogleLens(uri, context)
+                            
+                            if (success) {
+                                // Close the overlay since Lens is taking over
+                                onClose()
+                                return@LaunchedEffect
+                            } else {
+                                // Fallback to multi-search if Lens failed
+                                android.util.Log.e("CircleToSearch", "Google Lens launch failed, falling back to multi-search")
+                            }
+                        }
+
+                        // 2. Upload to host if needed (Multi-Search Mode)
                         if (hostedImageUrl == null) {
                             val url = ImageSearchUploader.uploadToImageHost(selectedBitmap!!)
                             if (url != null) {
