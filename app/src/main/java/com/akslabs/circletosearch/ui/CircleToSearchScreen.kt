@@ -61,6 +61,7 @@ import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -139,20 +140,39 @@ fun CircleToSearchScreen(
     val supportSheetState = rememberModalBottomSheetState()
     
 
-    // Search Engines Definition (Moved top for scope access)
-    val searchEngines = SearchEngine.values()
+    // Search Engines Order Logic
+    val preferredOrder = remember(uiPreferences.getSearchEngineOrder()) {
+        val allEngines = SearchEngine.values()
+        val orderString = uiPreferences.getSearchEngineOrder()
+        if (orderString == null) allEngines
+        else {
+            val preferredNames = orderString.split(",")
+            val ordered = mutableListOf<SearchEngine>()
+            preferredNames.forEach { name ->
+                allEngines.find { it.name == name }?.let { ordered.add(it) }
+            }
+            allEngines.forEach { if (!ordered.contains(it)) ordered.add(it) }
+            ordered
+        }
+    }
+    val searchEngines = preferredOrder
+
+    // Support Settings Sheet
+    var showSettingsScreen by remember { mutableStateOf(false) }
 
     // Friendly Message State
     var friendlyMessage by remember { mutableStateOf("") }
     var isMessageVisible by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
-        val manager = FriendlyMessageManager(context)
-        friendlyMessage = manager.getNextMessage()
-        delay(500) // Small delay for smooth entrance
-        isMessageVisible = true
-        delay(4000) // Show for 4 seconds
-        isMessageVisible = false
+        if (uiPreferences.isShowFriendlyMessages()) {
+            val manager = FriendlyMessageManager(context)
+            friendlyMessage = manager.getNextMessage()
+            delay(500) // Small delay for smooth entrance
+            isMessageVisible = true
+            delay(4000) // Show for 4 seconds
+            isMessageVisible = false
+        }
     }
 
     // Search State
@@ -897,87 +917,99 @@ fun CircleToSearchScreen(
                 )
                 Spacer(modifier = Modifier.weight(1f))
                 
-                // Menu
-                Box {
-                    var showMenu by remember { mutableStateOf(false) }
+                // Action Buttons (Settings & Menu)
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(
-                        onClick = { showMenu = true },
+                        onClick = { showSettingsScreen = true },
                         modifier = Modifier
                             .background(Color.Gray.copy(alpha = 0.5f), CircleShape)
                             .size(40.dp)
                     ) {
-                        Icon(Icons.Default.MoreVert, contentDescription = "Menu", tint = Color.White)
+                        Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.White)
                     }
                     
-                    androidx.compose.material3.DropdownMenu(
-                        expanded = showMenu,
-                        onDismissRequest = { showMenu = false }
-                    ) {
-                        androidx.compose.material3.DropdownMenuItem(
-                            text = { Text(if (isDesktop(selectedEngine)) "Mobile Mode" else "Desktop Mode") },
-                            onClick = { 
-                                val newSet = desktopModeEngines.toMutableSet()
-                                if (newSet.contains(selectedEngine)) {
-                                    newSet.remove(selectedEngine)
-                                } else {
-                                    newSet.add(selectedEngine)
-                                }
-                                desktopModeEngines = newSet
-                                showMenu = false
-                            }
-                        )
-                        androidx.compose.material3.DropdownMenuItem(
-                            text = { Text(if (isDarkMode) "Light Mode" else "Dark Mode") },
-                            onClick = { 
-                                isDarkMode = !isDarkMode 
-                                showMenu = false
-                            }
-                        )
-                        androidx.compose.material3.DropdownMenuItem(
-                            text = { Text(if (showGradientBorder) "Hide Border" else "Show Border") },
-                            onClick = { 
-                                showGradientBorder = !showGradientBorder 
-                                showMenu = false
-                            }
-                        )
-                        androidx.compose.material3.DropdownMenuItem(
-                            text = { Text("Refresh") },
-                            onClick = { 
-                                webViews[selectedEngine]?.reload()
-                                showMenu = false
-                            }
-                        )
-                        androidx.compose.material3.DropdownMenuItem(
-                            text = { Text("Copy URL") },
-                            onClick = {
-                                if (searchUrl != null) {
-                                    val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                                    val clip = android.content.ClipData.newPlainText("Search URL", searchUrl)
-                                    clipboard.setPrimaryClip(clip)
-                                }
-                                showMenu = false
-                            }
-                        )
-                        androidx.compose.material3.DropdownMenuItem(
-                            text = { Text("Open in Browser") },
-                            onClick = {
-                                val currentUrl = webViews[selectedEngine]?.url ?: searchUrl
-                                if (currentUrl != null) {
-                                    try {
-                                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(currentUrl))
-                                        context.startActivity(intent)
-                                    } catch (e: Exception) {
-                                        android.util.Log.e("CircleToSearch", "Failed to open browser", e)
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    // Menu
+                    Box {
+                        var showMenu by remember { mutableStateOf(false) }
+                        IconButton(
+                            onClick = { showMenu = true },
+                            modifier = Modifier
+                                .background(Color.Gray.copy(alpha = 0.5f), CircleShape)
+                                .size(40.dp)
+                        ) {
+                            Icon(Icons.Default.MoreVert, contentDescription = "Menu", tint = Color.White)
+                        }
+                    
+                        androidx.compose.material3.DropdownMenu(
+                            expanded = showMenu,
+                            onDismissRequest = { showMenu = false }
+                        ) {
+                            androidx.compose.material3.DropdownMenuItem(
+                                text = { Text(if (isDesktop(selectedEngine)) "Mobile Mode" else "Desktop Mode") },
+                                onClick = { 
+                                    val newSet = desktopModeEngines.toMutableSet()
+                                    if (newSet.contains(selectedEngine)) {
+                                        newSet.remove(selectedEngine)
+                                    } else {
+                                        newSet.add(selectedEngine)
                                     }
+                                    desktopModeEngines = newSet
+                                    showMenu = false
                                 }
-                                showMenu = false
-                            }
-                        )
+                            )
+                            androidx.compose.material3.DropdownMenuItem(
+                                text = { Text(if (isDarkMode) "Light Mode" else "Dark Mode") },
+                                onClick = { 
+                                    isDarkMode = !isDarkMode 
+                                    showMenu = false
+                                }
+                            )
+                            androidx.compose.material3.DropdownMenuItem(
+                                text = { Text(if (showGradientBorder) "Hide Border" else "Show Border") },
+                                onClick = { 
+                                    showGradientBorder = !showGradientBorder 
+                                    showMenu = false
+                                }
+                            )
+                            androidx.compose.material3.DropdownMenuItem(
+                                text = { Text("Refresh") },
+                                onClick = { 
+                                    webViews[selectedEngine]?.reload()
+                                    showMenu = false
+                                }
+                            )
+                            androidx.compose.material3.DropdownMenuItem(
+                                text = { Text("Copy URL") },
+                                onClick = {
+                                    if (searchUrl != null) {
+                                        val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                        val clip = android.content.ClipData.newPlainText("Search URL", searchUrl)
+                                        clipboard.setPrimaryClip(clip)
+                                    }
+                                    showMenu = false
+                                }
+                            )
+                            androidx.compose.material3.DropdownMenuItem(
+                                text = { Text("Open in Browser") },
+                                onClick = {
+                                    val currentUrl = webViews[selectedEngine]?.url ?: searchUrl
+                                    if (currentUrl != null) {
+                                        try {
+                                            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(currentUrl))
+                                            context.startActivity(intent)
+                                        } catch (e: Exception) {
+                                            android.util.Log.e("CircleToSearch", "Failed to open browser", e)
+                                        }
+                                    }
+                                    showMenu = false
+                                }
+                            )
+                        }
                     }
                 }
-            }
-
-            // 5. Search Bar / Pill (Bottom Fixed) - Clickable to open sheet
+            }      // 5. Search Bar / Pill (Bottom Fixed) - Clickable to open sheet
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -1078,6 +1110,13 @@ fun CircleToSearchScreen(
                         }
                     }
                 }
+            )
+        }
+
+        if (showSettingsScreen) {
+            SettingsScreen(
+                uiPreferences = uiPreferences,
+                onDismissRequest = { showSettingsScreen = false }
             )
         }
 

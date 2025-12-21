@@ -29,6 +29,8 @@ class UIPreferences(context: Context) {
         private const val KEY_DESKTOP_MODE = "is_desktop_mode"
         private const val KEY_DARK_MODE = "is_dark_mode"
         private const val KEY_SHOW_GRADIENT_BORDER = "show_gradient_border"
+        private const val KEY_SHOW_FRIENDLY_MESSAGES = "show_friendly_messages"
+        private const val KEY_SEARCH_ENGINE_ORDER = "search_engine_order"
     }
     
     fun isDesktopMode(): Boolean {
@@ -53,5 +55,21 @@ class UIPreferences(context: Context) {
     
     fun setShowGradientBorder(isEnabled: Boolean) {
         prefs.edit().putBoolean(KEY_SHOW_GRADIENT_BORDER, isEnabled).apply()
+    }
+
+    fun isShowFriendlyMessages(): Boolean {
+        return prefs.getBoolean(KEY_SHOW_FRIENDLY_MESSAGES, true)
+    }
+
+    fun setShowFriendlyMessages(isEnabled: Boolean) {
+        prefs.edit().putBoolean(KEY_SHOW_FRIENDLY_MESSAGES, isEnabled).apply()
+    }
+
+    fun getSearchEngineOrder(): String? {
+        return prefs.getString(KEY_SEARCH_ENGINE_ORDER, null)
+    }
+
+    fun setSearchEngineOrder(order: String) {
+        prefs.edit().putString(KEY_SEARCH_ENGINE_ORDER, order).apply()
     }
 }
