@@ -484,11 +484,9 @@ fun CircleToSearchScreen(
                     webViews.clear()
                 }
 
-                // Main Loading & Search Logic
                 LaunchedEffect(selectedBitmap, hostedImageUrl) {
                     if (selectedBitmap != null) {
                         isLoading = true
-                        scope.launch { scaffoldState.bottomSheetState.expand() }
                         
                         // 1. Google Lens Only Mode Check
                         if (uiPreferences.isUseGoogleLensOnly()) {
@@ -509,7 +507,10 @@ fun CircleToSearchScreen(
                             }
                         }
 
-                        // 2. Upload to host if needed (Multi-Search Mode)
+                        // 2. Multi-Search Mode (Expanded UI)
+                        scope.launch { scaffoldState.bottomSheetState.expand() }
+
+                        // 3. Upload to host if needed (Multi-Search Mode)
                         if (hostedImageUrl == null) {
                             val url = ImageSearchUploader.uploadToImageHost(selectedBitmap!!)
                             if (url != null) {
