@@ -62,6 +62,14 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Smartphone
+import androidx.compose.material.icons.filled.DesktopWindows
+import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.OpenInNew
+import androidx.compose.material.icons.filled.BorderOuter
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -917,103 +925,117 @@ fun CircleToSearchScreen(
                 )
                 Spacer(modifier = Modifier.weight(1f))
                 
-                // Action Buttons (Settings & Menu)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(
-                        onClick = { showSettingsScreen = true },
-                        modifier = Modifier
-                            .background(Color.Gray.copy(alpha = 0.5f), CircleShape)
-                            .size(40.dp)
-                    ) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.White)
+                // Action Button (Menu)
+                Box(
+                    modifier = Modifier
+                        .background(Color.Gray.copy(alpha = 0.5f), CircleShape)
+                        .size(40.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    var showMenu by remember { mutableStateOf(false) }
+                    IconButton(onClick = { showMenu = true }) {
+                        Icon(Icons.Default.MoreVert, contentDescription = "Menu", tint = Color.White)
                     }
-                    
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    // Menu
-                    Box {
-                        var showMenu by remember { mutableStateOf(false) }
-                        IconButton(
-                            onClick = { showMenu = true },
-                            modifier = Modifier
-                                .background(Color.Gray.copy(alpha = 0.5f), CircleShape)
-                                .size(40.dp)
-                        ) {
-                            Icon(Icons.Default.MoreVert, contentDescription = "Menu", tint = Color.White)
-                        }
-                    
-                        androidx.compose.material3.DropdownMenu(
-                            expanded = showMenu,
-                            onDismissRequest = { showMenu = false }
-                        ) {
-                            androidx.compose.material3.DropdownMenuItem(
-                                text = { Text(if (isDesktop(selectedEngine)) "Mobile Mode" else "Desktop Mode") },
-                                onClick = { 
-                                    val newSet = desktopModeEngines.toMutableSet()
-                                    if (newSet.contains(selectedEngine)) {
-                                        newSet.remove(selectedEngine)
-                                    } else {
-                                        newSet.add(selectedEngine)
+                
+                    androidx.compose.material3.DropdownMenu(
+                        expanded = showMenu,
+                        onDismissRequest = { showMenu = false }
+                    ) {
+                        val isDesktop = isDesktop(selectedEngine)
+                        androidx.compose.material3.DropdownMenuItem(
+                            text = { Text(if (isDesktop) "Mobile Mode" else "Desktop Mode") },
+                            leadingIcon = { 
+                                Icon(
+                                    if (isDesktop) Icons.Default.Smartphone else Icons.Default.DesktopWindows,
+                                    contentDescription = null
+                                )
+                            },
+                            onClick = { 
+                                val newSet = desktopModeEngines.toMutableSet()
+                                if (newSet.contains(selectedEngine)) {
+                                    newSet.remove(selectedEngine)
+                                } else {
+                                    newSet.add(selectedEngine)
+                                }
+                                desktopModeEngines = newSet
+                                showMenu = false
+                            }
+                        )
+                        androidx.compose.material3.DropdownMenuItem(
+                            text = { Text(if (isDarkMode) "Light Mode" else "Dark Mode") },
+                            leadingIcon = {
+                                Icon(
+                                    if (isDarkMode) Icons.Default.LightMode else Icons.Default.DarkMode,
+                                    contentDescription = null
+                                )
+                            },
+                            onClick = { 
+                                isDarkMode = !isDarkMode 
+                                showMenu = false
+                            }
+                        )
+                        androidx.compose.material3.DropdownMenuItem(
+                            text = { Text(if (showGradientBorder) "Hide Border" else "Show Border") },
+                            leadingIcon = {
+                                Icon(Icons.Default.BorderOuter, contentDescription = null)
+                            },
+                            onClick = { 
+                                showGradientBorder = !showGradientBorder 
+                                showMenu = false
+                            }
+                        )
+                        androidx.compose.material3.DropdownMenuItem(
+                            text = { Text("Refresh") },
+                            leadingIcon = {
+                                Icon(Icons.Default.Refresh, contentDescription = null)
+                            },
+                            onClick = { 
+                                webViews[selectedEngine]?.reload()
+                                showMenu = false
+                            }
+                        )
+                        androidx.compose.material3.DropdownMenuItem(
+                            text = { Text("Copy URL") },
+                            leadingIcon = {
+                                Icon(Icons.Default.ContentCopy, contentDescription = null)
+                            },
+                            onClick = {
+                                if (searchUrl != null) {
+                                    val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                    val clip = android.content.ClipData.newPlainText("Search URL", searchUrl)
+                                    clipboard.setPrimaryClip(clip)
+                                }
+                                showMenu = false
+                            }
+                        )
+                        androidx.compose.material3.DropdownMenuItem(
+                            text = { Text("Open in Browser") },
+                            leadingIcon = {
+                                Icon(Icons.Default.OpenInNew, contentDescription = null)
+                            },
+                            onClick = {
+                                val currentUrl = webViews[selectedEngine]?.url ?: searchUrl
+                                if (currentUrl != null) {
+                                    try {
+                                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(currentUrl))
+                                        context.startActivity(intent)
+                                    } catch (e: Exception) {
+                                        android.util.Log.e("CircleToSearch", "Failed to open browser", e)
                                     }
-                                    desktopModeEngines = newSet
-                                    showMenu = false
                                 }
-                            )
-                            androidx.compose.material3.DropdownMenuItem(
-                                text = { Text(if (isDarkMode) "Light Mode" else "Dark Mode") },
-                                onClick = { 
-                                    isDarkMode = !isDarkMode 
-                                    showMenu = false
-                                }
-                            )
-                            androidx.compose.material3.DropdownMenuItem(
-                                text = { Text(if (showGradientBorder) "Hide Border" else "Show Border") },
-                                onClick = { 
-                                    showGradientBorder = !showGradientBorder 
-                                    showMenu = false
-                                }
-                            )
-                            androidx.compose.material3.DropdownMenuItem(
-                                text = { Text("Refresh") },
-                                onClick = { 
-                                    webViews[selectedEngine]?.reload()
-                                    showMenu = false
-                                }
-                            )
-                            androidx.compose.material3.DropdownMenuItem(
-                                text = { Text("Copy URL") },
-                                onClick = {
-                                    if (searchUrl != null) {
-                                        val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                                        val clip = android.content.ClipData.newPlainText("Search URL", searchUrl)
-                                        clipboard.setPrimaryClip(clip)
-                                    }
-                                    showMenu = false
-                                }
-                            )
-                            androidx.compose.material3.DropdownMenuItem(
-                                text = { Text("Open in Browser") },
-                                onClick = {
-                                    val currentUrl = webViews[selectedEngine]?.url ?: searchUrl
-                                    if (currentUrl != null) {
-                                        try {
-                                            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(currentUrl))
-                                            context.startActivity(intent)
-                                        } catch (e: Exception) {
-                                            android.util.Log.e("CircleToSearch", "Failed to open browser", e)
-                                        }
-                                    }
-                                    showMenu = false
-                                }
-                            )
-                            androidx.compose.material3.DropdownMenuItem(
-                                text = { Text("Settings") },
-                                onClick = {
-                                    showSettingsScreen = true
-                                    showMenu = false
-                                }
-                            )
-                        }
+                                showMenu = false
+                            }
+                        )
+                        androidx.compose.material3.DropdownMenuItem(
+                            text = { Text("Settings") },
+                            leadingIcon = {
+                                Icon(Icons.Default.Settings, contentDescription = null)
+                            },
+                            onClick = {
+                                showSettingsScreen = true
+                                showMenu = false
+                            }
+                        )
                     }
                 }
             }      // 5. Search Bar / Pill (Bottom Fixed) - Clickable to open sheet
