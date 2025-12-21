@@ -176,7 +176,7 @@ fun CircleToSearchScreen(
     }
 
     // Search State
-    var selectedEngine by remember { mutableStateOf<SearchEngine>(SearchEngine.Google) }
+    var selectedEngine by remember(searchEngines) { mutableStateOf<SearchEngine>(searchEngines.first()) }
     var searchUrl by remember { mutableStateOf<String?>(null) }
     var hostedImageUrl by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(false) }
@@ -1003,6 +1003,13 @@ fun CircleToSearchScreen(
                                             android.util.Log.e("CircleToSearch", "Failed to open browser", e)
                                         }
                                     }
+                                    showMenu = false
+                                }
+                            )
+                            androidx.compose.material3.DropdownMenuItem(
+                                text = { Text("Settings") },
+                                onClick = {
+                                    showSettingsScreen = true
                                     showMenu = false
                                 }
                             )
