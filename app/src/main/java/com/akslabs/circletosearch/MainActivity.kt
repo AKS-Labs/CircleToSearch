@@ -61,7 +61,13 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    SetupScreen()
+                    var currentScreen by remember { mutableStateOf("home") }
+                    
+                    if (currentScreen == "settings") {
+                        com.akslabs.circletosearch.ui.OverlaySettingsScreen(onBack = { currentScreen = "home" })
+                    } else {
+                        SetupScreen(onSettingsClick = { currentScreen = "settings" })
+                    }
                 }
             }
         }
@@ -70,7 +76,7 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SetupScreen() {
+fun SetupScreen(onSettingsClick: () -> Unit) {
     val context = LocalContext.current
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     val prefs = context.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
@@ -312,6 +318,43 @@ fun SetupScreen() {
             )
             BubbleSwitch(context)
             LensOnlySwitch(context)
+            
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            // Advanced Overlay Settings Button
+            Card(
+                onClick = onSettingsClick,
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                ),
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                 Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Settings,
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp),
+                        tint = MaterialTheme.colorScheme.onTertiaryContainer
+                    )
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column {
+                        Text(
+                            text = "Advanced Status Bar Settings",
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                        Text(
+                            text = "Customize overlay size, gestures & segments",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f)
+                        )
+                    }
+                }
+            }
 
             Spacer(modifier = Modifier.height(25.dp))
 
