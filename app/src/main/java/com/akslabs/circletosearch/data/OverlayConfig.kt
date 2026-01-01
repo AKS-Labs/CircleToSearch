@@ -43,12 +43,19 @@ enum class ActionType {
     BACK,
     RECENTS,
     LOCK_SCREEN,
-    OPEN_APP, 
     OPEN_NOTIFICATIONS,
     OPEN_QUICK_SETTINGS,
     CTS_LENS,
     CTS_MULTI,
-    SPLIT_SCREEN
+    SPLIT_SCREEN,
+    OPEN_APP,
+    SCROLL_TOP,
+    SCROLL_BOTTOM,
+    SCREEN_OFF,
+    TOGGLE_AUTO_ROTATE,
+    MEDIA_PLAY_PAUSE,
+    MEDIA_NEXT,
+    MEDIA_PREVIOUS
 }
 
 class OverlayConfigurationManager(context: Context) {

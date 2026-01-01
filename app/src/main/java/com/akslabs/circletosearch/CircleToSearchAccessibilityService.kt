@@ -435,7 +435,67 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
                      android.widget.Toast.makeText(this, "Split Screen not supported or failed", android.widget.Toast.LENGTH_SHORT).show()
                  }
             }
+            ActionType.SCROLL_TOP -> performScroll(true)
+            ActionType.SCROLL_BOTTOM -> performScroll(false)
+            ActionType.SCREEN_OFF -> {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN)
+                } else {
+                     android.widget.Toast.makeText(this, "Screen Off requires Android 9+", android.widget.Toast.LENGTH_SHORT).show()
+                }
+            }
+            ActionType.TOGGLE_AUTO_ROTATE -> toggleAutoRotate()
+            ActionType.MEDIA_PLAY_PAUSE -> injectMediaKey(android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
+            ActionType.MEDIA_NEXT -> injectMediaKey(android.view.KeyEvent.KEYCODE_MEDIA_NEXT)
+            ActionType.MEDIA_PREVIOUS -> injectMediaKey(android.view.KeyEvent.KEYCODE_MEDIA_PREVIOUS)
             else -> {}
+        }
+    }
+    
+    // Helpers for new actions
+    
+    private fun performScroll(toTop: Boolean) {
+        // We simulate a long swipe. 
+        // Scroll To Top = Swipe Down (drag content down).
+        // Scroll To Bottom = Swipe Up (drag content up).
+        val displayMetrics = resources.displayMetrics
+        val centerX = displayMetrics.widthPixels / 2f
+        val startY = if (toTop) displayMetrics.heightPixels * 0.3f else displayMetrics.heightPixels * 0.7f
+        val endY = if (toTop) displayMetrics.heightPixels * 0.9f else displayMetrics.heightPixels * 0.1f
+        
+        val path = android.graphics.Path().apply {
+            moveTo(centerX, startY)
+            lineTo(centerX, endY)
+        }
+        val stroke = android.accessibilityservice.GestureDescription.StrokeDescription(path, 0, 300)
+        val gesture = android.accessibilityservice.GestureDescription.Builder().addStroke(stroke).build()
+        dispatchGesture(gesture, null, null)
+    }
+    
+    private fun injectMediaKey(keyCode: Int) {
+        val audioManager = getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
+        val eventTime = android.os.SystemClock.uptimeMillis()
+        
+        val downEvent = android.view.KeyEvent(eventTime, eventTime, android.view.KeyEvent.ACTION_DOWN, keyCode, 0)
+        val upEvent = android.view.KeyEvent(eventTime, eventTime, android.view.KeyEvent.ACTION_UP, keyCode, 0)
+        
+        audioManager.dispatchMediaKeyEvent(downEvent)
+        audioManager.dispatchMediaKeyEvent(upEvent)
+    }
+    
+    private fun toggleAutoRotate() {
+        if (android.provider.Settings.System.canWrite(this)) {
+            val current = android.provider.Settings.System.getInt(contentResolver, android.provider.Settings.System.ACCELEROMETER_ROTATION, 0)
+            val next = if (current == 1) 0 else 1
+            android.provider.Settings.System.putInt(contentResolver, android.provider.Settings.System.ACCELEROMETER_ROTATION, next)
+            android.widget.Toast.makeText(this, "Auto Rotate: ${if (next == 1) "ON" else "OFF"}", android.widget.Toast.LENGTH_SHORT).show()
+        } else {
+             android.widget.Toast.makeText(this, "Permission required for Auto Rotate", android.widget.Toast.LENGTH_SHORT).show()
+             val intent = android.content.Intent(android.provider.Settings.ACTION_MANAGE_WRITE_SETTINGS).apply {
+                 data = android.net.Uri.parse("package:$packageName")
+                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+             }
+             startActivity(intent)
         }
     }
     
