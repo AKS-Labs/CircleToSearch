@@ -184,11 +184,11 @@ fun SegmentEditorItem(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.clickable { isExpanded = !isExpanded }
             ) {
-                Box(
-                    modifier = Modifier.size(16.dp).background(
-                         listOf(Color.Red, Color.Blue, Color.Green, Color.Yellow, Color.Magenta)[index % 5],
-                         shape = CircleShape
-                    )
+                Icon(
+                    imageVector = Icons.Default.Layers,
+                    contentDescription = null,
+                    tint = listOf(Color.Red, Color.Blue, Color.Green, Color.Yellow, Color.Magenta)[index % 5],
+                    modifier = Modifier.size(24.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Overlay ${index + 1}", fontWeight = FontWeight.Bold)
@@ -207,6 +207,9 @@ fun SegmentEditorItem(
                 Spacer(modifier = Modifier.height(16.dp))
                 
                 // Dimensions Sliders - Limited to Screen
+                // Dimensions Sliders - Limited to Screen
+                // Only Height is discrete (10px steps) per user request
+                
                 Text("Horizontal Position (X): ${segment.xOffset}px", style = MaterialTheme.typography.labelMedium)
                 Slider(
                     value = segment.xOffset.toFloat().coerceIn(0f, maxWidth),
@@ -223,16 +226,19 @@ fun SegmentEditorItem(
                 
                 Text("Width: ${segment.width}px", style = MaterialTheme.typography.labelMedium)
                 Slider(
-                    value = segment.width.toFloat().coerceIn(0f, maxWidth),
+                    value = segment.width.toFloat().coerceIn(10f, maxWidth),
                     onValueChange = { onUpdate(segment.copy(width = it.toInt())) },
                     valueRange = 10f..maxWidth
                 )
                 
                 Text("Height: ${segment.height}px", style = MaterialTheme.typography.labelMedium)
+                val hRange = 10f..400f
+                val hSteps = ((hRange.endInclusive - hRange.start) / 10).toInt() - 1
                 Slider(
-                    value = segment.height.toFloat().coerceIn(0f, 400f),
+                    value = segment.height.toFloat().coerceIn(hRange),
                     onValueChange = { onUpdate(segment.copy(height = it.toInt())) },
-                    valueRange = 10f..400f // Limited to 400px as per verification request
+                    valueRange = hRange,
+                    steps = if (hSteps > 0) hSteps else 0
                 )
 
                 
