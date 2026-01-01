@@ -7,27 +7,32 @@ package com.akslabs.circletosearch.data
 import android.content.Context
 import android.content.SharedPreferences
 import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
+import com.akslabs.circletosearch.data.OverlaySegment
 
 data class OverlayConfig(
     val isEnabled: Boolean = true,
     val isEnabledInLandscape: Boolean = false,
-    val height: Int = 100, // Pixels
-    val verticalOffset: Int = 0, // Pixels from top
     val isVisible: Boolean = false, // Debug visibility (colored)
-    val segments: List<OverlaySegment> = listOf(OverlaySegment(0f, 1f)) // Default single full-width segment
+    val segments: List<OverlaySegment> = listOf(OverlaySegment(width = 1080)) // Default to a common large width
 )
 
 data class OverlaySegment(
-    val startFraction: Float, // 0.0 to 1.0
-    val widthFraction: Float, // 0.0 to 1.0
-    val gestures: MutableMap<GestureType, ActionType> = mutableMapOf(GestureType.DOUBLE_TAP to ActionType.SCREENSHOT)
+    val width: Int = 150, // Pixels
+    val height: Int = 60, // Pixels
+    val xOffset: Int = 0, // Pixels from left
+    val yOffset: Int = 0, // Pixels from top
+    val gestures: MutableMap<GestureType, ActionType> = mutableMapOf(GestureType.DOUBLE_TAP to ActionType.SCREENSHOT),
+    val gestureData: MutableMap<GestureType, String> = mutableMapOf() // Stores extra data like package name for OPEN_APP
 )
 
 enum class GestureType {
     DOUBLE_TAP,
     LONG_PRESS,
-    TRIPLE_TAP
+    TRIPLE_TAP,
+    SWIPE_UP,
+    SWIPE_DOWN,
+    SWIPE_LEFT,
+    SWIPE_RIGHT
 }
 
 enum class ActionType {
@@ -38,9 +43,12 @@ enum class ActionType {
     BACK,
     RECENTS,
     LOCK_SCREEN,
-    OPEN_APP, // Requires extra data, maybe simple string for package name later
+    OPEN_APP, 
     OPEN_NOTIFICATIONS,
-    OPEN_QUICK_SETTINGS
+    OPEN_QUICK_SETTINGS,
+    CTS_LENS,
+    CTS_MULTI,
+    SPLIT_SCREEN
 }
 
 class OverlayConfigurationManager(context: Context) {
@@ -53,14 +61,21 @@ class OverlayConfigurationManager(context: Context) {
 
     fun getConfig(): OverlayConfig {
         val json = prefs.getString(KEY_CONFIG, null)
-        return if (json != null) {
+        if (json != null) {
             try {
-                gson.fromJson(json, OverlayConfig::class.java)
+                val config = gson.fromJson(json, OverlayConfig::class.java)
+                // Sanitize: Gson might result in null keys in maps if enum values are missing
+                val sanitizedSegments = config.segments.map { segment ->
+                     val cleanGestures = segment.gestures.filterKeys { it != null }.toMutableMap()
+                     segment.copy(gestures = cleanGestures)
+                }
+                return config.copy(segments = sanitizedSegments)
             } catch (e: Exception) {
-                OverlayConfig()
+                // If deep failure, return default
+                return OverlayConfig()
             }
         } else {
-            OverlayConfig()
+            return OverlayConfig()
         }
     }
 

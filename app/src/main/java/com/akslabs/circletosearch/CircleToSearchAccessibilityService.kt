@@ -44,6 +44,7 @@ import com.akslabs.circletosearch.data.ActionType
 import com.akslabs.circletosearch.data.BitmapRepository
 import com.akslabs.circletosearch.data.GestureType
 import com.akslabs.circletosearch.data.OverlayConfigurationManager
+import com.akslabs.circletosearch.data.OverlaySegment
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
 
@@ -167,137 +168,222 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
     }
 
     private fun updateOverlay() {
-        // Remove existing views
-        overlayViews.forEach { view ->
-            try {
-                windowManager?.removeView(view)
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
-        overlayViews.clear()
-        
         val config = configManager.getConfig()
         
-        if (!config.isEnabled) return
+        if (!config.isEnabled) {
+            overlayViews.forEach { 
+                try { windowManager?.removeView(it) } catch(e: Exception) {} 
+            }
+            overlayViews.clear()
+            return
+        }
         
-        // Check Landscape Mode
+        // Landscape check
         val currentOrientation = resources.configuration.orientation
         if (currentOrientation == Configuration.ORIENTATION_LANDSCAPE && !config.isEnabledInLandscape) {
+             overlayViews.forEach { 
+                try { windowManager?.removeView(it) } catch(e: Exception) {} 
+            }
+            overlayViews.clear()
             return
         }
 
-        val screenWidth = resources.displayMetrics.widthPixels
+        // --- OPTIMIZATION: Diff Update to prevent flashing ---
+        // If the number of segments matches, we try to update existing views' LayoutParams
+        // If not, we rebuild.
         
-        // Create views for each segment
-        config.segments.forEach { segment ->
-            val segmentWidth = (screenWidth * segment.widthFraction).toInt()
-            val segmentX = (screenWidth * segment.startFraction).toInt()
-            
-            val view = View(this)
-            
-            // Visual debug or transparent
-            if (config.isVisible) {
-                view.setBackgroundColor(Color.argb(100, 255, 0, 0)) // Semi-transparent red for debug
-            } else {
-                view.setBackgroundColor(Color.TRANSPARENT)
-            }
-            
-            val params = WindowManager.LayoutParams(
-                segmentWidth,
-                config.height,
-                WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                        WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
-                        WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                        WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
-                PixelFormat.TRANSLUCENT
-            )
-            
-            params.gravity = Gravity.TOP or Gravity.START
-            params.x = segmentX
-            params.y = config.verticalOffset
-            
-            // GestureDetector for this segment
-            val gestureDetector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
-                override fun onDoubleTap(e: MotionEvent): Boolean {
-                    val action = segment.gestures[GestureType.DOUBLE_TAP] ?: ActionType.NONE
-                    performAction(action)
-                    return true
-                }
+        if (overlayViews.size == config.segments.size) {
+            // Update mode
+            config.segments.forEachIndexed { index, segment ->
+                val view = overlayViews[index]
+                val params = view.layoutParams as WindowManager.LayoutParams
                 
-                override fun onLongPress(e: MotionEvent) {
-                    val action = segment.gestures[GestureType.LONG_PRESS] ?: ActionType.NONE
-                    performAction(action)
-                }
-
-                override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
-                    // Possible triple tap logic here if needed, but Triple Tap usually handled by onDoubleTapEvent or custom logic.
-                    // For simplicity, we stick to Double and Long for now, or Tripple via custom counter if GestureDetector doesn't support it directly easily.
-                    // Standard GestureDetector doesn't have explicit onTripleTap. 
-                    // We can check previous tap times if we want triple tap.
-                    // For now, let's just stick to what GestureDetector offers cleanly.
-                    return false
-                }
-            }).apply {
-                // Triple tap workaround could be added here
-                setOnDoubleTapListener(object : GestureDetector.OnDoubleTapListener {
-                    override fun onSingleTapConfirmed(e: MotionEvent): Boolean = false
-                    
-                    override fun onDoubleTap(e: MotionEvent): Boolean {
-                        // Check for Triple Tap (very crude implementation concept, but standard is double)
-                        // Implementing strict double tap mapped action
-                        val action = segment.gestures[GestureType.DOUBLE_TAP] ?: ActionType.NONE
-                        if (action != ActionType.NONE) {
-                             performAction(action)
-                             return true
-                        }
-                        return false
-                    }
-
-                    override fun onDoubleTapEvent(e: MotionEvent): Boolean = false
-                })
-            }
-            
-            // Triple tap helper
-            var lastTapTime: Long = 0
-            var tapCount = 0
-            
-            @SuppressLint("ClickableViewAccessibility")
-            view.setOnTouchListener { _, event ->
-                if (event.action == MotionEvent.ACTION_DOWN) {
-                    val currentTime = System.currentTimeMillis()
-                    if (currentTime - lastTapTime < 400) {
-                        tapCount++
-                    } else {
-                        tapCount = 1
-                    }
-                    lastTapTime = currentTime
-                    
-                    if (tapCount == 3) {
-                         val action = segment.gestures[GestureType.TRIPLE_TAP] ?: ActionType.NONE
-                         if (action != ActionType.NONE) {
-                             performAction(action)
-                             tapCount = 0 // Reset
-                             return@setOnTouchListener true
-                         }
+                // Update params
+                var changed = false
+                if (params.width != segment.width) { params.width = segment.width; changed = true }
+                if (params.height != segment.height) { params.height = segment.height; changed = true }
+                if (params.x != segment.xOffset) { params.x = segment.xOffset; changed = true }
+                if (params.y != segment.yOffset) { params.y = segment.yOffset; changed = true }
+                
+                if (changed) {
+                    try {
+                        windowManager?.updateViewLayout(view, params)
+                    } catch (e: Exception) {
+                        // Fallback implies view might be detached, shouldn't happen commonly
                     }
                 }
                 
-                gestureDetector.onTouchEvent(event)
-                true 
+                // Update Color (Debug)
+                if (config.isVisible) {
+                    val colors = listOf(Color.parseColor("#80FF0000"), Color.parseColor("#8000FF00"), Color.parseColor("#800000FF"), Color.parseColor("#80FFFF00"), Color.parseColor("#80FF00FF")) // Red, Green, Blue, Yellow, Magenta
+                    view.setBackgroundColor(colors[index % colors.size])
+                } else {
+                    view.setBackgroundColor(Color.TRANSPARENT)
+                }
+                
+                // Update gesture listener
+                // Since we created the detector in the loop, we can't easily "update" its inner logic if it closes over the *old* segment.
+                // WE MUST re-attach the listener or make the listener dynamic.
+                // The cleanest way is to just attach a NEW listener wrapper that reads the LATEST segment config.
+                // But `segment` here is from the new config.
+                // Creating a new detector is cheap.
+                attachTouchListener(view, segment)
             }
+        } else {
+            // Rebuild mode (Count changed)
+            overlayViews.forEach { 
+                try { windowManager?.removeView(it) } catch(e: Exception) {} 
+            }
+            overlayViews.clear()
             
-            try {
-                windowManager?.addView(view, params)
-                overlayViews.add(view)
-            } catch (e: Exception) {
-                e.printStackTrace()
+            config.segments.forEachIndexed { index, segment ->
+                val view = View(this)
+                val params = WindowManager.LayoutParams(
+                    segment.width,
+                    segment.height,
+                    WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                            WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                            WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                    PixelFormat.TRANSLUCENT
+                )
+                
+                params.gravity = Gravity.TOP or Gravity.START
+                params.x = segment.xOffset
+                params.y = segment.yOffset
+                
+                 if (config.isVisible) {
+                    val colors = listOf(Color.parseColor("#80FF0000"), Color.parseColor("#8000FF00"), Color.parseColor("#800000FF"), Color.parseColor("#80FFFF00"), Color.parseColor("#80FF00FF"))
+                    view.setBackgroundColor(colors[index % colors.size])
+                } else {
+                    view.setBackgroundColor(Color.TRANSPARENT)
+                }
+
+                attachTouchListener(view, segment)
+                
+                try {
+                    windowManager?.addView(view, params)
+                    overlayViews.add(view)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
             }
         }
     }
     
-    private fun performAction(action: ActionType) {
+    @SuppressLint("ClickableViewAccessibility")
+    private fun attachTouchListener(view: View, segment: OverlaySegment) {
+        val gestureDetector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onDoubleTap(e: MotionEvent): Boolean {
+                val action = segment.gestures[GestureType.DOUBLE_TAP] ?: ActionType.NONE
+                if (action != ActionType.NONE) { performAction(action, segment); return true }
+                return false
+            }
+            
+            override fun onLongPress(e: MotionEvent) {
+                val action = segment.gestures[GestureType.LONG_PRESS] ?: ActionType.NONE
+                if (action != ActionType.NONE) performAction(action, segment)
+            }
+
+            override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
+                 // User wants "buttons behind to be clickable" 
+                 // We temporarily disable touch on our window and dispatch the click through.
+                 propagateSingleTap(view, e.rawX, e.rawY)
+                 return false
+            }
+            
+            override fun onFling(e1: MotionEvent?, e2: MotionEvent, velocityX: Float, velocityY: Float): Boolean {
+                if (e1 == null) return false
+                val diffY = e2.y - e1.y
+                val diffX = e2.x - e1.x
+                
+                if (Math.abs(diffX) > Math.abs(diffY)) {
+                    if (Math.abs(diffX) > 100 && Math.abs(velocityX) > 100) {
+                        if (diffX > 0) {
+                             // Swipe Right
+                             val action = segment.gestures[GestureType.SWIPE_RIGHT] ?: ActionType.NONE
+                             if (action != ActionType.NONE) { performAction(action, segment); return true }
+                        } else {
+                            // Swipe Left
+                            val action = segment.gestures[GestureType.SWIPE_LEFT] ?: ActionType.NONE
+                             if (action != ActionType.NONE) { performAction(action, segment); return true }
+                        }
+                    }
+                } else {
+                    if (Math.abs(diffY) > 100 && Math.abs(velocityY) > 100) {
+                        if (diffY > 0) {
+                             // Swipe Down
+                             val action = segment.gestures[GestureType.SWIPE_DOWN] ?: ActionType.NONE
+                             if (action != ActionType.NONE) { 
+                                 performAction(action, segment) 
+                             } else {
+                                 // Smart Scroll Down Logic (Default)
+                                 // If overlay is on LEFT side (< screenWidth/2), open Notifications.
+                                 // If overlay is on RIGHT side (> screenWidth/2), open Quick Settings.
+                                 
+                                 // We need to calculate the CENTER of this segment.
+                                 // segment.xOffset is the left edge.
+                                 // segment.width is width.
+                                 val segmentCenterX = segment.xOffset + (segment.width / 2)
+                                 val screenWidth = resources.displayMetrics.widthPixels
+                                 
+                                 if (segmentCenterX < (screenWidth / 2)) {
+                                     performGlobalAction(GLOBAL_ACTION_NOTIFICATIONS)
+                                 } else {
+                                     performGlobalAction(GLOBAL_ACTION_QUICK_SETTINGS)
+                                 }
+                             }
+                             return true
+                        } else {
+                            // Swipe Up
+                             val action = segment.gestures[GestureType.SWIPE_UP] ?: ActionType.NONE
+                             if (action != ActionType.NONE) { performAction(action, segment); return true }
+                        }
+                    }
+                }
+                return false
+            }
+        }).apply {
+             setOnDoubleTapListener(object : GestureDetector.OnDoubleTapListener {
+                override fun onSingleTapConfirmed(e: MotionEvent): Boolean = false
+                override fun onDoubleTap(e: MotionEvent): Boolean {
+                    val action = segment.gestures[GestureType.DOUBLE_TAP] ?: ActionType.NONE
+                    if (action != ActionType.NONE) { performAction(action, segment); return true }
+                    return false
+                }
+                override fun onDoubleTapEvent(e: MotionEvent): Boolean = false
+            })
+        }
+        
+        var lastTapTime: Long = 0
+        var tapCount = 0
+        
+        view.setOnTouchListener { _, event ->
+             if (event.action == MotionEvent.ACTION_DOWN) {
+                val currentTime = System.currentTimeMillis()
+                if (currentTime - lastTapTime < 400) {
+                    tapCount++
+                } else {
+                    tapCount = 1
+                }
+                lastTapTime = currentTime
+                
+                if (tapCount == 3) {
+                     val action = segment.gestures[GestureType.TRIPLE_TAP] ?: ActionType.NONE
+                     if (action != ActionType.NONE) {
+                         performAction(action, segment)
+                         tapCount = 0 
+                         return@setOnTouchListener true
+                     }
+                }
+            }
+            gestureDetector.onTouchEvent(event)
+            true
+        }
+    }
+    
+    private fun performAction(action: ActionType, segment: OverlaySegment) {
         if (action == ActionType.NONE) return
         
         // Haptic feedback for action trigger
@@ -310,7 +396,7 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         }
 
         when(action) {
-            ActionType.SCREENSHOT -> performCapture()
+            ActionType.SCREENSHOT -> performGlobalAction(GLOBAL_ACTION_TAKE_SCREENSHOT)
             ActionType.FLASHLIGHT -> toggleFlashlight()
             ActionType.HOME -> performGlobalAction(GLOBAL_ACTION_HOME)
             ActionType.BACK -> performGlobalAction(GLOBAL_ACTION_BACK)
@@ -321,10 +407,84 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
             ActionType.OPEN_NOTIFICATIONS -> performGlobalAction(GLOBAL_ACTION_NOTIFICATIONS)
             ActionType.OPEN_QUICK_SETTINGS -> performGlobalAction(GLOBAL_ACTION_QUICK_SETTINGS)
             ActionType.OPEN_APP -> {
-                // TODO: Implement open app logic if package name provided
+                // Open App Logic
+                val packageName = segment.gestureData[findGestureForAction(segment, ActionType.OPEN_APP)]
+                if (!packageName.isNullOrEmpty()) {
+                    val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
+                    if (launchIntent != null) {
+                        launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        startActivity(launchIntent)
+                    }
+                }
+            }
+            ActionType.CTS_LENS -> {
+                 // Force Lens Mode
+                 val uiPrefs = com.akslabs.circletosearch.utils.UIPreferences(this)
+                 uiPrefs.setUseGoogleLensOnly(true)
+                 performCapture()
+            }
+            ActionType.CTS_MULTI -> {
+                 // Force Multi Mode
+                 val uiPrefs = com.akslabs.circletosearch.utils.UIPreferences(this)
+                 uiPrefs.setUseGoogleLensOnly(false)
+                 performCapture()
+            }
+            ActionType.SPLIT_SCREEN -> {
+                 val success = performGlobalAction(GLOBAL_ACTION_TOGGLE_SPLIT_SCREEN)
+                 if (!success) {
+                     android.widget.Toast.makeText(this, "Split Screen not supported or failed", android.widget.Toast.LENGTH_SHORT).show()
+                 }
             }
             else -> {}
         }
+    }
+    
+    private fun findGestureForAction(segment: OverlaySegment, action: ActionType): GestureType {
+        return segment.gestures.entries.firstOrNull { it.value == action }?.key ?: GestureType.DOUBLE_TAP
+    }
+    
+    // Pass-through Logic for Single Tap
+    // We must temporarily make the window UNTOUCHABLE so the injected gesture falls through to the app below.
+    // Otherwise, the injected tap hits our own overlay (loop/blocked).
+    private fun propagateSingleTap(view: View, x: Float, y: Float) {
+        val params = view.layoutParams as WindowManager.LayoutParams
+        val originalFlags = params.flags
+        
+        // Make untouchable
+        params.flags = params.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+        windowManager?.updateViewLayout(view, params)
+        
+        val path = android.graphics.Path().apply { moveTo(x, y) }
+        val stroke = android.accessibilityservice.GestureDescription.StrokeDescription(path, 0, 50) // 50ms tap duration (more standard)
+        val gesture = android.accessibilityservice.GestureDescription.Builder().addStroke(stroke).build()
+        
+        // Wait for WindowManager to update input focus before dispatching
+        val handler = android.os.Handler(android.os.Looper.getMainLooper())
+        handler.postDelayed({
+            dispatchGesture(gesture, object : android.accessibilityservice.AccessibilityService.GestureResultCallback() {
+                override fun onCompleted(gestureDescription: android.accessibilityservice.GestureDescription?) {
+                    super.onCompleted(gestureDescription)
+                    restoreFlags()
+                }
+    
+                override fun onCancelled(gestureDescription: android.accessibilityservice.GestureDescription?) {
+                    super.onCancelled(gestureDescription)
+                    restoreFlags()
+                }
+                
+                fun restoreFlags() {
+                    // Restore original flags (Touchable) using main thread to be safe with UI
+                    handler.post {
+                        params.flags = originalFlags
+                        try {
+                            windowManager?.updateViewLayout(view, params)
+                        } catch (e: Exception) {
+                            // View might be removed
+                        }
+                    }
+                }
+            }, null)
+        }, 100) // 100ms Delay to ensure 'untouchable' takes effect solidly
     }
     
     private fun toggleFlashlight() {

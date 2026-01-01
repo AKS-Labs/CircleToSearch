@@ -5,13 +5,11 @@
 package com.akslabs.circletosearch.ui
 
 import android.content.Context
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -20,16 +18,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.akslabs.circletosearch.data.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -37,11 +32,14 @@ import com.akslabs.circletosearch.data.*
 fun OverlaySettingsScreen(
     onBack: () -> Unit
 ) {
+    // Handle system back press
+    androidx.activity.compose.BackHandler(onBack = onBack)
+    
     val context = LocalContext.current
     val configManager = remember { OverlayConfigurationManager(context) }
     var config by remember { mutableStateOf(configManager.getConfig()) }
     
-    // Save on changes
+    // Save on changes - Updates in REALTIME
     fun updateConfig(newConfig: OverlayConfig) {
         config = newConfig
         configManager.saveConfig(newConfig)
@@ -73,13 +71,7 @@ fun OverlaySettingsScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp)
         ) {
-            // 1. Visualizer
-            Text("PREVIEW", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-            Spacer(modifier = Modifier.height(8.dp))
-            OverlayVisualizer(config = config)
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // 2. Main Toggles
+            // 1. Main Toggles
             SettingsSectionHeader(title = "General")
             SettingsToggleItem(
                 title = "Enable Overlay",
@@ -99,7 +91,7 @@ fun OverlaySettingsScreen(
             Spacer(modifier = Modifier.height(12.dp))
             SettingsToggleItem(
                 title = "Debug Visibility",
-                subtitle = "Show colored overlay for testing",
+                subtitle = "Show color to adjust position",
                 icon = Icons.Default.Visibility,
                 checked = config.isVisible,
                 onCheckedChange = { updateConfig(config.copy(isVisible = it)) }
@@ -107,59 +99,31 @@ fun OverlaySettingsScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // 3. Dimensions
-            SettingsSectionHeader(title = "Dimensions")
-            Text("Height: ${config.height}px", style = MaterialTheme.typography.bodySmall)
-            Slider(
-                value = config.height.toFloat(),
-                onValueChange = { updateConfig(config.copy(height = it.toInt())) },
-                valueRange = 20f..300f
-            )
-            
-            Text("Vertical Offset: ${config.verticalOffset}px", style = MaterialTheme.typography.bodySmall)
-            Slider(
-                value = config.verticalOffset.toFloat(),
-                onValueChange = { updateConfig(config.copy(verticalOffset = it.toInt())) },
-                valueRange = 0f..200f
-            )
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // 4. Segments
+            // 2. Overlays List
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                SettingsSectionHeader(title = "Segments & Gestures")
+                SettingsSectionHeader(title = "Overlays")
                 TextButton(onClick = {
-                    // Add split logic: Split the last segment in half or add new one
+                    // Add new overlay segment
                     val currentSegments = config.segments.toMutableList()
-                     if (currentSegments.isNotEmpty()) {
-                        // Redistribution logic: reset to equal parts for simplicity when adding
-                        val newCount = currentSegments.size + 1
-                        val newWidth = 1f / newCount
-                        val newSegments = mutableListOf<OverlaySegment>()
-                        for (i in 0 until newCount) {
-                             newSegments.add(OverlaySegment(startFraction = i * newWidth, widthFraction = newWidth))
-                        }
-                        updateConfig(config.copy(segments = newSegments))
-                    } else {
-                        updateConfig(config.copy(segments = listOf(OverlaySegment(0f, 1f))))
-                    }
+                    currentSegments.add(OverlaySegment(xOffset = 300)) // Add with some offset so it doesn't overlap perfectly if 0
+                    updateConfig(config.copy(segments = currentSegments))
                 }) {
-                    Text("+ Add Split")
+                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Add Overlay")
                 }
             }
             
-            // Re-distribute/Clear
-            if (config.segments.size > 1) {
-                TextButton(
-                    onClick = { updateConfig(config.copy(segments = listOf(OverlaySegment(0f, 1f)))) },
-                    modifier = Modifier.align(Alignment.End)
-                ) {
-                    Text("Reset to Single", color = MaterialTheme.colorScheme.error)
-                }
+            if (config.segments.isEmpty()) {
+                Text(
+                    "No overlays added. Click Add Overlay to start.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
 
             config.segments.forEachIndexed { index, segment ->
@@ -170,79 +134,15 @@ fun OverlaySettingsScreen(
                         val newSegments = config.segments.toMutableList()
                         newSegments[index] = updatedSegment
                         updateConfig(config.copy(segments = newSegments))
+                    },
+                    onDelete = {
+                        val newSegments = config.segments.toMutableList()
+                        newSegments.removeAt(index)
+                        updateConfig(config.copy(segments = newSegments))
                     }
                 )
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(16.dp))
             }
-        }
-    }
-}
-
-@Composable
-fun OverlayVisualizer(config: OverlayConfig) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(60.dp) // Scaled down verification
-            .clip(RoundedCornerShape(8.dp))
-            .background(Color.Black)
-            .border(1.dp, Color.DarkGray, RoundedCornerShape(8.dp))
-    ) {
-        // Draw Status Bar hints
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("9:41", color = Color.White, fontSize = 10.sp)
-            Row {
-                Icon(Icons.Default.Wifi, contentDescription = null, tint = Color.White, modifier = Modifier.size(10.dp))
-                Spacer(modifier = Modifier.width(4.dp))
-                Icon(Icons.Default.BatteryFull, contentDescription = null, tint = Color.White, modifier = Modifier.size(10.dp))
-            }
-        }
-        
-        // Draw Overlay Segments
-        Box(modifier = Modifier.fillMaxSize()) {
-            config.segments.forEachIndexed { index, segment ->
-                Box(
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .fillMaxWidth(fraction = segment.widthFraction)
-                        // Align based on start fraction. 
-                        // Note: fillMaxWidth(fraction) takes fraction of PARENT. 
-                        // To allow arbitrary positioning we might need offsets or a Row with weights.
-                        // Or easier: Custom Layout or simple Offset.
-                        // Since segments are usually sequential, Row is best visually. But we support config.
-                        // Let's use alignment bias or Offset.
-                ) 
-            }
-            
-             // Better Visualizer: Canvas
-             Canvas(modifier = Modifier.fillMaxSize()) {
-                 val totalWidth = size.width
-                 val height = if (config.height > size.height) size.height else config.height.toFloat() // Clamp for visual
-                 val yOffset = 0f // In visualizer, always top
-                 
-                 config.segments.forEachIndexed { index, segment ->
-                     val x = totalWidth * segment.startFraction
-                     val w = totalWidth * segment.widthFraction
-                     
-                     // Colors
-                     val colors = listOf(Color.Red, Color.Blue, Color.Green, Color.Yellow, Color.Magenta)
-                     val color = colors[index % colors.size].copy(alpha = 0.5f)
-                     
-                     drawRect(
-                         color = color,
-                         topLeft = Offset(x, yOffset),
-                         size = androidx.compose.ui.geometry.Size(w, 20f) // Fixed visual height
-                     )
-                     
-                     // Draw Borders
-                 }
-             }
         }
     }
 }
@@ -252,37 +152,121 @@ fun OverlayVisualizer(config: OverlayConfig) {
 fun SegmentEditorItem(
     index: Int,
     segment: OverlaySegment,
-    onUpdate: (OverlaySegment) -> Unit
+    onUpdate: (OverlaySegment) -> Unit,
+    onDelete: () -> Unit
 ) {
+    var isExpanded by remember { mutableStateOf(false) }
     var showGestureDialog by remember { mutableStateOf(false) }
+    
+    // Get screen dimensions for sliders
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val screenWidth = configuration.screenWidthDp.toFloat() * 3 // Rough dp to px. 
+    val screenHeight = configuration.screenHeightDp.toFloat() * 3
+    // Use actual resource metrics if possible, but LocalConfiguration is easiest in Compose. 
+    // To be safer and strictly follow "screen boundaries", we can clamp. 
+    // But since pixels vary by density, let's allow a generous but bounded range based on config.
+    // 3.0 density is common (XXHDPI). 
+    // We will just use a reasonably high cap matching probable max resolution (e.g. 1440p width -> ~1500, height -> ~3000)
+    // Actually, user said "limit sliders to screen boundaries".
+    // I should probably pass exact screen metrics from MainActivity or Context.
+    val metrics = LocalContext.current.resources.displayMetrics
+    val maxWidth = metrics.widthPixels.toFloat()
+    val maxHeight = metrics.heightPixels.toFloat()
 
     Card(
-        modifier = Modifier.fillMaxWidth().clickable { showGestureDialog = true },
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha=0.5f))
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha=0.3f)),
+        shape = RoundedCornerShape(16.dp)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            // Header
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.clickable { isExpanded = !isExpanded }
+            ) {
                 Box(
                     modifier = Modifier.size(16.dp).background(
                          listOf(Color.Red, Color.Blue, Color.Green, Color.Yellow, Color.Magenta)[index % 5],
-                         shape = androidx.compose.foundation.shape.CircleShape
+                         shape = CircleShape
                     )
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Segment ${index + 1}", fontWeight = FontWeight.Bold)
+                Text("Overlay ${index + 1}", fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.weight(1f))
-                Icon(Icons.Default.Edit, contentDescription = "Edit", modifier = Modifier.size(16.dp))
+                
+                IconButton(onClick = onDelete) {
+                     Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp))
+                }
+                Icon(
+                    if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = null
+                )
             }
             
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            // Readout of gestures
-            segment.gestures.forEach { (type, action) ->
-                Text(
-                    "${type.name}: ${action.name}", 
-                    style = MaterialTheme.typography.bodySmall, 
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+            if (isExpanded) {
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // Dimensions Sliders - Limited to Screen
+                Text("Horizontal Position (X): ${segment.xOffset}px", style = MaterialTheme.typography.labelMedium)
+                Slider(
+                    value = segment.xOffset.toFloat().coerceIn(0f, maxWidth),
+                    onValueChange = { onUpdate(segment.copy(xOffset = it.toInt())) },
+                    valueRange = 0f..maxWidth
                 )
+                
+                Text("Vertical Position (Y): ${segment.yOffset}px", style = MaterialTheme.typography.labelMedium)
+                Slider(
+                    value = segment.yOffset.toFloat().coerceIn(0f, maxHeight),
+                    onValueChange = { onUpdate(segment.copy(yOffset = it.toInt())) },
+                    valueRange = 0f..maxHeight
+                )
+                
+                Text("Width: ${segment.width}px", style = MaterialTheme.typography.labelMedium)
+                Slider(
+                    value = segment.width.toFloat().coerceIn(0f, maxWidth),
+                    onValueChange = { onUpdate(segment.copy(width = it.toInt())) },
+                    valueRange = 10f..maxWidth
+                )
+                
+                Text("Height: ${segment.height}px", style = MaterialTheme.typography.labelMedium)
+                Slider(
+                    value = segment.height.toFloat().coerceIn(0f, 400f),
+                    onValueChange = { onUpdate(segment.copy(height = it.toInt())) },
+                    valueRange = 10f..400f // Limited to 400px as per verification request
+                )
+
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                Divider(color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha=0.1f))
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                // Gestures
+                Row(
+                    modifier = Modifier.fillMaxWidth().clickable { showGestureDialog = true },
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.TouchApp, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                         Text("Gestures", fontWeight = FontWeight.Bold)
+                         Text("Configure taps, long press & swipes", style = MaterialTheme.typography.bodySmall)
+                    }
+                    Spacer(modifier = Modifier.weight(1f))
+                    Icon(Icons.Default.ArrowForwardIos, contentDescription = null, modifier = Modifier.size(16.dp))
+                }
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                // Gesture Summary (first 2 non-none)
+                Column {
+                    segment.gestures.entries.filter { it.value != ActionType.NONE }.take(2).forEach {
+                        Text(
+                            "${it.key.name}: ${it.value.name}", 
+                            style = MaterialTheme.typography.bodySmall, 
+                            color = MaterialTheme.colorScheme.secondary
+                        )
+                    }
+                }
             }
         }
     }
@@ -302,13 +286,37 @@ fun GestureConfigDialog(
     onDismiss: () -> Unit,
     onUpdate: (OverlaySegment) -> Unit
 ) {
-    // We only support configuring specific gestures.
-    // Let's just list them.
+    var showAppPicker by remember { mutableStateOf<GestureType?>(null) }
+    val context = LocalContext.current
     
-    Dialog(onDismissRequest = onDismiss) {
+    if (showAppPicker != null) {
+        AppPickerDialog(
+            onDismiss = { showAppPicker = null },
+            onAppSelected = { pkg -> 
+                 val gesture = showAppPicker!!
+                 val newGestures = segment.gestures.toMutableMap()
+                 newGestures[gesture] = ActionType.OPEN_APP
+                 
+                 val newData = segment.gestureData.toMutableMap()
+                 newData[gesture] = pkg
+                 
+                 onUpdate(segment.copy(gestures = newGestures, gestureData = newData))
+                 showAppPicker = null
+            }
+        )
+    }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false) // Allow full width control
+    ) {
         Card(
             shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(24.dp) // Screen padding
+                .fillMaxHeight(0.85f)
         ) {
             Column(
                 modifier = Modifier.padding(24.dp).verticalScroll(rememberScrollState())
@@ -327,23 +335,38 @@ fun GestureConfigDialog(
                             onClick = { expanded = true },
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text(currentAction.name)
+                            var label = currentAction.name
+                            if (currentAction == ActionType.OPEN_APP) {
+                                val pkg = segment.gestureData[gesture]
+                                val appName = runCatching { 
+                                    val info = context.packageManager.getApplicationInfo(pkg ?: "", 0)
+                                    context.packageManager.getApplicationLabel(info).toString()
+                                }.getOrDefault(pkg ?: "Unknown App")
+                                label = "Open: $appName"
+                            }
+                            Text(label, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                             Spacer(modifier = Modifier.weight(1f))
                             Icon(Icons.Default.ArrowDropDown, contentDescription = null)
                         }
                         
                         DropdownMenu(
                             expanded = expanded,
-                            onDismissRequest = { expanded = false }
+                            onDismissRequest = { expanded = false },
+                            modifier = Modifier.heightIn(max = 300.dp)
                         ) {
                             ActionType.values().forEach { action ->
                                 DropdownMenuItem(
                                     text = { Text(action.name) },
                                     onClick = {
-                                        val newGestures = segment.gestures.toMutableMap()
-                                        newGestures[gesture] = action
-                                        onUpdate(segment.copy(gestures = newGestures))
-                                        expanded = false
+                                        if (action == ActionType.OPEN_APP) {
+                                            showAppPicker = gesture
+                                            expanded = false
+                                        } else {
+                                            val newGestures = segment.gestures.toMutableMap()
+                                            newGestures[gesture] = action
+                                            onUpdate(segment.copy(gestures = newGestures))
+                                            expanded = false
+                                        }
                                     }
                                 )
                             }
@@ -358,6 +381,75 @@ fun GestureConfigDialog(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text("Done")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun AppPickerDialog(onDismiss: () -> Unit, onAppSelected: (String) -> Unit) {
+    val context = LocalContext.current
+    data class AppItem(val label: String, val packageName: String)
+    var apps by remember { mutableStateOf<List<AppItem>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+    
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val pm = context.packageManager
+            // Use getInstalledPackages to get EVERYTHING, then filter by launchability
+            val allPackages = pm.getInstalledPackages(0)
+            val list = allPackages.mapNotNull { pkg ->
+                val intent = pm.getLaunchIntentForPackage(pkg.packageName)
+                if (intent != null) {
+                    val label = pkg.applicationInfo?.loadLabel(pm).toString()
+                    AppItem(label, pkg.packageName)
+                } else null
+            }.sortedBy { it.label.lowercase() } // Case-insensitive sort
+            
+            apps = list
+            isLoading = false
+        }
+    }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Card(
+            shape = RoundedCornerShape(24.dp), // Consistent 24dp corner
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(24.dp)
+                .fillMaxHeight(0.85f)
+        ) {
+            Column(modifier = Modifier.padding(24.dp)) { // Interior padding
+                Text("Select App", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                if (isLoading) {
+                    Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                         CircularProgressIndicator()
+                    }
+                } else {
+                    androidx.compose.foundation.lazy.LazyColumn(modifier = Modifier.weight(1f)) {
+                        items(apps.size) { index ->
+                            val app = apps[index]
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onAppSelected(app.packageName) }
+                                    .padding(vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(app.label, style = MaterialTheme.typography.bodyLarge)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(app.packageName, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Divider(color = MaterialTheme.colorScheme.surfaceVariant)
+                        }
+                    }
                 }
             }
         }

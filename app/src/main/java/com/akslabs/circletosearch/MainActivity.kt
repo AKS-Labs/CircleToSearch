@@ -62,11 +62,12 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     var currentScreen by remember { mutableStateOf("home") }
-                    
-                    if (currentScreen == "settings") {
-                        com.akslabs.circletosearch.ui.OverlaySettingsScreen(onBack = { currentScreen = "home" })
-                    } else {
-                        SetupScreen(onSettingsClick = { currentScreen = "settings" })
+                    androidx.compose.animation.Crossfade(targetState = currentScreen) { screen ->
+                        if (screen == "settings") {
+                            com.akslabs.circletosearch.ui.OverlaySettingsScreen(onBack = { currentScreen = "home" })
+                        } else {
+                            SetupScreen(onSettingsClick = { currentScreen = "settings" })
+                        }
                     }
                 }
             }
@@ -132,17 +133,28 @@ fun SetupScreen(onSettingsClick: () -> Unit) {
             Spacer(modifier = Modifier.height(32.dp))
             
             // 1. Header
-            Text(
-                text = "Circle to Search",
-                style = MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.primary
-            )
+            Box(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "Circle to Search",
+                    style = MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.align(Alignment.Center)
+                )
+                IconButton(
+                    onClick = onSettingsClick,
+                    modifier = Modifier.align(Alignment.CenterEnd)
+                ) {
+                     Icon(Icons.Default.Settings, contentDescription = "Overlay Settings", tint = MaterialTheme.colorScheme.primary)
+                }
+            }
             Spacer(modifier = Modifier.height(16.dp))
             Text(
                 text = "Search anything on your screen instantly.",
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Start
             )
             
             Spacer(modifier = Modifier.height(32.dp))
@@ -318,44 +330,6 @@ fun SetupScreen(onSettingsClick: () -> Unit) {
             )
             BubbleSwitch(context)
             LensOnlySwitch(context)
-            
-            Spacer(modifier = Modifier.height(12.dp))
-            
-            // Advanced Overlay Settings Button
-            Card(
-                onClick = onSettingsClick,
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.tertiaryContainer
-                ),
-                shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                 Row(
-                    modifier = Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Settings,
-                        contentDescription = null,
-                        modifier = Modifier.size(24.dp),
-                        tint = MaterialTheme.colorScheme.onTertiaryContainer
-                    )
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column {
-                        Text(
-                            text = "Advanced Status Bar Settings",
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                            color = MaterialTheme.colorScheme.onTertiaryContainer
-                        )
-                        Text(
-                            text = "Customize overlay size, gestures & segments",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f)
-                        )
-                    }
-                }
-            }
-
             Spacer(modifier = Modifier.height(25.dp))
 
             // Privacy Note
