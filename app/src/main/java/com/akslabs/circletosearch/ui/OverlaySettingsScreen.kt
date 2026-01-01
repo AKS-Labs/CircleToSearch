@@ -391,13 +391,26 @@ fun GestureConfigDialog(
 fun AppPickerDialog(onDismiss: () -> Unit, onAppSelected: (String) -> Unit) {
     val context = LocalContext.current
     data class AppItem(val label: String, val packageName: String)
-    var apps by remember { mutableStateOf<List<AppItem>>(emptyList()) }
+    
+    // Full list
+    var allApps by remember { mutableStateOf<List<AppItem>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
+    
+    // Search
+    var searchQuery by remember { mutableStateOf("") }
+    
+    // Filtered list
+    val filteredApps = remember(allApps, searchQuery) {
+        if (searchQuery.isEmpty()) allApps
+        else allApps.filter { 
+            it.label.contains(searchQuery, ignoreCase = true) || 
+            it.packageName.contains(searchQuery, ignoreCase = true) 
+        }
+    }
     
     LaunchedEffect(Unit) {
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             val pm = context.packageManager
-            // Use getInstalledPackages to get EVERYTHING, then filter by launchability
             val allPackages = pm.getInstalledPackages(0)
             val list = allPackages.mapNotNull { pkg ->
                 val intent = pm.getLaunchIntentForPackage(pkg.packageName)
@@ -405,9 +418,9 @@ fun AppPickerDialog(onDismiss: () -> Unit, onAppSelected: (String) -> Unit) {
                     val label = pkg.applicationInfo?.loadLabel(pm).toString()
                     AppItem(label, pkg.packageName)
                 } else null
-            }.sortedBy { it.label.lowercase() } // Case-insensitive sort
+            }.sortedBy { it.label.lowercase() }
             
-            apps = list
+            allApps = list
             isLoading = false
         }
     }
@@ -417,15 +430,28 @@ fun AppPickerDialog(onDismiss: () -> Unit, onAppSelected: (String) -> Unit) {
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
         Card(
-            shape = RoundedCornerShape(24.dp), // Consistent 24dp corner
+            shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(24.dp)
                 .fillMaxHeight(0.85f)
         ) {
-            Column(modifier = Modifier.padding(24.dp)) { // Interior padding
+            Column(modifier = Modifier.padding(24.dp)) {
                 Text("Select App", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                // Search Bar
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Search apps") },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp)
+                )
+                
                 Spacer(modifier = Modifier.height(12.dp))
                 
                 if (isLoading) {
@@ -434,8 +460,8 @@ fun AppPickerDialog(onDismiss: () -> Unit, onAppSelected: (String) -> Unit) {
                     }
                 } else {
                     androidx.compose.foundation.lazy.LazyColumn(modifier = Modifier.weight(1f)) {
-                        items(apps.size) { index ->
-                            val app = apps[index]
+                        items(filteredApps.size) { index ->
+                            val app = filteredApps[index]
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -443,11 +469,33 @@ fun AppPickerDialog(onDismiss: () -> Unit, onAppSelected: (String) -> Unit) {
                                     .padding(vertical = 12.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(app.label, style = MaterialTheme.typography.bodyLarge)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(app.packageName, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                // App Icon using AndroidView for performance (avoids Bitmap conversion lag in Compose)
+                                androidx.compose.ui.viewinterop.AndroidView(
+                                    factory = { ctx ->
+                                        android.widget.ImageView(ctx).apply {
+                                            scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+                                        }
+                                    },
+                                    update = { imageView ->
+                                        // Load icon
+                                        try {
+                                            val icon = context.packageManager.getApplicationIcon(app.packageName)
+                                            imageView.setImageDrawable(icon)
+                                        } catch (e: Exception) {
+                                            imageView.setImageResource(android.R.drawable.sym_def_app_icon)
+                                        }
+                                    },
+                                    modifier = Modifier.size(40.dp)
+                                )
+                                
+                                Spacer(modifier = Modifier.width(16.dp))
+                                
+                                Column {
+                                    Text(app.label, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                                    Text(app.packageName, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
                             }
-                            Divider(color = MaterialTheme.colorScheme.surfaceVariant)
+                            Divider(color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha=0.5f))
                         }
                     }
                 }
