@@ -227,7 +227,7 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
                 // The cleanest way is to just attach a NEW listener wrapper that reads the LATEST segment config.
                 // But `segment` here is from the new config.
                 // Creating a new detector is cheap.
-                attachTouchListener(view, segment)
+                attachTouchListener(view, segment, index)
             }
         } else {
             // Rebuild mode (Count changed)
@@ -260,7 +260,7 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
                     view.setBackgroundColor(Color.TRANSPARENT)
                 }
 
-                attachTouchListener(view, segment)
+                attachTouchListener(view, segment, index)
                 
                 try {
                     windowManager?.addView(view, params)
@@ -273,7 +273,7 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
     }
     
     @SuppressLint("ClickableViewAccessibility")
-    private fun attachTouchListener(view: View, segment: OverlaySegment) {
+    private fun attachTouchListener(view: View, segment: OverlaySegment, segmentIndex: Int) {
         val gestureDetector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
             override fun onDoubleTap(e: MotionEvent): Boolean {
                 val action = segment.gestures[GestureType.DOUBLE_TAP] ?: ActionType.NONE
@@ -311,27 +311,39 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
                         }
                     }
                 } else {
-                    if (Math.abs(diffY) > 100 && Math.abs(velocityY) > 100) {
+                    // Reduced threshold for vertical swipes to work with smaller overlay heights
+                    if (Math.abs(diffY) > 50 && Math.abs(velocityY) > 100) {
                         if (diffY > 0) {
                              // Swipe Down
+                             android.util.Log.d("CTS_Swipe", "Swipe DOWN detected - segmentIndex=$segmentIndex, diffY=$diffY, velocityY=$velocityY")
                              val action = segment.gestures[GestureType.SWIPE_DOWN] ?: ActionType.NONE
-                             if (action != ActionType.NONE) { 
+                             if (action != ActionType.NONE) {
+                                 android.util.Log.d("CTS_Swipe", "Custom action assigned: $action")
                                  performAction(action, segment) 
                              } else {
-                                 // Smart Scroll Down Logic (Default)
-                                 // If overlay is on LEFT side (< screenWidth/2), open Notifications.
-                                 // If overlay is on RIGHT side (> screenWidth/2), open Quick Settings.
-                                 
-                                 // We need to calculate the CENTER of this segment.
-                                 // segment.xOffset is the left edge.
-                                 // segment.width is width.
-                                 val segmentCenterX = segment.xOffset + (segment.width / 2)
+                                 // Smart Swipe Logic: Only apply for first overlay (index 0) when it's full width
                                  val screenWidth = resources.displayMetrics.widthPixels
+                                 val isFirstOverlay = segmentIndex == 0
+                                 val isFullWidth = segment.width >= screenWidth
                                  
-                                 if (segmentCenterX < (screenWidth / 2)) {
-                                     performGlobalAction(GLOBAL_ACTION_NOTIFICATIONS)
+                                 android.util.Log.d("CTS_Swipe", "Smart swipe check - isFirstOverlay=$isFirstOverlay, isFullWidth=$isFullWidth (width=${segment.width}, screenWidth=$screenWidth)")
+                                 
+                                 if (isFirstOverlay && isFullWidth) {
+                                     // Smart logic: Check where user actually swiped (touch X position)
+                                     // Left half of screen = Notifications, Right half = Quick Settings
+                                     val touchX = e1.rawX
+                                     android.util.Log.d("CTS_Swipe", "Smart swipe active - touchX=$touchX, screenWidth/2=${screenWidth/2}")
+                                     if (touchX < (screenWidth / 2)) {
+                                         android.util.Log.d("CTS_Swipe", "Opening NOTIFICATIONS (left half)")
+                                         performGlobalAction(GLOBAL_ACTION_NOTIFICATIONS)
+                                     } else {
+                                         android.util.Log.d("CTS_Swipe", "Opening QUICK_SETTINGS (right half)")
+                                         performGlobalAction(GLOBAL_ACTION_QUICK_SETTINGS)
+                                     }
                                  } else {
-                                     performGlobalAction(GLOBAL_ACTION_QUICK_SETTINGS)
+                                     // Default: Always open notification shade
+                                     android.util.Log.d("CTS_Swipe", "Default behavior - Opening NOTIFICATIONS")
+                                     performGlobalAction(GLOBAL_ACTION_NOTIFICATIONS)
                                  }
                              }
                              return true
@@ -455,21 +467,46 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
     // Helpers for new actions
     
     private fun performScroll(toTop: Boolean) {
-        // We simulate a long swipe. 
-        // Scroll To Top = Swipe Down (drag content down).
-        // Scroll To Bottom = Swipe Up (drag content up).
+        android.util.Log.d("CTS_Scroll", "performScroll called - toTop=$toTop")
+        
+        // We simulate multiple quick swipes instead of one long one
+        // This is more reliable and less likely to be cancelled
         val displayMetrics = resources.displayMetrics
         val centerX = displayMetrics.widthPixels / 2f
-        val startY = if (toTop) displayMetrics.heightPixels * 0.3f else displayMetrics.heightPixels * 0.7f
-        val endY = if (toTop) displayMetrics.heightPixels * 0.9f else displayMetrics.heightPixels * 0.1f
         
-        val path = android.graphics.Path().apply {
-            moveTo(centerX, startY)
-            lineTo(centerX, endY)
+        // Perform 3 quick swipes with delays
+        val handler = android.os.Handler(android.os.Looper.getMainLooper())
+        
+        for (i in 0..2) {
+            handler.postDelayed({
+                // Scroll To Top = Swipe DOWN (drag content down, revealing top)
+                // Scroll To Bottom = Swipe UP (drag content up, revealing bottom)
+                val startY = if (toTop) displayMetrics.heightPixels * 0.3f else displayMetrics.heightPixels * 0.7f
+                val endY = if (toTop) displayMetrics.heightPixels * 0.7f else displayMetrics.heightPixels * 0.3f
+                
+                android.util.Log.d("CTS_Scroll", "Scroll swipe #${i+1} - toTop=$toTop, centerX=$centerX, startY=$startY, endY=$endY")
+                
+                val path = android.graphics.Path().apply {
+                    moveTo(centerX, startY)
+                    lineTo(centerX, endY)
+                }
+                // Shorter, faster swipes (200ms each)
+                val stroke = android.accessibilityservice.GestureDescription.StrokeDescription(path, 0, 200)
+                val gesture = android.accessibilityservice.GestureDescription.Builder().addStroke(stroke).build()
+                
+                val success = dispatchGesture(gesture, object : AccessibilityService.GestureResultCallback() {
+                    override fun onCompleted(gestureDescription: android.accessibilityservice.GestureDescription?) {
+                        android.util.Log.d("CTS_Scroll", "Scroll swipe #${i+1} COMPLETED")
+                    }
+                    
+                    override fun onCancelled(gestureDescription: android.accessibilityservice.GestureDescription?) {
+                        android.util.Log.e("CTS_Scroll", "Scroll swipe #${i+1} CANCELLED")
+                    }
+                }, null)
+                
+                android.util.Log.d("CTS_Scroll", "Scroll swipe #${i+1} dispatched: $success")
+            }, i * 250L) // 250ms delay between each swipe
         }
-        val stroke = android.accessibilityservice.GestureDescription.StrokeDescription(path, 0, 300)
-        val gesture = android.accessibilityservice.GestureDescription.Builder().addStroke(stroke).build()
-        dispatchGesture(gesture, null, null)
     }
     
     private fun injectMediaKey(keyCode: Int) {

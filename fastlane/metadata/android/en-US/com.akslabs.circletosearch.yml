@@ -16,7 +16,7 @@ RepoType: git
 Repo: https://github.com/AKS-Labs/CircleToSearch
 
 Builds:
-  - versionName: '0.1'
+  - versionName: '0.'
     versionCode: 1
     commit: v0.1
     subdir: app
