@@ -61,7 +61,14 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    SetupScreen()
+                    var currentScreen by remember { mutableStateOf("home") }
+                    androidx.compose.animation.Crossfade(targetState = currentScreen) { screen ->
+                        if (screen == "settings") {
+                            com.akslabs.circletosearch.ui.OverlaySettingsScreen(onBack = { currentScreen = "home" })
+                        } else {
+                            SetupScreen(onSettingsClick = { currentScreen = "settings" })
+                        }
+                    }
                 }
             }
         }
@@ -70,7 +77,7 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SetupScreen() {
+fun SetupScreen(onSettingsClick: () -> Unit) {
     val context = LocalContext.current
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     val prefs = context.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
@@ -126,17 +133,28 @@ fun SetupScreen() {
             Spacer(modifier = Modifier.height(32.dp))
             
             // 1. Header
-            Text(
-                text = "Circle to Search",
-                style = MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.primary
-            )
+            Box(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "Circle to Search",
+                    style = MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.align(Alignment.Center)
+                )
+                IconButton(
+                    onClick = onSettingsClick,
+                    modifier = Modifier.align(Alignment.CenterEnd)
+                ) {
+                     Icon(Icons.Default.Settings, contentDescription = "Overlay Settings", tint = MaterialTheme.colorScheme.primary)
+                }
+            }
             Spacer(modifier = Modifier.height(16.dp))
             Text(
                 text = "Search anything on your screen instantly.",
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Start
             )
             
             Spacer(modifier = Modifier.height(32.dp))
@@ -312,7 +330,6 @@ fun SetupScreen() {
             )
             BubbleSwitch(context)
             LensOnlySwitch(context)
-
             Spacer(modifier = Modifier.height(25.dp))
 
             // Privacy Note
