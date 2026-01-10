@@ -27,6 +27,7 @@ import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -60,7 +61,14 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    SetupScreen()
+                    var currentScreen by remember { mutableStateOf("home") }
+                    androidx.compose.animation.Crossfade(targetState = currentScreen) { screen ->
+                        if (screen == "settings") {
+                            com.akslabs.circletosearch.ui.OverlaySettingsScreen(onBack = { currentScreen = "home" })
+                        } else {
+                            SetupScreen(onSettingsClick = { currentScreen = "settings" })
+                        }
+                    }
                 }
             }
         }
@@ -69,7 +77,7 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SetupScreen() {
+fun SetupScreen(onSettingsClick: () -> Unit) {
     val context = LocalContext.current
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     val prefs = context.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
@@ -125,17 +133,28 @@ fun SetupScreen() {
             Spacer(modifier = Modifier.height(32.dp))
             
             // 1. Header
-            Text(
-                text = "Circle to Search",
-                style = MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.primary
-            )
+            Box(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "Circle to Search",
+                    style = MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.align(Alignment.Center)
+                )
+                IconButton(
+                    onClick = onSettingsClick,
+                    modifier = Modifier.align(Alignment.CenterEnd)
+                ) {
+                     Icon(Icons.Default.Settings, contentDescription = "Overlay Settings", tint = MaterialTheme.colorScheme.primary)
+                }
+            }
             Spacer(modifier = Modifier.height(16.dp))
             Text(
                 text = "Search anything on your screen instantly.",
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Start
             )
             
             Spacer(modifier = Modifier.height(32.dp))
@@ -310,7 +329,7 @@ fun SetupScreen() {
                 modifier = Modifier.align(Alignment.Start)
             )
             BubbleSwitch(context)
-
+            LensOnlySwitch(context)
             Spacer(modifier = Modifier.height(25.dp))
 
             // Privacy Note
@@ -577,4 +596,73 @@ fun BubbleSwitch(context: android.content.Context) {
             containerColor = Color.Transparent
         )
     )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun LensOnlySwitch(context: android.content.Context) {
+    val uiPreferences = remember { com.akslabs.circletosearch.utils.UIPreferences(context) }
+    var isLensOnlyEnabled by remember { mutableStateOf(uiPreferences.isUseGoogleLensOnly()) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(androidx.compose.foundation.shape.RoundedCornerShape(20.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+            .padding(16.dp)
+    ) {
+        Text(
+            text = "Search Method",
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(bottom = 12.dp)
+        )
+
+        SingleChoiceSegmentedButtonRow(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            SegmentedButton(
+                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                onClick = {
+                    isLensOnlyEnabled = false
+                    uiPreferences.setUseGoogleLensOnly(false)
+                },
+                selected = !isLensOnlyEnabled,
+                icon = { SegmentedButtonDefaults.Icon(!isLensOnlyEnabled) }
+            ) {
+                Text("Multi-Search Engines", style = MaterialTheme.typography.labelLarge)
+            }
+            SegmentedButton(
+                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                onClick = {
+                    isLensOnlyEnabled = true
+                    uiPreferences.setUseGoogleLensOnly(true)
+                },
+                selected = isLensOnlyEnabled,
+                icon = { SegmentedButtonDefaults.Icon(isLensOnlyEnabled) }
+            ) {
+                Text("Google Lens", style = MaterialTheme.typography.labelLarge)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(top = 8.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Info,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.secondary,
+                modifier = Modifier.size(16.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "Lens needs Google App Installed. But Degoogled friends can stick with the versatile Multi-Search Engine mode. 🚀",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
 }

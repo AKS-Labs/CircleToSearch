@@ -61,6 +61,15 @@ import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Smartphone
+import androidx.compose.material.icons.filled.DesktopWindows
+import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.OpenInNew
+import androidx.compose.material.icons.filled.BorderOuter
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -111,6 +120,7 @@ import com.akslabs.circletosearch.data.SearchEngine
 import com.akslabs.circletosearch.ui.theme.OverlayGradientColors
 import com.akslabs.circletosearch.utils.ImageSearchUploader
 import com.akslabs.circletosearch.utils.ImageUtils
+import com.akslabs.circletosearch.ui.components.searchWithGoogleLens
 import kotlinx.coroutines.launch
 import java.io.ByteArrayOutputStream
 import androidx.activity.compose.BackHandler
@@ -139,24 +149,43 @@ fun CircleToSearchScreen(
     val supportSheetState = rememberModalBottomSheetState()
     
 
-    // Search Engines Definition (Moved top for scope access)
-    val searchEngines = SearchEngine.values()
+    // Search Engines Order Logic
+    val preferredOrder = remember(uiPreferences.getSearchEngineOrder()) {
+        val allEngines = SearchEngine.values()
+        val orderString = uiPreferences.getSearchEngineOrder()
+        if (orderString == null) allEngines
+        else {
+            val preferredNames = orderString.split(",")
+            val ordered = mutableListOf<SearchEngine>()
+            preferredNames.forEach { name ->
+                allEngines.find { it.name == name }?.let { ordered.add(it) }
+            }
+            allEngines.forEach { if (!ordered.contains(it)) ordered.add(it) }
+            ordered
+        }
+    }
+    val searchEngines = preferredOrder
+
+    // Support Settings Sheet
+    var showSettingsScreen by remember { mutableStateOf(false) }
 
     // Friendly Message State
     var friendlyMessage by remember { mutableStateOf("") }
     var isMessageVisible by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
-        val manager = FriendlyMessageManager(context)
-        friendlyMessage = manager.getNextMessage()
-        delay(500) // Small delay for smooth entrance
-        isMessageVisible = true
-        delay(4000) // Show for 4 seconds
-        isMessageVisible = false
+        if (uiPreferences.isShowFriendlyMessages()) {
+            val manager = FriendlyMessageManager(context)
+            friendlyMessage = manager.getNextMessage()
+            delay(500) // Small delay for smooth entrance
+            isMessageVisible = true
+            delay(4000) // Show for 4 seconds
+            isMessageVisible = false
+        }
     }
 
     // Search State
-    var selectedEngine by remember { mutableStateOf<SearchEngine>(SearchEngine.Google) }
+    var selectedEngine by remember(searchEngines) { mutableStateOf<SearchEngine>(searchEngines.first()) }
     var searchUrl by remember { mutableStateOf<String?>(null) }
     var hostedImageUrl by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(false) }
@@ -455,13 +484,33 @@ fun CircleToSearchScreen(
                     webViews.clear()
                 }
 
-                // Main Loading & Search Logic
                 LaunchedEffect(selectedBitmap, hostedImageUrl) {
                     if (selectedBitmap != null) {
                         isLoading = true
-                        scope.launch { scaffoldState.bottomSheetState.expand() }
                         
-                        // 1. Upload to host if needed
+                        // 1. Google Lens Only Mode Check
+                        if (uiPreferences.isUseGoogleLensOnly()) {
+                            // Save to cache and launch Lens
+                            val path = ImageUtils.saveBitmap(context, selectedBitmap!!)
+                            val uri = android.net.Uri.fromFile(java.io.File(path))
+                            
+                            // Prepare content URI for Lens (using existing FileProvider logic in helper)
+                            val success = searchWithGoogleLens(uri, context)
+                            
+                            if (success) {
+                                // Close the overlay since Lens is taking over
+                                onClose()
+                                return@LaunchedEffect
+                            } else {
+                                // Fallback to multi-search if Lens failed
+                                android.util.Log.e("CircleToSearch", "Google Lens launch failed, falling back to multi-search")
+                            }
+                        }
+
+                        // 2. Multi-Search Mode (Expanded UI)
+                        scope.launch { scaffoldState.bottomSheetState.expand() }
+
+                        // 3. Upload to host if needed (Multi-Search Mode)
                         if (hostedImageUrl == null) {
                             val url = ImageSearchUploader.uploadToImageHost(selectedBitmap!!)
                             if (url != null) {
@@ -897,24 +946,31 @@ fun CircleToSearchScreen(
                 )
                 Spacer(modifier = Modifier.weight(1f))
                 
-                // Menu
-                Box {
+                // Action Button (Menu)
+                Box(
+                    modifier = Modifier
+                        .background(Color.Gray.copy(alpha = 0.5f), CircleShape)
+                        .size(40.dp),
+                    contentAlignment = Alignment.Center
+                ) {
                     var showMenu by remember { mutableStateOf(false) }
-                    IconButton(
-                        onClick = { showMenu = true },
-                        modifier = Modifier
-                            .background(Color.Gray.copy(alpha = 0.5f), CircleShape)
-                            .size(40.dp)
-                    ) {
+                    IconButton(onClick = { showMenu = true }) {
                         Icon(Icons.Default.MoreVert, contentDescription = "Menu", tint = Color.White)
                     }
-                    
+                
                     androidx.compose.material3.DropdownMenu(
                         expanded = showMenu,
                         onDismissRequest = { showMenu = false }
                     ) {
+                        val isDesktop = isDesktop(selectedEngine)
                         androidx.compose.material3.DropdownMenuItem(
-                            text = { Text(if (isDesktop(selectedEngine)) "Mobile Mode" else "Desktop Mode") },
+                            text = { Text(if (isDesktop) "Mobile Mode" else "Desktop Mode") },
+                            leadingIcon = { 
+                                Icon(
+                                    if (isDesktop) Icons.Default.Smartphone else Icons.Default.DesktopWindows,
+                                    contentDescription = null
+                                )
+                            },
                             onClick = { 
                                 val newSet = desktopModeEngines.toMutableSet()
                                 if (newSet.contains(selectedEngine)) {
@@ -928,6 +984,12 @@ fun CircleToSearchScreen(
                         )
                         androidx.compose.material3.DropdownMenuItem(
                             text = { Text(if (isDarkMode) "Light Mode" else "Dark Mode") },
+                            leadingIcon = {
+                                Icon(
+                                    if (isDarkMode) Icons.Default.LightMode else Icons.Default.DarkMode,
+                                    contentDescription = null
+                                )
+                            },
                             onClick = { 
                                 isDarkMode = !isDarkMode 
                                 showMenu = false
@@ -935,6 +997,9 @@ fun CircleToSearchScreen(
                         )
                         androidx.compose.material3.DropdownMenuItem(
                             text = { Text(if (showGradientBorder) "Hide Border" else "Show Border") },
+                            leadingIcon = {
+                                Icon(Icons.Default.BorderOuter, contentDescription = null)
+                            },
                             onClick = { 
                                 showGradientBorder = !showGradientBorder 
                                 showMenu = false
@@ -942,6 +1007,9 @@ fun CircleToSearchScreen(
                         )
                         androidx.compose.material3.DropdownMenuItem(
                             text = { Text("Refresh") },
+                            leadingIcon = {
+                                Icon(Icons.Default.Refresh, contentDescription = null)
+                            },
                             onClick = { 
                                 webViews[selectedEngine]?.reload()
                                 showMenu = false
@@ -949,6 +1017,9 @@ fun CircleToSearchScreen(
                         )
                         androidx.compose.material3.DropdownMenuItem(
                             text = { Text("Copy URL") },
+                            leadingIcon = {
+                                Icon(Icons.Default.ContentCopy, contentDescription = null)
+                            },
                             onClick = {
                                 if (searchUrl != null) {
                                     val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
@@ -960,6 +1031,9 @@ fun CircleToSearchScreen(
                         )
                         androidx.compose.material3.DropdownMenuItem(
                             text = { Text("Open in Browser") },
+                            leadingIcon = {
+                                Icon(Icons.Default.OpenInNew, contentDescription = null)
+                            },
                             onClick = {
                                 val currentUrl = webViews[selectedEngine]?.url ?: searchUrl
                                 if (currentUrl != null) {
@@ -973,11 +1047,19 @@ fun CircleToSearchScreen(
                                 showMenu = false
                             }
                         )
+                        androidx.compose.material3.DropdownMenuItem(
+                            text = { Text("Settings") },
+                            leadingIcon = {
+                                Icon(Icons.Default.Settings, contentDescription = null)
+                            },
+                            onClick = {
+                                showSettingsScreen = true
+                                showMenu = false
+                            }
+                        )
                     }
                 }
-            }
-
-            // 5. Search Bar / Pill (Bottom Fixed) - Clickable to open sheet
+            }      // 5. Search Bar / Pill (Bottom Fixed) - Clickable to open sheet
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -1078,6 +1160,13 @@ fun CircleToSearchScreen(
                         }
                     }
                 }
+            )
+        }
+
+        if (showSettingsScreen) {
+            SettingsScreen(
+                uiPreferences = uiPreferences,
+                onDismissRequest = { showSettingsScreen = false }
             )
         }
 

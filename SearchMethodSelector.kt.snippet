@@ -1,0 +1,55 @@
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SearchMethodSelector(
+    isLensOnly: Boolean,
+    onMethodChange: (Boolean) -> Unit
+) {
+    Column {
+        Text(
+            text = "SEARCH METHOD",
+            style = MaterialTheme.typography.labelLarge.copy(
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.sp
+            ),
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(bottom = 12.dp)
+        )
+
+        SingleChoiceSegmentedButtonRow(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            SegmentedButton(
+                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                onClick = { onMethodChange(false) },
+                selected = !isLensOnly,
+                icon = { SegmentedButtonDefaults.Icon(!isLensOnly) },
+                colors = SegmentedButtonDefaults.colors(
+                    activeContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                    activeContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.ManageSearch, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Multi-Search", style = MaterialTheme.typography.labelLarge)
+                }
+            }
+            SegmentedButton(
+                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                onClick = { onMethodChange(true) },
+                selected = isLensOnly,
+                icon = { SegmentedButtonDefaults.Icon(isLensOnly) },
+                colors = SegmentedButtonDefaults.colors(
+                    activeContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                    activeContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.AutoFixHigh, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Google Lens", style = MaterialTheme.typography.labelLarge)
+                }
+            }
+        }
+    }
+}

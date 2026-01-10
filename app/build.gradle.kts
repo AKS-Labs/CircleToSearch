@@ -34,8 +34,8 @@ android {
         applicationId = "com.akslabs.circletosearch"
         minSdk = 29
         targetSdk = 36
-        versionCode = 2
-        versionName = "0.2"
+        versionCode = 3
+        versionName = "0.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -88,4 +88,5 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
     implementation("androidx.webkit:webkit:1.9.0")
+    implementation("com.google.code.gson:gson:2.10.1")
 }
