@@ -48,6 +48,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            // Enable R8 full mode for more aggressive optimization
+            // This is usually done in gradle.properties, but can be influenced here indirectly
+            // by using the "proguard-android-optimize.txt" which includes optimization rules.
         }
     }
     compileOptions {

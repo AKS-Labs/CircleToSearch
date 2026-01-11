@@ -7,22 +7,22 @@ package com.akslabs.circletosearch.data
 import android.content.Context
 import android.content.SharedPreferences
 import com.google.gson.Gson
-import com.akslabs.circletosearch.data.OverlaySegment
+import com.google.gson.annotations.SerializedName
 
 data class OverlayConfig(
-    val isEnabled: Boolean = true,
-    val isEnabledInLandscape: Boolean = false,
-    val isVisible: Boolean = false, // Debug visibility (colored)
-    val segments: List<OverlaySegment> = listOf(OverlaySegment(width = 1080)) // Default to a common large width
+    @SerializedName("isEnabled") val isEnabled: Boolean = true,
+    @SerializedName("isEnabledInLandscape") val isEnabledInLandscape: Boolean = false,
+    @SerializedName("isVisible") val isVisible: Boolean = false, // Debug visibility (colored)
+    @SerializedName("segments") val segments: List<OverlaySegment> = listOf(OverlaySegment(width = 1080)) // Default to a common large width
 )
 
 data class OverlaySegment(
-    val width: Int = 150, // Pixels
-    val height: Int = 60, // Pixels
-    val xOffset: Int = 0, // Pixels from left
-    val yOffset: Int = 0, // Pixels from top
-    val gestures: MutableMap<GestureType, ActionType> = mutableMapOf(GestureType.DOUBLE_TAP to ActionType.CTS_MULTI),
-    val gestureData: MutableMap<GestureType, String> = mutableMapOf() // Stores extra data like package name for OPEN_APP
+    @SerializedName("width") val width: Int = 150, // Pixels
+    @SerializedName("height") val height: Int = 60, // Pixels
+    @SerializedName("xOffset") val xOffset: Int = 0, // Pixels from left
+    @SerializedName("yOffset") val yOffset: Int = 0, // Pixels from top
+    @SerializedName("gestures") val gestures: MutableMap<GestureType, ActionType> = mutableMapOf(GestureType.DOUBLE_TAP to ActionType.CTS_MULTI),
+    @SerializedName("gestureData") val gestureData: MutableMap<GestureType, String> = mutableMapOf() // Stores extra data like package name for OPEN_APP
 )
 
 enum class GestureType {

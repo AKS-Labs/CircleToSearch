@@ -2,45 +2,40 @@
 # You can control the set of applied configuration files using the
 # proguardFiles setting in build.gradle.
 
-# Keep Compose-specific classes
--keep class androidx.compose.** { *; }
--keep interface androidx.compose.** { *; }
--dontwarn androidx.compose.**
+# R8 handles Compose optimization automatically. 
+# Broadly keeping all compose classes prevents maximum shrinking.
+# We only keep what's strictly necessary if we encounter issues.
 
-# Keep WebView JavaScript interfaces
+# Keep WebView JavaScript interfaces - essential for functionality
 -keepclassmembers class * {
     @android.webkit.JavascriptInterface <methods>;
 }
 
-# Keep WebView-related classes
--keep class android.webkit.** { *; }
--keepclassmembers class android.webkit.** { *; }
--dontwarn android.webkit.**
+# Keep the data classes for GSON but allow obfuscation of names
+# Since we added @SerializedName, we don't need to keep the field names.
+-keepclassmembers class com.akslabs.circletosearch.data.** {
+    <fields>;
+}
 
-# Keep all classes that extend WebView
--keep public class * extends android.webkit.WebView
+# Keep Enums for GSON serialization
+-keepclassmembers enum com.akslabs.circletosearch.data.** {
+    <fields>;
+    public static **[] values();
+    public static ** valueOf(java.lang.String);
+}
 
-# For FileProvider
--keep class androidx.core.content.FileProvider { *; }
-
-# Keep SearchEngine enum
--keep enum com.akslabs.circletosearch.data.SearchEngine { *; }
-
-# Keep Preferences classes
--keep class com.akslabs.circletosearch.utils.UIPreferences { *; }
--keep class com.akslabs.circletosearch.utils.PrivacyPreferences { *; }
-
-# Keep data classes
--keep class com.akslabs.circletosearch.data.** { *; }
-
-# Preserve line number information for debugging
+# Preserve line number information for debugging (optional, remove for absolute min size)
 -keepattributes SourceFile,LineNumberTable
-
-# Hide source file name
 -renamesourcefileattribute SourceFile
 
 # Optimization flags
 -optimizationpasses 5
 -dontusemixedcaseclassnames
 -dontskipnonpubliclibraryclasses
--verbose
+
+# Remove log messages in release builds (improves performance and size)
+-assumenosideeffects class android.util.Log {
+    public static *** d(...);
+    public static *** v(...);
+    public static *** i(...);
+}
