@@ -21,7 +21,7 @@ data class OverlaySegment(
     val height: Int = 60, // Pixels
     val xOffset: Int = 0, // Pixels from left
     val yOffset: Int = 0, // Pixels from top
-    val gestures: MutableMap<GestureType, ActionType> = mutableMapOf(GestureType.DOUBLE_TAP to ActionType.SCREENSHOT),
+    val gestures: MutableMap<GestureType, ActionType> = mutableMapOf(GestureType.DOUBLE_TAP to ActionType.CTS_MULTI),
     val gestureData: MutableMap<GestureType, String> = mutableMapOf() // Stores extra data like package name for OPEN_APP
 )
 
@@ -56,6 +56,39 @@ enum class ActionType {
     MEDIA_PLAY_PAUSE,
     MEDIA_NEXT,
     MEDIA_PREVIOUS
+}
+
+fun ActionType.getFriendlyName(): String = when (this) {
+    ActionType.NONE -> "No Action"
+    ActionType.SCREENSHOT -> "Take Screenshot"
+    ActionType.FLASHLIGHT -> "Flashlight"
+    ActionType.HOME -> "Go Home"
+    ActionType.BACK -> "Go Back"
+    ActionType.RECENTS -> "Recent Apps"
+    ActionType.LOCK_SCREEN -> "Lock Screen"
+    ActionType.OPEN_NOTIFICATIONS -> "Open Notifications"
+    ActionType.OPEN_QUICK_SETTINGS -> "Quick Settings"
+    ActionType.CTS_LENS -> "Google Lens Search"
+    ActionType.CTS_MULTI -> "Multi-Search (All Engines)"
+    ActionType.SPLIT_SCREEN -> "Split Screen"
+    ActionType.OPEN_APP -> "Open Application"
+    ActionType.SCROLL_TOP -> "Scroll to Top"
+    ActionType.SCROLL_BOTTOM -> "Scroll to Bottom"
+    ActionType.SCREEN_OFF -> "Turn Off Screen"
+    ActionType.TOGGLE_AUTO_ROTATE -> "Toggle Auto Rotate"
+    ActionType.MEDIA_PLAY_PAUSE -> "Media Play/Pause"
+    ActionType.MEDIA_NEXT -> "Media Next"
+    ActionType.MEDIA_PREVIOUS -> "Media Previous"
+}
+
+fun GestureType.getFriendlyName(): String = when (this) {
+    GestureType.DOUBLE_TAP -> "Double Tap"
+    GestureType.LONG_PRESS -> "Long Press"
+    GestureType.TRIPLE_TAP -> "Triple Tap"
+    GestureType.SWIPE_UP -> "Swipe Up"
+    GestureType.SWIPE_DOWN -> "Swipe Down"
+    GestureType.SWIPE_LEFT -> "Swipe Left"
+    GestureType.SWIPE_RIGHT -> "Swipe Right"
 }
 
 class OverlayConfigurationManager(context: Context) {

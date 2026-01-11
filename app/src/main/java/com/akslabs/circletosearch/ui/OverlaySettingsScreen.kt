@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -265,9 +266,9 @@ fun SegmentEditorItem(
                 
                 // Gesture Summary (first 2 non-none)
                 Column {
-                    segment.gestures.entries.filter { it.value != ActionType.NONE }.take(2).forEach {
+                    segment.gestures.entries.filter { it.value != ActionType.NONE }.take(3).forEach {
                         Text(
-                            "${it.key.name}: ${it.value.name}", 
+                            "${it.key.getFriendlyName()}: ${it.value.getFriendlyName()}", 
                             style = MaterialTheme.typography.bodySmall, 
                             color = MaterialTheme.colorScheme.secondary
                         )
@@ -332,65 +333,178 @@ fun GestureConfigDialog(
                 
                 GestureType.values().forEach { gesture ->
                     val currentAction = segment.gestures[gesture] ?: ActionType.NONE
-                    var expanded by remember { mutableStateOf(false) }
+                    var showPicker by remember { mutableStateOf(false) }
                     
-                    Text(gesture.name.replace("_", " "), fontWeight = FontWeight.Medium)
-                    
-                    Box(modifier = Modifier.fillMaxWidth()) {
-                        OutlinedButton(
-                            onClick = { expanded = true },
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
+                    ) {
+                        Text(
+                            gesture.getFriendlyName(), 
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
+                        )
+                        
+                        Surface(
+                            onClick = { showPicker = true },
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            var label = currentAction.name
-                            if (currentAction == ActionType.OPEN_APP) {
-                                val pkg = segment.gestureData[gesture]
-                                val appName = runCatching { 
-                                    val info = context.packageManager.getApplicationInfo(pkg ?: "", 0)
-                                    context.packageManager.getApplicationLabel(info).toString()
-                                }.getOrDefault(pkg ?: "Unknown App")
-                                label = "Open: $appName"
-                            }
-                            Text(label, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-                            Spacer(modifier = Modifier.weight(1f))
-                            Icon(Icons.Default.ArrowDropDown, contentDescription = null)
-                        }
-                        
-                        DropdownMenu(
-                            expanded = expanded,
-                            onDismissRequest = { expanded = false },
-                            modifier = Modifier.heightIn(max = 300.dp)
-                        ) {
-                            ActionType.values().forEach { action ->
-                                DropdownMenuItem(
-                                    text = { Text(action.name) },
-                                    onClick = {
-                                        if (action == ActionType.OPEN_APP) {
-                                            showAppPicker = gesture
-                                            expanded = false
-                                        } else {
-                                            val newGestures = segment.gestures.toMutableMap()
-                                            newGestures[gesture] = action
-                                            onUpdate(segment.copy(gestures = newGestures))
-                                            expanded = false
-                                        }
-                                    }
+                            Row(
+                                modifier = Modifier.padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                val actionIcon = getActionIcon(currentAction)
+                                Icon(actionIcon, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Spacer(modifier = Modifier.width(12.dp))
+                                
+                                var label = currentAction.getFriendlyName()
+                                if (currentAction == ActionType.OPEN_APP) {
+                                    val pkg = segment.gestureData[gesture]
+                                    val appName = runCatching { 
+                                        val info = context.packageManager.getApplicationInfo(pkg ?: "", 0)
+                                        context.packageManager.getApplicationLabel(info).toString()
+                                    }.getOrDefault(pkg ?: "Unknown App")
+                                    label = "Open: $appName"
+                                }
+                                
+                                Text(
+                                    label, 
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    maxLines = 1, 
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f)
                                 )
+                                
+                                Icon(Icons.AutoMirrored.Filled.ArrowForwardIos, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f))
                             }
                         }
                     }
-                    Spacer(modifier = Modifier.height(12.dp))
+
+                    if (showPicker) {
+                        ActionPickerDialog(
+                            currentAction = currentAction,
+                            onDismiss = { showPicker = false },
+                            onActionSelected = { action ->
+                                if (action == ActionType.OPEN_APP) {
+                                    showAppPicker = gesture
+                                } else {
+                                    val newGestures = segment.gestures.toMutableMap()
+                                    newGestures[gesture] = action
+                                    onUpdate(segment.copy(gestures = newGestures))
+                                }
+                                showPicker = false
+                            }
+                        )
+                    }
                 }
                 
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(
                     onClick = onDismiss,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
                 ) {
-                    Text("Done")
+                    Text("Close")
                 }
             }
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ActionPickerDialog(
+    currentAction: ActionType,
+    onDismiss: () -> Unit,
+    onActionSelected: (ActionType) -> Unit
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Card(
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(24.dp)
+                .fillMaxHeight(0.8f)
+        ) {
+            Column(modifier = Modifier.padding(24.dp)) {
+                Text("Select Action", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                androidx.compose.foundation.lazy.LazyColumn(modifier = Modifier.weight(1f)) {
+                    items(ActionType.values().size) { index ->
+                        val action = ActionType.values()[index]
+                        val isSelected = action == currentAction
+                        
+                        Surface(
+                            onClick = { onActionSelected(action) },
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    getActionIcon(action), 
+                                    contentDescription = null, 
+                                    modifier = Modifier.size(24.dp),
+                                    tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(modifier = Modifier.width(16.dp))
+                                Text(
+                                    action.getFriendlyName(),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
+                                )
+                                if (isSelected) {
+                                    Spacer(modifier = Modifier.weight(1f))
+                                    Icon(Icons.Default.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) {
+                    Text("Cancel")
+                }
+            }
+        }
+    }
+}
+
+fun getActionIcon(action: ActionType): ImageVector = when (action) {
+    ActionType.NONE -> Icons.Default.Block
+    ActionType.SCREENSHOT -> Icons.Default.Screenshot
+    ActionType.FLASHLIGHT -> Icons.Default.FlashlightOn
+    ActionType.HOME -> Icons.Default.Home
+    ActionType.BACK -> Icons.Default.ArrowBack
+    ActionType.RECENTS -> Icons.Default.History
+    ActionType.LOCK_SCREEN -> Icons.Default.Lock
+    ActionType.OPEN_NOTIFICATIONS -> Icons.Default.Notifications
+    ActionType.OPEN_QUICK_SETTINGS -> Icons.Default.Settings
+    ActionType.CTS_LENS -> Icons.Default.Search
+    ActionType.CTS_MULTI -> Icons.Default.TravelExplore
+    ActionType.SPLIT_SCREEN -> Icons.Default.VerticalSplit
+    ActionType.OPEN_APP -> Icons.Default.Apps
+    ActionType.SCROLL_TOP -> Icons.Default.VerticalAlignTop
+    ActionType.SCROLL_BOTTOM -> Icons.Default.VerticalAlignBottom
+    ActionType.SCREEN_OFF -> Icons.Default.PowerSettingsNew
+    ActionType.TOGGLE_AUTO_ROTATE -> Icons.Default.ScreenRotation
+    ActionType.MEDIA_PLAY_PAUSE -> Icons.Default.PlayArrow
+    ActionType.MEDIA_NEXT -> Icons.Default.SkipNext
+    ActionType.MEDIA_PREVIOUS -> Icons.Default.SkipPrevious
 }
 
 @Composable

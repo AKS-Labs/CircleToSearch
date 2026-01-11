@@ -310,7 +310,7 @@ fun SetupScreen(onSettingsClick: () -> Unit) {
                                 color = MaterialTheme.colorScheme.onPrimaryContainer
                             )
                             Text(
-                                text = "Hold the Home button or edge-swipe up to summon CircleToSearch — like calling your Pokémon. \uD83D\uDD0D\uD83D\uDE06",
+                                text = "Hold the Home button or edge-swipe up to summon CircleToSearch — like calling your Pokémon.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                             )
@@ -334,7 +334,7 @@ fun SetupScreen(onSettingsClick: () -> Unit) {
 
             // Privacy Note
             Text(
-                text = "That’s it. No more permissions.\n We’re not trying to adopt your phone. \uD83D\uDE02.",
+                text = "That’s it. No more permissions.\n We’re not trying to adopt your phone.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                 textAlign = TextAlign.Center
@@ -659,7 +659,7 @@ fun LensOnlySwitch(context: android.content.Context) {
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = "Lens needs Google App Installed. But Degoogled friends can stick with the versatile Multi-Search Engine mode. 🚀",
+                text = "Lens needs Google App Installed. But Degoogled friends can stick with the versatile Multi-Search Engine mode.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

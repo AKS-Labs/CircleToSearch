@@ -608,6 +608,7 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
     }
 
     private fun performCapture() {
+        android.util.Log.d("CircleToSearch", "performCapture called. hasWindowManager=${windowManager != null}")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             // Haptic Feedback (Crisp Click) - Moved to performAction, but keeping here specifically for direct calls if any
              // (performAction handles its own vibration)
@@ -673,6 +674,7 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         private var isFlashlightOn = false // Simple static state tracking
 
         fun triggerCapture() {
+            android.util.Log.d("CircleToSearch", "triggerCapture static called. instance=${instance != null}")
             instance?.performCapture()
         }
     }
