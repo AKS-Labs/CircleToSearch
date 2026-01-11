@@ -5,9 +5,8 @@
 package com.akslabs.circletosearch
 
 import android.app.Activity
+import android.os.Build
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 
 /**
  * A transparent activity launched from the Quick Settings tile.
@@ -20,14 +19,26 @@ class TileTriggerActivity : Activity() {
         // Hide from recents and UI
         // Theme is set in manifest (Translucent/Transparent)
         
+        // Disable window animations for this activity
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            overrideActivityTransition(OVERRIDE_TRANSITION_OPEN, 0, 0)
+            overrideActivityTransition(OVERRIDE_TRANSITION_CLOSE, 0, 0)
+        } else {
+            @Suppress("DEPRECATION")
+            overridePendingTransition(0, 0)
+        }
+        
         android.util.Log.d("CircleToSearchTile", "TileTriggerActivity started")
         
-        // Small delay to ensure the shade is fully collapsed and system is ready
-        Handler(Looper.getMainLooper()).postDelayed({
-            android.util.Log.d("CircleToSearchTile", "Triggering capture from activity")
-            CircleToSearchAccessibilityService.triggerCapture()
-            finish()
-            // Optional: overridePendingTransition(0, 0)
-        }, 300)
+        // Trigger capture immediately
+        CircleToSearchAccessibilityService.triggerCapture()
+        finish()
+        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            overrideActivityTransition(OVERRIDE_TRANSITION_CLOSE, 0, 0)
+        } else {
+            @Suppress("DEPRECATION")
+            overridePendingTransition(0, 0)
+        }
     }
 }

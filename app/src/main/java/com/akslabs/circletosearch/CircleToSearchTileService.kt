@@ -4,10 +4,15 @@
 
 package com.akslabs.circletosearch
 
+import android.accessibilityservice.AccessibilityServiceInfo
+import android.app.PendingIntent
+import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.provider.Settings
 import android.service.quicksettings.Tile
 import android.service.quicksettings.TileService
+import android.view.accessibility.AccessibilityManager
 import android.widget.Toast
 import android.util.Log
 
@@ -23,14 +28,30 @@ class CircleToSearchTileService : TileService() {
             val intent = Intent(this, TileTriggerActivity::class.java).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
-            startActivityAndCollapse(intent)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                val pendingIntent = PendingIntent.getActivity(
+                    this, 0, intent, PendingIntent.FLAG_IMMUTABLE
+                )
+                startActivityAndCollapse(pendingIntent)
+            } else {
+                @Suppress("DEPRECATION")
+                startActivityAndCollapse(intent)
+            }
         } else {
             // Guide user to enable accessibility
             Toast.makeText(this, "Please enable Circle to Search Accessibility Service", Toast.LENGTH_LONG).show()
             val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
-            startActivityAndCollapse(intent)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                val pendingIntent = PendingIntent.getActivity(
+                    this, 0, intent, PendingIntent.FLAG_IMMUTABLE
+                )
+                startActivityAndCollapse(pendingIntent)
+            } else {
+                @Suppress("DEPRECATION")
+                startActivityAndCollapse(intent)
+            }
         }
     }
 
@@ -49,8 +70,14 @@ class CircleToSearchTileService : TileService() {
     }
 
     private fun isAccessibilityServiceEnabled(): Boolean {
-        val expectedComponentName = android.content.ComponentName(this, CircleToSearchAccessibilityService::class.java).flattenToString()
-        val enabledServices = Settings.Secure.getString(contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES) ?: ""
-        return enabledServices.contains(expectedComponentName)
+        val am = getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
+        val enabledServices = am.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
+        for (service in enabledServices) {
+            if (service.resolveInfo.serviceInfo.packageName == packageName &&
+                service.resolveInfo.serviceInfo.name == CircleToSearchAccessibilityService::class.java.name) {
+                return true
+            }
+        }
+        return false
     }
 }

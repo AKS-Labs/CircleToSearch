@@ -69,7 +69,7 @@ fun ActionType.getFriendlyName(): String = when (this) {
     ActionType.OPEN_NOTIFICATIONS -> "Open Notifications"
     ActionType.OPEN_QUICK_SETTINGS -> "Quick Settings"
     ActionType.CTS_LENS -> "Google Lens Search"
-    ActionType.CTS_MULTI -> "Multi-Search (All Engines)"
+    ActionType.CTS_MULTI -> "Multi-Search (All Search Engines)"
     ActionType.SPLIT_SCREEN -> "Split Screen"
     ActionType.OPEN_APP -> "Open Application"
     ActionType.SCROLL_TOP -> "Scroll to Top"
