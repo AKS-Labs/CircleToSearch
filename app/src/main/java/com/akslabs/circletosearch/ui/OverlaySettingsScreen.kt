@@ -21,8 +21,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.core.content.ContextCompat
+import android.os.Build
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -46,6 +49,8 @@ fun OverlaySettingsScreen(
         configManager.saveConfig(newConfig)
     }
 
+    val overlayPalette = rememberOverlayPalette(context)
+    
     Scaffold(
         topBar = {
             TopAppBar(
@@ -75,7 +80,7 @@ fun OverlaySettingsScreen(
             // 1. Main Toggles
             SettingsSectionHeader(title = "General")
             SettingsToggleItem(
-                title = "Enable Overlay",
+                title = "Enable StatusBar Overlay",
                 subtitle = "Show trigger zone over status bar",
                 icon = Icons.Default.Layers,
                 checked = config.isEnabled,
@@ -91,8 +96,8 @@ fun OverlaySettingsScreen(
             )
             Spacer(modifier = Modifier.height(12.dp))
             SettingsToggleItem(
-                title = "Debug Visibility",
-                subtitle = "Show color to adjust position",
+                title = "Show Overlay",
+                subtitle = "Show overlay to adjust position",
                 icon = Icons.Default.Visibility,
                 checked = config.isVisible,
                 onCheckedChange = { updateConfig(config.copy(isVisible = it)) }
@@ -131,6 +136,12 @@ fun OverlaySettingsScreen(
                 SegmentEditorItem(
                     index = index,
                     segment = segment,
+                    overlayPalette = overlayPalette,
+                    isExpanded = config.activeSegmentIndex == index,
+                    onExpandToggle = {
+                        val nextIndex = if (config.activeSegmentIndex == index) -1 else index
+                        updateConfig(config.copy(activeSegmentIndex = nextIndex))
+                    },
                     onUpdate = { updatedSegment ->
                         val newSegments = config.segments.toMutableList()
                         newSegments[index] = updatedSegment
@@ -139,7 +150,11 @@ fun OverlaySettingsScreen(
                     onDelete = {
                         val newSegments = config.segments.toMutableList()
                         newSegments.removeAt(index)
-                        updateConfig(config.copy(segments = newSegments))
+                        // If we deleted the active one or shifted indices, reset/update active index
+                        val nextActiveIndex = if (config.activeSegmentIndex == index) -1 
+                                              else if (config.activeSegmentIndex > index) config.activeSegmentIndex - 1
+                                              else config.activeSegmentIndex
+                        updateConfig(config.copy(segments = newSegments, activeSegmentIndex = nextActiveIndex))
                     }
                 )
                 Spacer(modifier = Modifier.height(16.dp))
@@ -153,10 +168,12 @@ fun OverlaySettingsScreen(
 fun SegmentEditorItem(
     index: Int,
     segment: OverlaySegment,
+    overlayPalette: List<Color>,
+    isExpanded: Boolean,
+    onExpandToggle: () -> Unit,
     onUpdate: (OverlaySegment) -> Unit,
     onDelete: () -> Unit
 ) {
-    var isExpanded by remember { mutableStateOf(false) }
     var showGestureDialog by remember { mutableStateOf(false) }
     
     // Get screen dimensions for sliders
@@ -183,12 +200,12 @@ fun SegmentEditorItem(
             // Header
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.clickable { isExpanded = !isExpanded }
+                modifier = Modifier.clickable { onExpandToggle() }
             ) {
                 Icon(
                     imageVector = Icons.Default.Layers,
                     contentDescription = null,
-                    tint = listOf(Color.Red, Color.Blue, Color.Green, Color.Yellow, Color.Magenta)[index % 5],
+                    tint = overlayPalette[index % overlayPalette.size],
                     modifier = Modifier.size(24.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
@@ -620,6 +637,30 @@ fun AppPickerDialog(onDismiss: () -> Unit, onAppSelected: (String) -> Unit) {
                     }
                 }
             }
+        }
+    }
+}
+@Composable
+fun rememberOverlayPalette(context: Context): List<Color> {
+    return remember(context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            listOf(
+                android.R.color.system_accent1_200,
+                android.R.color.system_accent2_200,
+                android.R.color.system_accent3_200,
+                android.R.color.system_neutral1_200,
+                android.R.color.system_neutral2_200
+            ).map { 
+                Color(ContextCompat.getColor(context, it))
+            }
+        } else {
+            listOf(
+                Color.Red,
+                Color.Green,
+                Color.Blue,
+                Color.Yellow,
+                Color.Magenta
+            )
         }
     }
 }
