@@ -7,22 +7,23 @@ package com.akslabs.circletosearch.data
 import android.content.Context
 import android.content.SharedPreferences
 import com.google.gson.Gson
-import com.akslabs.circletosearch.data.OverlaySegment
+import com.google.gson.annotations.SerializedName
 
 data class OverlayConfig(
-    val isEnabled: Boolean = true,
-    val isEnabledInLandscape: Boolean = false,
-    val isVisible: Boolean = false, // Debug visibility (colored)
-    val segments: List<OverlaySegment> = listOf(OverlaySegment(width = 1080)) // Default to a common large width
+    @SerializedName("isEnabled") val isEnabled: Boolean = true,
+    @SerializedName("isEnabledInLandscape") val isEnabledInLandscape: Boolean = false,
+    @SerializedName("isVisible") val isVisible: Boolean = false, // Debug visibility (colored)
+    @SerializedName("activeSegmentIndex") val activeSegmentIndex: Int = -1, // Currently being edited in settings
+    @SerializedName("segments") val segments: List<OverlaySegment> = listOf(OverlaySegment(width = 1080)) // Default to a common large width
 )
 
 data class OverlaySegment(
-    val width: Int = 150, // Pixels
-    val height: Int = 60, // Pixels
-    val xOffset: Int = 0, // Pixels from left
-    val yOffset: Int = 0, // Pixels from top
-    val gestures: MutableMap<GestureType, ActionType> = mutableMapOf(GestureType.DOUBLE_TAP to ActionType.SCREENSHOT),
-    val gestureData: MutableMap<GestureType, String> = mutableMapOf() // Stores extra data like package name for OPEN_APP
+    @SerializedName("width") val width: Int = 150, // Pixels
+    @SerializedName("height") val height: Int = 60, // Pixels
+    @SerializedName("xOffset") val xOffset: Int = 0, // Pixels from left
+    @SerializedName("yOffset") val yOffset: Int = 0, // Pixels from top
+    @SerializedName("gestures") val gestures: MutableMap<GestureType, ActionType> = mutableMapOf(GestureType.DOUBLE_TAP to ActionType.CTS_MULTI),
+    @SerializedName("gestureData") val gestureData: MutableMap<GestureType, String> = mutableMapOf() // Stores extra data like package name for OPEN_APP
 )
 
 enum class GestureType {
@@ -56,6 +57,39 @@ enum class ActionType {
     MEDIA_PLAY_PAUSE,
     MEDIA_NEXT,
     MEDIA_PREVIOUS
+}
+
+fun ActionType.getFriendlyName(): String = when (this) {
+    ActionType.NONE -> "No Action"
+    ActionType.SCREENSHOT -> "Take Screenshot"
+    ActionType.FLASHLIGHT -> "Flashlight"
+    ActionType.HOME -> "Go Home"
+    ActionType.BACK -> "Go Back"
+    ActionType.RECENTS -> "Recent Apps"
+    ActionType.LOCK_SCREEN -> "Lock Screen"
+    ActionType.OPEN_NOTIFICATIONS -> "Open Notifications"
+    ActionType.OPEN_QUICK_SETTINGS -> "Quick Settings"
+    ActionType.CTS_LENS -> "Google Lens Search"
+    ActionType.CTS_MULTI -> "Multi-Search (All Search Engines)"
+    ActionType.SPLIT_SCREEN -> "Split Screen"
+    ActionType.OPEN_APP -> "Open Application"
+    ActionType.SCROLL_TOP -> "Scroll to Top"
+    ActionType.SCROLL_BOTTOM -> "Scroll to Bottom"
+    ActionType.SCREEN_OFF -> "Turn Off Screen"
+    ActionType.TOGGLE_AUTO_ROTATE -> "Toggle Auto Rotate"
+    ActionType.MEDIA_PLAY_PAUSE -> "Media Play/Pause"
+    ActionType.MEDIA_NEXT -> "Media Next"
+    ActionType.MEDIA_PREVIOUS -> "Media Previous"
+}
+
+fun GestureType.getFriendlyName(): String = when (this) {
+    GestureType.DOUBLE_TAP -> "Double Tap"
+    GestureType.LONG_PRESS -> "Long Press"
+    GestureType.TRIPLE_TAP -> "Triple Tap"
+    GestureType.SWIPE_UP -> "Swipe Up"
+    GestureType.SWIPE_DOWN -> "Swipe Down"
+    GestureType.SWIPE_LEFT -> "Swipe Left"
+    GestureType.SWIPE_RIGHT -> "Swipe Right"
 }
 
 class OverlayConfigurationManager(context: Context) {

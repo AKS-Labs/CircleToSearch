@@ -29,6 +29,7 @@ import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.PixelFormat
+import android.graphics.drawable.GradientDrawable
 import android.hardware.camera2.CameraManager
 import android.os.Build
 import android.os.VibrationEffect
@@ -38,6 +39,7 @@ import android.view.GestureDetector
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewOutlineProvider
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import com.akslabs.circletosearch.data.ActionType
@@ -177,6 +179,36 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
             overlayViews.clear()
             return
         }
+
+        // --- Resolution of Colors ---
+        val primaryColor = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            getColor(android.R.color.system_accent1_500)
+        } else {
+            Color.parseColor("#FF6200EE") // Default Material Primary
+        }
+
+        val themePalette = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            listOf(
+                android.R.color.system_accent1_200,
+                android.R.color.system_accent2_200,
+                android.R.color.system_accent3_200,
+                android.R.color.system_neutral1_200,
+                android.R.color.system_neutral2_200
+            ).map { 
+                val color = getColor(it)
+                // Set alpha to 40% (approx 102/255) for subtle blending
+                Color.argb(102, Color.red(color), Color.green(color), Color.blue(color))
+            }
+        } else {
+            // Legacy fallbacks with 40% opacity
+            listOf(
+                Color.parseColor("#66FF0000"), // Red
+                Color.parseColor("#6600FF00"), // Green
+                Color.parseColor("#660000FF"), // Blue
+                Color.parseColor("#66FFFF00"), // Yellow
+                Color.parseColor("#66FF00FF")  // Magenta
+            )
+        }
         
         // Landscape check
         val currentOrientation = resources.configuration.orientation
@@ -215,10 +247,20 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
                 
                 // Update Color (Debug)
                 if (config.isVisible) {
-                    val colors = listOf(Color.parseColor("#80FF0000"), Color.parseColor("#8000FF00"), Color.parseColor("#800000FF"), Color.parseColor("#80FFFF00"), Color.parseColor("#80FF00FF")) // Red, Green, Blue, Yellow, Magenta
-                    view.setBackgroundColor(colors[index % colors.size])
+                    val color = themePalette[index % themePalette.size]
+                    val drawable = GradientDrawable().apply {
+                        setColor(color)
+                        // Only show solid primary border for the expanded/active overlay
+                        if (index == config.activeSegmentIndex) {
+                            setStroke(3, primaryColor)
+                        }
+                    }
+                    view.background = drawable
+                    view.elevation = 0f
                 } else {
+                    view.background = null
                     view.setBackgroundColor(Color.TRANSPARENT)
+                    view.elevation = 0f
                 }
                 
                 // Update gesture listener
@@ -254,10 +296,20 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
                 params.y = segment.yOffset
                 
                  if (config.isVisible) {
-                    val colors = listOf(Color.parseColor("#80FF0000"), Color.parseColor("#8000FF00"), Color.parseColor("#800000FF"), Color.parseColor("#80FFFF00"), Color.parseColor("#80FF00FF"))
-                    view.setBackgroundColor(colors[index % colors.size])
+                    val color = themePalette[index % themePalette.size]
+                    val drawable = GradientDrawable().apply {
+                        setColor(color)
+                        // Only show solid primary border for the expanded/active overlay
+                        if (index == config.activeSegmentIndex) {
+                            setStroke(3, primaryColor)
+                        }
+                    }
+                    view.background = drawable
+                    view.elevation = 0f
                 } else {
+                    view.background = null
                     view.setBackgroundColor(Color.TRANSPARENT)
+                    view.elevation = 0f
                 }
 
                 attachTouchListener(view, segment, index)
@@ -608,6 +660,7 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
     }
 
     private fun performCapture() {
+        android.util.Log.d("CircleToSearch", "performCapture called. hasWindowManager=${windowManager != null}")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             // Haptic Feedback (Crisp Click) - Moved to performAction, but keeping here specifically for direct calls if any
              // (performAction handles its own vibration)
@@ -673,6 +726,7 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         private var isFlashlightOn = false // Simple static state tracking
 
         fun triggerCapture() {
+            android.util.Log.d("CircleToSearch", "triggerCapture static called. instance=${instance != null}")
             instance?.performCapture()
         }
     }

@@ -102,6 +102,25 @@
             android:excludeFromRecents="true"
             android:launchMode="singleInstance" />
 
+        <activity
+            android:name=".TileTriggerActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:launchMode="singleInstance" />
+
+        <service
+            android:name=".CircleToSearchTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_qs_circle_to_search"
+            android:label="Circle to Search"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="com.akslabs.circletosearch.fileprovider"
