@@ -83,4 +83,10 @@ class UIPreferences(context: Context) {
     fun setSearchEngineOrder(order: String) {
         prefs.edit().putString(KEY_SEARCH_ENGINE_ORDER, order).apply()
     }
+
+    fun isDirectLensEnabled(): Boolean = prefs.getBoolean("direct_lens_enabled", false)
+
+    fun setDirectLensEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean("direct_lens_enabled", enabled).apply()
+    }
 }

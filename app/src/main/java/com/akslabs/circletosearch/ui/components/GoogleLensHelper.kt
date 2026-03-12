@@ -66,9 +66,7 @@ fun searchWithGoogleLens(uri: Uri, context: Context): Boolean {
                 putExtra(Intent.EXTRA_STREAM, contentUri)
                 setPackage("com.google.android.googlequicksearchbox")
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-
-                // NE PAS mettre FLAG_ACTIVITY_NO_HISTORY
-                // NE PAS mettre FLAG_ACTIVITY_NEW_DOCUMENT
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
             }
 

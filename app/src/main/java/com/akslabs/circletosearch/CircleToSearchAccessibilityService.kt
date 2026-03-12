@@ -49,6 +49,11 @@ import com.akslabs.circletosearch.data.OverlayConfigurationManager
 import com.akslabs.circletosearch.data.OverlaySegment
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
+import com.akslabs.circletosearch.utils.UIPreferences
+import com.akslabs.circletosearch.utils.ImageUtils
+import com.akslabs.circletosearch.ui.components.searchWithGoogleLens
+import androidx.core.content.FileProvider
+import java.io.File
 
 class CircleToSearchAccessibilityService : AccessibilityService() {
 
@@ -731,16 +736,13 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
     private var packageBeforeCTS: String? = null // On mémorise l'appli ici
 
     private fun performCapture() {
-        android.util.Log.d("CircleToSearch", "performCapture called. hasWindowManager=${windowManager != null}")
+        android.util.Log.d("CircleToSearch", "performCapture called.")
 
-        // --- ÉTAPE CRUCIALE : On capture l'identité de l'appli AVANT le screenshot ---
         val root = rootInActiveWindow
         if (root != null) {
             val pkg = root.packageName?.toString()
-            // Si ce n'est pas notre propre appli, on enregistre qui c'est
             if (pkg != null && pkg != packageName) {
                 packageBeforeCTS = pkg
-                android.util.Log.d("CTS_SMART", "Appli détectée au lancement : $pkg")
             }
         }
 
@@ -762,9 +764,30 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
                             hardwareBuffer.close()
                             if (copy == null) return
 
-                            BitmapRepository.setScreenshot(copy)
-                            launchOverlay()
+                            val uiPrefs = UIPreferences(this@CircleToSearchAccessibilityService)
+                            if (uiPrefs.isDirectLensEnabled()) {
+                                // 1. Vibration pour confirmer la capture
+                                val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                    vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
+                                } else {
+                                    vibrator.vibrate(20)
+                                }
 
+                                // 2. Envoi direct à Lens
+                                val path = ImageUtils.saveBitmap(this@CircleToSearchAccessibilityService, copy)
+                                val file = java.io.File(path)
+                                val uri = FileProvider.getUriForFile(
+                                    this@CircleToSearchAccessibilityService,
+                                    "com.akslabs.circletosearch.fileprovider",
+                                    file
+                                )
+                                searchWithGoogleLens(uri, this@CircleToSearchAccessibilityService)
+                            } else {
+                                // Mode Normal
+                                BitmapRepository.setScreenshot(copy)
+                                launchOverlay()
+                            }
                         } catch (e: Exception) {
                             e.printStackTrace()
                         }
