@@ -92,12 +92,55 @@ fun GestureType.getFriendlyName(): String = when (this) {
     GestureType.SWIPE_RIGHT -> "Swipe Right"
 }
 
-class OverlayConfigurationManager(context: Context) {
+class OverlayConfigurationManager(private val context: Context) {
     private val prefs: SharedPreferences = context.getSharedPreferences("overlay_prefs", Context.MODE_PRIVATE)
     private val gson = Gson()
-    
+
     companion object {
         private const val KEY_CONFIG = "overlay_config"
+    }
+
+    // 1. LE GÉNÉRATEUR ADAPTATIF MATHÉMATIQUE
+    fun getDefaultConfig(): OverlayConfig {
+        // 1. On récupère les dimensions réelles de l'écran du téléphone actuel
+        val metrics = context.resources.displayMetrics
+        val screenWidth = metrics.widthPixels
+        val screenHeight = metrics.heightPixels
+
+        // 2. LA LARGEUR (Width)
+        // On prend 28% de l'écran.
+        // Sur ton Pixel 7a (1080px), 1080 * 0.28 = 302 pixels ! (On retombe sur tes ~300px)
+        // Sur un S24 Ultra (1440px), ça fera 403 pixels. L'aspect visuel sera identique.
+        val w = (screenWidth * 0.28f).toInt()
+
+        // 3. LA HAUTEUR (Height)
+        // On utilise la "densité" (density) pour avoir une hauteur physique constante (environ 40dp).
+        // Ça fera environ 100 à 120 pixels selon l'écran.
+        val h = (25f * metrics.density).toInt()
+
+        // 4. LE CENTRE HORIZONTAL PARFAIT (Position X)
+        // La formule universelle du centrage : (Taille totale - Taille de l'objet) divisé par 2.
+        val x = (screenWidth - w) / 2
+
+        // 5. COLLÉ EN BAS (Position Y)
+        // La taille totale de l'écran, moins la hauteur de notre zone.
+        val y = screenHeight - h
+
+        val defaultSegment = OverlaySegment(
+            width = w,
+            height = h,
+            xOffset = x,
+            yOffset = y,
+            gestures = mutableMapOf(GestureType.LONG_PRESS to ActionType.CTS_MULTI)
+        )
+
+        return OverlayConfig(
+            isEnabled = true,
+            isEnabledInLandscape = false,
+            isVisible = false,
+            activeSegmentIndex = -1,
+            segments = listOf(defaultSegment)
+        )
     }
 
     fun getConfig(): OverlayConfig {
@@ -105,18 +148,18 @@ class OverlayConfigurationManager(context: Context) {
         if (json != null) {
             try {
                 val config = gson.fromJson(json, OverlayConfig::class.java)
-                // Sanitize: Gson might result in null keys in maps if enum values are missing
                 val sanitizedSegments = config.segments.map { segment ->
-                     val cleanGestures = segment.gestures.filterKeys { it != null }.toMutableMap()
-                     segment.copy(gestures = cleanGestures)
+                    val cleanGestures = segment.gestures.filterKeys { it != null }.toMutableMap()
+                    segment.copy(gestures = cleanGestures)
                 }
                 return config.copy(segments = sanitizedSegments)
             } catch (e: Exception) {
-                // If deep failure, return default
-                return OverlayConfig()
+                // Si la sauvegarde est corrompue, on génère le parfait défaut
+                return getDefaultConfig()
             }
         } else {
-            return OverlayConfig()
+            // 3. PREMIÈRE INSTALLATION : On génère le parfait défaut
+            return getDefaultConfig()
         }
     }
 
@@ -124,8 +167,9 @@ class OverlayConfigurationManager(context: Context) {
         val json = gson.toJson(config)
         prefs.edit().putString(KEY_CONFIG, json).apply()
     }
-    
+
     fun resetConfig() {
+        // En supprimant la clé, le prochain getConfig() recréera la barre adaptative parfaite
         prefs.edit().remove(KEY_CONFIG).apply()
     }
 }

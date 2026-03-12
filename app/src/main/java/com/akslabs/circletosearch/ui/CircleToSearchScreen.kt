@@ -208,7 +208,7 @@ fun CircleToSearchScreen(
         if (uiPreferences.isShowFriendlyMessages()) {
             val manager = FriendlyMessageManager(context)
             friendlyMessage = manager.getNextMessage()
-            delay(500) // Small delay for smooth entrance
+            delay(350) // Small delay for smooth entrance
             isMessageVisible = true
             delay(4000) // Show for 4 seconds
             isMessageVisible = false
@@ -776,7 +776,7 @@ fun CircleToSearchScreen(
             if (showGradientBorder) {
                 androidx.compose.animation.AnimatedVisibility(
                     visible = isUIVisible,
-                    enter = androidx.compose.animation.fadeIn(animationSpec = tween(700))
+                    enter = androidx.compose.animation.fadeIn(animationSpec = tween(5))
                 ) {
                     Box(
                         modifier = Modifier
@@ -964,7 +964,7 @@ fun CircleToSearchScreen(
                 visible = isUIVisible,
                 enter = androidx.compose.animation.slideInVertically(
                     initialOffsetY = { -it }, // Commence au-dessus de l'écran (-100%)
-                    animationSpec = tween(500, easing = androidx.compose.animation.core.FastOutSlowInEasing)
+                    animationSpec = tween(350, easing = androidx.compose.animation.core.FastOutSlowInEasing)
                 ),
                 modifier = Modifier.align(Alignment.TopCenter)
             ) {
@@ -1147,7 +1147,7 @@ fun CircleToSearchScreen(
                 visible = isUIVisible,
                 enter = androidx.compose.animation.slideInVertically(
                     initialOffsetY = { it }, // Commence en dessous de l'écran (+100%)
-                    animationSpec = tween(500, easing = androidx.compose.animation.core.FastOutSlowInEasing)
+                    animationSpec = tween(350, easing = androidx.compose.animation.core.FastOutSlowInEasing)
                 ),
                 modifier = Modifier.align(Alignment.BottomCenter)
             ) {
