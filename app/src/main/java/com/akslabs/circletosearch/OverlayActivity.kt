@@ -47,6 +47,7 @@ class OverlayActivity : ComponentActivity() {
         }
     }
 
+
     override fun onNewIntent(intent: android.content.Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
@@ -62,6 +63,7 @@ class OverlayActivity : ComponentActivity() {
             screenshotBitmap.value = bitmap
         }
     }
+
 
     override fun finish() {
         super.finish()
