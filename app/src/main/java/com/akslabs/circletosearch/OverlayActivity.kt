@@ -20,6 +20,7 @@
 package com.akslabs.circletosearch
 
 import android.os.Bundle
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -29,11 +30,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import com.akslabs.circletosearch.data.BitmapRepository
 import com.akslabs.circletosearch.ui.CircleToSearchScreen
+import com.akslabs.circletosearch.ui.components.CopyTextOverlayManager
 import com.akslabs.circletosearch.ui.theme.CircleToSearchTheme
 
 class OverlayActivity : ComponentActivity() {
     
     private val screenshotBitmap = androidx.compose.runtime.mutableStateOf<android.graphics.Bitmap?>(null)
+    private var copyTextManager: CopyTextOverlayManager? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
@@ -53,11 +56,38 @@ class OverlayActivity : ComponentActivity() {
                         onClose = { 
                             BitmapRepository.clear()
                             finish() 
-                        }
+                        },
+                        onCopyText = { activateCopyText() }
                     )
                 }
             }
         }
+    }
+
+    /**
+     * Activates the Copy Text overlay.
+     * Uses the accessibility service's root node as the source for text scanning.
+     */
+    private fun activateCopyText() {
+        if (copyTextManager != null) return // Already active
+        android.util.Log.d("CircleToSearch", "Activating Copy Text overlay")
+
+        val wm = getSystemService(WINDOW_SERVICE) as WindowManager
+
+        copyTextManager = CopyTextOverlayManager(
+            context = this,
+            windowManager = wm,
+            getRoot = {
+                // Delegate to accessibility service for the current window's node tree
+                CircleToSearchAccessibilityService.getRootNode()
+            }
+        )
+
+        copyTextManager?.show(onDismiss = {
+            android.util.Log.d("CircleToSearch", "Copy Text overlay dismissed")
+            copyTextManager = null
+            // Forward scroll-rescan binding is automatic via accessibility event forwarding
+        })
     }
 
     override fun onNewIntent(intent: android.content.Intent) {
@@ -74,12 +104,13 @@ class OverlayActivity : ComponentActivity() {
             screenshotBitmap.value = bitmap
         } else {
             android.util.Log.e("CircleToSearch", "No bitmap in Repository")
-            // Fallback or finish? For now just log.
         }
     }
     
     override fun onDestroy() {
         super.onDestroy()
+        copyTextManager?.dismiss()
+        copyTextManager = null
         if (isFinishing) {
              BitmapRepository.clear()
         }

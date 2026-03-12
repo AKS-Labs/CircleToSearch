@@ -42,11 +42,13 @@ import android.view.View
 import android.view.ViewOutlineProvider
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
+import android.view.accessibility.AccessibilityNodeInfo
 import com.akslabs.circletosearch.data.ActionType
 import com.akslabs.circletosearch.data.BitmapRepository
 import com.akslabs.circletosearch.data.GestureType
 import com.akslabs.circletosearch.data.OverlayConfigurationManager
 import com.akslabs.circletosearch.data.OverlaySegment
+import com.akslabs.circletosearch.ui.components.CopyTextOverlayManager
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
 
@@ -56,6 +58,9 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
     private val overlayViews = mutableListOf<View>() // Track all added segment views
     private val executor: Executor = Executors.newSingleThreadExecutor()
     private lateinit var configManager: OverlayConfigurationManager
+    
+    /** Kept by companion so scroll events can re-scan copy-text nodes. */
+    internal var copyTextManager: CopyTextOverlayManager? = null
     
     // Bubble related - Keeping existing logic but refactoring slightly if needed
     // For now, keeping bubble separate as requested in prompt "statusbar overlay customization... but it should work normally like now"
@@ -80,6 +85,12 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         super.onServiceConnected()
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         configManager = OverlayConfigurationManager(this)
+        
+        // Add FLAG_RETRIEVE_INTERACTIVE_WINDOWS at runtime so we can read
+        // node info from other windows without touching AndroidManifest.xml.
+        val info = serviceInfo
+        info.flags = info.flags or android.accessibilityservice.AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
+        serviceInfo = info
         
         prefs.registerOnSharedPreferenceChangeListener(prefsListener)
         overlayPrefs.registerOnSharedPreferenceChangeListener(overlayPrefsListener)
@@ -717,7 +728,12 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         startActivity(intent)
     }
 
-    override fun onAccessibilityEvent(event: AccessibilityEvent?) {}
+    override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        // Forward scroll events to the Copy Text overlay for live re-scan
+        if (event?.eventType == AccessibilityEvent.TYPE_VIEW_SCROLLED) {
+            copyTextManager?.rescanNodes()
+        }
+    }
 
     override fun onInterrupt() {}
 
@@ -728,6 +744,19 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         fun triggerCapture() {
             android.util.Log.d("CircleToSearch", "triggerCapture static called. instance=${instance != null}")
             instance?.performCapture()
+        }
+
+        /**
+         * Returns the current root AccessibilityNodeInfo for the active window.
+         * Used by [com.akslabs.circletosearch.ui.components.CopyTextOverlayManager]
+         * to scan on-screen text nodes.
+         */
+        fun getRootNode(): AccessibilityNodeInfo? = instance?.rootInActiveWindow
+
+        /** Allows OverlayActivity to register an active CopyTextOverlayManager
+         * so scroll events can trigger a live re-scan. */
+        fun setCopyTextManager(mgr: CopyTextOverlayManager?) {
+            instance?.copyTextManager = mgr
         }
     }
 

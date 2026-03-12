@@ -76,6 +76,20 @@ import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.BorderOuter
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.filled.TextFields
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -145,7 +159,8 @@ import android.os.Build
 @Composable
 fun CircleToSearchScreen(
     screenshot: Bitmap?,
-    onClose: () -> Unit
+    onClose: () -> Unit,
+    onCopyText: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -1142,138 +1157,362 @@ fun CircleToSearchScreen(
                     }
                 }
             }
-            // 5. Search Bar / Pill
+            // 5. Bottom Bar — Material 3 Expressive two-row card
+            // State for Copy Text mode
+            var isCopyTextActive by remember { mutableStateOf(false) }
+
             androidx.compose.animation.AnimatedVisibility(
                 visible = isUIVisible,
-                enter = androidx.compose.animation.slideInVertically(
-                    initialOffsetY = { it }, // Commence en dessous de l'écran (+100%)
-                    animationSpec = tween(500, easing = androidx.compose.animation.core.FastOutSlowInEasing)
-                ),
+                enter = slideInVertically(
+                    initialOffsetY = { it }, // slides up from below
+                    animationSpec = tween(300, easing = androidx.compose.animation.core.CubicBezierEasing(0f, 0f, 0.2f, 1f))
+                ) + fadeIn(animationSpec = tween(300)),
+                exit = slideOutVertically(
+                    targetOffsetY = { it }, // slides back down
+                    animationSpec = tween(200, easing = androidx.compose.animation.core.CubicBezierEasing(0.4f, 0f, 1f, 1f))
+                ) + fadeOut(animationSpec = tween(200)),
                 modifier = Modifier.align(Alignment.BottomCenter)
             ) {
+                // ── Outer card container ──────────────────────────────────────────
                 androidx.compose.material3.Surface(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .navigationBarsPadding()
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 24.dp)
-                        .height(64.dp),
-                    shape = CircleShape,
-                    color = barBgColor, // Utilise la couleur dynamique/pitch black
-                    border = androidx.compose.foundation.BorderStroke(
-                        width = 1.dp,
-                        color = contentColor.copy(alpha = 0.1f) // Bordure subtile assortie
-                    ),
-                    shadowElevation = 12.dp
+                        .padding(horizontal = 12.dp, vertical = 16.dp),
+                    shape = RoundedCornerShape(28.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    shadowElevation = 8.dp,
+                    tonalElevation = 4.dp
                 ) {
-                    Row(
+                    Column(
                         modifier = Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        // Left: App Logo
-                        Image(
-                            painter = painterResource(id = com.akslabs.circletosearch.R.drawable.circletosearch),
-                            contentDescription = "Logo",
+                        // ── ROW 1: Main search pill ─────────────────────────────
+                        androidx.compose.material3.Surface(
                             modifier = Modifier
-                                .size(50.dp)
-                                .clickable {
-                                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                                    scope.launch { scaffoldState.bottomSheetState.expand() }
-                                }
-                        )
-
-                        Spacer(modifier = Modifier.weight(1f))
-
-                        // Right: Actions Container
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                .fillMaxWidth()
+                                .height(60.dp),
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.surfaceContainer,
+                            tonalElevation = 2.dp
                         ) {
-                            // Social/Contribution Bubble (Anthracite / Dynamic)
-                            androidx.compose.material3.Surface(
-                                shape = CircleShape,
-                                color = bubbleColor, // Utilise l'anthracite ou le container dynamique
-                                modifier = Modifier.height(44.dp)
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.padding(horizontal = 4.dp)
-                                ) {
-                                    // Boutons sociaux - On utilise contentColor pour les icônes
-                                    val socialButtons = listOf(
-                                        com.akslabs.circletosearch.R.drawable.telegram to "https://t.me/akslabs",
-                                        com.akslabs.circletosearch.R.drawable.github to "https://github.com/aks-labs"
-                                    )
-
-                                    socialButtons.forEach { (iconRes, url) ->
-                                        IconButton(onClick = {
-                                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                                            context.startActivity(
-                                                android.content.Intent(
-                                                    android.content.Intent.ACTION_VIEW,
-                                                    android.net.Uri.parse(url)
-                                                )
-                                            )
-                                        }, modifier = Modifier.size(36.dp)) {
-                                            Icon(
-                                                painterResource(id = iconRes),
-                                                null,
-                                                tint = contentColor,
-                                                modifier = Modifier.size(20.dp)
-                                            )
-                                        }
-                                    }
-
-                                    IconButton(
-                                        onClick = { showSupportSheet = true },
-                                        modifier = Modifier.size(36.dp)
-                                    ) {
-                                        Icon(
-                                            painterResource(id = com.akslabs.circletosearch.R.drawable.donation),
-                                            null,
-                                            tint = contentColor,
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                    }
-                                }
-                            }
-
-                            // Fullscreen Scan Bubble (Anthracite / Dynamic)
-                            androidx.compose.material3.Surface(
+                            Row(
                                 modifier = Modifier
-                                    .size(44.dp)
-                                    .clip(CircleShape)
-                                    .clickable {
-                                        haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                    .fillMaxSize()
+                                    .padding(horizontal = 14.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // App logo — tapping expands search results sheet
+                                Image(
+                                    painter = painterResource(id = com.akslabs.circletosearch.R.drawable.circletosearch),
+                                    contentDescription = "Circle to Search Logo",
+                                    modifier = Modifier
+                                        .size(44.dp)
+                                        .clickable {
+                                            haptic.performHapticFeedback(
+                                                androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress
+                                            )
+                                            scope.launch { scaffoldState.bottomSheetState.expand() }
+                                        }
+                                )
+
+                                Spacer(modifier = Modifier.weight(1f))
+
+                                // Mic button — voice search
+                                val micInteraction = remember { MutableInteractionSource() }
+                                val micPressed by micInteraction.collectIsPressedAsState()
+                                val micScale by animateFloatAsState(
+                                    targetValue = if (micPressed) 0.92f else 1f,
+                                    animationSpec = spring(stiffness = 400f, dampingRatio = 0.75f),
+                                    label = "micScale"
+                                )
+                                IconButton(
+                                    onClick = {
+                                        haptic.performHapticFeedback(
+                                            androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress
+                                        )
+                                        try {
+                                            val intent = android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                                                putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                                                    android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                            }
+                                            context.startActivity(intent)
+                                        } catch (e: Exception) {
+                                            android.util.Log.e("CircleToSearch", "Voice search failed", e)
+                                        }
+                                    },
+                                    interactionSource = micInteraction,
+                                    modifier = Modifier
+                                        .size(44.dp)
+                                        .graphicsLayer { scaleX = micScale; scaleY = micScale }
+                                ) {
+                                    Icon(
+                                        Icons.Default.Mic,
+                                        contentDescription = "Voice Search",
+                                        tint = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.width(4.dp))
+
+                                // Lens button — Google Lens visual search
+                                val lensInteraction = remember { MutableInteractionSource() }
+                                val lensPressed by lensInteraction.collectIsPressedAsState()
+                                val lensScale by animateFloatAsState(
+                                    targetValue = if (lensPressed) 0.92f else 1f,
+                                    animationSpec = spring(stiffness = 400f, dampingRatio = 0.75f),
+                                    label = "lensScale"
+                                )
+                                IconButton(
+                                    onClick = {
+                                        haptic.performHapticFeedback(
+                                            androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress
+                                        )
+                                        // Reuse existing Google Lens flow
+                                        uiPreferences.setUseGoogleLensOnly(true)
                                         if (screenshot != null) {
-                                            val rect =
-                                                Rect(0, 0, screenshot.width, screenshot.height)
-                                            selectionRect = rect
-                                            currentPathPoints.clear()
                                             scope.launch {
-                                                selectionAnim.snapTo(0f)
-                                                selectionAnim.animateTo(1f, tween(600))
                                                 selectedBitmap = screenshot
-                                                isSearching = true
                                             }
                                         }
                                     },
-                                shape = CircleShape,
-                                color = bubbleColor // Même couleur anthracite/dynamique
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
+                                    interactionSource = lensInteraction,
+                                    modifier = Modifier
+                                        .size(44.dp)
+                                        .graphicsLayer { scaleX = lensScale; scaleY = lensScale }
+                                ) {
+                                    // Use circletosearch ring logo as lens indicator
                                     Icon(
-                                        imageVector = Icons.Default.Fullscreen,
-                                        contentDescription = "Scan All",
-                                        tint = contentColor, // Icone blanche en sombre, colorée en clair
-                                        modifier = Modifier.size(24.dp)
+                                        painter = painterResource(id = com.akslabs.circletosearch.R.drawable.circletosearch),
+                                        contentDescription = "Google Lens",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(26.dp)
                                     )
                                 }
                             }
                         }
-                    }
+
+                        // ── ROW 2: Action buttons ───────────────────────────────
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceEvenly,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Helper composable for each tonal icon button with label
+                            @Composable
+                            fun BottomBarButton(
+                                label: String,
+                                icon: @Composable () -> Unit,
+                                onClick: () -> Unit
+                            ) {
+                                val interactionSource = remember { MutableInteractionSource() }
+                                val isPressed by interactionSource.collectIsPressedAsState()
+                                val scale by animateFloatAsState(
+                                    targetValue = if (isPressed) 0.92f else 1f,
+                                    animationSpec = spring(
+                                        stiffness = Spring.StiffnessMediumLow,
+                                        dampingRatio = 0.75f
+                                    ),
+                                    label = "scale_$label"
+                                )
+
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                                    modifier = Modifier.graphicsLayer {
+                                        scaleX = scale
+                                        scaleY = scale
+                                    }
+                                ) {
+                                    FilledTonalIconButton(
+                                        onClick = {
+                                            haptic.performHapticFeedback(
+                                                androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress
+                                            )
+                                            onClick()
+                                        },
+                                        modifier = Modifier.size(52.dp),
+                                        interactionSource = interactionSource
+                                    ) {
+                                        icon()
+                                    }
+                                    Text(
+                                        text = label,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        textAlign = TextAlign.Center,
+                                        maxLines = 1,
+                                        softWrap = false,
+                                        modifier = Modifier.wrapContentSize()
+                                    )
+                                }
+                            }
+
+                            // 1. Song Search ♪
+                            BottomBarButton(
+                                label = "Song",
+                                icon = { Icon(Icons.Default.MusicNote, contentDescription = "Song Search") },
+                                onClick = {
+                                    try {
+                                        // Try Shazam first, fallback to SoundHound, fallback to chooser
+                                        val shazamIntent = context.packageManager
+                                            .getLaunchIntentForPackage("com.shazam.android")
+                                        val soundHoundIntent = context.packageManager
+                                            .getLaunchIntentForPackage("com.melodis.midomiMusicIdentifier.freemium")
+                                        val launchIntent = (shazamIntent ?: soundHoundIntent)?.apply {
+                                            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                        }
+                                        if (launchIntent != null) {
+                                            context.startActivity(launchIntent)
+                                        } else {
+                                            // Fallback: open Play Store search
+                                            context.startActivity(
+                                                android.content.Intent(
+                                                    android.content.Intent.ACTION_VIEW,
+                                                    android.net.Uri.parse("https://play.google.com/store/search?q=shazam&c=apps")
+                                                ).apply { addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK) }
+                                            )
+                                        }
+                                    } catch (e: Exception) {
+                                        android.util.Log.e("CircleToSearch", "Song search failed", e)
+                                    }
+                                }
+                            )
+
+                            // 2. Translate 文A
+                            BottomBarButton(
+                                label = "Translate",
+                                icon = { Icon(Icons.Default.Translate, contentDescription = "Translate") },
+                                onClick = {
+                                    try {
+                                        // Google Translate deep link
+                                        val intent = context.packageManager
+                                            .getLaunchIntentForPackage("com.google.android.apps.translate")
+                                            ?.apply { addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK) }
+                                        if (intent != null) {
+                                            context.startActivity(intent)
+                                        } else {
+                                            context.startActivity(
+                                                android.content.Intent(
+                                                    android.content.Intent.ACTION_VIEW,
+                                                    android.net.Uri.parse("https://translate.google.com")
+                                                ).apply { addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK) }
+                                            )
+                                        }
+                                    } catch (e: Exception) {
+                                        android.util.Log.e("CircleToSearch", "Translate failed", e)
+                                    }
+                                }
+                            )
+
+                            // 3. Share / Send ✈
+                            BottomBarButton(
+                                label = "Share",
+                                icon = { Icon(Icons.Default.Send, contentDescription = "Share") },
+                                onClick = {
+                                    if (screenshot != null) {
+                                        scope.launch {
+                                            try {
+                                                val path = com.akslabs.circletosearch.utils.ImageUtils
+                                                    .saveBitmap(context, selectedBitmap ?: screenshot)
+                                                val file = java.io.File(path)
+                                                val uri = androidx.core.content.FileProvider.getUriForFile(
+                                                    context,
+                                                    "com.akslabs.circletosearch.fileprovider",
+                                                    file
+                                                )
+                                                val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                                    type = "image/*"
+                                                    putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                                                    addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                    addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                                }
+                                                context.startActivity(
+                                                    android.content.Intent.createChooser(shareIntent, "Share Image")
+                                                        .apply { addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK) }
+                                                )
+                                            } catch (e: Exception) {
+                                                android.util.Log.e("CircleToSearch", "Share failed", e)
+                                            }
+                                        }
+                                    }
+                                }
+                            )
+
+                            // 4. GitHub 🐙
+                            BottomBarButton(
+                                label = "GitHub",
+                                icon = {
+                                    Icon(
+                                        painterResource(id = com.akslabs.circletosearch.R.drawable.github),
+                                        contentDescription = "GitHub",
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                },
+                                onClick = {
+                                    context.startActivity(
+                                        android.content.Intent(
+                                            android.content.Intent.ACTION_VIEW,
+                                            android.net.Uri.parse("https://github.com/aks-labs")
+                                        ).apply { addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK) }
+                                    )
+                                }
+                            )
+
+                            // 5. Donate 🤲♥
+                            BottomBarButton(
+                                label = "Donate",
+                                icon = {
+                                    Icon(
+                                        painterResource(id = com.akslabs.circletosearch.R.drawable.donation),
+                                        contentDescription = "Donate",
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                },
+                                onClick = { showSupportSheet = true }
+                            )
+
+                            // 6. Copy Text T|
+                            BottomBarButton(
+                                label = "Copy Text",
+                                icon = { Icon(Icons.Default.TextFields, contentDescription = "Copy Text") },
+                                onClick = { isCopyTextActive = true }
+                            )
+
+                            // 7. Fullscreen ⛶
+                            BottomBarButton(
+                                label = "Fullscreen",
+                                icon = { Icon(Icons.Default.Fullscreen, contentDescription = "Fullscreen") },
+                                onClick = {
+                                    if (screenshot != null) {
+                                        val rect = Rect(0, 0, screenshot.width, screenshot.height)
+                                        selectionRect = rect
+                                        currentPathPoints.clear()
+                                        scope.launch {
+                                            selectionAnim.snapTo(0f)
+                                            selectionAnim.animateTo(1f, tween(600))
+                                            selectedBitmap = screenshot
+                                            isSearching = true
+                                        }
+                                    }
+                                }
+                            )
+                        } // End Row 2
+                    } // End Column
+                } // End outer Surface card
+            } // End AnimatedVisibility
+
+            // Copy Text overlay activation — fires a callback to OverlayActivity
+            LaunchedEffect(isCopyTextActive) {
+                if (isCopyTextActive) {
+                    onCopyText()
+                    isCopyTextActive = false
                 }
             }
 
