@@ -49,6 +49,11 @@ import com.akslabs.circletosearch.data.OverlayConfigurationManager
 import com.akslabs.circletosearch.data.OverlaySegment
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
+import com.akslabs.circletosearch.utils.UIPreferences
+import com.akslabs.circletosearch.utils.ImageUtils
+import com.akslabs.circletosearch.ui.components.searchWithGoogleLens
+import androidx.core.content.FileProvider
+import java.io.File
 
 class CircleToSearchAccessibilityService : AccessibilityService() {
 
@@ -78,6 +83,7 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
 
     override fun onServiceConnected() {
         super.onServiceConnected()
+        instance = this
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         configManager = OverlayConfigurationManager(this)
         
@@ -323,7 +329,7 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
             }
         }
     }
-    
+
     @SuppressLint("ClickableViewAccessibility")
     private fun attachTouchListener(view: View, segment: OverlaySegment, segmentIndex: Int) {
         val gestureDetector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
@@ -332,84 +338,62 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
                 if (action != ActionType.NONE) { performAction(action, segment); return true }
                 return false
             }
-            
-            override fun onLongPress(e: MotionEvent) {
-                val action = segment.gestures[GestureType.LONG_PRESS] ?: ActionType.NONE
-                if (action != ActionType.NONE) performAction(action, segment)
-            }
+
+            // ON DESACTIVE LE LONG PRESS PAR DEFAUT CAR ON VA LE GERER MANUELLEMENT
+            // override fun onLongPress(e: MotionEvent) { ... }
 
             override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
-                 // User wants "buttons behind to be clickable" 
-                 // We temporarily disable touch on our window and dispatch the click through.
-                 propagateSingleTap(view, e.rawX, e.rawY)
-                 return false
+                propagateSingleTap(view, e.rawX, e.rawY)
+                return false
             }
-            
+
             override fun onFling(e1: MotionEvent?, e2: MotionEvent, velocityX: Float, velocityY: Float): Boolean {
                 if (e1 == null) return false
                 val diffY = e2.y - e1.y
                 val diffX = e2.x - e1.x
-                
+
                 if (Math.abs(diffX) > Math.abs(diffY)) {
                     if (Math.abs(diffX) > 100 && Math.abs(velocityX) > 100) {
                         if (diffX > 0) {
-                             // Swipe Right
-                             val action = segment.gestures[GestureType.SWIPE_RIGHT] ?: ActionType.NONE
-                             if (action != ActionType.NONE) { performAction(action, segment); return true }
+                            val action = segment.gestures[GestureType.SWIPE_RIGHT] ?: ActionType.NONE
+                            if (action != ActionType.NONE) { performAction(action, segment); return true }
                         } else {
-                            // Swipe Left
                             val action = segment.gestures[GestureType.SWIPE_LEFT] ?: ActionType.NONE
-                             if (action != ActionType.NONE) { performAction(action, segment); return true }
+                            if (action != ActionType.NONE) { performAction(action, segment); return true }
                         }
                     }
                 } else {
-                    // Reduced threshold for vertical swipes to work with smaller overlay heights
                     if (Math.abs(diffY) > 50 && Math.abs(velocityY) > 100) {
                         if (diffY > 0) {
-                             // Swipe Down
-                             android.util.Log.d("CTS_Swipe", "Swipe DOWN detected - segmentIndex=$segmentIndex, diffY=$diffY, velocityY=$velocityY")
-                             val action = segment.gestures[GestureType.SWIPE_DOWN] ?: ActionType.NONE
-                             if (action != ActionType.NONE) {
-                                 android.util.Log.d("CTS_Swipe", "Custom action assigned: $action")
-                                 performAction(action, segment) 
-                             } else {
-                                 // Smart Swipe Logic: Only apply for first overlay (index 0) when it's full width
-                                 val screenWidth = resources.displayMetrics.widthPixels
-                                 val isFirstOverlay = segmentIndex == 0
-                                 val isFullWidth = segment.width >= screenWidth
-                                 
-                                 android.util.Log.d("CTS_Swipe", "Smart swipe check - isFirstOverlay=$isFirstOverlay, isFullWidth=$isFullWidth (width=${segment.width}, screenWidth=$screenWidth)")
-                                 
-                                 if (isFirstOverlay && isFullWidth) {
-                                     // Smart logic: Check where user actually swiped (touch X position)
-                                     // Left half of screen = Notifications, Right half = Quick Settings
-                                     val touchX = e1.rawX
-                                     android.util.Log.d("CTS_Swipe", "Smart swipe active - touchX=$touchX, screenWidth/2=${screenWidth/2}")
-                                     if (touchX < (screenWidth / 2)) {
-                                         android.util.Log.d("CTS_Swipe", "Opening NOTIFICATIONS (left half)")
-                                         performGlobalAction(GLOBAL_ACTION_NOTIFICATIONS)
-                                     } else {
-                                         android.util.Log.d("CTS_Swipe", "Opening QUICK_SETTINGS (right half)")
-                                         performGlobalAction(GLOBAL_ACTION_QUICK_SETTINGS)
-                                     }
-                                 } else {
-                                     // Default: Always open notification shade
-                                     android.util.Log.d("CTS_Swipe", "Default behavior - Opening NOTIFICATIONS")
-                                     performGlobalAction(GLOBAL_ACTION_NOTIFICATIONS)
-                                 }
-                             }
-                             return true
+                            val action = segment.gestures[GestureType.SWIPE_DOWN] ?: ActionType.NONE
+                            if (action != ActionType.NONE) {
+                                performAction(action, segment)
+                            } else {
+                                val screenWidth = resources.displayMetrics.widthPixels
+                                val isFirstOverlay = segmentIndex == 0
+                                val isFullWidth = segment.width >= screenWidth
+                                if (isFirstOverlay && isFullWidth) {
+                                    val touchX = e1.rawX
+                                    if (touchX < (screenWidth / 2)) {
+                                        performGlobalAction(GLOBAL_ACTION_NOTIFICATIONS)
+                                    } else {
+                                        performGlobalAction(GLOBAL_ACTION_QUICK_SETTINGS)
+                                    }
+                                } else {
+                                    performGlobalAction(GLOBAL_ACTION_NOTIFICATIONS)
+                                }
+                            }
+                            return true
                         } else {
-                            // Swipe Up
-                             val action = segment.gestures[GestureType.SWIPE_UP] ?: ActionType.NONE
-                             if (action != ActionType.NONE) { performAction(action, segment); return true }
+                            val action = segment.gestures[GestureType.SWIPE_UP] ?: ActionType.NONE
+                            if (action != ActionType.NONE) { performAction(action, segment); return true }
                         }
                     }
                 }
                 return false
             }
         }).apply {
-             setOnDoubleTapListener(object : GestureDetector.OnDoubleTapListener {
+            setOnDoubleTapListener(object : GestureDetector.OnDoubleTapListener {
                 override fun onSingleTapConfirmed(e: MotionEvent): Boolean = false
                 override fun onDoubleTap(e: MotionEvent): Boolean {
                     val action = segment.gestures[GestureType.DOUBLE_TAP] ?: ActionType.NONE
@@ -419,12 +403,69 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
                 override fun onDoubleTapEvent(e: MotionEvent): Boolean = false
             })
         }
-        
+
         var lastTapTime: Long = 0
         var tapCount = 0
-        
+
+        // --- LOGIQUE MANUELLE DU MOTEUR HAPTIQUE (V3: Waveform Native Continue) ---
+        val handler = android.os.Handler(android.os.Looper.getMainLooper())
+        var isTouching = false
+        var hasTriggered = false
+        var startX = 0f
+        var startY = 0f
+
+        // 1. Le Moteur de vibration (Haptique Haute Définition / Primitives)
+        val startVibrationRunnable = Runnable {
+            if (!isTouching || hasTriggered) return@Runnable
+            val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+
+            // On tente d'utiliser l'API Premium (Android 12+)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                try {
+                    val composition = VibrationEffect.startComposition()
+                    val numTicks = 20
+                    for (i in 0 until numTicks) {
+                        // L'intensité d'un "Tick" : Commence à 5% et finit à 25%
+                        val scale = 0.05f + (0.20f * i / (numTicks - 1))
+                        // On ajoute un micro-frisson (LOW_TICK) tous les 20 millisecondes
+                        composition.addPrimitive(VibrationEffect.Composition.PRIMITIVE_LOW_TICK, scale, 20)
+                    }
+                    vibrator.vibrate(composition.compose())
+                    return@Runnable // On sort pour ne pas lancer le fallback
+                } catch (e: Exception) {
+                    // Fallback silencieux si le téléphone ne supporte pas
+                }
+            }
+
+            // Fallback (Ancienne méthode) : On reste à l'amplitude 1 tout le long
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && vibrator.hasAmplitudeControl()) {
+                val timings = LongArray(40) { 10L }
+                val amplitudes = IntArray(40) { 1 }
+                vibrator.vibrate(VibrationEffect.createWaveform(timings, amplitudes, -1))
+            }
+        }
+
+        // 2. Le Déclencheur Automatique (à 0.5 seconde)
+        val triggerRunnable = Runnable {
+            if (!isTouching || hasTriggered) return@Runnable
+            hasTriggered = true
+
+            val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+            vibrator.cancel() // Coupe le bourdonnement juste avant de frapper
+
+            val action = segment.gestures[GestureType.LONG_PRESS] ?: ActionType.NONE
+            if (action != ActionType.NONE) {
+                // Gros BAM final de confirmation
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK))
+                }
+                performAction(action, segment)
+            }
+        }
+
         view.setOnTouchListener { _, event ->
-             if (event.action == MotionEvent.ACTION_DOWN) {
+            // On gère les triples taps
+            if (event.action == MotionEvent.ACTION_DOWN) {
                 val currentTime = System.currentTimeMillis()
                 if (currentTime - lastTapTime < 400) {
                     tapCount++
@@ -432,21 +473,54 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
                     tapCount = 1
                 }
                 lastTapTime = currentTime
-                
+
                 if (tapCount == 3) {
-                     val action = segment.gestures[GestureType.TRIPLE_TAP] ?: ActionType.NONE
-                     if (action != ActionType.NONE) {
-                         performAction(action, segment)
-                         tapCount = 0 
-                         return@setOnTouchListener true
-                     }
+                    val action = segment.gestures[GestureType.TRIPLE_TAP] ?: ActionType.NONE
+                    if (action != ActionType.NONE) {
+                        performAction(action, segment)
+                        tapCount = 0
+                        return@setOnTouchListener true
+                    }
                 }
             }
+
+            // GESTION DU "CHARGING UP"
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    isTouching = true
+                    hasTriggered = false
+                    startX = event.rawX
+                    startY = event.rawY
+
+                    // On démarre la courbe continue après 100ms
+                    handler.postDelayed(startVibrationRunnable, 100)
+
+                    // On programme l'ouverture automatique à 500ms
+                    handler.postDelayed(triggerRunnable, 500)
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    // Si on bouge de plus de 50 pixels (swipe), on annule tout
+                    if (Math.abs(event.rawX - startX) > 50 || Math.abs(event.rawY - startY) > 50) {
+                        isTouching = false
+                        handler.removeCallbacks(startVibrationRunnable)
+                        handler.removeCallbacks(triggerRunnable)
+                        val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+                        vibrator.cancel() // Arrête le moteur si on swipe
+                    }
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    isTouching = false
+                    handler.removeCallbacks(startVibrationRunnable)
+                    handler.removeCallbacks(triggerRunnable)
+                    val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+                    vibrator.cancel() // Arrête le moteur si on lâche avant 500ms
+                }
+            }
+
             gestureDetector.onTouchEvent(event)
             true
         }
     }
-    
     private fun performAction(action: ActionType, segment: OverlaySegment) {
         if (action == ActionType.NONE) return
         
@@ -456,7 +530,7 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
             vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK))
         } else {
              @Suppress("DEPRECATION")
-            vibrator.vibrate(10)
+            vibrator.vibrate(5)
         }
 
         when(action) {
@@ -659,13 +733,20 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         }
     }
 
+    private var packageBeforeCTS: String? = null // On mémorise l'appli ici
+
     private fun performCapture() {
-        android.util.Log.d("CircleToSearch", "performCapture called. hasWindowManager=${windowManager != null}")
+        android.util.Log.d("CircleToSearch", "performCapture called.")
+
+        val root = rootInActiveWindow
+        if (root != null) {
+            val pkg = root.packageName?.toString()
+            if (pkg != null && pkg != packageName) {
+                packageBeforeCTS = pkg
+            }
+        }
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            // Haptic Feedback (Crisp Click) - Moved to performAction, but keeping here specifically for direct calls if any
-             // (performAction handles its own vibration)
-            
-            // Execute immediately for instant trigger
             takeScreenshot(
                 Display.DEFAULT_DISPLAY,
                 executor,
@@ -674,60 +755,108 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
                         try {
                             val hardwareBuffer = screenshot.hardwareBuffer
                             val colorSpace = screenshot.colorSpace
-                            
                             val bitmap = Bitmap.wrapHardwareBuffer(hardwareBuffer, colorSpace)
                             if (bitmap == null) {
                                 hardwareBuffer.close()
                                 return
                             }
-
-                            // Copy to software bitmap
                             val copy = bitmap.copy(Bitmap.Config.ARGB_8888, false)
-                            hardwareBuffer.close() // Close buffer after copy
+                            hardwareBuffer.close()
+                            if (copy == null) return
 
-                            if (copy == null) {
-                                return
+                            val uiPrefs = UIPreferences(this@CircleToSearchAccessibilityService)
+                            if (uiPrefs.isDirectLensEnabled()) {
+                                // 1. Vibration pour confirmer la capture
+                                val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                    vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK))
+                                } else {
+                                    vibrator.vibrate(20)
+                                }
+
+                                // 2. Envoi direct à Lens
+                                val path = ImageUtils.saveBitmap(this@CircleToSearchAccessibilityService, copy)
+                                val file = java.io.File(path)
+                                val uri = FileProvider.getUriForFile(
+                                    this@CircleToSearchAccessibilityService,
+                                    "com.akslabs.circletosearch.fileprovider",
+                                    file
+                                )
+                                searchWithGoogleLens(uri, this@CircleToSearchAccessibilityService)
+                            } else {
+                                // Mode Normal
+                                BitmapRepository.setScreenshot(copy)
+                                launchOverlay()
                             }
-                            
-                            // Store in Repository (In-Memory)
-                            BitmapRepository.setScreenshot(copy)
-                            
-                            // Launch Overlay Immediately
-                            launchOverlay()
-                            
                         } catch (e: Exception) {
                             e.printStackTrace()
                         }
                     }
-
                     override fun onFailure(errorCode: Int) {
-                        android.util.Log.e("CircleToSearch", "Screenshot failed with error code: $errorCode")
+                        android.util.Log.e("CircleToSearch", "Screenshot failed: $errorCode")
                     }
                 }
             )
         }
     }
 
+    // Fonction de vérification à appeler depuis l'écran
+    fun isStartedFromLauncher(): Boolean {
+        val intent = Intent(Intent.ACTION_MAIN).apply { addCategory(Intent.CATEGORY_HOME) }
+        val resolveInfo = packageManager.resolveActivity(intent, android.content.pm.PackageManager.MATCH_DEFAULT_ONLY)
+        val launcherPackage = resolveInfo?.activityInfo?.packageName
+
+        return packageBeforeCTS == launcherPackage
+    }
+
     private fun launchOverlay() {
-        android.util.Log.d("CircleToSearchAccess", "AccessibilityService launching OverlayActivity")
         val intent = Intent(this, OverlayActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION) // Disable animation for faster feel
+            addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION)
         }
         startActivity(intent)
     }
+    private var lastPackageName: String? = null
+    override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        // On traque le changement de fenêtre
+        if (event?.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+            val pkg = event.packageName?.toString()
+            // On n'enregistre que si ce n'est pas notre propre appli CTS
+            if (pkg != null && pkg != packageName) {
+                lastPackageName = pkg
+            }
+        }
+    }
+    //To track if we're on the launcher or not
+    fun isPreviousAppLauncher(): Boolean {
+        val intent = Intent(Intent.ACTION_MAIN).apply { addCategory(Intent.CATEGORY_HOME) }
+        val resolveInfo = packageManager.resolveActivity(intent, android.content.pm.PackageManager.MATCH_DEFAULT_ONLY)
+        val launcherPackage = resolveInfo?.activityInfo?.packageName
 
-    override fun onAccessibilityEvent(event: AccessibilityEvent?) {}
-
+        return lastPackageName == launcherPackage
+    }
     override fun onInterrupt() {}
 
     companion object {
-        private var instance: CircleToSearchAccessibilityService? = null
-        private var isFlashlightOn = false // Simple static state tracking
+        @SuppressLint("StaticFieldLeak")
+        var instance: CircleToSearchAccessibilityService? = null
+        private var isFlashlightOn = false
 
         fun triggerCapture() {
-            android.util.Log.d("CircleToSearch", "triggerCapture static called. instance=${instance != null}")
             instance?.performCapture()
+        }
+        fun openRecents() {
+            instance?.performGlobalAction(GLOBAL_ACTION_RECENTS)
+        }
+
+        fun performBack() {
+            // GLOBAL_ACTION_BACK simule l'appui sur la touche retour du système
+            instance?.performGlobalAction(GLOBAL_ACTION_BACK)
+        }
+        fun shouldSmartExit(): Boolean {
+            // Si c'est le launcher, on dit "vrai" (on doit juste quitter)
+            return instance?.isPreviousAppLauncher() ?: true
         }
     }
 

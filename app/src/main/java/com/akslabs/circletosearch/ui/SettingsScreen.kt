@@ -52,6 +52,7 @@ fun SettingsScreen(
     var useGoogleLensOnly by remember { mutableStateOf(uiPreferences.isUseGoogleLensOnly()) }
     val initialOrderString = uiPreferences.getSearchEngineOrder()
     val allEngines = SearchEngine.values()
+    var isDirectLensEnabled by remember { mutableStateOf(uiPreferences.isDirectLensEnabled()) }
     
     // Parse order from preferences or use default
     val engineOrder = remember {
@@ -114,6 +115,16 @@ fun SettingsScreen(
                 icon = Icons.Default.ChatBubbleOutline,
                 checked = showFriendlyMessages,
                 onCheckedChange = { showFriendlyMessages = it }
+            )
+            SettingsToggleItem(
+                title = "Direct Lens Mode",
+                subtitle = "Skip CTS interface and launch Lens immediately",
+                icon = Icons.Default.Bolt,
+                checked = isDirectLensEnabled,
+                onCheckedChange = {
+                    isDirectLensEnabled = it
+                    uiPreferences.setDirectLensEnabled(it)
+                }
             )
 
             Spacer(modifier = Modifier.height(16.dp))

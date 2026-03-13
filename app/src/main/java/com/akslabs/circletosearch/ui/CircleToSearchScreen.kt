@@ -38,8 +38,10 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -73,6 +75,7 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.BorderOuter
 import androidx.compose.material.icons.filled.Translate
+import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -133,6 +136,11 @@ import androidx.webkit.WebViewFeature
 import com.akslabs.circletosearch.data.isDirectUpload
 import kotlin.math.max
 import kotlin.math.min
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
+import android.os.Build
+import com.akslabs.circletosearch.CircleToSearchAccessibilityService
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -149,7 +157,29 @@ fun CircleToSearchScreen(
     // Support Sheet State
     var showSupportSheet by remember { mutableStateOf(false) }
     val supportSheetState = rememberModalBottomSheetState()
-    
+
+
+    // Material You logic for colors
+    val isDark = isSystemInDarkTheme()
+    val dynamicColor = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+    val colorScheme = when {
+        dynamicColor && isDark -> dynamicDarkColorScheme(context)
+        dynamicColor && !isDark -> dynamicLightColorScheme(context)
+        else -> MaterialTheme.colorScheme // Fallback standard
+    }
+    //Colors for dark theme
+    val barBgColor = if (isDark) Color(0xFF0D0D0D) else colorScheme.surface
+    val bubbleColor = if (isDark) Color(0xFF1F1F1F) else colorScheme.secondaryContainer.copy(alpha = 0.9f)
+    val contentColor = if (isDark) Color.White else colorScheme.onSecondaryContainer
+
+    //Haptic feedback
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+
+    //Slide-in animation
+    var isUIVisible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        isUIVisible = true // Déclenche l'animation à l'ouverture
+    }
 
     // Search Engines Order Logic
     val preferredOrder = remember(uiPreferences.getSearchEngineOrder()) {
@@ -168,6 +198,7 @@ fun CircleToSearchScreen(
     }
     val searchEngines = preferredOrder
 
+
     // Support Settings Sheet
     var showSettingsScreen by remember { mutableStateOf(false) }
 
@@ -179,7 +210,7 @@ fun CircleToSearchScreen(
         if (uiPreferences.isShowFriendlyMessages()) {
             val manager = FriendlyMessageManager(context)
             friendlyMessage = manager.getNextMessage()
-            delay(500) // Small delay for smooth entrance
+            delay(350) // Small delay for smooth entrance
             isMessageVisible = true
             delay(4000) // Show for 4 seconds
             isMessageVisible = false
@@ -202,7 +233,25 @@ fun CircleToSearchScreen(
     
     // Track initialized engines for Smart Loading
     val initializedEngines = remember { mutableStateListOf<SearchEngine>() }
-    
+    //To avoid going to previous apps if the user is on the launcher interface
+    // To avoid going to previous apps if the user is on the launcher interface
+    val handleSmartExit = {
+        // On demande au service si on a démarré depuis le launcher
+        val isFromLauncher = CircleToSearchAccessibilityService.instance?.isStartedFromLauncher() ?: true
+
+        if (isFromLauncher) {
+            // Si on est sur le bureau -> on ferme juste (pas de switch)
+            onClose()
+        } else {
+            // Si on est dans une appli -> on fait le switch magique vers elle
+            scope.launch {
+                CircleToSearchAccessibilityService.openRecents()
+                delay(150) // Délai de stabilité
+                CircleToSearchAccessibilityService.openRecents()
+                onClose()
+            }
+        }
+    }
     // Save global preference if user toggles it for the MAIN engine (Google) - Optional choice, 
     // or we just keep it per session. Let's keep it simple: no auto-save of per-tab state to verify complex persistence yet.
     // simpler: If user toggles, we just update the state.
@@ -399,17 +448,17 @@ fun CircleToSearchScreen(
     // Back Handler Logic
     BackHandler(enabled = true) {
         val currentWebView = webViews[selectedEngine]
+
         if (currentWebView != null && currentWebView.canGoBack()) {
             currentWebView.goBack()
         } else if (scaffoldState.bottomSheetState.currentValue == androidx.compose.material3.SheetValue.Expanded) {
-             scope.launch { scaffoldState.bottomSheetState.partialExpand() }
+            scope.launch { scaffoldState.bottomSheetState.partialExpand() }
         } else if (scaffoldState.bottomSheetState.currentValue == androidx.compose.material3.SheetValue.PartiallyExpanded) {
-             scope.launch { scaffoldState.bottomSheetState.hide() }
+            scope.launch { scaffoldState.bottomSheetState.hide() }
         } else {
-            onClose()
+            handleSmartExit()
         }
     }
-
     androidx.compose.material3.BottomSheetScaffold(
         scaffoldState = scaffoldState,
         sheetPeekHeight = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp * 0.55f), // Dynamic 55% peek
@@ -489,19 +538,18 @@ fun CircleToSearchScreen(
                 LaunchedEffect(selectedBitmap, hostedImageUrl) {
                     if (selectedBitmap != null) {
                         isLoading = true
-                        
+
                         // 1. Google Lens Only Mode Check
                         if (uiPreferences.isUseGoogleLensOnly()) {
                             // Save to cache and launch Lens
                             val path = ImageUtils.saveBitmap(context, selectedBitmap!!)
                             val uri = android.net.Uri.fromFile(java.io.File(path))
-                            
+
                             // Prepare content URI for Lens (using existing FileProvider logic in helper)
                             val success = searchWithGoogleLens(uri, context)
-                            
                             if (success) {
-                                // Close the overlay since Lens is taking over
-                                onClose()
+                                // On ne fait RIEN. On ne ferme pas, on ne cache rien.
+                                // On attend simplement que l'utilisateur revienne.
                                 return@LaunchedEffect
                             } else {
                                 // Fallback to multi-search if Lens failed
@@ -685,8 +733,8 @@ fun CircleToSearchScreen(
                                     modifier = Modifier
                                         .fillMaxSize()
                                         .zIndex(if (isSelected) 1f else 0f)
-                                        .graphicsLayer { 
-                                            alpha = if (isSelected) 1f else 0f 
+                                        .graphicsLayer {
+                                            alpha = if (isSelected) 1f else 0f
                                         }
                                 )
                              }
@@ -695,7 +743,7 @@ fun CircleToSearchScreen(
                 }
             }
         }
-    ) { _ ->
+    ) { _ ->}
         // Root Box
         Box(
             modifier = Modifier
@@ -733,9 +781,10 @@ fun CircleToSearchScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.15f))
                             .background(
                                 brush = Brush.verticalGradient(
-                                    colors = OverlayGradientColors.map { it.copy(alpha = 0.3f) }
+                                    colors = OverlayGradientColors.map { it.copy(alpha = 0.15f) }
                                 )
                             )
                     )
@@ -744,16 +793,23 @@ fun CircleToSearchScreen(
 
             // 2. Gradient Border Layer (Overlaying screenshot, clipped to rounded corners)
             if (showGradientBorder) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .border(
-                            width = 8.dp,
-                            brush = Brush.verticalGradient(colors = OverlayGradientColors),
-                            shape = RoundedCornerShape(24.dp) // Rounded corners for device
-                        )
-                        .clip(RoundedCornerShape(24.dp))
-                )
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = isUIVisible,
+                    enter = androidx.compose.animation.fadeIn(animationSpec = tween(5))
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .border(
+                                width = 8.dp,
+                                brush = Brush.verticalGradient(
+                                    colors = OverlayGradientColors.map { it.copy(alpha = 0.5f) }
+                                ),
+                                shape = RoundedCornerShape(24.dp) // Rounded corners for device
+                            )
+                            .clip(RoundedCornerShape(24.dp))
+                    )
+                }
             }
 
             // 3. Drawing Canvas (Interactive Layer)
@@ -786,18 +842,18 @@ fun CircleToSearchScreen(
                                         maxX = max(maxX, p.x)
                                         maxY = max(maxY, p.y)
                                     }
-                                    
+
                                     val rect = Rect(
                                         minX.toInt(),
                                         minY.toInt(),
                                         maxX.toInt(),
                                         maxY.toInt()
                                     )
-                                    
+
                                     selectionRect = rect
                                     // Clear points to remove the drawn line and show the lens rect
-                                    currentPathPoints.clear() 
-                                    
+                                    currentPathPoints.clear()
+
                                     scope.launch {
                                         selectionAnim.animateTo(
                                             targetValue = 1f,
@@ -923,230 +979,318 @@ fun CircleToSearchScreen(
             }
 
             // 4. Header (Top)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .statusBarsPadding()
-                    .padding(top = 16.dp, start = 16.dp, end = 16.dp)
-                    .align(Alignment.TopCenter),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(
-                    onClick = onClose,
-                    modifier = Modifier
-                        .background(Color.Gray.copy(alpha = 0.5f), CircleShape)
-                        .size(40.dp)
-                ) {
-                    Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
-                }
-                Spacer(modifier = Modifier.weight(1f))
-                Text(
-                    text = selectedEngine.name,
-                    style = MaterialTheme.typography.headlineMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                )
-                Spacer(modifier = Modifier.weight(1f))
-                
-                // Action Button (Menu)
-                Box(
-                    modifier = Modifier
-                        .background(Color.Gray.copy(alpha = 0.5f), CircleShape)
-                        .size(40.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    var showMenu by remember { mutableStateOf(false) }
-                    IconButton(onClick = { showMenu = true }) {
-                        Icon(Icons.Default.MoreVert, contentDescription = "Menu", tint = Color.White)
-                    }
-                
-                    androidx.compose.material3.DropdownMenu(
-                        expanded = showMenu,
-                        onDismissRequest = { showMenu = false }
-                    ) {
-                        val isDesktop = isDesktop(selectedEngine)
-                        androidx.compose.material3.DropdownMenuItem(
-                            text = { Text(if (isDesktop) "Mobile Mode" else "Desktop Mode") },
-                            leadingIcon = { 
-                                Icon(
-                                    if (isDesktop) Icons.Default.Smartphone else Icons.Default.DesktopWindows,
-                                    contentDescription = null
-                                )
-                            },
-                            onClick = { 
-                                val newSet = desktopModeEngines.toMutableSet()
-                                if (newSet.contains(selectedEngine)) {
-                                    newSet.remove(selectedEngine)
-                                } else {
-                                    newSet.add(selectedEngine)
-                                }
-                                desktopModeEngines = newSet
-                                showMenu = false
-                            }
-                        )
-                        androidx.compose.material3.DropdownMenuItem(
-                            text = { Text(if (isDarkMode) "Light Mode" else "Dark Mode") },
-                            leadingIcon = {
-                                Icon(
-                                    if (isDarkMode) Icons.Default.LightMode else Icons.Default.DarkMode,
-                                    contentDescription = null
-                                )
-                            },
-                            onClick = { 
-                                isDarkMode = !isDarkMode 
-                                showMenu = false
-                            }
-                        )
-                        androidx.compose.material3.DropdownMenuItem(
-                            text = { Text(if (showGradientBorder) "Hide Border" else "Show Border") },
-                            leadingIcon = {
-                                Icon(Icons.Default.BorderOuter, contentDescription = null)
-                            },
-                            onClick = { 
-                                showGradientBorder = !showGradientBorder 
-                                showMenu = false
-                            }
-                        )
-                        androidx.compose.material3.DropdownMenuItem(
-                            text = { Text("Refresh") },
-                            leadingIcon = {
-                                Icon(Icons.Default.Refresh, contentDescription = null)
-                            },
-                            onClick = { 
-                                webViews[selectedEngine]?.reload()
-                                showMenu = false
-                            }
-                        )
-                        androidx.compose.material3.DropdownMenuItem(
-                            text = { Text("Copy URL") },
-                            leadingIcon = {
-                                Icon(Icons.Default.ContentCopy, contentDescription = null)
-                            },
-                            onClick = {
-                                if (searchUrl != null) {
-                                    val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                                    val clip = android.content.ClipData.newPlainText("Search URL", searchUrl)
-                                    clipboard.setPrimaryClip(clip)
-                                }
-                                showMenu = false
-                            }
-                        )
-                        androidx.compose.material3.DropdownMenuItem(
-                            text = { Text("Open in Browser") },
-                            leadingIcon = {
-                                Icon(Icons.Default.OpenInNew, contentDescription = null)
-                            },
-                            onClick = {
-                                val currentUrl = webViews[selectedEngine]?.url ?: searchUrl
-                                if (currentUrl != null) {
-                                    try {
-                                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(currentUrl))
-                                        context.startActivity(intent)
-                                    } catch (e: Exception) {
-                                        android.util.Log.e("CircleToSearch", "Failed to open browser", e)
-                                    }
-                                }
-                                showMenu = false
-                            }
-                        )
-                        androidx.compose.material3.DropdownMenuItem(
-                            text = { Text("Settings") },
-                            leadingIcon = {
-                                Icon(Icons.Default.Settings, contentDescription = null)
-                            },
-                            onClick = {
-                                showSettingsScreen = true
-                                showMenu = false
-                            }
-                        )
-                    }
-                }
-            }      // 5. Search Bar / Pill (Bottom Fixed) - Clickable to open sheet
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .navigationBarsPadding()
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 24.dp)
-                    .shadow(8.dp, CircleShape)
-                    .background(Color(0xFF1F1F1F), CircleShape)
-                    .height(64.dp)
-                    .padding(horizontal = 20.dp)
-                    .pointerInput(Unit) {
-                        detectTapGestures {
-                            scope.launch { 
-                                scaffoldState.bottomSheetState.expand()
-                            }
-                        }
-                    }
+            androidx.compose.animation.AnimatedVisibility(
+                visible = isUIVisible,
+                enter = androidx.compose.animation.slideInVertically(
+                    initialOffsetY = { -it }, // Commence au-dessus de l'écran (-100%)
+                    animationSpec = tween(350, easing = androidx.compose.animation.core.FastOutSlowInEasing)
+                ),
+                modifier = Modifier.align(Alignment.TopCenter)
             ) {
                 Row(
-                    modifier = Modifier.align(Alignment.CenterStart),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .padding(top = 16.dp, start = 16.dp, end = 16.dp)
+                        .align(Alignment.TopCenter),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    if (selectedBitmap != null) {
+                    IconButton(
+                        onClick = {
+                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                            handleSmartExit()
+                        },
+                        modifier = Modifier
+                            .background(Color.Gray.copy(alpha = 0.5f), CircleShape)
+                            .size(40.dp)
+                    ) {
+                        Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
+                    }
+                    Spacer(modifier = Modifier.weight(1f))
+                    if (selectedEngine.name == "Google") {
+                        // Si c'est Google, on affiche ta belle typo officielle
                         Image(
-                            bitmap = selectedBitmap!!.asImageBitmap(),
-                            contentDescription = "Selected",
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .border(1.dp, Color.Gray, RoundedCornerShape(12.dp))
+                            painter = painterResource(id = com.akslabs.circletosearch.R.drawable.googletypo),
+                            contentDescription = "Google Search",
+                            modifier = Modifier.height(50.dp), // Hauteur ajustable selon ton PNG
+                            colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(Color.White)
                         )
                     } else {
-                        // G Logo
-                        Row {
-                            Text("G", style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold, color = Color(0xFF4285F4)))
-                            Text("o", style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold, color = Color(0xFFEA4335)))
-                            Text("o", style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold, color = Color(0xFFFBBC05)))
-                            Text("g", style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold, color = Color(0xFF4285F4)))
-                            Text("l", style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold, color = Color(0xFF34A853)))
-                            Text("e", style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold, color = Color(0xFFEA4335)))
+                        // Si c'est Bing, Yandex, etc., on garde le texte stylé d'origine
+                        Text(
+                            text = selectedEngine.name,
+                            style = MaterialTheme.typography.headlineMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                        )
+                    }
+                    Spacer(modifier = Modifier.weight(1f))
+
+                    // Action Button (Menu)
+                    Box(
+                        modifier = Modifier
+                            .background(Color.Gray.copy(alpha = 0.5f), CircleShape)
+                            .size(40.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        var showMenu by remember { mutableStateOf(false) }
+                        IconButton(onClick = {
+                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                            showMenu = true
+                        }) {
+                            Icon(
+                                Icons.Default.MoreVert,
+                                contentDescription = "Menu",
+                                tint = Color.White
+                            )
+                        }
+
+                        androidx.compose.material3.DropdownMenu(
+                            expanded = showMenu,
+                            onDismissRequest = { showMenu = false }
+                        ) {
+                            val isDesktop = isDesktop(selectedEngine)
+                            androidx.compose.material3.DropdownMenuItem(
+                                text = { Text(if (isDesktop) "Mobile Mode" else "Desktop Mode") },
+                                leadingIcon = {
+                                    Icon(
+                                        if (isDesktop) Icons.Default.Smartphone else Icons.Default.DesktopWindows,
+                                        contentDescription = null
+                                    )
+                                },
+                                onClick = {
+                                    val newSet = desktopModeEngines.toMutableSet()
+                                    if (newSet.contains(selectedEngine)) {
+                                        newSet.remove(selectedEngine)
+                                    } else {
+                                        newSet.add(selectedEngine)
+                                    }
+                                    desktopModeEngines = newSet
+                                    showMenu = false
+                                }
+                            )
+                            androidx.compose.material3.DropdownMenuItem(
+                                text = { Text(if (isDarkMode) "Light Mode" else "Dark Mode") },
+                                leadingIcon = {
+                                    Icon(
+                                        if (isDarkMode) Icons.Default.LightMode else Icons.Default.DarkMode,
+                                        contentDescription = null
+                                    )
+                                },
+                                onClick = {
+                                    isDarkMode = !isDarkMode
+                                    showMenu = false
+                                }
+                            )
+                            androidx.compose.material3.DropdownMenuItem(
+                                text = { Text(if (showGradientBorder) "Hide Border" else "Show Border") },
+                                leadingIcon = {
+                                    Icon(Icons.Default.BorderOuter, contentDescription = null)
+                                },
+                                onClick = {
+                                    showGradientBorder = !showGradientBorder
+                                    showMenu = false
+                                }
+                            )
+                            androidx.compose.material3.DropdownMenuItem(
+                                text = { Text("Refresh") },
+                                leadingIcon = {
+                                    Icon(Icons.Default.Refresh, contentDescription = null)
+                                },
+                                onClick = {
+                                    webViews[selectedEngine]?.reload()
+                                    showMenu = false
+                                }
+                            )
+                            androidx.compose.material3.DropdownMenuItem(
+                                text = { Text("Copy URL") },
+                                leadingIcon = {
+                                    Icon(Icons.Default.ContentCopy, contentDescription = null)
+                                },
+                                onClick = {
+                                    if (searchUrl != null) {
+                                        val clipboard =
+                                            context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                        val clip = android.content.ClipData.newPlainText(
+                                            "Search URL",
+                                            searchUrl
+                                        )
+                                        clipboard.setPrimaryClip(clip)
+                                    }
+                                    showMenu = false
+                                }
+                            )
+                            androidx.compose.material3.DropdownMenuItem(
+                                text = { Text("Open in Browser") },
+                                leadingIcon = {
+                                    Icon(Icons.Default.OpenInNew, contentDescription = null)
+                                },
+                                onClick = {
+                                    val currentUrl = webViews[selectedEngine]?.url ?: searchUrl
+                                    if (currentUrl != null) {
+                                        try {
+                                            val intent = android.content.Intent(
+                                                android.content.Intent.ACTION_VIEW,
+                                                android.net.Uri.parse(currentUrl)
+                                            )
+                                            context.startActivity(intent)
+                                        } catch (e: Exception) {
+                                            android.util.Log.e(
+                                                "CircleToSearch",
+                                                "Failed to open browser",
+                                                e
+                                            )
+                                        }
+                                    }
+                                    showMenu = false
+                                }
+                            )
+                            androidx.compose.material3.DropdownMenuItem(
+                                text = { Text("Settings") },
+                                leadingIcon = {
+                                    Icon(Icons.Default.Settings, contentDescription = null)
+                                },
+                                onClick = {
+                                    showSettingsScreen = true
+                                    showMenu = false
+                                }
+                            )
                         }
                     }
                 }
-                
-                Row(
-                    modifier = Modifier.align(Alignment.CenterEnd),
-                    verticalAlignment = Alignment.CenterVertically
+            }
+            // 5. Search Bar / Pill
+            androidx.compose.animation.AnimatedVisibility(
+                visible = isUIVisible,
+                enter = androidx.compose.animation.slideInVertically(
+                    initialOffsetY = { it }, // Commence en dessous de l'écran (+100%)
+                    animationSpec = tween(350, easing = androidx.compose.animation.core.FastOutSlowInEasing)
+                ),
+                modifier = Modifier.align(Alignment.BottomCenter)
+            ) {
+                androidx.compose.material3.Surface(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .navigationBarsPadding()
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 24.dp)
+                        .height(64.dp),
+                    shape = CircleShape,
+                    color = barBgColor, // Utilise la couleur dynamique/pitch black
+                    border = androidx.compose.foundation.BorderStroke(
+                        width = 1.dp,
+                        color = contentColor.copy(alpha = 0.1f) // Bordure subtile assortie
+                    ),
+                    shadowElevation = 12.dp
                 ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Left: App Logo
+                        Image(
+                            painter = painterResource(id = com.akslabs.circletosearch.R.drawable.circletosearch),
+                            contentDescription = "Logo",
+                            modifier = Modifier
+                                .size(50.dp)
+                                .clickable {
+                                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                    scope.launch { scaffoldState.bottomSheetState.expand() }
+                                }
+                        )
 
-                    IconButton(onClick = {
-                        showSupportSheet = true
-                    }, modifier = Modifier.size(32.dp)) {
-                        Icon(
-                            painter = painterResource(id = com.akslabs.circletosearch.R.drawable.donation),
-                            contentDescription = "Donate",
-                            tint = Color.White,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(3.dp))
-                    IconButton(onClick = {
-                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/aks-labs"))
-                        context.startActivity(intent)
-                    }, modifier = Modifier.size(32.dp)) {
-                        Icon(
-                            painter = painterResource(id = com.akslabs.circletosearch.R.drawable.github),
-                            contentDescription = "Github",
-                            tint = Color.White,
-                            modifier = Modifier.size(23.dp)
-                        )
-                    }
+                        Spacer(modifier = Modifier.weight(1f))
 
-                    Spacer(modifier = Modifier.width(3.dp))
-                    IconButton(onClick = {
-                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://t.me/akslabs"))
-                        context.startActivity(intent)
-                    }, modifier = Modifier.size(32.dp)) {
-                        Icon(
-                            painter = painterResource(id = com.akslabs.circletosearch.R.drawable.telegram),
-                            contentDescription = "Telegram",
-                            tint = Color.White,
-                            modifier = Modifier.size(23.dp)
-                        )
+                        // Right: Actions Container
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            // Social/Contribution Bubble (Anthracite / Dynamic)
+                            androidx.compose.material3.Surface(
+                                shape = CircleShape,
+                                color = bubbleColor, // Utilise l'anthracite ou le container dynamique
+                                modifier = Modifier.height(44.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(horizontal = 4.dp)
+                                ) {
+                                    // Boutons sociaux - On utilise contentColor pour les icônes
+                                    val socialButtons = listOf(
+                                        com.akslabs.circletosearch.R.drawable.telegram to "https://t.me/akslabs",
+                                        com.akslabs.circletosearch.R.drawable.github to "https://github.com/aks-labs"
+                                    )
+
+                                    socialButtons.forEach { (iconRes, url) ->
+                                        IconButton(onClick = {
+                                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                            context.startActivity(
+                                                android.content.Intent(
+                                                    android.content.Intent.ACTION_VIEW,
+                                                    android.net.Uri.parse(url)
+                                                )
+                                            )
+                                        }, modifier = Modifier.size(36.dp)) {
+                                            Icon(
+                                                painterResource(id = iconRes),
+                                                null,
+                                                tint = contentColor,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+                                    }
+
+                                    IconButton(
+                                        onClick = { showSupportSheet = true },
+                                        modifier = Modifier.size(36.dp)
+                                    ) {
+                                        Icon(
+                                            painterResource(id = com.akslabs.circletosearch.R.drawable.donation),
+                                            null,
+                                            tint = contentColor,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Fullscreen Scan Bubble (Anthracite / Dynamic)
+                            androidx.compose.material3.Surface(
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .clip(CircleShape)
+                                    .clickable {
+                                        haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                        if (screenshot != null) {
+                                            val rect =
+                                                Rect(0, 0, screenshot.width, screenshot.height)
+                                            selectionRect = rect
+                                            currentPathPoints.clear()
+                                            scope.launch {
+                                                selectionAnim.snapTo(0f)
+                                                selectionAnim.animateTo(1f, tween(600))
+                                                selectedBitmap = screenshot
+                                                isSearching = true
+                                            }
+                                        }
+                                    },
+                                shape = CircleShape,
+                                color = bubbleColor // Même couleur anthracite/dynamique
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        imageVector = Icons.Default.Fullscreen,
+                                        contentDescription = "Scan All",
+                                        tint = contentColor, // Icone blanche en sombre, colorée en clair
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -1176,7 +1320,7 @@ fun CircleToSearchScreen(
 
     }
 }
-}
+
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @androidx.compose.ui.tooling.preview.Preview

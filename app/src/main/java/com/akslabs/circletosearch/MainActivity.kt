@@ -630,7 +630,7 @@ fun LensOnlySwitch(context: android.content.Context) {
                 selected = !isLensOnlyEnabled,
                 icon = { SegmentedButtonDefaults.Icon(!isLensOnlyEnabled) }
             ) {
-                Text("Multi-Search Engines", style = MaterialTheme.typography.labelLarge)
+                Text("Multi-Search", style = MaterialTheme.typography.labelLarge)
             }
             SegmentedButton(
                 shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),

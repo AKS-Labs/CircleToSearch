@@ -61,8 +61,10 @@ fun OverlaySettingsScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { 
-                        updateConfig(OverlayConfig()) // Reset
+                    IconButton(onClick = {
+
+                        configManager.resetConfig()
+                        updateConfig(configManager.getConfig())
                     }) {
                         Icon(Icons.Default.Refresh, contentDescription = "Reset")
                     }

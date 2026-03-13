@@ -30,12 +30,14 @@ class UIPreferences(context: Context) {
         private const val KEY_DARK_MODE = "is_dark_mode"
         private const val KEY_SHOW_GRADIENT_BORDER = "show_gradient_border"
         private const val KEY_SHOW_FRIENDLY_MESSAGES = "show_friendly_messages"
-        private const val KEY_SEARCH_ENGINE_ORDER = "search_engine_order"
         private const val KEY_USE_GOOGLE_LENS_ONLY = "use_google_lens_only"
+        private const val KEY_SEARCH_ENGINE_ORDER = "search_engine_order"
+
     }
 
     fun isUseGoogleLensOnly(): Boolean {
-        return prefs.getBoolean(KEY_USE_GOOGLE_LENS_ONLY, false)
+
+        return prefs.getBoolean(KEY_USE_GOOGLE_LENS_ONLY, true)
     }
 
     fun setUseGoogleLensOnly(isEnabled: Boolean) {
@@ -80,5 +82,11 @@ class UIPreferences(context: Context) {
 
     fun setSearchEngineOrder(order: String) {
         prefs.edit().putString(KEY_SEARCH_ENGINE_ORDER, order).apply()
+    }
+
+    fun isDirectLensEnabled(): Boolean = prefs.getBoolean("direct_lens_enabled", false)
+
+    fun setDirectLensEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean("direct_lens_enabled", enabled).apply()
     }
 }
