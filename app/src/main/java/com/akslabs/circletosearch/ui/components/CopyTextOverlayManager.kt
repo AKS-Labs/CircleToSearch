@@ -356,6 +356,13 @@ class CopyTextOverlayManager(
 
         private var dragHandleType = 0  // 0=none, 1=start, 2=end
         private var toolbarButtons: List<ToolbarButton> = emptyList()
+        private var toolbarRect = RectF()
+        private var toolbarOffsetX = 0f
+        private var toolbarOffsetY = 0f
+        private var isDraggingToolbar = false
+        private var lastTouchX = 0f
+        private var lastTouchY = 0f
+        private var toolbarInitialized = false
 
 
         // ── Node entry / exit ─────────────────────────────────────────────────
@@ -472,11 +479,16 @@ class CopyTextOverlayManager(
             val labelWidths = buttonLabels.map { toolbarActionPaint.measureText(it) + btnPadding * 2 }
             val totalWidth = labelWidths.sum() + (buttonLabels.size - 1) * btnSpacing + m * 2
             
-            val tx = (width - totalWidth) / 2
-            var ty = anchor.bottom + 30f * density
-            if (ty + btnHeight + m * 2 > height - 100f) ty = anchor.top - (btnHeight + m * 2) - 30f * density
+            val tx = ((width - totalWidth) / 2) + toolbarOffsetX
             
-            val toolbarRect = RectF(tx, ty, tx + totalWidth, ty + btnHeight + m * 2)
+            if (!toolbarInitialized) {
+                // Dock to bottom initially
+                toolbarOffsetY = height - (btnHeight + m * 2) - 100f * density
+                toolbarInitialized = true
+            }
+            val ty = toolbarOffsetY
+            
+            toolbarRect.set(tx, ty, tx + totalWidth, ty + btnHeight + m * 2)
             
             // Dynamic Background with shadow
             val dynamicSurface = try { 
@@ -503,11 +515,17 @@ class CopyTextOverlayManager(
 
                 canvas.drawRoundRect(bRect, btnHeight / 2, btnHeight / 2, handlePaint.apply { color = dynamicPrimary })
                 
-                canvas.drawText(label, bRect.centerX(), bRect.centerY() + 10f, toolbarActionPaint.apply { 
+                // Fix: Ensure perfect vertical centering by using font metrics
+                val fontMetrics = toolbarActionPaint.fontMetrics
+                val textHeight = fontMetrics.descent - fontMetrics.ascent
+                val textOffset = (textHeight / 2) - fontMetrics.descent
+                
+                canvas.drawText(label, bRect.centerX(), bRect.centerY() + textOffset, toolbarActionPaint.apply { 
                     color = Color.WHITE
                     style = Paint.Style.FILL
                     textSize = 30f
                     typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                    textAlign = Paint.Align.CENTER
                 })
                 
                 newButtons.add(ToolbarButton(label, Rect(bRect.left.toInt(), bRect.top.toInt(), bRect.right.toInt(), bRect.bottom.toInt())))
@@ -524,16 +542,25 @@ class CopyTextOverlayManager(
 
             when (event.action) {
                 MotionEvent.ACTION_DOWN -> {
+                    lastTouchX = lx
+                    lastTouchY = ly
+                    
                     // Clicks for Top Bar are now handled by ComposeView, 
                     // so we only check the floating toolbar and selection logic.
                     
-                    // 1. Check toolbar FIRST with 24px extra hit-padding for reliability
+                    // 1. Check toolbar buttons FIRST
                     for (btn in toolbarButtons) {
                         val touchRect = Rect(btn.rect).apply { inset(-24, -24) }
                         if (touchRect.contains(lx.toInt(), ly.toInt())) {
                             handleToolbarAction(btn.label)
                             return true
                         }
+                    }
+
+                    // 2. Check toolbar background dragging
+                    if (toolbarRect.contains(lx, ly)) {
+                        isDraggingToolbar = true
+                        return true
                     }
 
                     // 2. Check for handle drag
@@ -567,6 +594,18 @@ class CopyTextOverlayManager(
                 }
 
                 MotionEvent.ACTION_MOVE -> {
+                    val dx = lx - lastTouchX
+                    val dy = ly - lastTouchY
+                    lastTouchX = lx
+                    lastTouchY = ly
+
+                    if (isDraggingToolbar) {
+                        toolbarOffsetX += dx
+                        toolbarOffsetY += dy
+                        invalidate()
+                        return true
+                    }
+
                     val sx = toScreenX(lx)
                     val sy = toScreenY(ly)
                     
@@ -589,6 +628,7 @@ class CopyTextOverlayManager(
                 }
 
                 MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    isDraggingToolbar = false
                     dragHandleType = 0
                     startSelectionIdx = -1
                     invalidate()
