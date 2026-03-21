@@ -250,6 +250,7 @@ fun CircleToSearchScreen(
     var isDarkMode by remember { mutableStateOf(uiPreferences.isDarkMode()) }
     var showGradientBorder by remember { mutableStateOf(uiPreferences.isShowGradientBorder()) }
     
+    
     // Track initialized engines for Smart Loading
     val initializedEngines = remember { mutableStateListOf<SearchEngine>() }
     
@@ -347,6 +348,18 @@ fun CircleToSearchScreen(
     var isSearching by remember { mutableStateOf(false) }
     var selectionRect by remember { mutableStateOf<Rect?>(null) }
     val selectionAnim = remember { androidx.compose.animation.core.Animatable(0f) }
+    
+    // Lifecycle reset: When screenshot changes, reset selection and modes
+    LaunchedEffect(screenshot) {
+        if (screenshot != null) {
+            isCopyMode = false
+            selectionRect = null
+            selectedBitmap = null
+            isSearching = false
+            currentPathPoints.clear()
+            selectionAnim.snapTo(0f)
+        }
+    }
     
     // searchEngines moved to top
     // val searchEngines = SearchEngine.values()
@@ -799,7 +812,12 @@ fun CircleToSearchScreen(
             // 1. Screenshot Layer
             if (screenshot != null && !isCopyMode) {
                 Box(
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            // Required for BlendMode.Clear to work in child Canvas
+                            compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen
+                        }
                 ) {
                     Image(
                         bitmap = screenshot.asImageBitmap(),
@@ -808,17 +826,40 @@ fun CircleToSearchScreen(
                         modifier = Modifier.fillMaxSize()
                     )
                     
-                    // Tint Overlay
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.Black.copy(alpha = 0.15f))
-                            .background(
-                                brush = Brush.verticalGradient(
-                                    colors = OverlayGradientColors.map { it.copy(alpha = 0.15f) }
-                                )
+                    // Tint Overlay (Punch-out style)
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        val strokeWidth = 0f
+                        val dimAlpha = 0.15f
+                        
+                        // 1. Draw global dim
+                        drawRect(Color.Black.copy(alpha = dimAlpha))
+                        drawRect(
+                            brush = Brush.verticalGradient(
+                                colors = OverlayGradientColors.map { it.copy(alpha = dimAlpha) }
                             )
-                    )
+                        )
+                        
+                        // 2. Clear selection area if it exists
+                        if (selectionRect != null && selectionAnim.value > 0f) {
+                            val rect = selectionRect!!
+                            val progress = selectionAnim.value
+                            val holeRect = androidx.compose.ui.geometry.Rect(
+                                rect.left.toFloat(), 
+                                rect.top.toFloat(), 
+                                rect.right.toFloat(), 
+                                rect.bottom.toFloat()
+                            )
+                            
+                            // Punch the hole
+                            drawRoundRect(
+                                color = Color.Transparent,
+                                topLeft = holeRect.topLeft,
+                                size = holeRect.size,
+                                cornerRadius = CornerRadius(32f),
+                                blendMode = androidx.compose.ui.graphics.BlendMode.Clear
+                            )
+                        }
+                    }
                 }
             }
 
@@ -1006,7 +1047,74 @@ fun CircleToSearchScreen(
                             cornerRadius = CornerRadius(32f),
                             style = Stroke(width = 4f),
                             alpha = (1f - progress) * 0.5f
-                        )
+                         )
+                    }
+                }
+
+                // 4. Selection Actions (Share)
+                if (selectionRect != null && selectionAnim.value == 1f) {
+                    val rect = selectionRect!!
+                    val density = androidx.compose.ui.platform.LocalDensity.current
+                    
+                    // Coordinates in pixels from rect
+                    val leftPx = rect.left.toFloat()
+                    val topPx = rect.top.toFloat()
+                    val rightPx = rect.right.toFloat()
+                    val bottomPx = rect.bottom.toFloat()
+                    
+                    // Convert to Dp for offset
+                    val leftDp = with(density) { leftPx.toDp() }
+                    val topDp = with(density) { topPx.toDp() }
+                    val rightDp = with(density) { rightPx.toDp() }
+                    val bottomDp = with(density) { bottomPx.toDp() }
+                    val widthDp = rightDp - leftDp
+                    
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .zIndex(300f)
+                    ) {
+                        androidx.compose.material3.FilledTonalButton(
+                            onClick = {
+                                if (selectedBitmap != null) {
+                                    scope.launch {
+                                        try {
+                                            val path = ImageUtils.saveBitmap(context, selectedBitmap!!)
+                                            val uri = androidx.core.content.FileProvider.getUriForFile(context, "com.akslabs.circletosearch.fileprovider", java.io.File(path))
+                                            val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply { 
+                                                type = "image/*"
+                                                putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                                                addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                            }
+                                            context.startActivity(android.content.Intent.createChooser(shareIntent, "Share Selection").apply { 
+                                                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK) 
+                                            })
+                                        } catch (e: Exception) {
+                                            android.util.Log.e("CircleToSearch", "Failed to share selection", e)
+                                        }
+                                    }
+                                }
+                            },
+                            modifier = Modifier
+                                .align(Alignment.TopStart)
+                                .offset(
+                                    x = leftDp + (widthDp / 2) - 80.dp, // Approximate center
+                                    y = if (topPx > 200f) topDp - 64.dp else bottomDp + 16.dp
+                                )
+                                .height(48.dp),
+                            shape = CircleShape,
+                            colors = androidx.compose.material3.ButtonDefaults.filledTonalButtonColors(
+                                containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.95f),
+                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                            ),
+                            elevation = androidx.compose.material3.ButtonDefaults.buttonElevation(defaultElevation = 6.dp),
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp)
+                        ) {
+                            Icon(Icons.Default.Send, contentDescription = null, modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Share Selection", fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }

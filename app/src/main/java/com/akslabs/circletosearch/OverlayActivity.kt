@@ -80,8 +80,9 @@ class OverlayActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: android.content.Intent) {
         super.onNewIntent(intent)
-        android.util.Log.d("CircleToSearch", "OverlayActivity onNewIntent")
+        android.util.Log.d("CircleToSearch", "OverlayActivity onNewIntent - Resetting state")
         setIntent(intent)
+        copyTextManager?.dismiss()
         loadScreenshot()
     }
 
