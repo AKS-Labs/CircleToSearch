@@ -45,6 +45,18 @@ object TesseractEngine {
         return filesDir
     }
 
+    fun getAvailableModels(context: Context): List<String> {
+        val dir = File(context.filesDir, "tessdata")
+        if (!dir.exists()) {
+            prepareTessData(context)
+        }
+        
+        val files = dir.listFiles() ?: return listOf("eng")
+        return files.filter { it.name.endsWith(".traineddata") }
+            .map { it.name.removeSuffix(".traineddata") }
+            .sorted()
+    }
+
     suspend fun extractText(context: Context, bitmap: Bitmap): List<TextNode> = withContext(Dispatchers.Default) {
         val result = mutableListOf<TextNode>()
         try {

@@ -82,7 +82,12 @@ class OverlayActivity : ComponentActivity() {
         super.onNewIntent(intent)
         android.util.Log.d("CircleToSearch", "OverlayActivity onNewIntent - Resetting state")
         setIntent(intent)
+        
+        // IMMEDIATE NULLING to prevent flash of previous screen
+        screenshotBitmap.value = null
         copyTextManager.value?.dismiss()
+        copyTextManager.value = null
+        
         loadScreenshot()
         
         // Recreate manager with new screenshot

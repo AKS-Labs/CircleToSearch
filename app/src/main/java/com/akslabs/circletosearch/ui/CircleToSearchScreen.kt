@@ -776,22 +776,6 @@ fun CircleToSearchScreen(
                 .background(Color.Transparent) // Changed from Black to Transparent
         ) {
             // Close button for Copy Mode (Top Left)
-            if (isCopyMode) {
-                IconButton(
-                    onClick = { 
-                        isCopyMode = false
-                        onExitCopyMode()
-                    },
-                    modifier = Modifier
-                        .statusBarsPadding()
-                        .padding(16.dp)
-                        .align(Alignment.TopStart)
-                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.7f), CircleShape)
-                        .zIndex(200f)
-                ) {
-                    Icon(Icons.Default.Close, contentDescription = "Exit Copy Mode")
-                }
-            }
 
             // Friendly Message Overlay (Top Center)
             if (!isCopyMode) {
@@ -1107,15 +1091,17 @@ fun CircleToSearchScreen(
                                 .height(48.dp),
                             shape = CircleShape,
                             colors = androidx.compose.material3.ButtonDefaults.filledTonalButtonColors(
-                                containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.95f),
-                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                contentColor = MaterialTheme.colorScheme.onSurface
                             ),
-                            elevation = androidx.compose.material3.ButtonDefaults.buttonElevation(defaultElevation = 6.dp),
-                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp)
+                            elevation = androidx.compose.material3.ButtonDefaults.buttonElevation(defaultElevation = 6.dp),                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp)
                         ) {
-                            Icon(Icons.Default.Send, contentDescription = null, modifier = Modifier.size(20.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text("Share Selection", fontWeight = FontWeight.Bold)
+                            Text(
+                                "Share", 
+                                style = MaterialTheme.typography.labelLarge.copy(
+                                    fontWeight = androidx.compose.ui.text.font.FontWeight.Normal
+                                )
+                            )
                         }
                     }
                 }

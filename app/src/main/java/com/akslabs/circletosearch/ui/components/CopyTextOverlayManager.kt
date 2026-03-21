@@ -99,8 +99,7 @@ class CopyTextOverlayManager(
                 MaterialTheme {
                     Box(modifier = Modifier.fillMaxSize()) {
                         TopBarUI(
-                            onClose = { dismiss() },
-                            onMenu = { showSettingsMenu() }
+                            onClose = { dismiss() }
                         )
                     }
                 }
@@ -114,7 +113,7 @@ class CopyTextOverlayManager(
     }
 
     @Composable
-    private fun TopBarUI(onClose: () -> Unit, onMenu: () -> Unit) {
+    private fun TopBarUI(onClose: () -> Unit) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -134,51 +133,57 @@ class CopyTextOverlayManager(
             }
 
             // Menu Button (Exact match from main UI)
-            IconButton(
-                onClick = onMenu,
-                modifier = Modifier
-                    .background(android.graphics.Color.GRAY.toComposeColor().copy(alpha = 0.5f), CircleShape)
-                    .size(40.dp)
-            ) {
-                Icon(Icons.Default.MoreVert, contentDescription = "Menu", tint = ComposeColor.White)
+            Box {
+                var showMenu by remember { mutableStateOf(false) }
+                IconButton(
+                    onClick = { showMenu = true },
+                    modifier = Modifier
+                        .background(android.graphics.Color.GRAY.toComposeColor().copy(alpha = 0.5f), CircleShape)
+                        .size(40.dp)
+                ) {
+                    Icon(Icons.Default.MoreVert, contentDescription = "Menu", tint = ComposeColor.White)
+                }
+
+                DropdownMenu(
+                    expanded = showMenu,
+                    onDismissRequest = { showMenu = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Select Language / Model") },
+                        onClick = {
+                            showMenu = false
+                            showLanguageModelSelector()
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Import Model (.traineddata)") },
+                        onClick = {
+                            showMenu = false
+                            triggerImport()
+                        }
+                    )
+                }
             }
         }
     }
 
     private fun Int.toComposeColor(): ComposeColor = ComposeColor(this)
 
-    private fun showSettingsMenu() {
-        val anchor = dimView ?: return
-        val popup = PopupMenu(context, anchor, Gravity.END)
-        popup.menu.add("Select Language")
-        popup.menu.add("Import traineddata")
-        
-        popup.setOnMenuItemClickListener { item ->
-            when (item.title) {
-                "Select Language" -> showLanguageSelector()
-                "Import traineddata" -> triggerImport()
-            }
-            true
-        }
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-            popup.setForceShowIcon(true)
-        }
-        popup.show()
-    }
-
-    private fun showLanguageSelector() {
-        val languages = listOf("English", "Hindi", "French", "Spanish", "German", "Chinese", "Japanese")
-        val codes = listOf("eng", "hin", "fra", "spa", "deu", "chi_sim", "jpn")
+    private fun showLanguageModelSelector() {
+        val models = com.akslabs.circletosearch.ocr.TesseractEngine.getAvailableModels(context)
+        val prefs = context.getSharedPreferences("OcrSettings", Context.MODE_PRIVATE)
+        val current = prefs.getString("selected_lang", "eng") ?: "eng"
         
         android.app.AlertDialog.Builder(context)
-            .setTitle("Select OCR Language")
-            .setItems(languages.toTypedArray()) { _, which ->
-                val code = codes[which]
-                context.getSharedPreferences("OcrSettings", Context.MODE_PRIVATE)
-                    .edit().putString("selected_lang", code).apply()
-                Toast.makeText(context, "Language changed to ${languages[which]}. Restarting scan...", Toast.LENGTH_SHORT).show()
+            .setTitle("Select OCR Model")
+            .setSingleChoiceItems(models.toTypedArray(), models.indexOf(current)) { dialog, which ->
+                val selected = models[which]
+                prefs.edit().putString("selected_lang", selected).apply()
+                Toast.makeText(context, "Selected: ${selected.uppercase()}. Restarting scan...", Toast.LENGTH_SHORT).show()
+                dialog.dismiss()
                 rescanNodes()
             }
+            .setNegativeButton("Cancel", null)
             .show()
     }
 

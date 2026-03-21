@@ -675,6 +675,10 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
 
     private fun performCapture() {
         android.util.Log.d("CircleToSearch", "performCapture called. hasWindowManager=${windowManager != null}")
+        
+        // Clear repository at the source to prevent any "ghost" flash of old data
+        BitmapRepository.clear()
+        
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             takeScreenshot(
                 Display.DEFAULT_DISPLAY,
