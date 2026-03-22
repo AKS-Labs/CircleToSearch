@@ -146,8 +146,10 @@ import com.akslabs.circletosearch.ui.theme.OverlayGradientColors
 import com.akslabs.circletosearch.utils.FriendlyMessageManager
 import com.akslabs.circletosearch.utils.ImageSearchUploader
 import com.akslabs.circletosearch.utils.ImageUtils
+import com.akslabs.circletosearch.utils.QrResult
 import com.akslabs.circletosearch.utils.QrResultWithBounds
 import com.akslabs.circletosearch.utils.QrScanner
+import com.akslabs.circletosearch.ui.qrResultShortLabel
 import com.akslabs.circletosearch.utils.UIPreferences
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
@@ -279,8 +281,10 @@ fun CircleToSearchScreen(
     var showGradientBorder by remember { mutableStateOf(uiPreferences.isShowGradientBorder()) }
     
     // Back gesture handler for QR sheet
+    // We use a high-priority check or ensure it's at the very top of the hierarchy
     BackHandler(enabled = showQrSheet) {
         showQrSheet = false
+        selectedQrResult = null
     }
 
     // Track initialized engines for Smart Loading
@@ -842,70 +846,7 @@ fun CircleToSearchScreen(
                         modifier = Modifier.fillMaxSize()
                     )
 
-                    // QR Overlay Chips
-                    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-                        val screenWidth = maxWidth
-                        val screenHeight = maxHeight
-                        val bitmapWidth = screenshot.width.toFloat()
-                        val bitmapHeight = screenshot.height.toFloat()
 
-                        detectedQrCodes.forEach { qr ->
-                            qr.bounds?.let { bounds ->
-                                val chipX = (bounds.centerX() / bitmapWidth) * screenWidth.value
-                                val chipY = (bounds.centerY() / bitmapHeight) * screenHeight.value
-
-                                Box(
-                                    modifier = Modifier
-                                        .offset(
-                                            x = chipX.dp - 24.dp,
-                                            y = chipY.dp - 24.dp
-                                        )
-                                        .size(48.dp)
-                                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.8f), CircleShape)
-                                        .border(2.dp, Color.White, CircleShape)
-                                        .clickable {
-                                            selectedQrResult = qr
-                                            qrScanBitmap = null // Use results directly
-                                            showQrSheet = true
-                                        }
-                                        .zIndex(200f),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        Icons.Default.QrCode,
-                                        contentDescription = "QR Found",
-                                        tint = Color.White,
-                                        modifier = Modifier.size(24.dp)
-                                    )
-                                }
-                                
-                                // Mini label
-                                val label = com.akslabs.circletosearch.ui.qrResultShortLabel(qr.result)
-                                if (label.isNotEmpty()) {
-                                    Surface(
-                                        modifier = Modifier
-                                            .offset(
-                                                x = chipX.dp + 28.dp,
-                                                y = chipY.dp - 12.dp
-                                            )
-                                            .zIndex(199f),
-                                        shape = RoundedCornerShape(8.dp),
-                                        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.9f),
-                                        tonalElevation = 4.dp
-                                    ) {
-                                        Text(
-                                            text = label,
-                                            style = MaterialTheme.typography.labelSmall,
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    
                     // Tint Overlay (Punch-out style)
                     Canvas(modifier = Modifier.fillMaxSize()) {
                         val strokeWidth = 0f
@@ -1710,9 +1651,98 @@ fun CircleToSearchScreen(
                     }
                 }
             }
-        
+
+        // --- NEW: QR Overlay Chips (High Layer) ---
+        if (screenshot != null && !isCopyMode) {
+            BoxWithConstraints(modifier = Modifier.fillMaxSize().zIndex(1100f)) {
+                val screenWidth = maxWidth
+                val screenHeight = maxHeight
+                val bitmapWidth = screenshot.width.toFloat()
+                val bitmapHeight = screenshot.height.toFloat()
+
+                detectedQrCodes.forEach { qr ->
+                    qr.bounds?.let { bounds ->
+                        val chipX = (bounds.centerX() / bitmapWidth) * screenWidth.value
+                        val chipY = (bounds.centerY() / bitmapHeight) * screenHeight.value
+                        val isUrl = qr.result is QrResult.Url
+
+                        // Using a Box with pointerInput to consume taps and prevent circling
+                        Box(
+                            modifier = Modifier
+                                .offset(x = chipX.dp - 22.dp, y = chipY.dp - 22.dp)
+                                .size(44.dp)
+                                .shadow(4.dp, CircleShape)
+                                .background(Color.White, CircleShape)
+                                .border(1.5.dp, if(isUrl) Color(0xFF1A73E8) else MaterialTheme.colorScheme.primary.copy(alpha = 0.5f), CircleShape)
+                                .pointerInput(qr) {
+                                    detectTapGestures {
+                                        selectedQrResult = qr
+                                        qrScanBitmap = null 
+                                        showQrSheet = true
+                                    }
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.QrCode, 
+                                null, 
+                                tint = if(isUrl) Color(0xFF1A73E8) else MaterialTheme.colorScheme.primary, 
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                        
+                        val label = qrResultShortLabel(qr.result)
+                        if (label.isNotEmpty()) {
+                            Surface(
+                                modifier = Modifier
+                                    .offset(x = chipX.dp + 16.dp, y = chipY.dp - 32.dp)
+                                    .pointerInput(qr) {
+                                        detectTapGestures {
+                                            selectedQrResult = qr
+                                            qrScanBitmap = null 
+                                            showQrSheet = true
+                                        }
+                                    },
+                                shape = RoundedCornerShape(12.dp),
+                                color = Color.White.copy(alpha = 0.95f),
+                                tonalElevation = 4.dp,
+                                shadowElevation = 4.dp,
+                                border = if(isUrl) androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF1A73E8).copy(alpha = 0.3f)) else null
+                            ) {
+                                Text(
+                                    text = label,
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        color = if(isUrl) Color(0xFF1A73E8) else MaterialTheme.colorScheme.onSurface,
+                                        fontWeight = if(isUrl) FontWeight.Bold else FontWeight.Medium
+                                    ),
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // QR Code Result Sheet
         if (showQrSheet) {
+            // Full-screen invisible overlay to catch "click outside"
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .zIndex(2500f)
+                    .background(Color.Black.copy(alpha = 0.01f)) // Almost invisible but catches taps
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) { 
+                        showQrSheet = false
+                        selectedQrResult = null
+                    }
+            )
+
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1722,24 +1752,22 @@ fun CircleToSearchScreen(
                     .zIndex(3000f),
                 contentAlignment = Alignment.BottomCenter
             ) {
-                Column {
-                    QrCodeResultSheet(
-                        context = context,
-                        bitmap = qrScanBitmap,
-                        onDismiss = { 
-                            showQrSheet = false
-                            selectedQrResult = null
-                        },
-                        preScanned = if (selectedQrResult != null) listOf(selectedQrResult!!) else detectedQrCodes
-                    )
-                    // Dismiss tap area
-                    androidx.compose.foundation.layout.Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(8.dp)
-                            .clickable { showQrSheet = false }
-                    )
+                // Ensure BackHandler is active when sheet is shown
+                androidx.activity.compose.BackHandler {
+                    showQrSheet = false
+                    selectedQrResult = null
                 }
+
+                QrCodeResultSheet(
+                    context = context,
+                    bitmap = qrScanBitmap,
+                    onDismiss = { 
+                        showQrSheet = false
+                        selectedQrResult = null
+                    },
+                    initialResults = detectedQrCodes,
+                    initialPage = if (selectedQrResult != null) detectedQrCodes.indexOf(selectedQrResult!!) else 0
+                )
             }
         }
 
