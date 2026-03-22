@@ -19,21 +19,24 @@
 
 package com.akslabs.circletosearch.ui
 
-import com.akslabs.circletosearch.utils.FriendlyMessageManager
-import com.akslabs.circletosearch.ui.components.FriendlyMessageBubble
-import com.akslabs.circletosearch.utils.UIPreferences
-import kotlinx.coroutines.delay
-
 import android.graphics.Bitmap
 import android.graphics.Rect
 import android.util.Base64
+import android.view.ViewGroup
+import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import android.webkit.WebSettings
 import android.widget.FrameLayout
-import android.view.ViewGroup
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -41,69 +44,63 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BorderOuter
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.DesktopWindows
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.OpenInNew
+import androidx.compose.material.icons.filled.QrCode
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material.icons.filled.Smartphone
-import androidx.compose.material.icons.filled.DesktopWindows
-import androidx.compose.material.icons.filled.LightMode
-import androidx.compose.material.icons.filled.DarkMode
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.OpenInNew
-import androidx.compose.material.icons.filled.BorderOuter
-import androidx.compose.material.icons.filled.Translate
-import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.TextFields
-import androidx.compose.material.icons.filled.QrCode
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.wrapContentSize
-import androidx.compose.material3.FilledTonalIconButton
-import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LoadingIndicator
-import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -114,6 +111,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -127,27 +125,35 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import com.akslabs.circletosearch.data.SearchEngine
-import com.akslabs.circletosearch.ui.theme.OverlayGradientColors
-import com.akslabs.circletosearch.utils.ImageSearchUploader
-import com.akslabs.circletosearch.utils.ImageUtils
-import com.akslabs.circletosearch.ui.components.searchWithGoogleLens
-import kotlinx.coroutines.launch
-import java.io.ByteArrayOutputStream
-import androidx.activity.compose.BackHandler
-import androidx.compose.animation.core.animateFloat
+import androidx.compose.ui.zIndex
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import androidx.webkit.WebSettingsCompat
+import com.akslabs.circletosearch.data.SearchEngine
+import com.akslabs.circletosearch.ui.components.FriendlyMessageBubble
+import com.akslabs.circletosearch.ui.components.searchWithGoogleLens
+import com.akslabs.circletosearch.ui.theme.OverlayGradientColors
+import com.akslabs.circletosearch.utils.FriendlyMessageManager
+import com.akslabs.circletosearch.utils.ImageSearchUploader
+import com.akslabs.circletosearch.utils.ImageUtils
+import com.akslabs.circletosearch.utils.QrResultWithBounds
+import com.akslabs.circletosearch.utils.QrScanner
+import com.akslabs.circletosearch.utils.UIPreferences
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.ByteArrayOutputStream
 import androidx.webkit.WebViewFeature
 import com.akslabs.circletosearch.data.isDirectUpload
 import kotlin.math.max
@@ -235,6 +241,8 @@ fun CircleToSearchScreen(
     // QR Scanner state
     var showQrSheet by remember { mutableStateOf(false) }
     var qrScanBitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+    var detectedQrCodes by remember { mutableStateOf<List<QrResultWithBounds>>(emptyList()) }
+    var selectedQrResult by remember { mutableStateOf<QrResultWithBounds?>(null) }
     
     LaunchedEffect(Unit) {
         if (uiPreferences.isShowFriendlyMessages()) {
@@ -253,6 +261,15 @@ fun CircleToSearchScreen(
     var hostedImageUrl by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(false) }
     
+    // Auto-scan entire screenshot for QR codes when it arrives
+    LaunchedEffect(screenshot) {
+        if (screenshot != null) {
+            val found = withContext(Dispatchers.Default) {
+                QrScanner.scanBitmapAll(screenshot!!)
+            }
+            detectedQrCodes = found
+        }
+    }
     // Desktop Mode - Per Tab
     // We use a set to track which engines are in desktop mode
     val initialDesktopMode = uiPreferences.isDesktopMode() // Global default
@@ -261,7 +278,11 @@ fun CircleToSearchScreen(
     var isDarkMode by remember { mutableStateOf(uiPreferences.isDarkMode()) }
     var showGradientBorder by remember { mutableStateOf(uiPreferences.isShowGradientBorder()) }
     
-    
+    // Back gesture handler for QR sheet
+    BackHandler(enabled = showQrSheet) {
+        showQrSheet = false
+    }
+
     // Track initialized engines for Smart Loading
     val initializedEngines = remember { mutableStateListOf<SearchEngine>() }
     
@@ -817,9 +838,73 @@ fun CircleToSearchScreen(
                     Image(
                         bitmap = screenshot.asImageBitmap(),
                         contentDescription = "Screenshot",
-                        contentScale = ContentScale.Crop,
+                        contentScale = ContentScale.FillBounds,
                         modifier = Modifier.fillMaxSize()
                     )
+
+                    // QR Overlay Chips
+                    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                        val screenWidth = maxWidth
+                        val screenHeight = maxHeight
+                        val bitmapWidth = screenshot.width.toFloat()
+                        val bitmapHeight = screenshot.height.toFloat()
+
+                        detectedQrCodes.forEach { qr ->
+                            qr.bounds?.let { bounds ->
+                                val chipX = (bounds.centerX() / bitmapWidth) * screenWidth.value
+                                val chipY = (bounds.centerY() / bitmapHeight) * screenHeight.value
+
+                                Box(
+                                    modifier = Modifier
+                                        .offset(
+                                            x = chipX.dp - 24.dp,
+                                            y = chipY.dp - 24.dp
+                                        )
+                                        .size(48.dp)
+                                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.8f), CircleShape)
+                                        .border(2.dp, Color.White, CircleShape)
+                                        .clickable {
+                                            selectedQrResult = qr
+                                            qrScanBitmap = null // Use results directly
+                                            showQrSheet = true
+                                        }
+                                        .zIndex(200f),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        Icons.Default.QrCode,
+                                        contentDescription = "QR Found",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
+                                
+                                // Mini label
+                                val label = com.akslabs.circletosearch.ui.qrResultShortLabel(qr.result)
+                                if (label.isNotEmpty()) {
+                                    Surface(
+                                        modifier = Modifier
+                                            .offset(
+                                                x = chipX.dp + 28.dp,
+                                                y = chipY.dp - 12.dp
+                                            )
+                                            .zIndex(199f),
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.9f),
+                                        tonalElevation = 4.dp
+                                    ) {
+                                        Text(
+                                            text = label,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
                     
                     // Tint Overlay (Punch-out style)
                     Canvas(modifier = Modifier.fillMaxSize()) {
@@ -1641,7 +1726,11 @@ fun CircleToSearchScreen(
                     QrCodeResultSheet(
                         context = context,
                         bitmap = qrScanBitmap,
-                        onDismiss = { showQrSheet = false }
+                        onDismiss = { 
+                            showQrSheet = false
+                            selectedQrResult = null
+                        },
+                        preScanned = if (selectedQrResult != null) listOf(selectedQrResult!!) else detectedQrCodes
                     )
                     // Dismiss tap area
                     androidx.compose.foundation.layout.Box(
