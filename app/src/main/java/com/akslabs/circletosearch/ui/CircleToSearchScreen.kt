@@ -1116,7 +1116,7 @@ fun CircleToSearchScreen(
                     initialOffsetY = { -it }, // Commence au-dessus de l'écran (-100%)
                     animationSpec = tween(500, easing = androidx.compose.animation.core.FastOutSlowInEasing)
                 ),
-                modifier = Modifier.align(Alignment.TopCenter)
+                modifier = Modifier.align(Alignment.TopCenter).zIndex(2000f)
             ) {
                 Row(
                     modifier = Modifier
@@ -1306,7 +1306,7 @@ fun CircleToSearchScreen(
                     targetOffsetY = { it }, // slides back down
                     animationSpec = tween(200, easing = androidx.compose.animation.core.CubicBezierEasing(0.4f, 0f, 1f, 1f))
                 ) + fadeOut(animationSpec = tween(200)),
-                modifier = Modifier.align(Alignment.BottomCenter)
+                modifier = Modifier.align(Alignment.BottomCenter).zIndex(2000f)
             ) {
                 // ── Outer card container ──────────────────────────────────────────
                 androidx.compose.material3.Surface(
@@ -1551,13 +1551,15 @@ fun CircleToSearchScreen(
                         .fillMaxSize()
                         .zIndex(2000f) // Highest Z-index
                 ) {
+                    val screenWidth = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp.dp
+                    val screenHeight = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp
                     Box(
                         modifier = Modifier
                             .offset(
-                                x = leftDp,
-                                y = if (topPx > 200f) topDp - 64.dp else bottomDp + 16.dp
+                                x = ((leftDp + rightDp) / 2 - 90.dp).coerceIn(16.dp, screenWidth - 196.dp),
+                                y = if (topPx > 200f) (topDp - 72.dp).coerceAtLeast(16.dp) else (bottomDp + 16.dp).coerceAtMost(screenHeight - 80.dp)
                             )
-                            .width(widthDp),
+                            .wrapContentSize(),
                         contentAlignment = Alignment.Center
                     ) {
                         // Wrapped in Surface to match Bottom Bar tonal environment
@@ -1654,7 +1656,7 @@ fun CircleToSearchScreen(
 
         // --- NEW: QR Overlay Chips (High Layer) ---
         if (screenshot != null && !isCopyMode) {
-            BoxWithConstraints(modifier = Modifier.fillMaxSize().zIndex(1100f)) {
+            BoxWithConstraints(modifier = Modifier.fillMaxSize().zIndex(2000f)) {
                 val screenWidth = maxWidth
                 val screenHeight = maxHeight
                 val bitmapWidth = screenshot.width.toFloat()
@@ -1669,9 +1671,9 @@ fun CircleToSearchScreen(
                         // Using a Box with pointerInput to consume taps and prevent circling
                         Box(
                             modifier = Modifier
-                                .offset(x = chipX.dp - 22.dp, y = chipY.dp - 22.dp)
-                                .size(44.dp)
-                                .shadow(4.dp, CircleShape)
+                                .offset(x = chipX.dp - 24.dp, y = chipY.dp - 24.dp)
+                                .size(48.dp)
+                                .shadow(6.dp, CircleShape)
                                 .background(Color.White, CircleShape)
                                 .border(1.5.dp, if(isUrl) Color(0xFF1A73E8) else MaterialTheme.colorScheme.primary.copy(alpha = 0.5f), CircleShape)
                                 .pointerInput(qr) {
@@ -1687,7 +1689,7 @@ fun CircleToSearchScreen(
                                 Icons.Default.QrCode, 
                                 null, 
                                 tint = if(isUrl) Color(0xFF1A73E8) else MaterialTheme.colorScheme.primary, 
-                                modifier = Modifier.size(22.dp)
+                                modifier = Modifier.size(24.dp)
                             )
                         }
                         
@@ -1695,7 +1697,7 @@ fun CircleToSearchScreen(
                         if (label.isNotEmpty()) {
                             Surface(
                                 modifier = Modifier
-                                    .offset(x = chipX.dp + 16.dp, y = chipY.dp - 32.dp)
+                                    .offset(x = chipX.dp + 28.dp, y = chipY.dp - 12.dp)
                                     .pointerInput(qr) {
                                         detectTapGestures {
                                             selectedQrResult = qr
@@ -1715,7 +1717,7 @@ fun CircleToSearchScreen(
                                         color = if(isUrl) Color(0xFF1A73E8) else MaterialTheme.colorScheme.onSurface,
                                         fontWeight = if(isUrl) FontWeight.Bold else FontWeight.Medium
                                     ),
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )

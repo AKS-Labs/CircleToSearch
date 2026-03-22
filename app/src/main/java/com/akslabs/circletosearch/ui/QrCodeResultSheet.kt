@@ -155,29 +155,29 @@ fun QrCodeResultSheet(
 
     Surface(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-        shape = RoundedCornerShape(28.dp),
+        shape = RoundedCornerShape(24.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        tonalElevation = 8.dp, shadowElevation = 12.dp
+        tonalElevation = 6.dp, shadowElevation = 12.dp
     ) {
-        Column(modifier = Modifier.padding(vertical = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             // Header Row
-            Row(modifier = Modifier.padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.QrCode, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
-                Spacer(Modifier.width(10.dp))
+            Row(modifier = Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.QrCode, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(8.dp))
                 val titleText = when {
                     isScanning -> "Scanning…"
                     notFound -> "No QR Found"
                     results.size > 1 -> "Result ${pagerState.currentPage + 1} of ${results.size}"
-                    else -> "QR / Barcode Detected"
+                    else -> "QR / Barcode"
                 }
-                Text(titleText, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), modifier = Modifier.weight(1f))
+                Text(titleText, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold), modifier = Modifier.weight(1f))
                 
                 if (results.size > 1) {
-                    IconButton(onClick = { scope.launch { pagerState.animateScrollToPage((pagerState.currentPage - 1 + results.size) % results.size) } }, modifier = Modifier.size(36.dp)) {
-                        Icon(Icons.Default.ChevronLeft, null)
+                    IconButton(onClick = { scope.launch { pagerState.animateScrollToPage((pagerState.currentPage - 1 + results.size) % results.size) } }, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.ChevronLeft, null, modifier = Modifier.size(20.dp))
                     }
-                    IconButton(onClick = { scope.launch { pagerState.animateScrollToPage((pagerState.currentPage + 1) % results.size) } }, modifier = Modifier.size(36.dp)) {
-                        Icon(Icons.Default.ChevronRight, null)
+                    IconButton(onClick = { scope.launch { pagerState.animateScrollToPage((pagerState.currentPage + 1) % results.size) } }, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.ChevronRight, null, modifier = Modifier.size(20.dp))
                     }
                 }
             }
@@ -193,8 +193,8 @@ fun QrCodeResultSheet(
                     HorizontalPager(
                         state = pagerState,
                         modifier = Modifier.fillMaxWidth(),
-                        contentPadding = PaddingValues(horizontal = 20.dp),
-                        pageSpacing = 16.dp
+                        contentPadding = PaddingValues(horizontal = 16.dp),
+                        pageSpacing = 12.dp
                     ) { page ->
                         QrResultContent(context, results[page].result)
                     }
@@ -210,19 +210,13 @@ fun QrCodeResultSheet(
                                 val active = pagerState.currentPage == i
                                 Box(
                                     modifier = Modifier
-                                        .padding(horizontal = 4.dp)
-                                        .size(if (active) 8.dp else 6.dp)
+                                        .padding(horizontal = 3.dp)
+                                        .size(if (active) 6.dp else 4.dp)
                                         .clip(CircleShape)
                                         .background(if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f))
                                 )
                             }
                         }
-                        Text(
-                            "Swipe for more results",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                            modifier = Modifier.padding(top = 8.dp)
-                        )
                     }
                 }
             }
@@ -234,27 +228,26 @@ fun QrCodeResultSheet(
 fun ScanningIndicator(scanlineY: Float) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
-            modifier = Modifier.size(90.dp).background(MaterialTheme.colorScheme.surfaceContainerHighest, RoundedCornerShape(20.dp)),
+            modifier = Modifier.size(70.dp).background(MaterialTheme.colorScheme.surfaceContainerHighest, RoundedCornerShape(16.dp)),
             contentAlignment = Alignment.Center
         ) {
-            CircularProgressIndicator(modifier = Modifier.size(44.dp), strokeWidth = 3.dp, color = MaterialTheme.colorScheme.primary)
-            Box(modifier = Modifier.fillMaxWidth().height(3.dp)
-                .offset(y = (90.dp * scanlineY) - 45.dp)
+            CircularProgressIndicator(modifier = Modifier.size(32.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.primary)
+            Box(modifier = Modifier.fillMaxWidth().height(2.dp)
+                .offset(y = (70.dp * scanlineY) - 35.dp)
                 .background(Brush.horizontalGradient(listOf(Color.Transparent, MaterialTheme.colorScheme.primary, Color.Transparent)))
             )
         }
-        Spacer(Modifier.height(16.dp))
-        Text("Scanning screenshot…", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(8.dp))
+        Text("Scanning…", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
 @Composable
 fun NotFoundContent() {
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(vertical = 10.dp)) {
-        Text("🔎", fontSize = 48.sp)
-        Spacer(Modifier.height(12.dp))
-        Text("No QR code detected", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-        Text("Ensure the code is clearly visible", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(vertical = 4.dp)) {
+        Text("🔎", fontSize = 32.sp)
+        Spacer(Modifier.height(8.dp))
+        Text("No QR code detected", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
     }
 }
 
@@ -277,46 +270,45 @@ fun QrResultContent(context: Context, result: QrResult) {
 private fun UrlResult(context: Context, result: QrResult.Url) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text("🔗", fontSize = 42.sp)
-        Spacer(Modifier.height(8.dp))
-        Text(result.displayUrl.substringBefore("/"), style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.ExtraBold))
+        Spacer(Modifier.height(4.dp))
+        Text(result.displayUrl.substringBefore("/"), style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
         Text(
             text = result.displayUrl,
-            style = MaterialTheme.typography.bodyLarge.copy(
+            style = MaterialTheme.typography.labelSmall.copy(
                 color = Color(0xFF1A73E8), 
-                textDecoration = TextDecoration.Underline,
-                fontWeight = FontWeight.Medium
+                textDecoration = TextDecoration.Underline
             ),
-            maxLines = 2,
+            maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.clickable { openUrl(context, result.url) }.padding(4.dp)
+            modifier = Modifier.clickable { openUrl(context, result.url) }.padding(2.dp)
         )
-        Spacer(Modifier.height(20.dp))
-        ActionRow { PrimaryAction("Open Browser") { openUrl(context, result.url) }; SecondaryAction("Copy Link") { copyToClipboard(context, "URL", result.url) } }
+        Spacer(Modifier.height(16.dp))
+        ActionRow { PrimaryAction("Open Link") { openUrl(context, result.url) }; SecondaryAction("Copy") { copyToClipboard(context, "URL", result.url) } }
     }
 }
 
 @Composable
 private fun WifiResult(context: Context, result: QrResult.WiFi) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Icon(Icons.Default.Wifi, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(42.dp))
-        Spacer(Modifier.height(10.dp))
-        Text(result.ssid, style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold))
-        Text("${result.security}${if (result.password != null) " · Password: ${result.password}" else ""}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(Modifier.height(20.dp))
-        ActionRow { if (result.password != null) PrimaryAction("Copy Password") { copyToClipboard(context, "WiFi Password", result.password) } }
+        Icon(Icons.Default.Wifi, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(40.dp))
+        Spacer(Modifier.height(6.dp))
+        Text(result.ssid, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
+        Text("${result.security}${if (result.password != null) " · ${result.password}" else ""}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(16.dp))
+        ActionRow { if (result.password != null) PrimaryAction("Copy Pass") { copyToClipboard(context, "WiFi Password", result.password) } }
     }
 }
 
 @Composable
 private fun PhoneResult(context: Context, result: QrResult.Phone) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Icon(Icons.Default.Phone, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(42.dp))
-        Spacer(Modifier.height(10.dp))
-        Text(result.number, style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold))
-        Spacer(Modifier.height(20.dp))
+        Icon(Icons.Default.Phone, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(40.dp))
+        Spacer(Modifier.height(6.dp))
+        Text(result.number, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
+        Spacer(Modifier.height(16.dp))
         ActionRow {
-            PrimaryAction("Call Now") { openUrl(context, "tel:${result.number}") }
-            SecondaryAction("Send SMS") { openUrl(context, "sms:${result.number}") }
+            PrimaryAction("Call") { openUrl(context, "tel:${result.number}") }
+            SecondaryAction("SMS") { openUrl(context, "sms:${result.number}") }
             SecondaryAction("Copy") { copyToClipboard(context, "Phone", result.number) }
         }
     }
@@ -325,12 +317,12 @@ private fun PhoneResult(context: Context, result: QrResult.Phone) {
 @Composable
 private fun ProductResult(context: Context, result: QrResult.Product) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Icon(Icons.Default.ShoppingBag, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(42.dp))
-        Spacer(Modifier.height(10.dp))
-        Text(result.barcode, style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold))
-        Spacer(Modifier.height(20.dp))
+        Icon(Icons.Default.ShoppingBag, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(40.dp))
+        Spacer(Modifier.height(6.dp))
+        Text(result.barcode, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
+        Spacer(Modifier.height(16.dp))
         ActionRow {
-            PrimaryAction("Amazon Search") { openUrl(context, "https://www.amazon.com/s?k=${result.barcode}") }
+            PrimaryAction("Amazon") { openUrl(context, "https://www.amazon.com/s?k=${result.barcode}") }
             SecondaryAction("Google") { openUrl(context, "https://www.google.com/search?q=${result.barcode}") }
             SecondaryAction("Copy") { copyToClipboard(context, "Barcode", result.barcode) }
         }
@@ -341,12 +333,12 @@ private fun ProductResult(context: Context, result: QrResult.Product) {
 private fun VCardResult(context: Context, result: QrResult.VCard) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text("👤", fontSize = 42.sp)
-        if (result.name != null) Text(result.name, style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold))
+        if (result.name != null) Text(result.name, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
         val sub = listOfNotNull(result.phone, result.email).joinToString(" · ")
-        if (sub.isNotEmpty()) Text(sub, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(Modifier.height(20.dp))
+        if (sub.isNotEmpty()) Text(sub, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.height(16.dp))
         ActionRow {
-            PrimaryAction("Save Contact") {
+            PrimaryAction("Save") {
                 context.startActivity(Intent(Intent.ACTION_INSERT).apply {
                     type = ContactsContract.RawContacts.CONTENT_TYPE
                     result.name?.let { putExtra(ContactsContract.Intents.Insert.NAME, it) }
@@ -355,7 +347,7 @@ private fun VCardResult(context: Context, result: QrResult.VCard) {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 })
             }
-            SecondaryAction("Copy Raw") { copyToClipboard(context, "Contact", result.raw) }
+            SecondaryAction("Copy") { copyToClipboard(context, "Contact", result.raw) }
         }
     }
 }
@@ -364,12 +356,12 @@ private fun VCardResult(context: Context, result: QrResult.VCard) {
 private fun GeoResult(context: Context, result: QrResult.GeoPoint) {
     val coord = "%.4f, %.4f".format(result.lat, result.lng)
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Icon(Icons.Default.LocationOn, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(42.dp))
-        Spacer(Modifier.height(10.dp))
-        Text(coord, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
-        Spacer(Modifier.height(20.dp))
+        Icon(Icons.Default.LocationOn, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(40.dp))
+        Spacer(Modifier.height(6.dp))
+        Text(coord, style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold))
+        Spacer(Modifier.height(16.dp))
         ActionRow {
-            PrimaryAction("Open in Maps") { openUrl(context, "geo:${result.lat},${result.lng}?q=${result.lat},${result.lng}") }
+            PrimaryAction("Maps") { openUrl(context, "geo:${result.lat},${result.lng}?q=${result.lat},${result.lng}") }
             SecondaryAction("Copy") { copyToClipboard(context, "Coordinates", coord) }
         }
     }
@@ -379,34 +371,34 @@ private fun GeoResult(context: Context, result: QrResult.GeoPoint) {
 private fun PlainTextResult(context: Context, result: QrResult.PlainText) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text("📝", fontSize = 42.sp)
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(4.dp))
         Text(
             text = "\"${result.text}\"", 
-            style = MaterialTheme.typography.bodyLarge.copy(lineHeight = 22.sp), 
-            maxLines = 5, 
+            style = MaterialTheme.typography.bodySmall.copy(lineHeight = 18.sp), 
+            maxLines = 3, 
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = 10.dp)
+            modifier = Modifier.padding(horizontal = 8.dp)
         )
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(16.dp))
         ActionRow {
             PrimaryAction("Search") { openUrl(context, "https://www.google.com/search?q=${Uri.encode(result.text)}") }
-            SecondaryAction("Copy Text") { copyToClipboard(context, "Text", result.text) }
-            SecondaryAction("Translate") { openUrl(context, "https://translate.google.com/?text=${Uri.encode(result.text)}") }
+            SecondaryAction("Copy") { copyToClipboard(context, "Text", result.text) }
+            SecondaryAction("Trans") { openUrl(context, "https://translate.google.com/?text=${Uri.encode(result.text)}") }
         }
     }
 }
 
 @Composable
 private fun ActionRow(content: @Composable () -> Unit) {
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally), verticalAlignment = Alignment.CenterVertically) { content() }
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally), verticalAlignment = Alignment.CenterVertically) { content() }
 }
 
 @Composable
 private fun PrimaryAction(label: String, onClick: () -> Unit) {
-    Button(onClick = onClick, shape = RoundedCornerShape(14.dp), contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp)) { Text(label, style = MaterialTheme.typography.labelLarge) }
+    Button(onClick = onClick, shape = RoundedCornerShape(12.dp), contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp), modifier = Modifier.height(44.dp)) { Text(label, style = MaterialTheme.typography.labelMedium) }
 }
 
 @Composable
 private fun SecondaryAction(label: String, onClick: () -> Unit) {
-    FilledTonalButton(onClick = onClick, shape = RoundedCornerShape(14.dp), contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp)) { Text(label, style = MaterialTheme.typography.labelLarge) }
+    FilledTonalButton(onClick = onClick, shape = RoundedCornerShape(12.dp), contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp), modifier = Modifier.height(44.dp)) { Text(label, style = MaterialTheme.typography.labelMedium) }
 }
