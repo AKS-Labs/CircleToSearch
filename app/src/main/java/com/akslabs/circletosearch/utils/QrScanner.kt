@@ -41,63 +41,100 @@ object QrScanner {
 
     /** Scan for all barcodes / QR codes in the given bitmap. Returns empty list when none found. */
     fun scanBitmapAll(bitmap: Bitmap): List<QrResultWithBounds> {
-        return try {
-            val width = bitmap.width
-            val height = bitmap.height
-            val pixels = IntArray(width * height)
-            bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
+        val allResults = mutableListOf<QrResultWithBounds>()
+        val foundTexts = mutableSetOf<String>()
 
-            val source = RGBLuminanceSource(width, height, pixels)
-            val multiReader = GenericMultipleBarcodeReader(MultiFormatReader())
-            
-            val allResults = mutableListOf<QrResultWithBounds>()
-            val foundTexts = mutableSetOf<String>()
+        fun processResults(rawResults: List<com.google.zxing.Result>, xOffset: Int, yOffset: Int) {
+            rawResults.forEach { raw ->
+                if (!foundTexts.contains(raw.text)) {
+                    foundTexts.add(raw.text)
+                    val globalBounds = computeBounds(raw.resultPoints)?.let { b ->
+                        android.graphics.RectF(b.left + xOffset, b.top + yOffset, b.right + xOffset, b.bottom + yOffset)
+                    }
+                    allResults.add(QrResultWithBounds(parseResult(raw.text), raw.text, globalBounds))
+                }
+            }
+        }
 
-            fun tryStrategy(binarizerType: String, inverted: Boolean) {
+        try {
+            val w = bitmap.width
+            val h = bitmap.height
+
+            // 1. FULL SCAN
+            val fullPixels = IntArray(w * h)
+            bitmap.getPixels(fullPixels, 0, w, 0, 0, w, h)
+            processResults(scanLuminanceSource(RGBLuminanceSource(w, h, fullPixels)), 0, 0)
+            android.util.Log.d("CircleToSearch", "QrScanner: Full scan found ${allResults.size} codes")
+
+            // 2. TILED SCAN (2x2 Overlapping Quadrants)
+            // Using ~65% size to ensure 15% middle overlap
+            val tileW = (w * 0.65f).toInt()
+            val tileH = (h * 0.65f).toInt()
+
+            val tiles = listOf(
+                android.graphics.Rect(0, 0, tileW, tileH),                 // Top Left
+                android.graphics.Rect(w - tileW, 0, w, tileH),             // Top Right
+                android.graphics.Rect(0, h - tileH, tileW, h),             // Bottom Left
+                android.graphics.Rect(w - tileW, h - tileH, w, h)          // Bottom Right
+            )
+
+            tiles.forEachIndexed { index, rect ->
                 try {
-                    val currentSource = if (inverted) source.invert() else source
-                    val binarizer = if (binarizerType == "Hybrid") {
-                        HybridBinarizer(currentSource)
-                    } else {
-                        com.google.zxing.common.GlobalHistogramBinarizer(currentSource)
-                    }
+                    val tw = rect.width()
+                    val th = rect.height()
+                    val tilePixels = IntArray(tw * th)
+                    bitmap.getPixels(tilePixels, 0, tw, rect.left, rect.top, tw, th)
                     
-                    val binaryBitmap = BinaryBitmap(binarizer)
-                    val rawResults = multiReader.decodeMultiple(binaryBitmap, HINTS)
-                    
-                    rawResults.forEach { raw ->
-                        if (!foundTexts.contains(raw.text)) {
-                            foundTexts.add(raw.text)
-                            val bounds = computeBounds(raw.resultPoints)
-                            allResults.add(QrResultWithBounds(parseResult(raw.text), raw.text, bounds))
-                        }
-                    }
-                    android.util.Log.d("CircleToSearch", "QrScanner: Strategy $binarizerType (inverted=$inverted) found ${rawResults.size} new codes")
-                } catch (e: NotFoundException) {
-                    // Normal, keep going
+                    val results = scanLuminanceSource(RGBLuminanceSource(tw, th, tilePixels))
+                    val beforeCount = allResults.size
+                    processResults(results, rect.left, rect.top)
+                    android.util.Log.d("CircleToSearch", "QrScanner: Tile $index found ${allResults.size - beforeCount} NEW codes")
                 } catch (e: Exception) {
-                    android.util.Log.e("CircleToSearch", "QrScanner: Strategy $binarizerType (inverted=$inverted) error", e)
+                    android.util.Log.e("CircleToSearch", "QrScanner: Tile $index failed", e)
                 }
             }
 
-            // 1. Standard Hybrid (Fast and good for most cases)
-            tryStrategy("Hybrid", false)
-            
-            // 2. Global Histogram (Handles low contrast / lighting issues better)
-            tryStrategy("Global", false)
-            
-            // 3. Inverted Hybrid (For light-on-dark QR codes)
-            tryStrategy("Hybrid", true)
-            
-            // 4. Inverted Global (For light-on-dark with poor contrast)
-            tryStrategy("Global", true)
-
-            android.util.Log.d("CircleToSearch", "QrScanner: Total distinct codes found: ${allResults.size}")
-            allResults
+            android.util.Log.d("CircleToSearch", "QrScanner: Tiled scan COMPLETE. Total codes: ${allResults.size}")
+            return allResults
         } catch (e: Exception) {
             android.util.Log.e("CircleToSearch", "QrScanner: Fatal error in scanBitmapAll", e)
-            emptyList()
+            return emptyList()
         }
+    }
+
+    /** Core scanner: tries Hybrid, Global, and Inverted versions of a source. */
+    private fun scanLuminanceSource(source: com.google.zxing.LuminanceSource): List<com.google.zxing.Result> {
+        val results = mutableListOf<com.google.zxing.Result>()
+        val foundTexts = mutableSetOf<String>()
+        val multiReader = GenericMultipleBarcodeReader(MultiFormatReader())
+
+        fun run(binarizer: com.google.zxing.Binarizer) {
+            try {
+                val bitmap = BinaryBitmap(binarizer)
+                val raw = multiReader.decodeMultiple(bitmap, HINTS)
+                raw.forEach { r ->
+                    if (!foundTexts.contains(r.text)) {
+                        foundTexts.add(r.text)
+                        results.add(r)
+                    }
+                }
+            } catch (e: NotFoundException) {
+                // Ignore
+            } catch (e: Exception) {
+                // Log minor errors if needed
+            }
+        }
+
+        // Try strategies
+        run(HybridBinarizer(source))
+        run(com.google.zxing.common.GlobalHistogramBinarizer(source))
+        
+        // Try inverted
+        val inverted = source.invert()
+        run(HybridBinarizer(inverted))
+        run(com.google.zxing.common.GlobalHistogramBinarizer(inverted))
+
+        return results
     }
 
     /** Compatibility single-result scan (kept for backward compat). */
