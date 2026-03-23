@@ -36,16 +36,7 @@ object QrScanner {
 
     private val HINTS = mapOf(
         DecodeHintType.TRY_HARDER to true,
-        DecodeHintType.POSSIBLE_FORMATS to listOf(
-            BarcodeFormat.QR_CODE,
-            BarcodeFormat.EAN_13,
-            BarcodeFormat.EAN_8,
-            BarcodeFormat.UPC_A,
-            BarcodeFormat.DATA_MATRIX,
-            BarcodeFormat.PDF_417,
-            BarcodeFormat.CODE_128,
-            BarcodeFormat.CODE_39
-        )
+        DecodeHintType.POSSIBLE_FORMATS to listOf(BarcodeFormat.QR_CODE)
     )
 
     /** Scan for all barcodes / QR codes in the given bitmap. Returns empty list when none found. */
@@ -57,34 +48,54 @@ object QrScanner {
             bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
 
             val source = RGBLuminanceSource(width, height, pixels)
-            val binaryBitmap = BinaryBitmap(HybridBinarizer(source))
-
             val multiReader = GenericMultipleBarcodeReader(MultiFormatReader())
-            android.util.Log.d("CircleToSearch", "QrScanner: Starting decodeMultiple (HybridBinarizer)...")
-            var rawResults: Array<Result> = try {
-                multiReader.decodeMultiple(binaryBitmap, HINTS)
-            } catch (e: NotFoundException) {
-                android.util.Log.d("CircleToSearch", "QrScanner: HybridBinarizer found nothing, trying GlobalHistogramBinarizer...")
-                try {
-                    val globalBitmap = BinaryBitmap(com.google.zxing.common.GlobalHistogramBinarizer(source))
-                    multiReader.decodeMultiple(globalBitmap, HINTS)
-                } catch (e2: NotFoundException) {
-                    android.util.Log.d("CircleToSearch", "QrScanner: GlobalHistogramBinarizer also found nothing")
-                    emptyArray()
-                }
-            } catch (e: Exception) {
-                android.util.Log.e("CircleToSearch", "QrScanner: Error during decode", e)
-                emptyArray()
-            }
-            android.util.Log.d("CircleToSearch", "QrScanner: Processed ${rawResults.size} raw results")
+            
+            val allResults = mutableListOf<QrResultWithBounds>()
+            val foundTexts = mutableSetOf<String>()
 
-            rawResults.mapNotNull { raw ->
+            fun tryStrategy(binarizerType: String, inverted: Boolean) {
                 try {
-                    val bounds = computeBounds(raw.resultPoints)
-                    QrResultWithBounds(parseResult(raw.text), raw.text, bounds)
-                } catch (e: Exception) { null }
+                    val currentSource = if (inverted) source.invert() else source
+                    val binarizer = if (binarizerType == "Hybrid") {
+                        HybridBinarizer(currentSource)
+                    } else {
+                        com.google.zxing.common.GlobalHistogramBinarizer(currentSource)
+                    }
+                    
+                    val binaryBitmap = BinaryBitmap(binarizer)
+                    val rawResults = multiReader.decodeMultiple(binaryBitmap, HINTS)
+                    
+                    rawResults.forEach { raw ->
+                        if (!foundTexts.contains(raw.text)) {
+                            foundTexts.add(raw.text)
+                            val bounds = computeBounds(raw.resultPoints)
+                            allResults.add(QrResultWithBounds(parseResult(raw.text), raw.text, bounds))
+                        }
+                    }
+                    android.util.Log.d("CircleToSearch", "QrScanner: Strategy $binarizerType (inverted=$inverted) found ${rawResults.size} new codes")
+                } catch (e: NotFoundException) {
+                    // Normal, keep going
+                } catch (e: Exception) {
+                    android.util.Log.e("CircleToSearch", "QrScanner: Strategy $binarizerType (inverted=$inverted) error", e)
+                }
             }
+
+            // 1. Standard Hybrid (Fast and good for most cases)
+            tryStrategy("Hybrid", false)
+            
+            // 2. Global Histogram (Handles low contrast / lighting issues better)
+            tryStrategy("Global", false)
+            
+            // 3. Inverted Hybrid (For light-on-dark QR codes)
+            tryStrategy("Hybrid", true)
+            
+            // 4. Inverted Global (For light-on-dark with poor contrast)
+            tryStrategy("Global", true)
+
+            android.util.Log.d("CircleToSearch", "QrScanner: Total distinct codes found: ${allResults.size}")
+            allResults
         } catch (e: Exception) {
+            android.util.Log.e("CircleToSearch", "QrScanner: Fatal error in scanBitmapAll", e)
             emptyList()
         }
     }

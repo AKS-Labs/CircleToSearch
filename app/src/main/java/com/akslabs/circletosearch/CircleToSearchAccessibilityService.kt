@@ -685,7 +685,7 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
                 executor,
                 object : TakeScreenshotCallback {
                     override fun onSuccess(screenshot: ScreenshotResult) {
-                        try {
+                         try {
                             val hardwareBuffer = screenshot.hardwareBuffer
                             val colorSpace = screenshot.colorSpace
                             
