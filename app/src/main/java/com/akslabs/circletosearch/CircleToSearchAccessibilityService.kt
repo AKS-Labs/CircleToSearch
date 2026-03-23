@@ -745,20 +745,10 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         val centerX = rect.centerX()
         val centerY = rect.centerY()
         
-        // Initial Size: Max 50% of screen width to keep it as a "sticker"
-        val maxDim = (screenWidth * 0.5f).toInt()
-        var width = bitmap.width
-        var height = bitmap.height
-        if (width > maxDim || height > maxDim) {
-            val ratio = width.toFloat() / height.toFloat()
-            if (width > height) {
-                width = maxDim
-                height = (maxDim / ratio).toInt()
-            } else {
-                height = maxDim
-                width = (maxDim * ratio).toInt()
-            }
-        }
+        // --- Phase 32: 1:1 Scaling ---
+        // Use natural dimensions of the cropped bitmap (match what user saw in lens)
+        val width = bitmap.width
+        val height = bitmap.height
 
         val params = WindowManager.LayoutParams(
             width, height,
@@ -776,7 +766,6 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
             setImageBitmap(bitmap)
             scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
             elevation = 20f
-            // Give it rounded corners
             outlineProvider = object : ViewOutlineProvider() {
                 override fun getOutline(view: View, outline: android.graphics.Outline) {
                     outline.setRoundRect(0, 0, view.width, view.height, 16f * resources.displayMetrics.density)
@@ -788,37 +777,59 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
             var initialY = 0
             var initialTouchX = 0f
             var initialTouchY = 0f
+            var isDragging = false
+            var currentMenu: View? = null
+
+            // --- Phase 31: GestureDetector for reliable long-press ---
+            val gestureDetector = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
+                override fun onLongPress(e: MotionEvent) {
+                    if (!isDragging) {
+                        // Show actions
+                        if (currentMenu == null) {
+                            showPinnedActions(this@apply, bitmap, params) { menu ->
+                                currentMenu = menu
+                            }
+                        }
+                    }
+                }
+            })
 
             @SuppressLint("ClickableViewAccessibility")
             setOnTouchListener { v, event ->
+                // Feed gesture detector
+                gestureDetector.onTouchEvent(event)
+                
                 when (event.action) {
                     MotionEvent.ACTION_DOWN -> {
                         initialX = params.x
                         initialY = params.y
                         initialTouchX = event.rawX
                         initialTouchY = event.rawY
-                        v.animate().scaleX(1.05f).scaleY(1.05f).setDuration(100).start()
+                        isDragging = false
+                        v.animate().scaleX(1.03f).scaleY(1.03f).setDuration(100).start()
                         true
                     }
                     MotionEvent.ACTION_MOVE -> {
-                        params.x = initialX + (event.rawX - initialTouchX).toInt()
-                        params.y = initialY + (event.rawY - initialTouchY).toInt()
+                        val dx = (event.rawX - initialTouchX).toInt()
+                        val dy = (event.rawY - initialTouchY).toInt()
+                        if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+                            isDragging = true
+                            // If dragging, dismiss menu
+                            currentMenu?.let { try { windowManager?.removeView(it) } catch(e: Exception) {} }
+                            currentMenu = null
+                        }
+                        
+                        params.x = initialX + dx
+                        params.y = initialY + dy
                         windowManager?.updateViewLayout(v, params)
                         true
                     }
-                    MotionEvent.ACTION_UP -> {
+                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                         v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(100).start()
-                        // Small bounce if dragged to edge? (Optional)
                         true
                     }
                     else -> false
                 }
-            }
-            
-            // Long press for actions (Phase 29)
-            setOnLongClickListener {
-                showPinnedActions(this, bitmap, params)
-                true
             }
         }
 
@@ -829,7 +840,7 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         }
     }
 
-    private fun showPinnedActions(anchorView: View, bitmap: Bitmap, anchorParams: WindowManager.LayoutParams) {
+    private fun showPinnedActions(anchorView: View, bitmap: Bitmap, anchorParams: WindowManager.LayoutParams, onMenuCreated: (View) -> Unit) {
         val displayMetrics = resources.displayMetrics
         val iconSize = (44 * displayMetrics.density).toInt()
         val padding = (8 * displayMetrics.density).toInt()
@@ -910,6 +921,7 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
 
         try {
             windowManager?.addView(menuLayout, menuParams)
+            onMenuCreated(menuLayout)
         } catch (e: Exception) {
             android.util.Log.e("CircleToSearch", "Failed to add menu view", e)
         }
