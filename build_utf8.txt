@@ -25,16 +25,15 @@ All code optimizations and obfuscation are disabled for debuggable builds.
 > Task :app:compileDebugKotlin FAILED
 ./gradlew.bat : e: file:///C:/Users/ashin/Androi
 dStudioProjects/CircleToSearch/app/src/main/java
-/com/akslabs/circletosearch/ui/CircleToSearchScr
-een.kt:1496:93 Argument type mismatch: actual 
-type is 'android.graphics.Rect?', but 
-'android.graphics.Rect' was expected.
+/com/akslabs/circletosearch/CircleToSearchAccess
+ibilityService.kt:808:57 Unresolved reference 
+'v'.
 At line:1 char:1
 + ./gradlew.bat :app:compileDebugKotlin 2>&1 | 
 Out-File -FilePath build ...
 + ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     + CategoryInfo          : NotSpecified: (e: 
-    file:///C:/U...' was expected.:String) [],  
+    file:///C:/U... reference 'v'.:String) [],  
    RemoteException
     + FullyQualifiedErrorId : NativeCommandErro 
    r
@@ -58,5 +57,5 @@ log output.
 > Run with --scan to get full insights.
 > Get more help at https://help.gradle.org.
 
-BUILD FAILED in 7s
+BUILD FAILED in 11s
 16 actionable tasks: 1 executed, 15 up-to-date

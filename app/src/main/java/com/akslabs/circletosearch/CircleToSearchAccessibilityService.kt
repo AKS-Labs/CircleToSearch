@@ -31,6 +31,7 @@ import android.graphics.Color
 import android.graphics.Outline
 import android.graphics.PixelFormat
 import android.graphics.Rect
+import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.hardware.camera2.CameraManager
 import android.os.Build
@@ -40,6 +41,7 @@ import android.view.Display
 import android.view.GestureDetector
 import android.view.Gravity
 import android.view.MotionEvent
+import android.view.ScaleGestureDetector
 import android.view.View
 import android.view.ViewOutlineProvider
 import android.view.WindowManager
@@ -765,10 +767,11 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         val pinnedView = android.widget.ImageView(this).apply {
             setImageBitmap(bitmap)
             scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
-            elevation = 20f
+            elevation = 0f // Phase 35: Remove shadows
             outlineProvider = object : ViewOutlineProvider() {
                 override fun getOutline(view: View, outline: android.graphics.Outline) {
-                    outline.setRoundRect(0, 0, view.width, view.height, 16f * resources.displayMetrics.density)
+                    // Phase 35: Fixed corner radius to be consistent with lens
+                    outline.setRoundRect(0, 0, view.width, view.height, 12f * resources.displayMetrics.density)
                 }
             }
             clipToOutline = true
@@ -778,7 +781,39 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
             var initialTouchX = 0f
             var initialTouchY = 0f
             var isDragging = false
+            var isScaling = false
             var currentMenu: View? = null
+
+            // --- Phase 33: ScaleGestureDetector for pinch zoom ---
+            val scaleDetector = ScaleGestureDetector(context, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+                override fun onScale(detector: ScaleGestureDetector): Boolean {
+                    isScaling = true
+                    val scaleFactor = detector.scaleFactor
+                    
+                    val newWidth = (params.width * scaleFactor).toInt()
+                    val newHeight = (params.height * scaleFactor).toInt()
+                    
+                    // Constraints: 15% to 95% of screen
+                    val minDim = (screenWidth * 0.15f).toInt()
+                    val maxDim = (screenWidth * 0.95f).toInt()
+                    
+                    if (newWidth in minDim..maxDim && newHeight in minDim..maxDim) {
+                        // Adjust position to scale from center of pinch
+                        val focusX = detector.focusX
+                        val focusY = detector.focusY
+                        
+                        params.x -= ((newWidth - params.width) * (focusX / this@apply.width)).toInt()
+                        params.y -= ((newHeight - params.height) * (focusY / this@apply.height)).toInt()
+                        
+                        params.width = newWidth
+                        params.height = newHeight
+                        windowManager?.updateViewLayout(this@apply, params)
+                        // Phase 39: Force outline invalidation to keep corners rounded during resize
+                        this@apply.invalidateOutline()
+                    }
+                    return true
+                }
+            })
 
             // --- Phase 31: GestureDetector for reliable long-press ---
             val gestureDetector = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
@@ -796,20 +831,28 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
 
             @SuppressLint("ClickableViewAccessibility")
             setOnTouchListener { v, event ->
-                // Feed gesture detector
+                // Feed both detectors
+                scaleDetector.onTouchEvent(event)
                 gestureDetector.onTouchEvent(event)
                 
-                when (event.action) {
+                when (event.actionMasked) {
                     MotionEvent.ACTION_DOWN -> {
                         initialX = params.x
                         initialY = params.y
                         initialTouchX = event.rawX
                         initialTouchY = event.rawY
                         isDragging = false
-                        v.animate().scaleX(1.03f).scaleY(1.03f).setDuration(100).start()
+                        isScaling = false
+                        // Phase 37: Removed scale-up animation to prevent corner issues
+                        true
+                    }
+                    MotionEvent.ACTION_POINTER_DOWN -> {
+                        isScaling = true
                         true
                     }
                     MotionEvent.ACTION_MOVE -> {
+                        if (isScaling) return@setOnTouchListener true
+                        
                         val dx = (event.rawX - initialTouchX).toInt()
                         val dy = (event.rawY - initialTouchY).toInt()
                         if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
@@ -825,7 +868,8 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
                         true
                     }
                     MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                        v.animate().scaleX(1.0f).scaleY(1.0f).setDuration(100).start()
+                        // Phase 37: Removed scale-down animation
+                        isScaling = false
                         true
                     }
                     else -> false
@@ -843,28 +887,60 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
     private fun showPinnedActions(anchorView: View, bitmap: Bitmap, anchorParams: WindowManager.LayoutParams, onMenuCreated: (View) -> Unit) {
         val displayMetrics = resources.displayMetrics
         val iconSize = (44 * displayMetrics.density).toInt()
-        val padding = (8 * displayMetrics.density).toInt()
+        val btnPadding = (8 * displayMetrics.density).toInt()
+        val menuPadding = (10 * displayMetrics.density).toInt()
+        val cornerRadius = 32f * displayMetrics.density
+
+        // --- Phase 40: CopyText-style Text Toolbar ---
+        val isNight = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+        
+        // Match CopyTextOverlayManager's palette
+        val toolbarBgColor = if (isNight) Color.parseColor("#FF1C1C1C") else Color.parseColor("#FFF3EDF7")
+        val primaryColor = if (isNight) Color.parseColor("#FFD0BCFF") else Color.parseColor("#FF6750A4")
+        val contentColor = Color.WHITE
+        val borderColor = if (isNight) Color.parseColor("#33FFFFFF") else Color.parseColor("#22000000")
 
         val menuLayout = android.widget.LinearLayout(this).apply {
             orientation = android.widget.LinearLayout.HORIZONTAL
-            setBackgroundColor(Color.parseColor("#E0000000")) // Semi-transparent black
-            setPadding(padding, padding, padding, padding)
-            // Rounded corners for menu
+            setPadding(menuPadding, menuPadding, menuPadding, menuPadding)
+            elevation = 24f
+            
+            val background = GradientDrawable().apply {
+                setColor(toolbarBgColor)
+                setCornerRadius(cornerRadius)
+                setStroke((1 * displayMetrics.density).toInt(), borderColor)
+            }
+            setBackground(background)
+            
             outlineProvider = object : ViewOutlineProvider() {
                 override fun getOutline(view: View, outline: android.graphics.Outline) {
-                    outline.setRoundRect(0, 0, view.width, view.height, 24f * displayMetrics.density)
+                    outline.setRoundRect(0, 0, view.width, view.height, cornerRadius)
                 }
             }
             clipToOutline = true
-            elevation = 30f
         }
 
-        fun createButton(iconRes: Int, color: Int, onClick: () -> Unit) = android.widget.ImageButton(this).apply {
-            setImageResource(iconRes)
-            setBackgroundColor(Color.TRANSPARENT)
-            imageTintList = android.content.res.ColorStateList.valueOf(color)
-            scaleType = android.widget.ImageView.ScaleType.CENTER_INSIDE
-            layoutParams = android.widget.LinearLayout.LayoutParams(iconSize, iconSize)
+        fun createTextActionButton(label: String, onClick: () -> Unit) = android.widget.Button(this).apply {
+            text = label
+            setTextColor(contentColor)
+            setTypeface(Typeface.DEFAULT, Typeface.BOLD)
+            textSize = 12f // Roughly 30f in Paint logic
+            
+            // Professional pill background (Solid Primary)
+            val btnDrawable = GradientDrawable().apply {
+                setColor(primaryColor)
+                setCornerRadius(20 * displayMetrics.density)
+            }
+            background = btnDrawable
+            
+            setPadding((16 * displayMetrics.density).toInt(), 0, (16 * displayMetrics.density).toInt(), 0)
+            
+            layoutParams = android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                (36 * displayMetrics.density).toInt()
+            ).apply {
+                marginEnd = (8 * displayMetrics.density).toInt()
+            }
             setOnClickListener { onClick() }
         }
 
@@ -877,12 +953,13 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         )
         menuParams.gravity = Gravity.TOP or Gravity.START
         
-        // Position menu above the anchor if possible, else below
-        menuParams.x = anchorParams.x + (anchorParams.width / 2) - (iconSize * 1.5f + padding * 2).toInt()
-        menuParams.y = if (anchorParams.y > iconSize * 3) anchorParams.y - iconSize * 2 else anchorParams.y + anchorParams.height + padding
+        // Position menu above the sticker
+        val menuWidthApprox = (80 * 3 * displayMetrics.density).toInt()
+        menuParams.x = (anchorParams.x + (anchorParams.width / 2) - (menuWidthApprox / 2)).coerceAtLeast(0)
+        menuParams.y = if (anchorParams.y > iconSize * 3) anchorParams.y - (50 * displayMetrics.density).toInt() else anchorParams.y + anchorParams.height + menuPadding
 
         // --- Action: Delete ---
-        menuLayout.addView(createButton(android.R.drawable.ic_menu_delete, Color.RED) {
+        menuLayout.addView(createTextActionButton("DELETE") {
             try {
                 windowManager?.removeView(anchorView)
                 windowManager?.removeView(menuLayout)
@@ -890,14 +967,14 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         })
 
         // --- Action: Save ---
-        menuLayout.addView(createButton(android.R.drawable.ic_menu_save, Color.WHITE) {
+        menuLayout.addView(createTextActionButton("SAVE") {
             val success = ImageUtils.saveToGallery(this@CircleToSearchAccessibilityService, bitmap)
             android.widget.Toast.makeText(this@CircleToSearchAccessibilityService, if (success) "Saved to Gallery" else "Save failed", android.widget.Toast.LENGTH_SHORT).show()
             try { windowManager?.removeView(menuLayout) } catch (e: Exception) {}
         })
 
         // --- Action: Share ---
-        menuLayout.addView(createButton(android.R.drawable.ic_menu_share, Color.WHITE) {
+        menuLayout.addView(createTextActionButton("SHARE") {
             try {
                 val fileName = "share_pin_${java.util.UUID.randomUUID()}.png"
                 val path = ImageUtils.saveBitmap(this@CircleToSearchAccessibilityService, bitmap, fileName)
@@ -915,9 +992,6 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
             }
             try { windowManager?.removeView(menuLayout) } catch (e: Exception) {}
         })
-
-        // Dismiss menu on outside touch or after delay (simpler: click elsewhere or just close it after action)
-        // For now, it stays until an action is picked or service is destroyed.
 
         try {
             windowManager?.addView(menuLayout, menuParams)
