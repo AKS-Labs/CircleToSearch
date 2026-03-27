@@ -28,7 +28,10 @@ import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.graphics.Outline
 import android.graphics.PixelFormat
+import android.graphics.Rect
+import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.hardware.camera2.CameraManager
 import android.os.Build
@@ -38,15 +41,22 @@ import android.view.Display
 import android.view.GestureDetector
 import android.view.Gravity
 import android.view.MotionEvent
+import android.view.ScaleGestureDetector
 import android.view.View
 import android.view.ViewOutlineProvider
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
+import android.view.accessibility.AccessibilityNodeInfo
 import com.akslabs.circletosearch.data.ActionType
 import com.akslabs.circletosearch.data.BitmapRepository
 import com.akslabs.circletosearch.data.GestureType
 import com.akslabs.circletosearch.data.OverlayConfigurationManager
 import com.akslabs.circletosearch.data.OverlaySegment
+import com.akslabs.circletosearch.ui.components.CopyTextOverlayManager
+import com.akslabs.circletosearch.utils.ImageUtils
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
 
@@ -56,6 +66,13 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
     private val overlayViews = mutableListOf<View>() // Track all added segment views
     private val executor: Executor = Executors.newSingleThreadExecutor()
     private lateinit var configManager: OverlayConfigurationManager
+    
+    /** Kept by companion so scroll events can re-scan copy-text nodes. */
+    internal var copyTextManager: CopyTextOverlayManager? = null
+    
+    // Phase 42: Extraction Results
+    private val _extractionResults = MutableStateFlow<List<Rect>>(emptyList())
+    val extractionResults: StateFlow<List<Rect>> = _extractionResults.asStateFlow()
     
     // Bubble related - Keeping existing logic but refactoring slightly if needed
     // For now, keeping bubble separate as requested in prompt "statusbar overlay customization... but it should work normally like now"
@@ -80,6 +97,15 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         super.onServiceConnected()
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         configManager = OverlayConfigurationManager(this)
+        
+        // node info from other windows without touching AndroidManifest.xml.
+        // Also enable enhanced web accessibility for better WebView coverage.
+        val info = serviceInfo
+        info.flags = info.flags or 
+            android.accessibilityservice.AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS or
+            android.accessibilityservice.AccessibilityServiceInfo.FLAG_REQUEST_ENHANCED_WEB_ACCESSIBILITY or
+            android.accessibilityservice.AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS
+        serviceInfo = info
         
         prefs.registerOnSharedPreferenceChangeListener(prefsListener)
         overlayPrefs.registerOnSharedPreferenceChangeListener(overlayPrefsListener)
@@ -661,17 +687,17 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
 
     private fun performCapture() {
         android.util.Log.d("CircleToSearch", "performCapture called. hasWindowManager=${windowManager != null}")
+        
+        // Clear repository at the source to prevent any "ghost" flash of old data
+        BitmapRepository.clear()
+        
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            // Haptic Feedback (Crisp Click) - Moved to performAction, but keeping here specifically for direct calls if any
-             // (performAction handles its own vibration)
-            
-            // Execute immediately for instant trigger
             takeScreenshot(
                 Display.DEFAULT_DISPLAY,
                 executor,
                 object : TakeScreenshotCallback {
                     override fun onSuccess(screenshot: ScreenshotResult) {
-                        try {
+                         try {
                             val hardwareBuffer = screenshot.hardwareBuffer
                             val colorSpace = screenshot.colorSpace
                             
@@ -708,7 +734,7 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         }
     }
 
-    private fun launchOverlay() {
+    fun launchOverlay() {
         android.util.Log.d("CircleToSearchAccess", "AccessibilityService launching OverlayActivity")
         val intent = Intent(this, OverlayActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -717,17 +743,422 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         startActivity(intent)
     }
 
-    override fun onAccessibilityEvent(event: AccessibilityEvent?) {}
+    private fun showPinnedArea(bitmap: Bitmap, rect: android.graphics.Rect) {
+        android.util.Log.d("CircleToSearch", "showPinnedArea called for rect: $rect")
+        
+        val displayMetrics = resources.displayMetrics
+        val screenWidth = displayMetrics.widthPixels
+        val screenHeight = displayMetrics.heightPixels
+
+        // Initial Position: Center of the selection
+        val centerX = rect.centerX()
+        val centerY = rect.centerY()
+        
+        // --- Phase 32: 1:1 Scaling ---
+        // Use natural dimensions of the cropped bitmap (match what user saw in lens)
+        val width = bitmap.width
+        val height = bitmap.height
+
+        val params = WindowManager.LayoutParams(
+            width, height,
+            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            PixelFormat.TRANSLUCENT
+        )
+        params.gravity = Gravity.TOP or Gravity.START
+        params.x = centerX - width / 2
+        params.y = centerY - height / 2
+
+        val pinnedView = android.widget.ImageView(this).apply {
+            setImageBitmap(bitmap)
+            scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+            elevation = 0f // Phase 35: Remove shadows
+            outlineProvider = object : ViewOutlineProvider() {
+                override fun getOutline(view: View, outline: android.graphics.Outline) {
+                    // Phase 35: Fixed corner radius to be consistent with lens
+                    outline.setRoundRect(0, 0, view.width, view.height, 12f * resources.displayMetrics.density)
+                }
+            }
+            clipToOutline = true
+            
+            var initialX = 0
+            var initialY = 0
+            var initialTouchX = 0f
+            var initialTouchY = 0f
+            var isDragging = false
+            var isScaling = false
+            var currentMenu: View? = null
+
+            // --- Phase 33: ScaleGestureDetector for pinch zoom ---
+            val scaleDetector = ScaleGestureDetector(context, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+                override fun onScale(detector: ScaleGestureDetector): Boolean {
+                    isScaling = true
+                    val scaleFactor = detector.scaleFactor
+                    
+                    val newWidth = (params.width * scaleFactor).toInt()
+                    val newHeight = (params.height * scaleFactor).toInt()
+                    
+                    // Constraints: 15% to 95% of screen
+                    val minDim = (screenWidth * 0.15f).toInt()
+                    val maxDim = (screenWidth * 0.95f).toInt()
+                    
+                    if (newWidth in minDim..maxDim && newHeight in minDim..maxDim) {
+                        // Adjust position to scale from center of pinch
+                        val focusX = detector.focusX
+                        val focusY = detector.focusY
+                        
+                        params.x -= ((newWidth - params.width) * (focusX / this@apply.width)).toInt()
+                        params.y -= ((newHeight - params.height) * (focusY / this@apply.height)).toInt()
+                        
+                        params.width = newWidth
+                        params.height = newHeight
+                        windowManager?.updateViewLayout(this@apply, params)
+                        // Phase 39: Force outline invalidation to keep corners rounded during resize
+                        this@apply.invalidateOutline()
+                    }
+                    return true
+                }
+            })
+
+            // --- Phase 31: GestureDetector for reliable long-press ---
+            val gestureDetector = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
+                override fun onLongPress(e: MotionEvent) {
+                    if (!isDragging) {
+                        // Show actions
+                        if (currentMenu == null) {
+                            showPinnedActions(this@apply, bitmap, params) { menu ->
+                                currentMenu = menu
+                            }
+                        }
+                    }
+                }
+            })
+
+            @SuppressLint("ClickableViewAccessibility")
+            setOnTouchListener { v, event ->
+                // Feed both detectors
+                scaleDetector.onTouchEvent(event)
+                gestureDetector.onTouchEvent(event)
+                
+                when (event.actionMasked) {
+                    MotionEvent.ACTION_DOWN -> {
+                        initialX = params.x
+                        initialY = params.y
+                        initialTouchX = event.rawX
+                        initialTouchY = event.rawY
+                        isDragging = false
+                        isScaling = false
+                        // Phase 37: Removed scale-up animation to prevent corner issues
+                        true
+                    }
+                    MotionEvent.ACTION_POINTER_DOWN -> {
+                        isScaling = true
+                        true
+                    }
+                    MotionEvent.ACTION_MOVE -> {
+                        if (isScaling) return@setOnTouchListener true
+                        
+                        val dx = (event.rawX - initialTouchX).toInt()
+                        val dy = (event.rawY - initialTouchY).toInt()
+                        if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+                            isDragging = true
+                            // If dragging, dismiss menu
+                            currentMenu?.let { try { windowManager?.removeView(it) } catch(e: Exception) {} }
+                            currentMenu = null
+                        }
+                        
+                        params.x = initialX + dx
+                        params.y = initialY + dy
+                        windowManager?.updateViewLayout(v, params)
+                        true
+                    }
+                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                        // Phase 37: Removed scale-down animation
+                        isScaling = false
+                        true
+                    }
+                    else -> false
+                }
+            }
+        }
+
+        try {
+            windowManager?.addView(pinnedView, params)
+        } catch (e: Exception) {
+            android.util.Log.e("CircleToSearch", "Failed to add pinned view", e)
+        }
+    }
+
+    private fun showPinnedActions(anchorView: View, bitmap: Bitmap, anchorParams: WindowManager.LayoutParams, onMenuCreated: (View) -> Unit) {
+        val displayMetrics = resources.displayMetrics
+        val iconSize = (44 * displayMetrics.density).toInt()
+        val btnPadding = (8 * displayMetrics.density).toInt()
+        val menuPadding = (10 * displayMetrics.density).toInt()
+        val cornerRadius = 32f * displayMetrics.density
+
+        // --- Phase 40: CopyText-style Text Toolbar ---
+        val isNight = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+        
+        // Match exactly CopyTextOverlayManager's palette mapping
+        val toolbarBgColor = try { getColor(android.R.color.system_surface_container_light) } catch(e: Exception) { if (isNight) Color.parseColor("#FF1C1C1C") else Color.parseColor("#FFF3EDF7") }
+        val primaryColor = try { getColor(android.R.color.system_accent1_600) } catch(e: Exception) { if (isNight) Color.parseColor("#FFD0BCFF") else Color.parseColor("#FF6750A4") }
+        val contentColor = Color.WHITE
+        val borderColor = if (isNight) Color.parseColor("#33FFFFFF") else Color.parseColor("#22000000")
+
+        val menuLayout = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.HORIZONTAL
+            setPadding(menuPadding, menuPadding, menuPadding, menuPadding)
+            elevation = 24f
+            
+            val background = GradientDrawable().apply {
+                setColor(toolbarBgColor)
+                setCornerRadius(cornerRadius)
+                setStroke((1 * displayMetrics.density).toInt(), borderColor)
+            }
+            setBackground(background)
+            
+            outlineProvider = object : ViewOutlineProvider() {
+                override fun getOutline(view: View, outline: android.graphics.Outline) {
+                    outline.setRoundRect(0, 0, view.width, view.height, cornerRadius)
+                }
+            }
+            clipToOutline = true
+        }
+
+        fun createTextActionButton(label: String, onClick: () -> Unit) = android.widget.Button(this).apply {
+            text = label
+            setTextColor(contentColor)
+            setTypeface(Typeface.DEFAULT, Typeface.BOLD)
+            textSize = 12f // Roughly 30f in Paint logic
+            
+            // Professional pill background (Solid Primary)
+            val btnDrawable = GradientDrawable().apply {
+                setColor(primaryColor)
+                setCornerRadius(20 * displayMetrics.density)
+            }
+            background = btnDrawable
+            
+            setPadding((16 * displayMetrics.density).toInt(), 0, (16 * displayMetrics.density).toInt(), 0)
+            
+            layoutParams = android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
+                (36 * displayMetrics.density).toInt()
+            ).apply {
+                marginEnd = (8 * displayMetrics.density).toInt()
+            }
+            setOnClickListener { onClick() }
+        }
+
+        // --- Action: Share ---
+        menuLayout.addView(createTextActionButton("SHARE") {
+            try {
+                val fileName = "share_pin_${java.util.UUID.randomUUID()}.png"
+                val path = ImageUtils.saveBitmap(this@CircleToSearchAccessibilityService, bitmap, fileName)
+                val file = java.io.File(path)
+                val uri = androidx.core.content.FileProvider.getUriForFile(this@CircleToSearchAccessibilityService, "com.akslabs.circletosearch.fileprovider", file)
+                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = "image/png"
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                startActivity(Intent.createChooser(shareIntent, "Share pinned image").apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) })
+            } catch (e: Exception) {
+                android.util.Log.e("CircleToSearch", "Failed to share pinned image", e)
+            }
+            try { windowManager?.removeView(menuLayout) } catch (e: Exception) {}
+        })
+
+        // Measure properly and clamp to screen bounds to avoid cutoff
+        menuLayout.measure(View.MeasureSpec.makeMeasureSpec(displayMetrics.widthPixels, View.MeasureSpec.AT_MOST), View.MeasureSpec.UNSPECIFIED)
+        val measuredMenuWidth = menuLayout.measuredWidth
+        val measuredMenuHeight = menuLayout.measuredHeight
+
+        val menuParams = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+            PixelFormat.TRANSLUCENT
+        )
+        menuParams.gravity = Gravity.TOP or Gravity.START
+        
+        // Perfectly center the menu above the sticker
+        var targetX = anchorParams.x + (anchorParams.width - measuredMenuWidth) / 2
+        
+        // Clamp to screen edges to prevent cutoff on left/right
+        if (targetX < menuPadding) targetX = menuPadding
+        if (targetX + measuredMenuWidth > displayMetrics.widthPixels - menuPadding) {
+            targetX = displayMetrics.widthPixels - measuredMenuWidth - menuPadding
+        }
+        menuParams.x = targetX
+        
+        val yPadding = (12 * displayMetrics.density).toInt()
+        menuParams.y = if (anchorParams.y > measuredMenuHeight + yPadding) {
+            anchorParams.y - measuredMenuHeight - yPadding
+        } else {
+            anchorParams.y + anchorParams.height + yPadding
+        }
+        menuLayout.addView(createTextActionButton("DELETE") {
+            try {
+                windowManager?.removeView(anchorView)
+                windowManager?.removeView(menuLayout)
+            } catch (e: Exception) {}
+        })
+
+        // --- Action: Save ---
+        menuLayout.addView(createTextActionButton("SAVE") {
+            val success = ImageUtils.saveToGallery(this@CircleToSearchAccessibilityService, bitmap)
+            android.widget.Toast.makeText(this@CircleToSearchAccessibilityService, if (success) "Saved to Gallery" else "Save failed", android.widget.Toast.LENGTH_SHORT).show()
+            try { windowManager?.removeView(menuLayout) } catch (e: Exception) {}
+        })
+
+        // --- Action: Share ---
+        menuLayout.addView(createTextActionButton("SHARE") {
+            try {
+                val fileName = "share_pin_${java.util.UUID.randomUUID()}.png"
+                val path = ImageUtils.saveBitmap(this@CircleToSearchAccessibilityService, bitmap, fileName)
+                val file = java.io.File(path)
+                val uri = androidx.core.content.FileProvider.getUriForFile(this@CircleToSearchAccessibilityService, "com.akslabs.circletosearch.fileprovider", file)
+                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = "image/png"
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                startActivity(Intent.createChooser(shareIntent, "Share Pin").apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) })
+            } catch (e: Exception) {
+                android.util.Log.e("CircleToSearch", "Share failed", e)
+            }
+            try { windowManager?.removeView(menuLayout) } catch (e: Exception) {}
+        })
+
+        try {
+            windowManager?.addView(menuLayout, menuParams)
+            onMenuCreated(menuLayout)
+        } catch (e: Exception) {
+            android.util.Log.e("CircleToSearch", "Failed to add menu view", e)
+        }
+    }
+
+    override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        // Forward scroll events to the Copy Text overlay for live re-scan
+        // Only if it's a scroll event and the copy manager is active
+        if (event?.eventType == AccessibilityEvent.TYPE_VIEW_SCROLLED) {
+            copyTextManager?.rescanNodes()
+        }
+    }
 
     override fun onInterrupt() {}
 
     companion object {
-        private var instance: CircleToSearchAccessibilityService? = null
+        var instance: CircleToSearchAccessibilityService? = null
+            private set
+            
         private var isFlashlightOn = false // Simple static state tracking
+        
+        fun setCopyTextManager(manager: CopyTextOverlayManager?) {
+            instance?.copyTextManager = manager
+        }
 
         fun triggerCapture() {
             android.util.Log.d("CircleToSearch", "triggerCapture static called. instance=${instance != null}")
             instance?.performCapture()
+        }
+
+        fun pinArea(bitmap: Bitmap, rect: android.graphics.Rect) {
+            android.util.Log.d("CircleToSearch", "pinArea static called. instance=${instance != null}")
+            instance?.showPinnedArea(bitmap, rect)
+        }
+    }
+
+    // --- Phase 42: Hybrid Image Extractor ---
+    fun extractImages() {
+        val bitmap = BitmapRepository.getScreenshot()
+        if (bitmap == null) return
+        
+        val results = mutableListOf<Rect>()
+        
+        // 1. Accessibility Tree Scan (High-fidelity for Views/Compose)
+        // Scan ALL windows instead of just rootInActiveWindow to ensure we get underlying app UI
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            for (window in windows) {
+                window.root?.let { scanNodesForImages(it, results) }
+            }
+        } else {
+            rootInActiveWindow?.let { scanNodesForImages(it, results) }
+        }
+        
+        // 2. Visual Scan Fallback (For Canvas/Games)
+        if (results.size < 3) {
+            visualScanForImages(bitmap, results)
+        }
+
+        // Deduplicate and filter (ignore tiny or massive items)
+        val filtered = results.distinctBy { "${it.left},${it.top},${it.right},${it.bottom}" }
+            .filter { it.width() > 50 && it.height() > 50 && it.width() < bitmap.width * 0.9f }
+            
+        _extractionResults.value = filtered
+        
+        android.os.Handler(android.os.Looper.getMainLooper()).post {
+            android.widget.Toast.makeText(this, "Found ${filtered.size} images", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun scanNodesForImages(node: AccessibilityNodeInfo, results: MutableList<Rect>) {
+        // Exclude our own app's UI elements (like the search tools) from extraction
+        if (node.packageName?.toString() == "com.akslabs.circletosearch") return
+        
+        val className = node.className?.toString() ?: ""
+        val contentDesc = node.contentDescription?.toString()?.lowercase() ?: ""
+        val roleDesc = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) node.viewIdResourceName?.lowercase() ?: "" else ""
+        
+        // Look for ImageViews or Compose nodes with Image semantics
+        val isImage = className.contains("ImageView", ignoreCase = true) || 
+                      className.contains("Image", ignoreCase = true) ||
+                      contentDesc.contains("photo", ignoreCase = true) ||
+                      contentDesc.contains("image", ignoreCase = true) ||
+                      roleDesc.contains("image", ignoreCase = true) ||
+                      roleDesc.contains("photo", ignoreCase = true)
+                      
+        if (isImage) {
+            val rect = Rect()
+            node.getBoundsInScreen(rect)
+            // Ensure bounds are valid
+            if (rect.width() > 0 && rect.height() > 0) {
+                results.add(rect)
+            }
+        }
+        
+        for (i in 0 until node.childCount) {
+            node.getChild(i)?.let { scanNodesForImages(it, results) }
+        }
+    }
+
+    private fun visualScanForImages(bitmap: Bitmap, results: MutableList<Rect>) {
+        val w = bitmap.width
+        val h = bitmap.height
+        val step = 100
+        
+        for (y in 100 until h - 100 step step) {
+            for (x in 100 until w - 100 step step) {
+                if (results.any { it.contains(x, y) }) continue
+                
+                val p1 = bitmap.getPixel(x, y)
+                val p2 = bitmap.getPixel(x + 5, y + 5)
+                // Simple entropy heuristic: check color difference
+                if (Math.abs(Color.red(p1) - Color.red(p2)) > 30) {
+                    // Create an estimated bounding box around the complex region
+                    val estimatedRect = Rect(
+                        (x - 50).coerceAtLeast(0), 
+                        (y - 50).coerceAtLeast(0), 
+                        (x + 150).coerceAtMost(w), 
+                        (y + 150).coerceAtMost(h)
+                    )
+                    results.add(estimatedRect)
+                }
+            }
         }
     }
 

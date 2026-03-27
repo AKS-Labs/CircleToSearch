@@ -63,10 +63,13 @@ class MainActivity : ComponentActivity() {
                 ) {
                     var currentScreen by remember { mutableStateOf("home") }
                     androidx.compose.animation.Crossfade(targetState = currentScreen) { screen ->
-                        if (screen == "settings") {
-                            com.akslabs.circletosearch.ui.OverlaySettingsScreen(onBack = { currentScreen = "home" })
-                        } else {
-                            SetupScreen(onSettingsClick = { currentScreen = "settings" })
+                        when (screen) {
+                            "settings" -> com.akslabs.circletosearch.ui.OverlaySettingsScreen(onBack = { currentScreen = "home" })
+                            "ocr_settings" -> com.akslabs.circletosearch.ui.OcrSettingsScreen(onBack = { currentScreen = "home" })
+                            else -> SetupScreen(
+                                onSettingsClick = { currentScreen = "settings" },
+                                onOcrSettingsClick = { currentScreen = "ocr_settings" }
+                            )
                         }
                     }
                 }
@@ -77,7 +80,7 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SetupScreen(onSettingsClick: () -> Unit) {
+fun SetupScreen(onSettingsClick: () -> Unit, onOcrSettingsClick: () -> Unit) {
     val context = LocalContext.current
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     val prefs = context.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
@@ -323,13 +326,21 @@ fun SetupScreen(onSettingsClick: () -> Unit) {
 
             // 4. Settings (Bubble)
             Text(
-                text = "OPTIONAL",
+                text = "CUSTOMIZATION",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.secondary,
                 modifier = Modifier.align(Alignment.Start)
             )
             BubbleSwitch(context)
             LensOnlySwitch(context)
+            
+            ListItem(
+                headlineContent = { Text("OCR Language Settings") },
+                supportingContent = { Text("Import custom Tesseract OCR models") },
+                trailingContent = { Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                modifier = Modifier.clickable(onClick = onOcrSettingsClick),
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+            )
             Spacer(modifier = Modifier.height(25.dp))
 
             // Privacy Note
