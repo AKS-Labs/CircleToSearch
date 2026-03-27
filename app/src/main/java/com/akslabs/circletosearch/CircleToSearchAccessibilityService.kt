@@ -54,6 +54,9 @@ import com.akslabs.circletosearch.data.OverlayConfigurationManager
 import com.akslabs.circletosearch.data.OverlaySegment
 import com.akslabs.circletosearch.ui.components.CopyTextOverlayManager
 import com.akslabs.circletosearch.utils.ImageUtils
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
 
@@ -66,6 +69,10 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
     
     /** Kept by companion so scroll events can re-scan copy-text nodes. */
     internal var copyTextManager: CopyTextOverlayManager? = null
+    
+    // Phase 42: Extraction Results
+    private val _extractionResults = MutableStateFlow<List<Rect>>(emptyList())
+    val extractionResults: StateFlow<List<Rect>> = _extractionResults.asStateFlow()
     
     // Bubble related - Keeping existing logic but refactoring slightly if needed
     // For now, keeping bubble separate as requested in prompt "statusbar overlay customization... but it should work normally like now"
@@ -894,9 +901,9 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         // --- Phase 40: CopyText-style Text Toolbar ---
         val isNight = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
         
-        // Match CopyTextOverlayManager's palette
-        val toolbarBgColor = if (isNight) Color.parseColor("#FF1C1C1C") else Color.parseColor("#FFF3EDF7")
-        val primaryColor = if (isNight) Color.parseColor("#FFD0BCFF") else Color.parseColor("#FF6750A4")
+        // Match exactly CopyTextOverlayManager's palette mapping
+        val toolbarBgColor = try { getColor(android.R.color.system_surface_container_light) } catch(e: Exception) { if (isNight) Color.parseColor("#FF1C1C1C") else Color.parseColor("#FFF3EDF7") }
+        val primaryColor = try { getColor(android.R.color.system_accent1_600) } catch(e: Exception) { if (isNight) Color.parseColor("#FFD0BCFF") else Color.parseColor("#FF6750A4") }
         val contentColor = Color.WHITE
         val borderColor = if (isNight) Color.parseColor("#33FFFFFF") else Color.parseColor("#22000000")
 
@@ -944,6 +951,30 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
             setOnClickListener { onClick() }
         }
 
+        // --- Action: Share ---
+        menuLayout.addView(createTextActionButton("SHARE") {
+            try {
+                val fileName = "share_pin_${java.util.UUID.randomUUID()}.png"
+                val path = ImageUtils.saveBitmap(this@CircleToSearchAccessibilityService, bitmap, fileName)
+                val file = java.io.File(path)
+                val uri = androidx.core.content.FileProvider.getUriForFile(this@CircleToSearchAccessibilityService, "com.akslabs.circletosearch.fileprovider", file)
+                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = "image/png"
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                startActivity(Intent.createChooser(shareIntent, "Share pinned image").apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) })
+            } catch (e: Exception) {
+                android.util.Log.e("CircleToSearch", "Failed to share pinned image", e)
+            }
+            try { windowManager?.removeView(menuLayout) } catch (e: Exception) {}
+        })
+
+        // Measure properly and clamp to screen bounds to avoid cutoff
+        menuLayout.measure(View.MeasureSpec.makeMeasureSpec(displayMetrics.widthPixels, View.MeasureSpec.AT_MOST), View.MeasureSpec.UNSPECIFIED)
+        val measuredMenuWidth = menuLayout.measuredWidth
+        val measuredMenuHeight = menuLayout.measuredHeight
+
         val menuParams = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
@@ -953,12 +984,22 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         )
         menuParams.gravity = Gravity.TOP or Gravity.START
         
-        // Position menu above the sticker
-        val menuWidthApprox = (80 * 3 * displayMetrics.density).toInt()
-        menuParams.x = (anchorParams.x + (anchorParams.width / 2) - (menuWidthApprox / 2)).coerceAtLeast(0)
-        menuParams.y = if (anchorParams.y > iconSize * 3) anchorParams.y - (50 * displayMetrics.density).toInt() else anchorParams.y + anchorParams.height + menuPadding
-
-        // --- Action: Delete ---
+        // Perfectly center the menu above the sticker
+        var targetX = anchorParams.x + (anchorParams.width - measuredMenuWidth) / 2
+        
+        // Clamp to screen edges to prevent cutoff on left/right
+        if (targetX < menuPadding) targetX = menuPadding
+        if (targetX + measuredMenuWidth > displayMetrics.widthPixels - menuPadding) {
+            targetX = displayMetrics.widthPixels - measuredMenuWidth - menuPadding
+        }
+        menuParams.x = targetX
+        
+        val yPadding = (12 * displayMetrics.density).toInt()
+        menuParams.y = if (anchorParams.y > measuredMenuHeight + yPadding) {
+            anchorParams.y - measuredMenuHeight - yPadding
+        } else {
+            anchorParams.y + anchorParams.height + yPadding
+        }
         menuLayout.addView(createTextActionButton("DELETE") {
             try {
                 windowManager?.removeView(anchorView)
@@ -1012,7 +1053,9 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
     override fun onInterrupt() {}
 
     companion object {
-        private var instance: CircleToSearchAccessibilityService? = null
+        var instance: CircleToSearchAccessibilityService? = null
+            private set
+            
         private var isFlashlightOn = false // Simple static state tracking
         
         fun setCopyTextManager(manager: CopyTextOverlayManager?) {
@@ -1027,6 +1070,95 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         fun pinArea(bitmap: Bitmap, rect: android.graphics.Rect) {
             android.util.Log.d("CircleToSearch", "pinArea static called. instance=${instance != null}")
             instance?.showPinnedArea(bitmap, rect)
+        }
+    }
+
+    // --- Phase 42: Hybrid Image Extractor ---
+    fun extractImages() {
+        val bitmap = BitmapRepository.getScreenshot()
+        if (bitmap == null) return
+        
+        val results = mutableListOf<Rect>()
+        
+        // 1. Accessibility Tree Scan (High-fidelity for Views/Compose)
+        // Scan ALL windows instead of just rootInActiveWindow to ensure we get underlying app UI
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            for (window in windows) {
+                window.root?.let { scanNodesForImages(it, results) }
+            }
+        } else {
+            rootInActiveWindow?.let { scanNodesForImages(it, results) }
+        }
+        
+        // 2. Visual Scan Fallback (For Canvas/Games)
+        if (results.size < 3) {
+            visualScanForImages(bitmap, results)
+        }
+
+        // Deduplicate and filter (ignore tiny or massive items)
+        val filtered = results.distinctBy { "${it.left},${it.top},${it.right},${it.bottom}" }
+            .filter { it.width() > 50 && it.height() > 50 && it.width() < bitmap.width * 0.9f }
+            
+        _extractionResults.value = filtered
+        
+        android.os.Handler(android.os.Looper.getMainLooper()).post {
+            android.widget.Toast.makeText(this, "Found ${filtered.size} images", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun scanNodesForImages(node: AccessibilityNodeInfo, results: MutableList<Rect>) {
+        // Exclude our own app's UI elements (like the search tools) from extraction
+        if (node.packageName?.toString() == "com.akslabs.circletosearch") return
+        
+        val className = node.className?.toString() ?: ""
+        val contentDesc = node.contentDescription?.toString()?.lowercase() ?: ""
+        val roleDesc = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) node.viewIdResourceName?.lowercase() ?: "" else ""
+        
+        // Look for ImageViews or Compose nodes with Image semantics
+        val isImage = className.contains("ImageView", ignoreCase = true) || 
+                      className.contains("Image", ignoreCase = true) ||
+                      contentDesc.contains("photo", ignoreCase = true) ||
+                      contentDesc.contains("image", ignoreCase = true) ||
+                      roleDesc.contains("image", ignoreCase = true) ||
+                      roleDesc.contains("photo", ignoreCase = true)
+                      
+        if (isImage) {
+            val rect = Rect()
+            node.getBoundsInScreen(rect)
+            // Ensure bounds are valid
+            if (rect.width() > 0 && rect.height() > 0) {
+                results.add(rect)
+            }
+        }
+        
+        for (i in 0 until node.childCount) {
+            node.getChild(i)?.let { scanNodesForImages(it, results) }
+        }
+    }
+
+    private fun visualScanForImages(bitmap: Bitmap, results: MutableList<Rect>) {
+        val w = bitmap.width
+        val h = bitmap.height
+        val step = 100
+        
+        for (y in 100 until h - 100 step step) {
+            for (x in 100 until w - 100 step step) {
+                if (results.any { it.contains(x, y) }) continue
+                
+                val p1 = bitmap.getPixel(x, y)
+                val p2 = bitmap.getPixel(x + 5, y + 5)
+                // Simple entropy heuristic: check color difference
+                if (Math.abs(Color.red(p1) - Color.red(p2)) > 30) {
+                    // Create an estimated bounding box around the complex region
+                    val estimatedRect = Rect(
+                        (x - 50).coerceAtLeast(0), 
+                        (y - 50).coerceAtLeast(0), 
+                        (x + 150).coerceAtMost(w), 
+                        (y + 150).coerceAtMost(h)
+                    )
+                    results.add(estimatedRect)
+                }
+            }
         }
     }
 

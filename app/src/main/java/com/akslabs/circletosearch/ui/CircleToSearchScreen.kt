@@ -74,6 +74,7 @@ import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.DesktopWindows
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
@@ -228,6 +229,22 @@ fun CircleToSearchScreen(
     
     // Copy Mode internal state
     var isCopyMode by remember { mutableStateOf(false) }
+    
+    // Image Extraction state (Phase 41-43)
+    var isExtractMode by remember { mutableStateOf(false) }
+    val extractedImages = remember { mutableStateListOf<android.graphics.Rect>() }
+    
+    // Listen for extraction results from service
+    LaunchedEffect(isExtractMode) {
+        if (isExtractMode) {
+            CircleToSearchAccessibilityService.instance?.let { service ->
+                service.extractionResults.collect { rects ->
+                    extractedImages.clear()
+                    extractedImages.addAll(rects)
+                }
+            }
+        }
+    }
 
 
     // Support Settings Sheet
@@ -1521,9 +1538,13 @@ fun CircleToSearchScreen(
                                 )
                             }
 
-                            // Telegram
-                            BottomBarButton("Telegram", { Icon(painterResource(id = com.akslabs.circletosearch.R.drawable.telegram), null, modifier = Modifier.size(22.dp)) }) {
-                                context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://t.me/akslabs")).apply { addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK) })
+                            // Image Extractor (Phase 41)
+                            BottomBarButton("Extract", { Icon(Icons.Default.Image, null, modifier = Modifier.size(22.dp)) }) {
+                                isExtractMode = true
+                                scope.launch {
+                                    // Trigger extraction logic in service
+                                    CircleToSearchAccessibilityService.instance?.extractImages()
+                                }
                             }
 
                             // Donate
@@ -1835,6 +1856,47 @@ fun CircleToSearchScreen(
                 uiPreferences = uiPreferences,
                 onDismissRequest = { showSettingsScreen = false }
             )
+        }
+
+        // --- Phase 43: Image Extraction Highlights ---
+        if (isExtractMode) {
+            Canvas(modifier = Modifier.fillMaxSize().zIndex(4000f)) {
+                extractedImages.forEach { rect ->
+                    val localRect = androidx.compose.ui.geometry.Rect(
+                        rect.left.toFloat(),
+                        rect.top.toFloat(),
+                        rect.right.toFloat(),
+                        rect.bottom.toFloat()
+                    )
+                    // Draw translucent highlight
+                    drawRect(
+                        color = Color.White.copy(alpha = 0.3f),
+                        topLeft = localRect.topLeft,
+                        size = localRect.size
+                    )
+                    // Draw subtle border
+                    drawRect(
+                        color = Color.White,
+                        topLeft = localRect.topLeft,
+                        size = localRect.size,
+                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx())
+                    )
+                }
+            }
+            
+            // Exit button for Extract Mode
+            Box(modifier = Modifier.fillMaxSize().padding(16.dp).statusBarsPadding().zIndex(5000f)) {
+                androidx.compose.material3.FilledTonalIconButton(
+                    onClick = { isExtractMode = false; extractedImages.clear() },
+                    modifier = Modifier.align(Alignment.TopStart).size(40.dp),
+                    colors = androidx.compose.material3.IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = Color.Black.copy(alpha = 0.6f),
+                        contentColor = Color.White
+                    )
+                ) {
+                    Icon(Icons.Default.Close, contentDescription = "Exit Extraction Mode")
+                }
+            }
         }
     }
 }
