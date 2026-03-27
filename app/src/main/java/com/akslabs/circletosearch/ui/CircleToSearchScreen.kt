@@ -19,65 +19,83 @@
 
 package com.akslabs.circletosearch.ui
 
-import com.akslabs.circletosearch.utils.FriendlyMessageManager
-import com.akslabs.circletosearch.ui.components.FriendlyMessageBubble
-import com.akslabs.circletosearch.utils.UIPreferences
-import kotlinx.coroutines.delay
-
 import android.graphics.Bitmap
 import android.graphics.Rect
+import com.akslabs.circletosearch.CircleToSearchAccessibilityService
 import android.util.Base64
+import android.view.ViewGroup
+import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import android.webkit.WebSettings
 import android.widget.FrameLayout
-import android.view.ViewGroup
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BorderOuter
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.DesktopWindows
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.OpenInNew
+import androidx.compose.material.icons.filled.QrCode
+import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.material.icons.filled.Smartphone
-import androidx.compose.material.icons.filled.DesktopWindows
-import androidx.compose.material.icons.filled.LightMode
-import androidx.compose.material.icons.filled.DarkMode
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.OpenInNew
-import androidx.compose.material.icons.filled.BorderOuter
+import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -85,6 +103,7 @@ import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -95,6 +114,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -108,37 +128,55 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import com.akslabs.circletosearch.data.SearchEngine
-import com.akslabs.circletosearch.ui.theme.OverlayGradientColors
-import com.akslabs.circletosearch.utils.ImageSearchUploader
-import com.akslabs.circletosearch.utils.ImageUtils
-import com.akslabs.circletosearch.ui.components.searchWithGoogleLens
-import kotlinx.coroutines.launch
-import java.io.ByteArrayOutputStream
-import androidx.activity.compose.BackHandler
-import androidx.compose.animation.core.animateFloat
+import androidx.compose.ui.zIndex
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import androidx.webkit.WebSettingsCompat
+import com.akslabs.circletosearch.data.SearchEngine
+import com.akslabs.circletosearch.ui.components.FriendlyMessageBubble
+import com.akslabs.circletosearch.ui.components.searchWithGoogleLens
+import com.akslabs.circletosearch.ui.theme.OverlayGradientColors
+import com.akslabs.circletosearch.utils.FriendlyMessageManager
+import com.akslabs.circletosearch.utils.ImageSearchUploader
+import com.akslabs.circletosearch.utils.ImageUtils
+import com.akslabs.circletosearch.utils.QrResult
+import com.akslabs.circletosearch.utils.QrResultWithBounds
+import com.akslabs.circletosearch.utils.QrScanner
+import com.akslabs.circletosearch.ui.qrResultShortLabel
+import com.akslabs.circletosearch.utils.UIPreferences
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.ByteArrayOutputStream
 import androidx.webkit.WebViewFeature
 import com.akslabs.circletosearch.data.isDirectUpload
 import kotlin.math.max
 import kotlin.math.min
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
+import android.os.Build
+import androidx.compose.material3.Surface
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CircleToSearchScreen(
     screenshot: Bitmap?,
-    onClose: () -> Unit
+    onClose: () -> Unit,
+    copyTextManager: com.akslabs.circletosearch.ui.components.CopyTextOverlayManager? = null,
+    onCopyText: () -> Unit = {},
+    onExitCopyMode: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -149,7 +187,28 @@ fun CircleToSearchScreen(
     // Support Sheet State
     var showSupportSheet by remember { mutableStateOf(false) }
     val supportSheetState = rememberModalBottomSheetState()
-    
+
+    // Material You logic for colors
+    val isDark = isSystemInDarkTheme()
+    val dynamicColor = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+    val colorScheme = when {
+        dynamicColor && isDark -> dynamicDarkColorScheme(context)
+        dynamicColor && !isDark -> dynamicLightColorScheme(context)
+        else -> MaterialTheme.colorScheme // Fallback standard
+    }
+    //Colors for dark theme
+    val barBgColor = if (isDark) Color(0xFF0D0D0D) else colorScheme.surface
+    val bubbleColor = if (isDark) Color(0xFF1F1F1F) else colorScheme.secondaryContainer.copy(alpha = 0.9f)
+    val contentColor = if (isDark) Color.White else colorScheme.onSecondaryContainer
+
+    //Haptic feedback
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+
+    //Slide-in animation
+    var isUIVisible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        isUIVisible = true // Déclenche l'animation à l'ouverture
+    }
 
     // Search Engines Order Logic
     val preferredOrder = remember(uiPreferences.getSearchEngineOrder()) {
@@ -167,6 +226,26 @@ fun CircleToSearchScreen(
         }
     }
     val searchEngines = preferredOrder
+    
+    // Copy Mode internal state
+    var isCopyMode by remember { mutableStateOf(false) }
+    
+    // Image Extraction state (Phase 41-43)
+    var isExtractMode by remember { mutableStateOf(false) }
+    val extractedImages = remember { mutableStateListOf<android.graphics.Rect>() }
+    
+    // Listen for extraction results from service
+    LaunchedEffect(isExtractMode) {
+        if (isExtractMode) {
+            CircleToSearchAccessibilityService.instance?.let { service ->
+                service.extractionResults.collect { rects ->
+                    extractedImages.clear()
+                    extractedImages.addAll(rects)
+                }
+            }
+        }
+    }
+
 
     // Support Settings Sheet
     var showSettingsScreen by remember { mutableStateOf(false) }
@@ -174,7 +253,18 @@ fun CircleToSearchScreen(
     // Friendly Message State
     var friendlyMessage by remember { mutableStateOf("") }
     var isMessageVisible by remember { mutableStateOf(false) }
-
+    var isCopyTextTriggered by remember { mutableStateOf(false) }
+    
+    // Resizing state
+    var isResizing by remember { mutableStateOf(false) }
+    var activeHandle by remember { mutableStateOf<String?>(null) } // "tl", "tr", "bl", "br"
+    
+    // QR Scanner state
+    var showQrSheet by remember { mutableStateOf(false) }
+    var qrScanBitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+    var detectedQrCodes by remember { mutableStateOf<List<QrResultWithBounds>>(emptyList()) }
+    var selectedQrResult by remember { mutableStateOf<QrResultWithBounds?>(null) }
+    
     LaunchedEffect(Unit) {
         if (uiPreferences.isShowFriendlyMessages()) {
             val manager = FriendlyMessageManager(context)
@@ -200,6 +290,13 @@ fun CircleToSearchScreen(
     var isDarkMode by remember { mutableStateOf(uiPreferences.isDarkMode()) }
     var showGradientBorder by remember { mutableStateOf(uiPreferences.isShowGradientBorder()) }
     
+    // Back gesture handler for QR sheet
+    // We use a high-priority check or ensure it's at the very top of the hierarchy
+    BackHandler(enabled = showQrSheet) {
+        showQrSheet = false
+        selectedQrResult = null
+    }
+
     // Track initialized engines for Smart Loading
     val initializedEngines = remember { mutableStateListOf<SearchEngine>() }
     
@@ -298,6 +395,19 @@ fun CircleToSearchScreen(
     var selectionRect by remember { mutableStateOf<Rect?>(null) }
     val selectionAnim = remember { androidx.compose.animation.core.Animatable(0f) }
     
+    // Lifecycle reset: When screenshot changes, reset selection and modes
+    LaunchedEffect(screenshot) {
+        if (screenshot != null) {
+            isCopyMode = false
+            selectionRect = null
+            selectedBitmap = null
+            isSearching = false
+            currentPathPoints.clear()
+            selectionAnim.snapTo(0f)
+        }
+    }
+    
+    
     // searchEngines moved to top
     // val searchEngines = SearchEngine.values()
 
@@ -306,6 +416,22 @@ fun CircleToSearchScreen(
         targetValue = if (screenshot != null) 1f else 0f,
         animationSpec = tween(1000), label = "alpha"
     )
+
+    // Auto-scan entire screenshot for QR codes when it arrives
+    LaunchedEffect(screenshot) {
+        android.util.Log.d("CircleToSearch", "Auto-scan Effect: screenshot=${screenshot != null}")
+        if (screenshot != null) {
+            val found = withContext(Dispatchers.Default) {
+                android.util.Log.d("CircleToSearch", "Auto-scan starting...")
+                val res = QrScanner.scanBitmapAll(screenshot!!)
+                android.util.Log.d("CircleToSearch", "Auto-scan finished: found ${res.size} codes")
+                res
+            }
+            detectedQrCodes = found
+        } else {
+            detectedQrCodes = emptyList()
+        }
+    }
 
     // Helper to create and configure WebView
     fun createWebView(ctx: android.content.Context, engine: SearchEngine): WebView {
@@ -398,6 +524,11 @@ fun CircleToSearchScreen(
 
     // Back Handler Logic
     BackHandler(enabled = true) {
+        if (isCopyMode) {
+            isCopyMode = false
+            onExitCopyMode()
+            return@BackHandler
+        }
         val currentWebView = webViews[selectedEngine]
         if (currentWebView != null && currentWebView.canGoBack()) {
             currentWebView.goBack()
@@ -410,21 +541,26 @@ fun CircleToSearchScreen(
         }
     }
 
-    androidx.compose.material3.BottomSheetScaffold(
-        scaffoldState = scaffoldState,
-        sheetPeekHeight = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp * 0.55f), // Dynamic 55% peek
-        sheetContainerColor = Color.Transparent,
-        sheetContentColor = MaterialTheme.colorScheme.onSurface,
-        sheetDragHandle = { BottomSheetDefaults.DragHandle() },
-        sheetSwipeEnabled = true,
-        sheetContent = {
-            // Bottom Sheet Content (Results)
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(800.dp)
-                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
-            ) {
+    Surface(
+        color = Color.Transparent,
+        tonalElevation = 0.dp
+    ) {
+        androidx.compose.material3.BottomSheetScaffold(
+            scaffoldState = scaffoldState,
+            sheetPeekHeight = (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp * 0.55f), // Dynamic 55% peek
+            containerColor = Color.Transparent,
+            sheetContainerColor = Color.Transparent,
+            sheetContentColor = MaterialTheme.colorScheme.onSurface,
+            sheetDragHandle = { BottomSheetDefaults.DragHandle() },
+            sheetSwipeEnabled = true,
+            sheetContent = {
+                // Bottom Sheet Content (Results)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(800.dp)
+                        .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
+                ) {
                 Spacer(modifier = Modifier.height(16.dp))
                 
                 // Tabs - Polished UI
@@ -712,458 +848,1006 @@ fun CircleToSearchScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black)
-                .background(Color.Black)
+                .background(Color.Transparent) // Changed from Black to Transparent
         ) {
+            // Close button for Copy Mode (Top Left)
+
             // Friendly Message Overlay (Top Center)
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .offset(y = 100.dp) // Offset to not cover potential top icons
-                    .zIndex(100f), // Ensure on top
-                contentAlignment = Alignment.TopCenter
-            ) {
-                FriendlyMessageBubble(
-                    message = friendlyMessage,
-                    visible = isMessageVisible
-                )
+            if (!isCopyMode) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .offset(y = 100.dp) // Offset to not cover potential top icons
+                        .zIndex(100f), // Ensure on top
+                    contentAlignment = Alignment.TopCenter
+                ) {
+                    FriendlyMessageBubble(
+                        message = friendlyMessage,
+                        visible = isMessageVisible
+                    )
+                }
             }
 
             // 1. Screenshot Layer
-            if (screenshot != null) {
+            if (screenshot != null && !isCopyMode) {
                 Box(
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            // Required for BlendMode.Clear to work in child Canvas
+                            compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen
+                        }
                 ) {
                     Image(
                         bitmap = screenshot.asImageBitmap(),
                         contentDescription = "Screenshot",
-                        contentScale = ContentScale.Crop,
+                        contentScale = ContentScale.FillBounds,
                         modifier = Modifier.fillMaxSize()
                     )
-                    
-                    // Tint Overlay
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(
-                                brush = Brush.verticalGradient(
-                                    colors = OverlayGradientColors.map { it.copy(alpha = 0.3f) }
-                                )
+
+
+                    // Tint Overlay (Punch-out style)
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        val strokeWidth = 0f
+                        val dimAlpha = 0.15f
+                        
+                        // 1. Draw global dim
+                        drawRect(Color.Black.copy(alpha = dimAlpha))
+                        drawRect(
+                            brush = Brush.verticalGradient(
+                                colors = OverlayGradientColors.map { it.copy(alpha = dimAlpha) }
                             )
-                    )
+                        )
+                        
+                        // 2. Clear selection area if it exists
+                        if (selectionRect != null && selectionAnim.value > 0f) {
+                            val rect = selectionRect!!
+                            val progress = selectionAnim.value
+                            val holeRect = androidx.compose.ui.geometry.Rect(
+                                rect.left.toFloat(), 
+                                rect.top.toFloat(), 
+                                rect.right.toFloat(), 
+                                rect.bottom.toFloat()
+                            )
+                            
+                            // Punch the hole
+                            drawRoundRect(
+                                color = Color.Transparent,
+                                topLeft = holeRect.topLeft,
+                                size = holeRect.size,
+                                cornerRadius = CornerRadius(48f),
+                                blendMode = androidx.compose.ui.graphics.BlendMode.Clear
+                            )
+                        }
+                    }
                 }
             }
 
             // 2. Gradient Border Layer (Overlaying screenshot, clipped to rounded corners)
-            if (showGradientBorder) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .border(
-                            width = 8.dp,
-                            brush = Brush.verticalGradient(colors = OverlayGradientColors),
-                            shape = RoundedCornerShape(24.dp) // Rounded corners for device
-                        )
-                        .clip(RoundedCornerShape(24.dp))
-                )
+            if (showGradientBorder && !isCopyMode) {
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = isUIVisible,
+                    enter = androidx.compose.animation.fadeIn(animationSpec = tween(700))
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .border(
+                                width = 8.dp,
+                                brush = Brush.verticalGradient(
+                                    colors = OverlayGradientColors.map { it.copy(alpha = 0.5f) }
+                                ),
+                                shape = RoundedCornerShape(24.dp) // Rounded corners for device
+                            )
+                            .clip(RoundedCornerShape(24.dp))
+                    )
+                }
             }
 
             // 3. Drawing Canvas (Interactive Layer)
-            Canvas(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .pointerInput(Unit) {
-                        detectDragGestures(
-                            onDragStart = { offset ->
-                                // Clear previous state
-                                currentPathPoints.clear()
-                                currentPathPoints.add(offset)
-                                selectionRect = null
-                                scope.launch { selectionAnim.snapTo(0f) }
-                            },
-                            onDrag = { change, _ ->
-                                val offset = change.position
-                                currentPathPoints.add(offset)
-                            },
-                            onDragEnd = {
-                                if (currentPathPoints.isNotEmpty()) {
-                                    var minX = Float.MAX_VALUE
-                                    var minY = Float.MAX_VALUE
-                                    var maxX = Float.MIN_VALUE
-                                    var maxY = Float.MIN_VALUE
-
-                                    currentPathPoints.forEach { p ->
-                                        minX = min(minX, p.x)
-                                        minY = min(minY, p.y)
-                                        maxX = max(maxX, p.x)
-                                        maxY = max(maxY, p.y)
+            if (!isCopyMode) {                Canvas(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .pointerInput(Unit) {
+                            detectDragGestures(
+                                onDragStart = { offset ->
+                                    val rect = selectionRect
+                                    if (rect != null && selectionAnim.value == 1f) {
+                                        val handleSize = 64f // px for hit testing
+                                        val tl = Offset(rect.left.toFloat(), rect.top.toFloat())
+                                        val tr = Offset(rect.right.toFloat(), rect.top.toFloat())
+                                        val bl = Offset(rect.left.toFloat(), rect.bottom.toFloat())
+                                        val br = Offset(rect.right.toFloat(), rect.bottom.toFloat())
+                                        
+                                        when {
+                                            (offset - tl).getDistance() < handleSize -> { isResizing = true; activeHandle = "tl" }
+                                            (offset - tr).getDistance() < handleSize -> { isResizing = true; activeHandle = "tr" }
+                                            (offset - bl).getDistance() < handleSize -> { isResizing = true; activeHandle = "bl" }
+                                            (offset - br).getDistance() < handleSize -> { isResizing = true; activeHandle = "br" }
+                                            else -> { isResizing = false; activeHandle = null }
+                                        }
+                                        
+                                        if (isResizing) return@detectDragGestures
                                     }
-                                    
-                                    val rect = Rect(
-                                        minX.toInt(),
-                                        minY.toInt(),
-                                        maxX.toInt(),
-                                        maxY.toInt()
-                                    )
-                                    
-                                    selectionRect = rect
-                                    // Clear points to remove the drawn line and show the lens rect
-                                    currentPathPoints.clear() 
-                                    
-                                    scope.launch {
-                                        selectionAnim.animateTo(
-                                            targetValue = 1f,
-                                            animationSpec = tween(600)
+
+                                    // Clear previous state if starting new draw
+                                    currentPathPoints.clear()
+                                    currentPathPoints.add(offset)
+                                    selectionRect = null
+                                    scope.launch { selectionAnim.snapTo(0f) }
+                                },
+                                onDrag = { change, _ ->
+                                    if (isResizing && activeHandle != null) {
+                                        val rect = selectionRect ?: return@detectDragGestures
+                                        val pos = change.position
+                                        val newRect = android.graphics.Rect(rect)
+                                        when (activeHandle) {
+                                            "tl" -> { newRect.left = pos.x.toInt(); newRect.top = pos.y.toInt() }
+                                            "tr" -> { newRect.right = pos.x.toInt(); newRect.top = pos.y.toInt() }
+                                            "bl" -> { newRect.left = pos.x.toInt(); newRect.bottom = pos.y.toInt() }
+                                            "br" -> { newRect.right = pos.x.toInt(); newRect.bottom = pos.y.toInt() }
+                                        }
+                                        // Basic validation (min size)
+                                        if (newRect.width() > 20 && newRect.height() > 20) {
+                                            selectionRect = newRect
+                                        }
+                                    } else {
+                                        currentPathPoints.add(change.position)
+                                    }
+                                },
+                                onDragEnd = {
+                                    if (isResizing) {
+                                        isResizing = false
+                                        activeHandle = null
+                                        // Update cropped bitmap after resize
+                                        if (screenshot != null && selectionRect != null) {
+                                            selectedBitmap = ImageUtils.cropBitmap(screenshot, selectionRect!!)
+                                        }
+                                    } else if (currentPathPoints.isNotEmpty()) {
+                                        var minX = Float.MAX_VALUE
+                                        var minY = Float.MAX_VALUE
+                                        var maxX = Float.MIN_VALUE
+                                        var maxY = Float.MIN_VALUE
+                                        currentPathPoints.forEach { p ->
+                                            minX = kotlin.math.min(minX, p.x)
+                                            minY = kotlin.math.min(minY, p.y)
+                                            maxX = kotlin.math.max(maxX, p.x)
+                                            maxY = kotlin.math.max(maxY, p.y)
+                                        }
+
+                                        val border = 20
+                                        val rect = android.graphics.Rect(
+                                            (minX - border).toInt().coerceAtLeast(0),
+                                            (minY - border).toInt().coerceAtLeast(0),
+                                            (maxX + border).toInt().coerceAtMost(screenshot?.width ?: 0),
+                                            (maxY + border).toInt().coerceAtMost(screenshot?.height ?: 0)
                                         )
-                                        android.util.Log.d("CircleToSearch", "Selection rect: ${rect.left},${rect.top},${rect.right},${rect.bottom}")
-                                        selectedBitmap = ImageUtils.cropBitmap(screenshot!!, rect)
-                                        android.util.Log.d("CircleToSearch", "Cropped bitmap size: ${selectedBitmap!!.width}x${selectedBitmap!!.height}")
-                                        isSearching = true
-                                        // Sheet expands automatically in LaunchedEffect
+
+                                        if (rect.width() > 10 && rect.height() > 10) {
+                                            selectionRect = rect
+                                            currentPathPoints.clear() // Hide the drawn circle
+                                            if (screenshot != null) {
+                                                selectedBitmap = ImageUtils.cropBitmap(screenshot!!, rect)
+                                            }
+                                            scope.launch {
+                                                selectionAnim.animateTo(1f, tween(600))
+                                                isSearching = true
+                                            }
+                                        }
                                     }
                                 }
-                            }
-                        )
-                    }
-            ) {
-                // Draw current path (Real-time)
-                if (currentPathPoints.size > 1) {
-                    val path = Path().apply {
-                        moveTo(currentPathPoints.first().x, currentPathPoints.first().y)
-                        for (i in 1 until currentPathPoints.size) {
-                            lineTo(currentPathPoints[i].x, currentPathPoints[i].y)
+                            )
                         }
+                ) {
+                    // Draw current path (Real-time)
+                    if (currentPathPoints.size > 1) {
+                        val path = Path().apply {
+                            moveTo(currentPathPoints.first().x, currentPathPoints.first().y)
+                            for (i in 1 until currentPathPoints.size) {
+                                lineTo(currentPathPoints[i].x, currentPathPoints[i].y)
+                            }
+                        }
+                        
+                        // Glow
+                        drawPath(
+                            path = path,
+                            brush = Brush.linearGradient(OverlayGradientColors),
+                            style = Stroke(width = 30f, cap = StrokeCap.Round, join = StrokeJoin.Round),
+                            alpha = 0.6f
+                        )
+                        // Core
+                        drawPath(
+                            path = path,
+                            color = Color.White,
+                            style = Stroke(width = 12f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+                        )
                     }
-                    
-                    // Glow
-                    drawPath(
-                        path = path,
-                        brush = Brush.linearGradient(OverlayGradientColors),
-                        style = Stroke(width = 30f, cap = StrokeCap.Round, join = StrokeJoin.Round),
-                        alpha = 0.6f
-                    )
-                    // Core
-                    drawPath(
-                        path = path,
-                        color = Color.White,
-                        style = Stroke(width = 12f, cap = StrokeCap.Round, join = StrokeJoin.Round)
-                    )
+
+                    // Draw Lens Animation (Rounded Corner Brackets)
+                    if (selectionRect != null && selectionAnim.value > 0f) {
+                        val rect = selectionRect!!
+                        val progress = selectionAnim.value
+                        val left = rect.left.toFloat()
+                        val top = rect.top.toFloat()
+                        val right = rect.right.toFloat()
+                        val bottom = rect.bottom.toFloat()
+                        
+                        val width = right - left
+                        val height = bottom - top
+                        val cornerRadius = 48f // Slightly smaller radius
+                        val armLength = min(width, height) * 0.15f // Slightly shorter arms
+
+                        // Top Left
+                        val tlPath = Path().apply {
+                            moveTo(left, top + armLength)
+                            lineTo(left, top + cornerRadius)
+                            arcTo(
+                                rect = androidx.compose.ui.geometry.Rect(left, top, left + 2 * cornerRadius, top + 2 * cornerRadius),
+                                startAngleDegrees = 180f,
+                                sweepAngleDegrees = 90f,
+                                forceMoveTo = false
+                            )
+                            lineTo(left + armLength, top)
+                        }
+                        // Top Right
+                        val trPath = Path().apply {
+                            moveTo(right - armLength, top)
+                            lineTo(right - cornerRadius, top)
+                            arcTo(
+                                rect = androidx.compose.ui.geometry.Rect(right - 2 * cornerRadius, top, right, top + 2 * cornerRadius),
+                                startAngleDegrees = 270f,
+                                sweepAngleDegrees = 90f,
+                                forceMoveTo = false
+                            )
+                            lineTo(right, top + armLength)
+                        }
+                        // Bottom Right
+                        val brPath = Path().apply {
+                            moveTo(right, bottom - armLength)
+                            lineTo(right, bottom - cornerRadius)
+                            arcTo(
+                                rect = androidx.compose.ui.geometry.Rect(right - 2 * cornerRadius, bottom - 2 * cornerRadius, right, bottom),
+                                startAngleDegrees = 0f,
+                                sweepAngleDegrees = 90f,
+                                forceMoveTo = false
+                            )
+                            lineTo(right - armLength, bottom)
+                        }
+                        // Bottom Left
+                        val blPath = Path().apply {
+                            moveTo(left + armLength, bottom)
+                            lineTo(left + cornerRadius, bottom)
+                            arcTo(
+                                rect = androidx.compose.ui.geometry.Rect(left, bottom - 2 * cornerRadius, left + 2 * cornerRadius, bottom),
+                                startAngleDegrees = 90f,
+                                sweepAngleDegrees = 90f,
+                                forceMoveTo = false
+                            )
+                            lineTo(left, bottom - armLength)
+                        }
+
+                        val bracketAlpha = progress
+                        val bracketStroke = Stroke(width = 12f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+                        
+                        // Draw Brackets (Solid White)
+                        listOf(tlPath, trPath, brPath, blPath).forEach { p ->
+                            drawPath(p, Color.White, style = bracketStroke, alpha = bracketAlpha)
+                        }
+                        
+                        // Optional: Flash effect inside
+                         drawRoundRect(
+                            color = Color.White,
+                            topLeft = Offset(left, top),
+                            size = Size(width, height),
+                            cornerRadius = CornerRadius(48f),
+                            style = Stroke(width = 4f),
+                            alpha = (1f - progress) * 0.5f
+                         )
+                    }
                 }
 
-                // Draw Lens Animation (Rounded Corner Brackets)
-                if (selectionRect != null && selectionAnim.value > 0f) {
-                    val rect = selectionRect!!
-                    val progress = selectionAnim.value
-                    val left = rect.left.toFloat()
-                    val top = rect.top.toFloat()
-                    val right = rect.right.toFloat()
-                    val bottom = rect.bottom.toFloat()
-                    
-                    val width = right - left
-                    val height = bottom - top
-                    val cornerRadius = 64f // Increased radius for rounder look
-                    val armLength = min(width, height) * 0.2f // Length of the straight part
-
-                    // Top Left
-                    val tlPath = Path().apply {
-                        moveTo(left, top + armLength)
-                        lineTo(left, top + cornerRadius)
-                        arcTo(
-                            rect = androidx.compose.ui.geometry.Rect(left, top, left + 2 * cornerRadius, top + 2 * cornerRadius),
-                            startAngleDegrees = 180f,
-                            sweepAngleDegrees = 90f,
-                            forceMoveTo = false
-                        )
-                        lineTo(left + armLength, top)
-                    }
-                    // Top Right
-                    val trPath = Path().apply {
-                        moveTo(right - armLength, top)
-                        lineTo(right - cornerRadius, top)
-                        arcTo(
-                            rect = androidx.compose.ui.geometry.Rect(right - 2 * cornerRadius, top, right, top + 2 * cornerRadius),
-                            startAngleDegrees = 270f,
-                            sweepAngleDegrees = 90f,
-                            forceMoveTo = false
-                        )
-                        lineTo(right, top + armLength)
-                    }
-                    // Bottom Right
-                    val brPath = Path().apply {
-                        moveTo(right, bottom - armLength)
-                        lineTo(right, bottom - cornerRadius)
-                        arcTo(
-                            rect = androidx.compose.ui.geometry.Rect(right - 2 * cornerRadius, bottom - 2 * cornerRadius, right, bottom),
-                            startAngleDegrees = 0f,
-                            sweepAngleDegrees = 90f,
-                            forceMoveTo = false
-                        )
-                        lineTo(right - armLength, bottom)
-                    }
-                    // Bottom Left
-                    val blPath = Path().apply {
-                        moveTo(left + armLength, bottom)
-                        lineTo(left + cornerRadius, bottom)
-                        arcTo(
-                            rect = androidx.compose.ui.geometry.Rect(left, bottom - 2 * cornerRadius, left + 2 * cornerRadius, bottom),
-                            startAngleDegrees = 90f,
-                            sweepAngleDegrees = 90f,
-                            forceMoveTo = false
-                        )
-                        lineTo(left, bottom - armLength)
-                    }
-
-                    val bracketAlpha = progress
-                    val bracketStroke = Stroke(width = 12f, cap = StrokeCap.Round, join = StrokeJoin.Round)
-                    
-                    // Draw Brackets with Glow
-                    listOf(tlPath, trPath, brPath, blPath).forEach { p ->
-                        drawPath(p, Color.White, style = bracketStroke, alpha = bracketAlpha)
-                        drawPath(p, Brush.linearGradient(OverlayGradientColors), style = Stroke(width = 20f, cap = StrokeCap.Round), alpha = bracketAlpha * 0.5f)
-                    }
-                    
-                    // Optional: Flash effect inside
-                     drawRoundRect(
-                        color = Color.White,
-                        topLeft = Offset(left, top),
-                        size = Size(width, height),
-                        cornerRadius = CornerRadius(32f),
-                        style = Stroke(width = 4f),
-                        alpha = (1f - progress) * 0.5f
-                    )
-                }
             }
 
             // 4. Header (Top)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .statusBarsPadding()
-                    .padding(top = 16.dp, start = 16.dp, end = 16.dp)
-                    .align(Alignment.TopCenter),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(
-                    onClick = onClose,
-                    modifier = Modifier
-                        .background(Color.Gray.copy(alpha = 0.5f), CircleShape)
-                        .size(40.dp)
-                ) {
-                    Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
-                }
-                Spacer(modifier = Modifier.weight(1f))
-                Text(
-                    text = selectedEngine.name,
-                    style = MaterialTheme.typography.headlineMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                )
-                Spacer(modifier = Modifier.weight(1f))
-                
-                // Action Button (Menu)
-                Box(
-                    modifier = Modifier
-                        .background(Color.Gray.copy(alpha = 0.5f), CircleShape)
-                        .size(40.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    var showMenu by remember { mutableStateOf(false) }
-                    IconButton(onClick = { showMenu = true }) {
-                        Icon(Icons.Default.MoreVert, contentDescription = "Menu", tint = Color.White)
-                    }
-                
-                    androidx.compose.material3.DropdownMenu(
-                        expanded = showMenu,
-                        onDismissRequest = { showMenu = false }
-                    ) {
-                        val isDesktop = isDesktop(selectedEngine)
-                        androidx.compose.material3.DropdownMenuItem(
-                            text = { Text(if (isDesktop) "Mobile Mode" else "Desktop Mode") },
-                            leadingIcon = { 
-                                Icon(
-                                    if (isDesktop) Icons.Default.Smartphone else Icons.Default.DesktopWindows,
-                                    contentDescription = null
-                                )
-                            },
-                            onClick = { 
-                                val newSet = desktopModeEngines.toMutableSet()
-                                if (newSet.contains(selectedEngine)) {
-                                    newSet.remove(selectedEngine)
-                                } else {
-                                    newSet.add(selectedEngine)
-                                }
-                                desktopModeEngines = newSet
-                                showMenu = false
-                            }
-                        )
-                        androidx.compose.material3.DropdownMenuItem(
-                            text = { Text(if (isDarkMode) "Light Mode" else "Dark Mode") },
-                            leadingIcon = {
-                                Icon(
-                                    if (isDarkMode) Icons.Default.LightMode else Icons.Default.DarkMode,
-                                    contentDescription = null
-                                )
-                            },
-                            onClick = { 
-                                isDarkMode = !isDarkMode 
-                                showMenu = false
-                            }
-                        )
-                        androidx.compose.material3.DropdownMenuItem(
-                            text = { Text(if (showGradientBorder) "Hide Border" else "Show Border") },
-                            leadingIcon = {
-                                Icon(Icons.Default.BorderOuter, contentDescription = null)
-                            },
-                            onClick = { 
-                                showGradientBorder = !showGradientBorder 
-                                showMenu = false
-                            }
-                        )
-                        androidx.compose.material3.DropdownMenuItem(
-                            text = { Text("Refresh") },
-                            leadingIcon = {
-                                Icon(Icons.Default.Refresh, contentDescription = null)
-                            },
-                            onClick = { 
-                                webViews[selectedEngine]?.reload()
-                                showMenu = false
-                            }
-                        )
-                        androidx.compose.material3.DropdownMenuItem(
-                            text = { Text("Copy URL") },
-                            leadingIcon = {
-                                Icon(Icons.Default.ContentCopy, contentDescription = null)
-                            },
-                            onClick = {
-                                if (searchUrl != null) {
-                                    val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                                    val clip = android.content.ClipData.newPlainText("Search URL", searchUrl)
-                                    clipboard.setPrimaryClip(clip)
-                                }
-                                showMenu = false
-                            }
-                        )
-                        androidx.compose.material3.DropdownMenuItem(
-                            text = { Text("Open in Browser") },
-                            leadingIcon = {
-                                Icon(Icons.Default.OpenInNew, contentDescription = null)
-                            },
-                            onClick = {
-                                val currentUrl = webViews[selectedEngine]?.url ?: searchUrl
-                                if (currentUrl != null) {
-                                    try {
-                                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(currentUrl))
-                                        context.startActivity(intent)
-                                    } catch (e: Exception) {
-                                        android.util.Log.e("CircleToSearch", "Failed to open browser", e)
-                                    }
-                                }
-                                showMenu = false
-                            }
-                        )
-                        androidx.compose.material3.DropdownMenuItem(
-                            text = { Text("Settings") },
-                            leadingIcon = {
-                                Icon(Icons.Default.Settings, contentDescription = null)
-                            },
-                            onClick = {
-                                showSettingsScreen = true
-                                showMenu = false
-                            }
-                        )
-                    }
-                }
-            }      // 5. Search Bar / Pill (Bottom Fixed) - Clickable to open sheet
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .navigationBarsPadding()
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 24.dp)
-                    .shadow(8.dp, CircleShape)
-                    .background(Color(0xFF1F1F1F), CircleShape)
-                    .height(64.dp)
-                    .padding(horizontal = 20.dp)
-                    .pointerInput(Unit) {
-                        detectTapGestures {
-                            scope.launch { 
-                                scaffoldState.bottomSheetState.expand()
-                            }
-                        }
-                    }
+            androidx.compose.animation.AnimatedVisibility(
+                visible = isUIVisible && !isCopyMode,
+                enter = androidx.compose.animation.slideInVertically(
+                    initialOffsetY = { -it }, // Commence au-dessus de l'écran (-100%)
+                    animationSpec = tween(500, easing = androidx.compose.animation.core.FastOutSlowInEasing)
+                ),
+                modifier = Modifier.align(Alignment.TopCenter).zIndex(2000f)
             ) {
                 Row(
-                    modifier = Modifier.align(Alignment.CenterStart),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .padding(top = 16.dp, start = 16.dp, end = 16.dp)
+                        .align(Alignment.TopCenter),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    if (selectedBitmap != null) {
+                    IconButton(
+                        onClick =
+                            {
+                                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                onClose()
+                            },
+                        modifier = Modifier
+                            .background(Color.Gray.copy(alpha = 0.5f), CircleShape)
+                            .size(40.dp)
+                    ) {
+                        Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
+                    }
+                    Spacer(modifier = Modifier.weight(1f))
+                    if (selectedEngine.name == "Google") {
+                        // Si c'est Google, on affiche ta belle typo officielle
                         Image(
-                            bitmap = selectedBitmap!!.asImageBitmap(),
-                            contentDescription = "Selected",
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .border(1.dp, Color.Gray, RoundedCornerShape(12.dp))
+                            painter = painterResource(id = com.akslabs.circletosearch.R.drawable.googletypo),
+                            contentDescription = "Google Search",
+                            modifier = Modifier.height(50.dp), // Hauteur ajustable selon ton PNG
+                            colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(Color.White)
                         )
                     } else {
-                        // G Logo
-                        Row {
-                            Text("G", style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold, color = Color(0xFF4285F4)))
-                            Text("o", style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold, color = Color(0xFFEA4335)))
-                            Text("o", style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold, color = Color(0xFFFBBC05)))
-                            Text("g", style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold, color = Color(0xFF4285F4)))
-                            Text("l", style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold, color = Color(0xFF34A853)))
-                            Text("e", style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold, color = Color(0xFFEA4335)))
+                        // Si c'est Bing, Yandex, etc., on garde le texte stylé d'origine
+                        Text(
+                            text = selectedEngine.name,
+                            style = MaterialTheme.typography.headlineMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                        )
+                    }
+                    Spacer(modifier = Modifier.weight(1f))
+
+                    // Action Button (Menu)
+                    Box(
+                        modifier = Modifier
+                            .background(Color.Gray.copy(alpha = 0.5f), CircleShape)
+                            .size(40.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        var showMenu by remember { mutableStateOf(false) }
+                        IconButton(onClick = {
+                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                            showMenu = true
+                        }) {
+                            Icon(
+                                Icons.Default.MoreVert,
+                                contentDescription = "Menu",
+                                tint = Color.White
+                            )
+                        }
+
+                        androidx.compose.material3.DropdownMenu(
+                            expanded = showMenu,
+                            onDismissRequest = { showMenu = false }
+                        ) {
+                            val isDesktop = isDesktop(selectedEngine)
+                            androidx.compose.material3.DropdownMenuItem(
+                                text = { Text(if (isDesktop) "Mobile Mode" else "Desktop Mode") },
+                                leadingIcon = {
+                                    Icon(
+                                        if (isDesktop) Icons.Default.Smartphone else Icons.Default.DesktopWindows,
+                                        contentDescription = null
+                                    )
+                                },
+                                onClick = {
+                                    val newSet = desktopModeEngines.toMutableSet()
+                                    if (newSet.contains(selectedEngine)) {
+                                        newSet.remove(selectedEngine)
+                                    } else {
+                                        newSet.add(selectedEngine)
+                                    }
+                                    desktopModeEngines = newSet
+                                    showMenu = false
+                                }
+                            )
+                            androidx.compose.material3.DropdownMenuItem(
+                                text = { Text(if (isDarkMode) "Light Mode" else "Dark Mode") },
+                                leadingIcon = {
+                                    Icon(
+                                        if (isDarkMode) Icons.Default.LightMode else Icons.Default.DarkMode,
+                                        contentDescription = null
+                                    )
+                                },
+                                onClick = {
+                                    isDarkMode = !isDarkMode
+                                    showMenu = false
+                                }
+                            )
+                            androidx.compose.material3.DropdownMenuItem(
+                                text = { Text(if (showGradientBorder) "Hide Border" else "Show Border") },
+                                leadingIcon = {
+                                    Icon(Icons.Default.BorderOuter, contentDescription = null)
+                                },
+                                onClick = {
+                                    showGradientBorder = !showGradientBorder
+                                    showMenu = false
+                                }
+                            )
+                            androidx.compose.material3.DropdownMenuItem(
+                                text = { Text("Refresh") },
+                                leadingIcon = {
+                                    Icon(Icons.Default.Refresh, contentDescription = null)
+                                },
+                                onClick = {
+                                    webViews[selectedEngine]?.reload()
+                                    showMenu = false
+                                }
+                            )
+                            androidx.compose.material3.DropdownMenuItem(
+                                text = { Text("Copy URL") },
+                                leadingIcon = {
+                                    Icon(Icons.Default.ContentCopy, contentDescription = null)
+                                },
+                                onClick = {
+                                    if (searchUrl != null) {
+                                        val clipboard =
+                                            context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                        val clip = android.content.ClipData.newPlainText(
+                                            "Search URL",
+                                            searchUrl
+                                        )
+                                        clipboard.setPrimaryClip(clip)
+                                    }
+                                    showMenu = false
+                                }
+                            )
+                            androidx.compose.material3.DropdownMenuItem(
+                                text = { Text("Open in Browser") },
+                                leadingIcon = {
+                                    Icon(Icons.Default.OpenInNew, contentDescription = null)
+                                },
+                                onClick = {
+                                    val currentUrl = webViews[selectedEngine]?.url ?: searchUrl
+                                    if (currentUrl != null) {
+                                        try {
+                                            val intent = android.content.Intent(
+                                                android.content.Intent.ACTION_VIEW,
+                                                android.net.Uri.parse(currentUrl)
+                                            )
+                                            context.startActivity(intent)
+                                        } catch (e: Exception) {
+                                            android.util.Log.e(
+                                                "CircleToSearch",
+                                                "Failed to open browser",
+                                                e
+                                            )
+                                        }
+                                    }
+                                    showMenu = false
+                                }
+                            )
+                            androidx.compose.material3.DropdownMenuItem(
+                                text = { Text("Settings") },
+                                leadingIcon = {
+                                    Icon(Icons.Default.Settings, contentDescription = null)
+                                },
+                                onClick = {
+                                    showSettingsScreen = true
+                                    showMenu = false
+                                }
+                            )
                         }
                     }
                 }
-                
-                Row(
-                    modifier = Modifier.align(Alignment.CenterEnd),
-                    verticalAlignment = Alignment.CenterVertically
+            }
+            // 5. Bottom Bar — Material 3 Expressive two-row card
+            // State for Copy Text mode
+            var isCopyTextTriggered by remember { mutableStateOf(false) }
+
+            androidx.compose.animation.AnimatedVisibility(
+                visible = isUIVisible && !isCopyMode,
+                enter = slideInVertically(
+                    initialOffsetY = { it }, // slides up from below
+                    animationSpec = tween(300, easing = androidx.compose.animation.core.CubicBezierEasing(0f, 0f, 0.2f, 1f))
+                ) + fadeIn(animationSpec = tween(300)),
+                exit = slideOutVertically(
+                    targetOffsetY = { it }, // slides back down
+                    animationSpec = tween(200, easing = androidx.compose.animation.core.CubicBezierEasing(0.4f, 0f, 1f, 1f))
+                ) + fadeOut(animationSpec = tween(200)),
+                modifier = Modifier.align(Alignment.BottomCenter).zIndex(2000f)
+            ) {
+                // ── Outer card container ──────────────────────────────────────────
+                androidx.compose.material3.Surface(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .navigationBarsPadding()
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 16.dp),
+                    shape = RoundedCornerShape(28.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    shadowElevation = 8.dp,
+                    tonalElevation = 4.dp
                 ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        // ── ROW 1: Search Pill + Instant Actions (Song, Translate) ──
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            // Main Search Pill
+                            androidx.compose.material3.Surface(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(60.dp),
+                                shape = CircleShape,
+                                color = MaterialTheme.colorScheme.surfaceContainer,
+                                tonalElevation = 2.dp
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .padding(horizontal = 14.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    // App logo
+                                    Image(
+                                        painter = painterResource(id = com.akslabs.circletosearch.R.drawable.circletosearch),
+                                        contentDescription = "Logo",
+                                        modifier = Modifier
+                                            .size(44.dp)
+                                            .clickable {
+                                                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                                scope.launch { scaffoldState.bottomSheetState.expand() }
+                                            }
+                                    )
 
-                    IconButton(onClick = {
-                        showSupportSheet = true
-                    }, modifier = Modifier.size(32.dp)) {
-                        Icon(
-                            painter = painterResource(id = com.akslabs.circletosearch.R.drawable.donation),
-                            contentDescription = "Donate",
-                            tint = Color.White,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(3.dp))
-                    IconButton(onClick = {
-                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/aks-labs"))
-                        context.startActivity(intent)
-                    }, modifier = Modifier.size(32.dp)) {
-                        Icon(
-                            painter = painterResource(id = com.akslabs.circletosearch.R.drawable.github),
-                            contentDescription = "Github",
-                            tint = Color.White,
-                            modifier = Modifier.size(23.dp)
-                        )
-                    }
+                                    Spacer(modifier = Modifier.weight(1f))
 
-                    Spacer(modifier = Modifier.width(3.dp))
-                    IconButton(onClick = {
-                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://t.me/akslabs"))
-                        context.startActivity(intent)
-                    }, modifier = Modifier.size(32.dp)) {
-                        Icon(
-                            painter = painterResource(id = com.akslabs.circletosearch.R.drawable.telegram),
-                            contentDescription = "Telegram",
-                            tint = Color.White,
-                            modifier = Modifier.size(23.dp)
-                        )
+                                    // Mic Button
+                                    IconButton(
+                                        onClick = {
+                                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                            try {
+                                                val intent = android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                                                    putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                                    addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                                }
+                                                context.startActivity(intent)
+                                            } catch (e: Exception) {}
+                                        },
+                                        modifier = Modifier.size(44.dp)
+                                    ) {
+                                        Icon(Icons.Default.Mic, contentDescription = "Voice Search")
+                                    }
+
+                                    Spacer(modifier = Modifier.width(4.dp))
+
+                                    // Lens Button
+                                    IconButton(
+                                        onClick = {
+                                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                            uiPreferences.setUseGoogleLensOnly(true)
+                                            if (screenshot != null) {
+                                                selectedBitmap = screenshot
+                                            }
+                                        },
+                                        modifier = Modifier.size(44.dp)
+                                    ) {
+                                        Icon(painterResource(id = com.akslabs.circletosearch.R.drawable.circletosearch), contentDescription = "Lens", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(26.dp))
+                                    }
+                                }
+                            }
+
+                            // Circular Button: Song
+                            IconButton(
+                                onClick = {
+                                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                    try {
+                                        val shazamIntent = context.packageManager.getLaunchIntentForPackage("com.shazam.android")
+                                        val soundHoundIntent = context.packageManager.getLaunchIntentForPackage("com.melodis.midomiMusicIdentifier.freemium")
+                                        val launchIntent = (shazamIntent ?: soundHoundIntent)?.apply { addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK) }
+                                        if (launchIntent != null) context.startActivity(launchIntent)
+                                        else context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://play.google.com/store/search?q=shazam&c=apps")).apply { addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK) })
+                                    } catch (e: Exception) {}
+                                },
+                                modifier = Modifier
+                                    .size(60.dp)
+                                    .background(MaterialTheme.colorScheme.surfaceContainer, CircleShape),
+                            ) {
+                                Icon(Icons.Default.MusicNote, contentDescription = "Song Search")
+                            }
+
+                            // Circular Button: Translate
+                            IconButton(
+                                onClick = {
+                                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                    try {
+                                        val intent = context.packageManager.getLaunchIntentForPackage("com.google.android.apps.translate")?.apply { addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK) }
+                                        if (intent != null) context.startActivity(intent)
+                                        else context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://translate.google.com")).apply { addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK) })
+                                    } catch (e: Exception) {}
+                                },
+                                modifier = Modifier
+                                    .size(60.dp)
+                                    .background(MaterialTheme.colorScheme.surfaceContainer, CircleShape),
+                            ) {
+                                Icon(Icons.Default.Translate, contentDescription = "Translate")
+                            }
+                        }
+
+                        // ── ROW 2: Action buttons ───────────────────────────────
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceEvenly,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            @Composable
+                            fun BottomBarButton(label: String, icon: @Composable () -> Unit, onClick: () -> Unit) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    FilledTonalIconButton(
+                                        onClick = { haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress); onClick() },
+                                        modifier = Modifier.size(52.dp),
+                                        colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                                            contentColor = MaterialTheme.colorScheme.onSurface
+                                        )
+                                    ) { icon() }
+                                    Text(text = label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center, maxLines = 1, softWrap = false)
+                                }
+                            }
+
+                            // Share
+                            BottomBarButton("Share", { Icon(Icons.Default.Send, null) }) {
+                                if (screenshot != null) {
+                                    scope.launch {
+                                        try {
+                                            val fileName = "share_${java.util.UUID.randomUUID()}.png"
+                                            val path = ImageUtils.saveBitmap(context, selectedBitmap ?: screenshot, fileName)
+                                            val file = java.io.File(path)
+                                            val uri = androidx.core.content.FileProvider.getUriForFile(context, "com.akslabs.circletosearch.fileprovider", file)
+                                            val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply { 
+                                                type = "image/png"
+                                                putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                                                clipData = android.content.ClipData.newRawUri("Selection", uri)
+                                                addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK) 
+                                            }
+                                            context.startActivity(android.content.Intent.createChooser(shareIntent, "Share Image").apply { addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK) })
+                                        } catch (e: Exception) {}
+                                    }
+                                }
+                            }
+
+                            // Pin
+                            val isPinEnabled = selectedBitmap != null
+                            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                FilledTonalIconButton(
+                                    onClick = { 
+                                        haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                        selectedBitmap?.let { bmp ->
+                                            CircleToSearchAccessibilityService.pinArea(bmp, selectionRect ?: android.graphics.Rect())
+                                            // Close CTS UI after pinning
+                                            (context as? android.app.Activity)?.finish()
+                                        }
+                                    },
+                                    enabled = isPinEnabled,
+                                    modifier = Modifier.size(52.dp),
+                                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                        containerColor = if (isPinEnabled) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.5f),
+                                        contentColor = if (isPinEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                                    )
+                                ) { 
+                                    Icon(
+                                        Icons.Default.PushPin, 
+                                        contentDescription = "Pin Selection",
+                                        modifier = Modifier.size(22.dp)
+                                    ) 
+                                }
+                                Text(
+                                    text = "Pin", 
+                                    style = MaterialTheme.typography.labelSmall, 
+                                    color = if (isPinEnabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f), 
+                                    textAlign = TextAlign.Center, 
+                                    maxLines = 1, 
+                                    softWrap = false
+                                )
+                            }
+
+                            // Image Extractor (Phase 41)
+                            BottomBarButton("Extract", { Icon(Icons.Default.Image, null, modifier = Modifier.size(22.dp)) }) {
+                                isExtractMode = true
+                                scope.launch {
+                                    // Trigger extraction logic in service
+                                    CircleToSearchAccessibilityService.instance?.extractImages()
+                                }
+                            }
+
+                            // Donate
+                            BottomBarButton("Donate", { Icon(painterResource(id = com.akslabs.circletosearch.R.drawable.donation), null, modifier = Modifier.size(22.dp)) }) {
+                                showSupportSheet = true
+                            }
+
+                            // Copy Text
+                            BottomBarButton("Copy Text", { Icon(Icons.Default.TextFields, null) }) {
+                                isCopyMode = true
+                                isCopyTextTriggered = true
+                            }
+
+                            // QR Scan
+                            BottomBarButton("Scan QR", { Icon(Icons.Default.QrCode, null) }) {
+                                qrScanBitmap = selectedBitmap ?: screenshot
+                                showQrSheet = true
+                            }
+
+                            // Fullscreen
+                            BottomBarButton("Fullscreen", { Icon(Icons.Default.Fullscreen, null) }) {
+                                if (screenshot != null) {
+                                    selectionRect = Rect(0, 0, screenshot.width, screenshot.height)
+                                    currentPathPoints.clear()
+                                    scope.launch { selectionAnim.snapTo(0f); selectionAnim.animateTo(1f, tween(600)); selectedBitmap = screenshot; isSearching = true }
+                                }
+                            }
+                        }
                     }
                 }
             }
 
-        
+            // Copy Text overlay integration (Activity-based)
+            if (isCopyMode && copyTextManager != null) {
+                AndroidView(
+                    factory = { ctx ->
+                        copyTextManager.getOverlayView(onDismiss = {
+                            isCopyMode = false
+                            onExitCopyMode()
+                        })
+                    },
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .zIndex(150f)
+                )
+            }
+
+            // 4. Selection Actions (Share) — Positioned at the very end for absolute top-layer rendering
+            if (selectionRect != null && selectionAnim.value == 1f && !isCopyMode) {
+                val rect = selectionRect!!
+                val density = androidx.compose.ui.platform.LocalDensity.current
+                val leftPx = rect.left.toFloat()
+                val topPx = rect.top.toFloat()
+                val rightPx = rect.right.toFloat()
+                val bottomPx = rect.bottom.toFloat()
+                
+                val leftDp = with(density) { leftPx.toDp() }
+                val topDp = with(density) { topPx.toDp() }
+                val rightDp = with(density) { rightPx.toDp() }
+                val bottomDp = with(density) { bottomPx.toDp() }
+                val widthDp = rightDp - leftDp
+                
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .zIndex(2000f) // Highest Z-index
+                ) {
+                    val screenWidth = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp.dp
+                    val screenHeight = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp
+                    val centerX = (leftDp + rightDp) / 2
+                    Box(
+                        modifier = Modifier
+                            .offset(
+                                x = (centerX - 125.dp).coerceIn(0.dp, screenWidth - 250.dp),
+                                y = if (topPx > 200f) (topDp - 72.dp).coerceAtLeast(16.dp) else (bottomDp + 16.dp).coerceAtMost(screenHeight - 80.dp)
+                            )
+                            .width(250.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        // Wrapped in Surface to match Bottom Bar tonal environment
+                        androidx.compose.material3.Surface(
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            shape = CircleShape,
+                            tonalElevation = 4.dp,
+                            shadowElevation = 8.dp
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                // 1. SHARE BUTTON
+                                androidx.compose.material3.FilledTonalButton(
+                                    onClick = {
+                                        if (selectedBitmap != null) {
+                                            scope.launch {
+                                                try {
+                                                    val fileName = "selection_${java.util.UUID.randomUUID()}.png"
+                                                    val path = ImageUtils.saveBitmap(context, selectedBitmap!!, fileName)
+                                                    val file = java.io.File(path)
+                                                    val uri = androidx.core.content.FileProvider.getUriForFile(context, "com.akslabs.circletosearch.fileprovider", file)
+                                                    val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply { 
+                                                        type = "image/png"
+                                                        putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                                                        clipData = android.content.ClipData.newRawUri("Selection", uri)
+                                                        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                        addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                                    }
+                                                    context.startActivity(android.content.Intent.createChooser(shareIntent, "Share Selection").apply { 
+                                                        addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK) 
+                                                    })
+                                                } catch (e: Exception) {
+                                                    android.util.Log.e("CircleToSearch", "Failed to share selection", e)
+                                                }
+                                            }
+                                        }
+                                    },
+                                    modifier = Modifier.height(48.dp),
+                                    shape = CircleShape,
+                                    colors = androidx.compose.material3.ButtonDefaults.filledTonalButtonColors(
+                                        containerColor = Color.Transparent, // Parent surface handles color
+                                        contentColor = MaterialTheme.colorScheme.onSurface
+                                    ),
+                                    elevation = null,
+                                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp)
+                                ) {
+                                    Text(
+                                        "Share", 
+                                        style = MaterialTheme.typography.labelLarge.copy(
+                                            fontWeight = androidx.compose.ui.text.font.FontWeight.Normal
+                                        )
+                                    )
+                                }
+
+                                // Separator
+                                androidx.compose.material3.VerticalDivider(
+                                    modifier = Modifier.height(24.dp).padding(horizontal = 2.dp),
+                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                                )
+
+                                // 2. SAVE BUTTON
+                                androidx.compose.material3.FilledTonalButton(
+                                    onClick = {
+                                        if (selectedBitmap != null) {
+                                            val success = ImageUtils.saveToGallery(context, selectedBitmap!!)
+                                            if (success) {
+                                                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                                android.widget.Toast.makeText(context, "Saved to Gallery", android.widget.Toast.LENGTH_SHORT).show()
+                                            } else {
+                                                android.widget.Toast.makeText(context, "Failed to save", android.widget.Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                    },
+                                    modifier = Modifier.height(48.dp),
+                                    shape = CircleShape,
+                                    colors = androidx.compose.material3.ButtonDefaults.filledTonalButtonColors(
+                                        containerColor = Color.Transparent,
+                                        contentColor = MaterialTheme.colorScheme.onSurface
+                                    ),
+                                    elevation = null,
+                                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp)
+                                ) {
+                                    Text(
+                                        "Save", 
+                                        style = MaterialTheme.typography.labelLarge.copy(
+                                            fontWeight = androidx.compose.ui.text.font.FontWeight.Normal
+                                        )
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+        // --- NEW: QR Overlay Chips (High Layer) ---
+        if (screenshot != null && !isCopyMode) {
+            BoxWithConstraints(modifier = Modifier.fillMaxSize().zIndex(2500f)) {
+                val screenWidth = maxWidth
+                val screenHeight = maxHeight
+                val bitmapWidth = screenshot.width.toFloat()
+                val bitmapHeight = screenshot.height.toFloat()
+
+                android.util.Log.d("CircleToSearch", "Rendering QR Chips: count=${detectedQrCodes.size}")
+                detectedQrCodes.forEach { qr ->
+                    qr.bounds?.let { bounds ->
+                        val chipX = (bounds.centerX() / bitmapWidth) * screenWidth.value
+                        val chipY = (bounds.centerY() / bitmapHeight) * screenHeight.value
+                        val isUrl = qr.result is QrResult.Url
+
+                        // Using a Box with pointerInput to consume taps and prevent circling
+                        Box(
+                            modifier = Modifier
+                                .offset(x = chipX.dp - 24.dp, y = chipY.dp - 24.dp)
+                                .size(48.dp)
+                                .shadow(6.dp, CircleShape)
+                                .background(Color.White, CircleShape)
+                                .border(1.5.dp, if(isUrl) Color(0xFF1A73E8) else MaterialTheme.colorScheme.primary.copy(alpha = 0.5f), CircleShape)
+                                .pointerInput(qr) {
+                                    detectTapGestures {
+                                        selectedQrResult = qr
+                                        qrScanBitmap = null 
+                                        showQrSheet = true
+                                    }
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.QrCode, 
+                                null, 
+                                tint = if(isUrl) Color(0xFF1A73E8) else MaterialTheme.colorScheme.primary, 
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                        
+                        val label = qrResultShortLabel(qr.result)
+                        if (label.isNotEmpty()) {
+                            Surface(
+                                modifier = Modifier
+                                    .offset(x = chipX.dp + 28.dp, y = chipY.dp - 12.dp)
+                                    .pointerInput(qr) {
+                                        detectTapGestures {
+                                            selectedQrResult = qr
+                                            qrScanBitmap = null 
+                                            showQrSheet = true
+                                        }
+                                    },
+                                shape = RoundedCornerShape(12.dp),
+                                color = Color.White.copy(alpha = 0.95f),
+                                tonalElevation = 4.dp,
+                                shadowElevation = 4.dp,
+                                border = if(isUrl) androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF1A73E8).copy(alpha = 0.3f)) else null
+                            ) {
+                                Text(
+                                    text = label,
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        color = if(isUrl) Color(0xFF1A73E8) else MaterialTheme.colorScheme.onSurface,
+                                        fontWeight = if(isUrl) FontWeight.Bold else FontWeight.Medium
+                                    ),
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // QR Code Result Sheet
+        if (showQrSheet) {
+            // Full-screen invisible overlay to catch "click outside"
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .zIndex(2500f)
+                    .background(Color.Black.copy(alpha = 0.01f)) // Almost invisible but catches taps
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null
+                    ) { 
+                        showQrSheet = false
+                        selectedQrResult = null
+                    }
+            )
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+                    .padding(bottom = 16.dp)
+                    .zIndex(3000f),
+                contentAlignment = Alignment.BottomCenter
+            ) {
+                // Ensure BackHandler is active when sheet is shown
+                androidx.activity.compose.BackHandler {
+                    showQrSheet = false
+                    selectedQrResult = null
+                }
+
+                QrCodeResultSheet(
+                    context = context,
+                    bitmap = qrScanBitmap,
+                    onDismiss = { 
+                        showQrSheet = false
+                        selectedQrResult = null
+                    },
+                    initialResults = detectedQrCodes,
+                    initialPage = if (selectedQrResult != null) detectedQrCodes.indexOf(selectedQrResult!!) else 0
+                )
+            }
+        }
+
         if (showSupportSheet) {
             com.akslabs.circletosearch.SupportSheet(
                 sheetState = supportSheetState,
@@ -1186,7 +1870,48 @@ fun CircleToSearchScreen(
             )
         }
 
+        // --- Phase 43: Image Extraction Highlights ---
+        if (isExtractMode) {
+            Canvas(modifier = Modifier.fillMaxSize().zIndex(4000f)) {
+                extractedImages.forEach { rect ->
+                    val localRect = androidx.compose.ui.geometry.Rect(
+                        rect.left.toFloat(),
+                        rect.top.toFloat(),
+                        rect.right.toFloat(),
+                        rect.bottom.toFloat()
+                    )
+                    // Draw translucent highlight
+                    drawRect(
+                        color = Color.White.copy(alpha = 0.3f),
+                        topLeft = localRect.topLeft,
+                        size = localRect.size
+                    )
+                    // Draw subtle border
+                    drawRect(
+                        color = Color.White,
+                        topLeft = localRect.topLeft,
+                        size = localRect.size,
+                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx())
+                    )
+                }
+            }
+            
+            // Exit button for Extract Mode
+            Box(modifier = Modifier.fillMaxSize().padding(16.dp).statusBarsPadding().zIndex(5000f)) {
+                androidx.compose.material3.FilledTonalIconButton(
+                    onClick = { isExtractMode = false; extractedImages.clear() },
+                    modifier = Modifier.align(Alignment.TopStart).size(40.dp),
+                    colors = androidx.compose.material3.IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = Color.Black.copy(alpha = 0.6f),
+                        contentColor = Color.White
+                    )
+                ) {
+                    Icon(Icons.Default.Close, contentDescription = "Exit Extraction Mode")
+                }
+            }
+        }
     }
+}
 }
 }
 

@@ -20,6 +20,7 @@
 package com.akslabs.circletosearch
 
 import android.os.Bundle
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -27,32 +28,48 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import com.akslabs.circletosearch.data.BitmapRepository
 import com.akslabs.circletosearch.ui.CircleToSearchScreen
+import com.akslabs.circletosearch.ui.components.CopyTextOverlayManager
 import com.akslabs.circletosearch.ui.theme.CircleToSearchTheme
 
 class OverlayActivity : ComponentActivity() {
     
     private val screenshotBitmap = androidx.compose.runtime.mutableStateOf<android.graphics.Bitmap?>(null)
+    private val copyTextManager = androidx.compose.runtime.mutableStateOf<CopyTextOverlayManager?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(0))
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         android.util.Log.d("CircleToSearch", "OverlayActivity onCreate")
         
         loadScreenshot()
 
+        // Initialize manager for Activity-based layout
+        copyTextManager.value = CopyTextOverlayManager(
+            context = this,
+            screenshotBitmap = screenshotBitmap.value
+        )
+        CircleToSearchAccessibilityService.setCopyTextManager(copyTextManager.value)
+
         setContent {
             CircleToSearchTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
-                    color = Color.Transparent
+                    color = Color.Transparent,
+                    tonalElevation = 0.dp
                 ) {
                     CircleToSearchScreen(
                         screenshot = screenshotBitmap.value,
                         onClose = { 
                             BitmapRepository.clear()
                             finish() 
+                        },
+                        copyTextManager = copyTextManager.value,
+                        onExitCopyMode = { 
+                            // Copy Mode exited
                         }
                     )
                 }
@@ -60,11 +77,25 @@ class OverlayActivity : ComponentActivity() {
         }
     }
 
+
     override fun onNewIntent(intent: android.content.Intent) {
         super.onNewIntent(intent)
-        android.util.Log.d("CircleToSearch", "OverlayActivity onNewIntent")
+        android.util.Log.d("CircleToSearch", "OverlayActivity onNewIntent - Resetting state")
         setIntent(intent)
+        
+        // IMMEDIATE NULLING to prevent flash of previous screen
+        screenshotBitmap.value = null
+        copyTextManager.value?.dismiss()
+        copyTextManager.value = null
+        
         loadScreenshot()
+        
+        // Recreate manager with new screenshot
+        copyTextManager.value = CopyTextOverlayManager(
+            context = this,
+            screenshotBitmap = screenshotBitmap.value
+        )
+        CircleToSearchAccessibilityService.setCopyTextManager(copyTextManager.value)
     }
 
     private fun loadScreenshot() {
@@ -74,12 +105,13 @@ class OverlayActivity : ComponentActivity() {
             screenshotBitmap.value = bitmap
         } else {
             android.util.Log.e("CircleToSearch", "No bitmap in Repository")
-            // Fallback or finish? For now just log.
         }
     }
     
     override fun onDestroy() {
         super.onDestroy()
+        copyTextManager.value?.dismiss()
+        copyTextManager.value = null
         if (isFinishing) {
              com.akslabs.circletosearch.data.BitmapRepository.clear()
              com.akslabs.circletosearch.utils.StorageUtils.clearAppCache(this)

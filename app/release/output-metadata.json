@@ -8,12 +8,30 @@
   "variantName": "release",
   "elements": [
     {
-      "type": "SINGLE",
-      "filters": [],
+      "type": "ONE_OF_MANY",
+      "filters": [
+        {
+          "filterType": "ABI",
+          "value": "armeabi-v7a"
+        }
+      ],
       "attributes": [],
-      "versionCode": 4,
+      "versionCode": 6,
       "versionName": "0.4",
-      "outputFile": "app-release.apk"
+      "outputFile": "app-armeabi-v7a-release.apk"
+    },
+    {
+      "type": "ONE_OF_MANY",
+      "filters": [
+        {
+          "filterType": "ABI",
+          "value": "arm64-v8a"
+        }
+      ],
+      "attributes": [],
+      "versionCode": 6,
+      "versionName": "0.4",
+      "outputFile": "app-arm64-v8a-release.apk"
     }
   ],
   "elementType": "File",
@@ -22,14 +40,16 @@
       "minApi": 28,
       "maxApi": 30,
       "baselineProfiles": [
-        "baselineProfiles/1/app-release.dm"
+        "baselineProfiles/1/app-armeabi-v7a-release.dm",
+        "baselineProfiles/1/app-arm64-v8a-release.dm"
       ]
     },
     {
       "minApi": 31,
       "maxApi": 2147483647,
       "baselineProfiles": [
-        "baselineProfiles/0/app-release.dm"
+        "baselineProfiles/0/app-armeabi-v7a-release.dm",
+        "baselineProfiles/0/app-arm64-v8a-release.dm"
       ]
     }
   ],
