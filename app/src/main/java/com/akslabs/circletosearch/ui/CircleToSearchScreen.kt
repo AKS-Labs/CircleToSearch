@@ -1142,7 +1142,7 @@ fun CircleToSearchScreen(
 
             // 4. Header (Top)
             androidx.compose.animation.AnimatedVisibility(
-                visible = isUIVisible && !isCopyMode,
+                visible = isUIVisible && !isCopyMode && !isEntityExtractMode,
                 enter = androidx.compose.animation.slideInVertically(
                     initialOffsetY = { -it }, // Commence au-dessus de l'écran (-100%)
                     animationSpec = tween(500, easing = androidx.compose.animation.core.FastOutSlowInEasing)
@@ -1328,7 +1328,7 @@ fun CircleToSearchScreen(
             var isCopyTextTriggered by remember { mutableStateOf(false) }
 
             androidx.compose.animation.AnimatedVisibility(
-                visible = isUIVisible && !isCopyMode,
+                visible = isUIVisible && !isCopyMode && !isEntityExtractMode,
                 enter = slideInVertically(
                     initialOffsetY = { it }, // slides up from below
                     animationSpec = tween(300, easing = androidx.compose.animation.core.CubicBezierEasing(0f, 0f, 0.2f, 1f))
@@ -1554,21 +1554,32 @@ fun CircleToSearchScreen(
                                         
                                         val urlRegex = android.util.Patterns.WEB_URL.toRegex()
                                         val emailRegex = android.util.Patterns.EMAIL_ADDRESS.toRegex()
-                                        val phoneRegex = Regex("""[\+\d\s\-\(\)]{7,15}""")
+                                        val phoneRegexLine = Regex("""(\+?[\d\s\-\(\).]{9,20})""")
                                         val upiRegex = Regex("""[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z]{2,64}""")
 
                                         textNodes.forEach { node ->
+                                            val lineText = node.fullText
+                                            phoneRegexLine.findAll(lineText).forEach { match ->
+                                                val phoneCandidate = match.value.trim()
+                                                if (phoneCandidate.count { it.isDigit() } >= 10) {
+                                                    val startIdx = match.range.first
+                                                    val endIdx = match.range.last + 1
+                                                    val ratioStart = startIdx.toFloat() / lineText.length.coerceAtLeast(1)
+                                                    val ratioEnd = endIdx.toFloat() / lineText.length.coerceAtLeast(1)
+                                                    val entityBounds = android.graphics.RectF(
+                                                        node.bounds.left.toFloat() + (ratioStart * node.bounds.width().toFloat()),
+                                                        node.bounds.top.toFloat(),
+                                                        node.bounds.left.toFloat() + (ratioEnd * node.bounds.width().toFloat()),
+                                                        node.bounds.bottom.toFloat()
+                                                    )
+                                                    entities.add(SmartEntity.Phone(phoneCandidate, entityBounds))
+                                                }
+                                            }
                                             node.words.forEach { word ->
                                                 val txt = word.text.trim()
-                                                if (emailRegex.matches(txt)) {
-                                                    entities.add(SmartEntity.Email(txt, word.bounds))
-                                                } else if (upiRegex.matches(txt)) {
-                                                    entities.add(SmartEntity.Upi(txt, word.bounds))
-                                                } else if (urlRegex.matches(txt)) {
-                                                    entities.add(SmartEntity.Url(txt, word.bounds))
-                                                } else if (phoneRegex.matches(txt) && txt.count { it.isDigit() } >= 10) {
-                                                    entities.add(SmartEntity.Phone(txt, word.bounds))
-                                                }
+                                                if (emailRegex.matches(txt)) entities.add(SmartEntity.Email(txt, word.bounds))
+                                                else if (upiRegex.matches(txt)) entities.add(SmartEntity.Upi(txt, word.bounds))
+                                                else if (urlRegex.matches(txt)) entities.add(SmartEntity.Url(txt, word.bounds))
                                             }
                                         }
                                         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
@@ -1607,6 +1618,20 @@ fun CircleToSearchScreen(
                         }
                     }
                 }
+            }
+
+            // Phase 44: Smart Entity Extractor Exit Overlay (Full Screen tap capture)
+            if (isEntityExtractMode) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .zIndex(2550f)
+                        .pointerInput(Unit) {
+                            detectTapGestures {
+                                isEntityExtractMode = false
+                            }
+                        }
+                )
             }
 
             // Copy Text overlay integration (Activity-based)
@@ -1855,6 +1880,11 @@ fun CircleToSearchScreen(
                             .border(1.5.dp, entity.sourceColor, CircleShape)
                             .clickable {
                                 try {
+                                    // Auto-copy clicked content to clipboard
+                                    val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                    val clip = android.content.ClipData.newPlainText(entity.typeName, entity.text)
+                                    clipboard.setPrimaryClip(clip)
+
                                     val intent = when(entity) {
                                         is SmartEntity.Url -> android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(if (!entity.text.startsWith("http")) "http://${entity.text}" else entity.text))
                                         is SmartEntity.Email -> android.content.Intent(android.content.Intent.ACTION_SENDTO, android.net.Uri.parse("mailto:${entity.text}"))
