@@ -49,6 +49,7 @@ import androidx.compose.ui.window.DialogProperties
 import com.akslabs.circletosearch.ui.components.PrivacyDialog
 import com.akslabs.circletosearch.ui.theme.CircleToSearchTheme
 import com.akslabs.circletosearch.utils.PrivacyPreferences
+import com.akslabs.circletosearch.ui.components.DonateBottomSheet
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -108,7 +109,7 @@ fun SetupScreen(onSettingsClick: () -> Unit, onOcrSettingsClick: () -> Unit) {
     val showSupportDialog = remember { mutableStateOf(!prefs.getBoolean("support_dialog_dismissed", false)) }
     val dontShowAgain = remember { mutableStateOf(false) }
     
-    var showSupportSheet by remember { mutableStateOf(false) }
+    var showDonateSheet by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState()
     val scope = rememberCoroutineScope()
     
@@ -357,7 +358,7 @@ fun SetupScreen(onSettingsClick: () -> Unit, onOcrSettingsClick: () -> Unit) {
             // 5. Footer
             SocialLinksRow(
                 context = context,
-                onDonateClick = { showSupportSheet = true }
+                onDonateClick = { showDonateSheet = true }
             )
             Spacer(modifier = Modifier.height(20.dp))
             Box(
@@ -392,7 +393,7 @@ fun SetupScreen(onSettingsClick: () -> Unit, onOcrSettingsClick: () -> Unit) {
                 }
             },
             onDonate = {
-                showSupportSheet = true
+                showDonateSheet = true
                 showSupportDialog.value = false
                 if (dontShowAgain.value) {
                     prefs.edit().putBoolean("support_dialog_dismissed", true).apply()
@@ -402,17 +403,17 @@ fun SetupScreen(onSettingsClick: () -> Unit, onOcrSettingsClick: () -> Unit) {
         )
     }
     
-    if (showSupportSheet) {
-        SupportSheet(
-            sheetState = sheetState,
-            onDismissRequest = {
-                scope.launch {
-                    sheetState.hide()
-                }.invokeOnCompletion {
-                    if (!sheetState.isVisible) {
-                        showSupportSheet = false
-                    }
+    if (showDonateSheet) {
+        DonateBottomSheet(
+            onDismiss = { showDonateSheet = false },
+            onDonateOptionSelected = { url ->
+                try {
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                    context.startActivity(intent)
+                } catch (e: Exception) {
+                    android.widget.Toast.makeText(context, "Could not open link", android.widget.Toast.LENGTH_SHORT).show()
                 }
+                showDonateSheet = false
             }
         )
     }
