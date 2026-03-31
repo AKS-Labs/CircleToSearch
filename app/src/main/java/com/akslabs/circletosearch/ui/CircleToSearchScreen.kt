@@ -1523,7 +1523,7 @@ fun CircleToSearchScreen(
                                     },
                                     modifier = Modifier.size(52.dp),
                                     colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
                                         contentColor = if (isPinEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                                     )
                                 ) { 
