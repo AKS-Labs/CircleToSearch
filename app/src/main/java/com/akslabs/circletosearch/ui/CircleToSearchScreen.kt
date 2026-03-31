@@ -1512,17 +1512,18 @@ fun CircleToSearchScreen(
                             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 FilledTonalIconButton(
                                     onClick = { 
-                                        haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                                        selectedBitmap?.let { bmp ->
-                                            CircleToSearchAccessibilityService.pinArea(bmp, selectionRect ?: android.graphics.Rect())
-                                            // Close CTS UI after pinning
-                                            (context as? android.app.Activity)?.finish()
+                                        if (isPinEnabled) {
+                                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                            selectedBitmap?.let { bmp ->
+                                                CircleToSearchAccessibilityService.pinArea(bmp, selectionRect ?: android.graphics.Rect())
+                                                // Close CTS UI after pinning
+                                                (context as? android.app.Activity)?.finish()
+                                            }
                                         }
                                     },
-                                    enabled = isPinEnabled,
                                     modifier = Modifier.size(52.dp),
                                     colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                        containerColor = if (isPinEnabled) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.5f),
+                                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                                         contentColor = if (isPinEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                                     )
                                 ) { 

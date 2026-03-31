@@ -879,6 +879,26 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
 
         try {
             windowManager?.addView(pinnedView, params)
+            
+            // --- Beautiful Pin Animation ---
+            pinnedView.scaleX = 0.5f
+            pinnedView.scaleY = 0.5f
+            pinnedView.alpha = 0f
+            pinnedView.animate()
+                .scaleX(1.05f)
+                .scaleY(1.05f)
+                .alpha(1f)
+                .setDuration(400)
+                .setInterpolator(android.view.animation.OvershootInterpolator())
+                .withEndAction {
+                    pinnedView.animate()
+                        .scaleX(1f)
+                        .scaleY(1f)
+                        .setDuration(200)
+                        .start()
+                }
+                .start()
+                
         } catch (e: Exception) {
             android.util.Log.e("CircleToSearch", "Failed to add pinned view", e)
         }
@@ -956,10 +976,25 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
                     putExtra(Intent.EXTRA_STREAM, uri)
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
-                startActivity(Intent.createChooser(shareIntent, "Share pinned image").apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) })
+                startActivity(Intent.createChooser(shareIntent, "Share Pin").apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) })
             } catch (e: Exception) {
                 android.util.Log.e("CircleToSearch", "Failed to share pinned image", e)
             }
+            try { windowManager?.removeView(menuLayout) } catch (e: Exception) {}
+        })
+
+        // --- Action: Delete ---
+        menuLayout.addView(createTextActionButton("DELETE") {
+            try {
+                windowManager?.removeView(anchorView)
+                windowManager?.removeView(menuLayout)
+            } catch (e: Exception) {}
+        })
+
+        // --- Action: Save ---
+        menuLayout.addView(createTextActionButton("SAVE") {
+            val success = ImageUtils.saveToGallery(this@CircleToSearchAccessibilityService, bitmap)
+            android.widget.Toast.makeText(this@CircleToSearchAccessibilityService, if (success) "Saved to Gallery" else "Save failed", android.widget.Toast.LENGTH_SHORT).show()
             try { windowManager?.removeView(menuLayout) } catch (e: Exception) {}
         })
 
@@ -993,39 +1028,6 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         } else {
             anchorParams.y + anchorParams.height + yPadding
         }
-        menuLayout.addView(createTextActionButton("DELETE") {
-            try {
-                windowManager?.removeView(anchorView)
-                windowManager?.removeView(menuLayout)
-            } catch (e: Exception) {}
-        })
-
-        // --- Action: Save ---
-        menuLayout.addView(createTextActionButton("SAVE") {
-            val success = ImageUtils.saveToGallery(this@CircleToSearchAccessibilityService, bitmap)
-            android.widget.Toast.makeText(this@CircleToSearchAccessibilityService, if (success) "Saved to Gallery" else "Save failed", android.widget.Toast.LENGTH_SHORT).show()
-            try { windowManager?.removeView(menuLayout) } catch (e: Exception) {}
-        })
-
-        // --- Action: Share ---
-        menuLayout.addView(createTextActionButton("SHARE") {
-            try {
-                val fileName = "share_pin_${java.util.UUID.randomUUID()}.png"
-                val path = ImageUtils.saveBitmap(this@CircleToSearchAccessibilityService, bitmap, fileName)
-                val file = java.io.File(path)
-                val uri = androidx.core.content.FileProvider.getUriForFile(this@CircleToSearchAccessibilityService, "com.akslabs.circletosearch.fileprovider", file)
-                val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                    type = "image/png"
-                    putExtra(Intent.EXTRA_STREAM, uri)
-                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                startActivity(Intent.createChooser(shareIntent, "Share Pin").apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) })
-            } catch (e: Exception) {
-                android.util.Log.e("CircleToSearch", "Share failed", e)
-            }
-            try { windowManager?.removeView(menuLayout) } catch (e: Exception) {}
-        })
 
         try {
             windowManager?.addView(menuLayout, menuParams)
