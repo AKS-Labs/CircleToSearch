@@ -110,46 +110,59 @@ class AssistSessionService : VoiceInteractionSessionService() {
             val nodeX = parentX + node.left
             val nodeY = parentY + node.top
             
-            val text = node.text?.toString()
-            if (!text.isNullOrBlank() && node.visibility == android.view.View.VISIBLE) {
+            // Extract text with fallback priority: text > contentDescription > hint
+            val text = node.text?.toString() 
+                       ?: node.contentDescription?.toString() 
+                       ?: node.hint?.toString()
+
+            if (!text.isNullOrBlank() && 
+                node.visibility == android.view.View.VISIBLE &&
+                node.width > 0 && node.height > 0) {
+                
                 val nodeRect = android.graphics.Rect(nodeX, nodeY, nodeX + node.width, nodeY + node.height)
                 
-                // Split text into words and estimate their positions
+                // Only add if it's within reasonable screen bounds (optional but safer)
+                // Filter out words that are clearly blank
                 val wordStrings = text.split(Regex("\\s+")).filter { it.isNotBlank() }
-                var currentStartIndex = 0
-                val words = mutableListOf<com.akslabs.circletosearch.ui.components.Word>()
-                
-                wordStrings.forEachIndexed { wordIndex, wordText ->
-                    val startIndex = text.indexOf(wordText, currentStartIndex)
-                    val endIndex = startIndex + wordText.length
-                    currentStartIndex = endIndex
+                if (wordStrings.isNotEmpty()) {
+                    var currentStartIndex = 0
+                    val words = mutableListOf<com.akslabs.circletosearch.ui.components.Word>()
                     
-                    // Estimate word bounds proportionally within the node's rectangle
-                    val wordBounds = android.graphics.RectF(nodeRect)
-                    
-                    words.add(
-                        com.akslabs.circletosearch.ui.components.Word(
-                            text = wordText,
-                            index = wordIndex,
-                            startIndex = startIndex,
-                            endIndex = endIndex,
-                            bounds = wordBounds
+                    wordStrings.forEachIndexed { wordIndex, wordText ->
+                        val startIndex = text.indexOf(wordText, currentStartIndex)
+                        val endIndex = startIndex + wordText.length
+                        if (startIndex != -1) {
+                            currentStartIndex = endIndex
+                            val wordBounds = android.graphics.RectF(nodeRect)
+                            words.add(
+                                com.akslabs.circletosearch.ui.components.Word(
+                                    text = wordText,
+                                    index = wordIndex,
+                                    startIndex = startIndex,
+                                    endIndex = endIndex,
+                                    bounds = wordBounds
+                                )
+                            )
+                        }
+                    }
+
+                    list.add(
+                        com.akslabs.circletosearch.ui.components.TextNode(
+                            id = java.util.UUID.randomUUID().toString(),
+                            fullText = text,
+                            bounds = nodeRect,
+                            words = words
                         )
                     )
                 }
-
-                list.add(
-                    com.akslabs.circletosearch.ui.components.TextNode(
-                        id = java.util.UUID.randomUUID().toString(),
-                        fullText = text,
-                        bounds = nodeRect,
-                        words = words
-                    )
-                )
             }
 
+            // Important: For children, subtract current node's scroll position from translated coordinates
+            val nextParentX = nodeX - node.scrollX
+            val nextParentY = nodeY - node.scrollY
+
             for (i in 0 until node.childCount) {
-                collectTextNodes(node.getChildAt(i), nodeX, nodeY, list)
+                collectTextNodes(node.getChildAt(i), nextParentX, nextParentY, list)
             }
         }
 
