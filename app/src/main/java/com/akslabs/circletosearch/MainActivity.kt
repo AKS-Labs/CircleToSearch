@@ -459,10 +459,10 @@ fun isDefaultAssistant(context: android.content.Context): Boolean {
     // A reliable check is to see if we are arguably the voice interaction service.
     
     val assistant = Settings.Secure.getString(context.contentResolver, "voice_interaction_service")
-    val component = android.content.ComponentName(context, CircleToSearchRecognitionService::class.java)
+    val component = android.content.ComponentName(context, CircleToSearchVoiceService::class.java)
     val myComponentString = component.flattenToString()
     
-    // Fallback: Checks if our service is the one set.
+    // Check if our VoiceInteractionService is the one currently set as default
     return assistant == myComponentString
 }
 

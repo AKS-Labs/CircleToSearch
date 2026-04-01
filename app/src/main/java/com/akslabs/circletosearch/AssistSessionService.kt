@@ -47,17 +47,9 @@ class AssistSessionService : VoiceInteractionSessionService() {
 
         override fun onShow(args: Bundle?, showFlags: Int) {
             super.onShow(args, showFlags)
-            android.util.Log.d("AssistSessionService", "onShow called")
-        }
-
-        override fun onHandleAssist(data: Bundle?, structure: AssistStructure?, content: AssistContent?) {
-            android.util.Log.d("AssistSessionService", "onHandleAssist called")
-            val prefs = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
-            if (!prefs.getBoolean("assistant_enabled", false)) {
-                android.util.Log.d("AssistSessionService", "Assistant disabled in prefs, but continuing for debug")
-            }
-
-            // Haptic feedback
+            android.util.Log.d("AssistSessionService", "onShow called with flags: $showFlags")
+            
+            // Haptic feedback to acknowledge the trigger
             val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 vibrator.vibrate(VibrationEffect.createOneShot(50, VibrationEffect.DEFAULT_AMPLITUDE))
@@ -65,35 +57,41 @@ class AssistSessionService : VoiceInteractionSessionService() {
                 @Suppress("DEPRECATION")
                 vibrator.vibrate(50)
             }
+        }
+
+        override fun onHandleAssist(data: Bundle?, structure: AssistStructure?, content: AssistContent?) {
+            super.onHandleAssist(data, structure, content)
+            android.util.Log.d("AssistSessionService", "onHandleAssist called")
+            // This is called for text/structure. We mainly care about the screenshot,
+            // but this is a good place to ensure the overlay starts if onHandleScreenshot is delayed.
+        }
+
+        override fun onHandleScreenshot(screenshot: android.graphics.Bitmap?) {
+            super.onHandleScreenshot(screenshot)
+            android.util.Log.d("AssistSessionService", "onHandleScreenshot received, bitmap null? ${screenshot == null}")
             
-            // Try to trigger capture via AccessibilityService (which handles screenshot & launch)
-            try {
-                android.util.Log.d("AssistSessionService", "Requesting triggerCapture from AccessibilityService")
-                CircleToSearchAccessibilityService.triggerCapture()
-            } catch (e: Exception) {
-                 android.util.Log.e("AssistSessionService", "Failed to trigger AccessibilityService capture", e)
-                 // Fallback: Launch overlay anyway (might be black, but better than nothing)
-                 launchOverlayDirectly()
-            }
+            // 1. Save screenshot to repository for the overlay to use
+            BitmapRepository.setScreenshot(screenshot)
             
-            // We can finish the session now as the overlay takes over
+            // 2. Launch the search overlay activity independently of Accessibility permission
+            launchOverlayDirectly()
+            
+            // 3. We can finish the session now as the overlay takes over
             finish()
         }
 
         private fun launchOverlayDirectly() {
-            BitmapRepository.setScreenshot(null)
-            android.util.Log.d("AssistSessionService", "Launching OverlayActivity directly (fallback)")
-            val intent = Intent(context, OverlayActivity::class.java)
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            intent.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION)
+            android.util.Log.d("AssistSessionService", "Launching OverlayActivity")
+            val intent = Intent(context, OverlayActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION)
+                // Signal that this was triggered by the assistant session
+                putExtra("triggered_by", "assistant")
+            }
+            
             try {
-                // startVoiceActivity might fail if not allowed, try catch
-                 try {
-                    startVoiceActivity(intent)
-                } catch (e: SecurityException) {
-                    android.util.Log.w("AssistSessionService", "startVoiceActivity failed, using startActivity", e)
-                    context.startActivity(intent)
-                }
+                // Using startActivity as an assistant session is allowed to start activities
+                context.startActivity(intent)
             } catch (e: Exception) {
                 android.util.Log.e("AssistSessionService", "Failed to launch OverlayActivity", e)
             }
