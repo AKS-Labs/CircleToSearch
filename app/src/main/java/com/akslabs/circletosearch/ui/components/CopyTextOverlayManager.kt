@@ -54,6 +54,21 @@ class CopyTextOverlayManager(
     private val textNodes = mutableStateListOf<TextNode>()
     private var allWords: List<Word> = emptyList()
     
+    // Assistant Data support
+    var isAssistMode: Boolean = false
+        private set
+
+    fun setAssistNodes(nodes: List<TextNode>) {
+        isAssistMode = true
+        textNodes.clear()
+        textNodes.addAll(nodes)
+        allWords = nodes.flatMap { node -> 
+            node.words.map { word -> 
+                word
+            }
+        }
+    }
+    
     // Selection state
     private var globalSelectionStart: Int = -1
     private var globalSelectionEnd: Int = -1
@@ -64,8 +79,11 @@ class CopyTextOverlayManager(
         // Reset state
         globalSelectionStart = -1
         globalSelectionEnd = -1
-        textNodes.clear()
-        allWords = emptyList()
+        
+        if (!isAssistMode) {
+            textNodes.clear()
+            allWords = emptyList()
+        }
         
         val container = FrameLayout(context)
         
@@ -91,7 +109,7 @@ class CopyTextOverlayManager(
                                 )
                                 Spacer(Modifier.height(16.dp))
                                 Text(
-                                    "Scanning text...", 
+                                    if (isAssistMode) "Applying Assist Data..." else "Scanning text...", 
                                     style = MaterialTheme.typography.titleMedium,
                                     color = ComposeColor.White,
                                     modifier = Modifier
@@ -106,7 +124,9 @@ class CopyTextOverlayManager(
         }
         container.addView(topBar)
 
-        scanNodes(view)
+        if (!isAssistMode) {
+            scanNodes(view)
+        }
         return container
     }
 

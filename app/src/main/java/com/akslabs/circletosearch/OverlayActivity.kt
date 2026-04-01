@@ -45,6 +45,10 @@ class OverlayActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         android.util.Log.d("CircleToSearch", "OverlayActivity onCreate")
         
+        // Ensure the activity can receive touches and focus properly
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL)
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN)
+        
         loadScreenshot()
 
         // Initialize manager for Activity-based layout
@@ -65,6 +69,7 @@ class OverlayActivity : ComponentActivity() {
                         screenshot = screenshotBitmap.value,
                         onClose = { 
                             BitmapRepository.clear()
+                            com.akslabs.circletosearch.data.AssistDataRepository.clear()
                             finish() 
                         },
                         copyTextManager = copyTextManager.value,
@@ -114,6 +119,7 @@ class OverlayActivity : ComponentActivity() {
         copyTextManager.value = null
         if (isFinishing) {
              com.akslabs.circletosearch.data.BitmapRepository.clear()
+             com.akslabs.circletosearch.data.AssistDataRepository.clear()
              com.akslabs.circletosearch.utils.StorageUtils.clearAppCache(this)
         }
     }

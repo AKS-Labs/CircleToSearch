@@ -119,6 +119,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -1432,26 +1433,29 @@ fun CircleToSearchScreen(
                                 }
                             }
 
-                            // Circular Button: Song
+                            // Circular Button: Assist Copy (Music Icon)
+                            val assistNodes by com.akslabs.circletosearch.data.AssistDataRepository.assistNodes.collectAsState()
+                            val isAssistDataReady by com.akslabs.circletosearch.data.AssistDataRepository.isDataReady.collectAsState()
+
                             IconButton(
                                 onClick = {
                                     haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                                    android.widget.Toast.makeText(context, "Coming soon", android.widget.Toast.LENGTH_SHORT).show()
-                                    /*
-                                    try {
-                                        val shazamIntent = context.packageManager.getLaunchIntentForPackage("com.shazam.android")
-                                        val soundHoundIntent = context.packageManager.getLaunchIntentForPackage("com.melodis.midomiMusicIdentifier.freemium")
-                                        val launchIntent = (shazamIntent ?: soundHoundIntent)?.apply { addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK) }
-                                        if (launchIntent != null) context.startActivity(launchIntent)
-                                        else context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://play.google.com/store/search?q=shazam&c=apps")).apply { addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK) })
-                                    } catch (e: Exception) {}
-                                    */
+                                    
+                                    if (isAssistDataReady) {
+                                        // Use high-accuracy AssistStructure data
+                                        copyTextManager?.setAssistNodes(assistNodes)
+                                        isCopyMode = true
+                                        isCopyTextTriggered = true
+                                    } else {
+                                        // Data not ready (likely bubble trigger)
+                                        android.widget.Toast.makeText(context, "Deep Scan: Please trigger via Home Long-Press for 100% accuracy.", android.widget.Toast.LENGTH_LONG).show()
+                                    }
                                 },
                                 modifier = Modifier
                                     .size(60.dp)
                                     .background(MaterialTheme.colorScheme.surfaceContainer, CircleShape),
                             ) {
-                                Icon(Icons.Default.MusicNote, contentDescription = "Song Search")
+                                Icon(Icons.Default.MusicNote, contentDescription = "Assist Copy", tint = if (isAssistDataReady) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
                             }
 
                             // Circular Button: Translate
