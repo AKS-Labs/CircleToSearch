@@ -45,6 +45,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -1481,8 +1483,11 @@ fun CircleToSearchScreen(
 
                         // ── ROW 2: Action buttons ───────────────────────────────
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceEvenly,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 8.dp)
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             @Composable
@@ -1522,7 +1527,9 @@ fun CircleToSearchScreen(
                                     modifier = Modifier.size(52.dp),
                                     colors = IconButtonDefaults.filledTonalIconButtonColors(
                                         containerColor = MaterialTheme.colorScheme.surfaceContainer,
-                                        contentColor = if (isPinEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                                        contentColor = if (isPinEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+                                        disabledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                                        disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                                     )
                                 ) { 
                                     Icon(
@@ -1610,9 +1617,17 @@ fun CircleToSearchScreen(
                             // Fullscreen
                             BottomBarButton("Fullscreen", { Icon(Icons.Default.Fullscreen, null) }) {
                                 if (screenshot != null) {
-                                    selectionRect = Rect(0, 0, screenshot.width, screenshot.height)
+                                    // Use a consistent frame (slight inset so brackets are visible)
+                                    val iX = (12 * context.resources.displayMetrics.density).toInt()
+                                    val iY = (12 * context.resources.displayMetrics.density).toInt()
+                                    selectionRect = Rect(iX, iY, screenshot.width - iX, screenshot.height - iY)
                                     currentPathPoints.clear()
-                                    scope.launch { selectionAnim.snapTo(0f); selectionAnim.animateTo(1f, tween(600)); selectedBitmap = screenshot; isSearching = true }
+                                    scope.launch { 
+                                        selectionAnim.snapTo(0f)
+                                        selectionAnim.animateTo(1f, tween(600))
+                                        selectedBitmap = screenshot
+                                        isSearching = true 
+                                    }
                                 }
                             }
                         }
