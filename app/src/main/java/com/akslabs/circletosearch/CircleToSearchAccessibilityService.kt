@@ -54,9 +54,6 @@ import com.akslabs.circletosearch.data.OverlayConfigurationManager
 import com.akslabs.circletosearch.data.OverlaySegment
 import com.akslabs.circletosearch.ui.components.CopyTextOverlayManager
 import com.akslabs.circletosearch.utils.ImageUtils
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
 
@@ -69,10 +66,6 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
     
     /** Kept by companion so scroll events can re-scan copy-text nodes. */
     internal var copyTextManager: CopyTextOverlayManager? = null
-    
-    // Phase 42: Extraction Results
-    private val _extractionResults = MutableStateFlow<List<Rect>>(emptyList())
-    val extractionResults: StateFlow<List<Rect>> = _extractionResults.asStateFlow()
     
     // Bubble related - Keeping existing logic but refactoring slightly if needed
     // For now, keeping bubble separate as requested in prompt "statusbar overlay customization... but it should work normally like now"
@@ -886,6 +879,26 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
 
         try {
             windowManager?.addView(pinnedView, params)
+            
+            // --- Beautiful Pin Animation ---
+            pinnedView.scaleX = 0.5f
+            pinnedView.scaleY = 0.5f
+            pinnedView.alpha = 0f
+            pinnedView.animate()
+                .scaleX(1.05f)
+                .scaleY(1.05f)
+                .alpha(1f)
+                .setDuration(400)
+                .setInterpolator(android.view.animation.OvershootInterpolator())
+                .withEndAction {
+                    pinnedView.animate()
+                        .scaleX(1f)
+                        .scaleY(1f)
+                        .setDuration(200)
+                        .start()
+                }
+                .start()
+                
         } catch (e: Exception) {
             android.util.Log.e("CircleToSearch", "Failed to add pinned view", e)
         }
@@ -963,10 +976,25 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
                     putExtra(Intent.EXTRA_STREAM, uri)
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
-                startActivity(Intent.createChooser(shareIntent, "Share pinned image").apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) })
+                startActivity(Intent.createChooser(shareIntent, "Share Pin").apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) })
             } catch (e: Exception) {
                 android.util.Log.e("CircleToSearch", "Failed to share pinned image", e)
             }
+            try { windowManager?.removeView(menuLayout) } catch (e: Exception) {}
+        })
+
+        // --- Action: Delete ---
+        menuLayout.addView(createTextActionButton("DELETE") {
+            try {
+                windowManager?.removeView(anchorView)
+                windowManager?.removeView(menuLayout)
+            } catch (e: Exception) {}
+        })
+
+        // --- Action: Save ---
+        menuLayout.addView(createTextActionButton("SAVE") {
+            val success = ImageUtils.saveToGallery(this@CircleToSearchAccessibilityService, bitmap)
+            android.widget.Toast.makeText(this@CircleToSearchAccessibilityService, if (success) "Saved to Gallery" else "Save failed", android.widget.Toast.LENGTH_SHORT).show()
             try { windowManager?.removeView(menuLayout) } catch (e: Exception) {}
         })
 
@@ -1000,39 +1028,6 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         } else {
             anchorParams.y + anchorParams.height + yPadding
         }
-        menuLayout.addView(createTextActionButton("DELETE") {
-            try {
-                windowManager?.removeView(anchorView)
-                windowManager?.removeView(menuLayout)
-            } catch (e: Exception) {}
-        })
-
-        // --- Action: Save ---
-        menuLayout.addView(createTextActionButton("SAVE") {
-            val success = ImageUtils.saveToGallery(this@CircleToSearchAccessibilityService, bitmap)
-            android.widget.Toast.makeText(this@CircleToSearchAccessibilityService, if (success) "Saved to Gallery" else "Save failed", android.widget.Toast.LENGTH_SHORT).show()
-            try { windowManager?.removeView(menuLayout) } catch (e: Exception) {}
-        })
-
-        // --- Action: Share ---
-        menuLayout.addView(createTextActionButton("SHARE") {
-            try {
-                val fileName = "share_pin_${java.util.UUID.randomUUID()}.png"
-                val path = ImageUtils.saveBitmap(this@CircleToSearchAccessibilityService, bitmap, fileName)
-                val file = java.io.File(path)
-                val uri = androidx.core.content.FileProvider.getUriForFile(this@CircleToSearchAccessibilityService, "com.akslabs.circletosearch.fileprovider", file)
-                val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                    type = "image/png"
-                    putExtra(Intent.EXTRA_STREAM, uri)
-                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                startActivity(Intent.createChooser(shareIntent, "Share Pin").apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) })
-            } catch (e: Exception) {
-                android.util.Log.e("CircleToSearch", "Share failed", e)
-            }
-            try { windowManager?.removeView(menuLayout) } catch (e: Exception) {}
-        })
 
         try {
             windowManager?.addView(menuLayout, menuParams)
@@ -1070,95 +1065,6 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         fun pinArea(bitmap: Bitmap, rect: android.graphics.Rect) {
             android.util.Log.d("CircleToSearch", "pinArea static called. instance=${instance != null}")
             instance?.showPinnedArea(bitmap, rect)
-        }
-    }
-
-    // --- Phase 42: Hybrid Image Extractor ---
-    fun extractImages() {
-        val bitmap = BitmapRepository.getScreenshot()
-        if (bitmap == null) return
-        
-        val results = mutableListOf<Rect>()
-        
-        // 1. Accessibility Tree Scan (High-fidelity for Views/Compose)
-        // Scan ALL windows instead of just rootInActiveWindow to ensure we get underlying app UI
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            for (window in windows) {
-                window.root?.let { scanNodesForImages(it, results) }
-            }
-        } else {
-            rootInActiveWindow?.let { scanNodesForImages(it, results) }
-        }
-        
-        // 2. Visual Scan Fallback (For Canvas/Games)
-        if (results.size < 3) {
-            visualScanForImages(bitmap, results)
-        }
-
-        // Deduplicate and filter (ignore tiny or massive items)
-        val filtered = results.distinctBy { "${it.left},${it.top},${it.right},${it.bottom}" }
-            .filter { it.width() > 50 && it.height() > 50 && it.width() < bitmap.width * 0.9f }
-            
-        _extractionResults.value = filtered
-        
-        android.os.Handler(android.os.Looper.getMainLooper()).post {
-            android.widget.Toast.makeText(this, "Found ${filtered.size} images", android.widget.Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    private fun scanNodesForImages(node: AccessibilityNodeInfo, results: MutableList<Rect>) {
-        // Exclude our own app's UI elements (like the search tools) from extraction
-        if (node.packageName?.toString() == "com.akslabs.circletosearch") return
-        
-        val className = node.className?.toString() ?: ""
-        val contentDesc = node.contentDescription?.toString()?.lowercase() ?: ""
-        val roleDesc = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) node.viewIdResourceName?.lowercase() ?: "" else ""
-        
-        // Look for ImageViews or Compose nodes with Image semantics
-        val isImage = className.contains("ImageView", ignoreCase = true) || 
-                      className.contains("Image", ignoreCase = true) ||
-                      contentDesc.contains("photo", ignoreCase = true) ||
-                      contentDesc.contains("image", ignoreCase = true) ||
-                      roleDesc.contains("image", ignoreCase = true) ||
-                      roleDesc.contains("photo", ignoreCase = true)
-                      
-        if (isImage) {
-            val rect = Rect()
-            node.getBoundsInScreen(rect)
-            // Ensure bounds are valid
-            if (rect.width() > 0 && rect.height() > 0) {
-                results.add(rect)
-            }
-        }
-        
-        for (i in 0 until node.childCount) {
-            node.getChild(i)?.let { scanNodesForImages(it, results) }
-        }
-    }
-
-    private fun visualScanForImages(bitmap: Bitmap, results: MutableList<Rect>) {
-        val w = bitmap.width
-        val h = bitmap.height
-        val step = 100
-        
-        for (y in 100 until h - 100 step step) {
-            for (x in 100 until w - 100 step step) {
-                if (results.any { it.contains(x, y) }) continue
-                
-                val p1 = bitmap.getPixel(x, y)
-                val p2 = bitmap.getPixel(x + 5, y + 5)
-                // Simple entropy heuristic: check color difference
-                if (Math.abs(Color.red(p1) - Color.red(p2)) > 30) {
-                    // Create an estimated bounding box around the complex region
-                    val estimatedRect = Rect(
-                        (x - 50).coerceAtLeast(0), 
-                        (y - 50).coerceAtLeast(0), 
-                        (x + 150).coerceAtMost(w), 
-                        (y + 150).coerceAtMost(h)
-                    )
-                    results.add(estimatedRect)
-                }
-            }
         }
     }
 

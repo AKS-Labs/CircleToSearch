@@ -89,6 +89,10 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.Translate
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Link
+import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.Email
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -115,6 +119,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -154,6 +159,9 @@ import com.akslabs.circletosearch.utils.QrResultWithBounds
 import com.akslabs.circletosearch.utils.QrScanner
 import com.akslabs.circletosearch.ui.qrResultShortLabel
 import com.akslabs.circletosearch.utils.UIPreferences
+import com.akslabs.circletosearch.ui.components.MoreAppsBottomSheet
+import com.akslabs.circletosearch.ui.components.DonateBottomSheet
+import android.net.Uri
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -167,6 +175,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import android.os.Build
+import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material3.Surface
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -184,9 +193,10 @@ fun CircleToSearchScreen(
     // Initialize preferences
     val uiPreferences = remember { UIPreferences(context) }
     
-    // Support Sheet State
-    var showSupportSheet by remember { mutableStateOf(false) }
-    val supportSheetState = rememberModalBottomSheetState()
+    
+    // New Sheet States
+    var showMoreAppsSheet by remember { mutableStateOf(false) }
+    var showDonateSheet by remember { mutableStateOf(false) }
 
     // Material You logic for colors
     val isDark = isSystemInDarkTheme()
@@ -229,23 +239,6 @@ fun CircleToSearchScreen(
     
     // Copy Mode internal state
     var isCopyMode by remember { mutableStateOf(false) }
-    
-    // Image Extraction state (Phase 41-43)
-    var isExtractMode by remember { mutableStateOf(false) }
-    val extractedImages = remember { mutableStateListOf<android.graphics.Rect>() }
-    
-    // Listen for extraction results from service
-    LaunchedEffect(isExtractMode) {
-        if (isExtractMode) {
-            CircleToSearchAccessibilityService.instance?.let { service ->
-                service.extractionResults.collect { rects ->
-                    extractedImages.clear()
-                    extractedImages.addAll(rects)
-                }
-            }
-        }
-    }
-
 
     // Support Settings Sheet
     var showSettingsScreen by remember { mutableStateOf(false) }
@@ -264,6 +257,11 @@ fun CircleToSearchScreen(
     var qrScanBitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
     var detectedQrCodes by remember { mutableStateOf<List<QrResultWithBounds>>(emptyList()) }
     var selectedQrResult by remember { mutableStateOf<QrResultWithBounds?>(null) }
+    
+    // Phase 44: Smart Entity Extractor
+    var isEntityExtractMode by remember { mutableStateOf(false) }
+    var detectedEntities by remember { mutableStateOf<List<SmartEntity>>(emptyList()) }
+    var isExtractingEntities by remember { mutableStateOf(false) }
     
     LaunchedEffect(Unit) {
         if (uiPreferences.isShowFriendlyMessages()) {
@@ -1150,7 +1148,7 @@ fun CircleToSearchScreen(
 
             // 4. Header (Top)
             androidx.compose.animation.AnimatedVisibility(
-                visible = isUIVisible && !isCopyMode,
+                visible = isUIVisible && !isCopyMode && !isEntityExtractMode,
                 enter = androidx.compose.animation.slideInVertically(
                     initialOffsetY = { -it }, // Commence au-dessus de l'écran (-100%)
                     animationSpec = tween(500, easing = androidx.compose.animation.core.FastOutSlowInEasing)
@@ -1336,7 +1334,7 @@ fun CircleToSearchScreen(
             var isCopyTextTriggered by remember { mutableStateOf(false) }
 
             androidx.compose.animation.AnimatedVisibility(
-                visible = isUIVisible && !isCopyMode,
+                visible = isUIVisible && !isCopyMode && !isEntityExtractMode,
                 enter = slideInVertically(
                     initialOffsetY = { it }, // slides up from below
                     animationSpec = tween(300, easing = androidx.compose.animation.core.CubicBezierEasing(0f, 0f, 0.2f, 1f))
@@ -1435,34 +1433,43 @@ fun CircleToSearchScreen(
                                 }
                             }
 
-                            // Circular Button: Song
+                            // Circular Button: Assist Copy (Music Icon)
+                            val assistNodes by com.akslabs.circletosearch.data.AssistDataRepository.assistNodes.collectAsState()
+                            val isAssistDataReady by com.akslabs.circletosearch.data.AssistDataRepository.isDataReady.collectAsState()
+
                             IconButton(
                                 onClick = {
                                     haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                                    try {
-                                        val shazamIntent = context.packageManager.getLaunchIntentForPackage("com.shazam.android")
-                                        val soundHoundIntent = context.packageManager.getLaunchIntentForPackage("com.melodis.midomiMusicIdentifier.freemium")
-                                        val launchIntent = (shazamIntent ?: soundHoundIntent)?.apply { addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK) }
-                                        if (launchIntent != null) context.startActivity(launchIntent)
-                                        else context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://play.google.com/store/search?q=shazam&c=apps")).apply { addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK) })
-                                    } catch (e: Exception) {}
+                                    
+                                    if (isAssistDataReady) {
+                                        // Use high-accuracy AssistStructure data + OCR merge
+                                        copyTextManager?.setHybridMode(assistNodes)
+                                        isCopyMode = true
+                                        isCopyTextTriggered = true
+                                    } else {
+                                        // Data not ready (likely bubble trigger)
+                                        android.widget.Toast.makeText(context, "Comming Soon: launch CTS as assistant to try Hybrid text detection.", android.widget.Toast.LENGTH_LONG).show()
+                                    }
                                 },
                                 modifier = Modifier
                                     .size(60.dp)
                                     .background(MaterialTheme.colorScheme.surfaceContainer, CircleShape),
                             ) {
-                                Icon(Icons.Default.MusicNote, contentDescription = "Song Search")
+                                Icon(Icons.Default.MusicNote, contentDescription = "Assist Copy", tint = if (isAssistDataReady) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
                             }
 
                             // Circular Button: Translate
                             IconButton(
                                 onClick = {
                                     haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                    android.widget.Toast.makeText(context, "Coming soon", android.widget.Toast.LENGTH_SHORT).show()
+                                    /*
                                     try {
                                         val intent = context.packageManager.getLaunchIntentForPackage("com.google.android.apps.translate")?.apply { addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK) }
                                         if (intent != null) context.startActivity(intent)
                                         else context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://translate.google.com")).apply { addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK) })
                                     } catch (e: Exception) {}
+                                    */
                                 },
                                 modifier = Modifier
                                     .size(60.dp)
@@ -1493,26 +1500,9 @@ fun CircleToSearchScreen(
                                 }
                             }
 
-                            // Share
-                            BottomBarButton("Share", { Icon(Icons.Default.Send, null) }) {
-                                if (screenshot != null) {
-                                    scope.launch {
-                                        try {
-                                            val fileName = "share_${java.util.UUID.randomUUID()}.png"
-                                            val path = ImageUtils.saveBitmap(context, selectedBitmap ?: screenshot, fileName)
-                                            val file = java.io.File(path)
-                                            val uri = androidx.core.content.FileProvider.getUriForFile(context, "com.akslabs.circletosearch.fileprovider", file)
-                                            val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply { 
-                                                type = "image/png"
-                                                putExtra(android.content.Intent.EXTRA_STREAM, uri)
-                                                clipData = android.content.ClipData.newRawUri("Selection", uri)
-                                                addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK) 
-                                            }
-                                            context.startActivity(android.content.Intent.createChooser(shareIntent, "Share Image").apply { addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK) })
-                                        } catch (e: Exception) {}
-                                    }
-                                }
+                            // More Apps
+                            BottomBarButton("More Apps", { Icon(Icons.Default.Apps, null) }) {
+                                showMoreAppsSheet = true
                             }
 
                             // Pin
@@ -1520,17 +1510,18 @@ fun CircleToSearchScreen(
                             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 FilledTonalIconButton(
                                     onClick = { 
-                                        haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                                        selectedBitmap?.let { bmp ->
-                                            CircleToSearchAccessibilityService.pinArea(bmp, selectionRect ?: android.graphics.Rect())
-                                            // Close CTS UI after pinning
-                                            (context as? android.app.Activity)?.finish()
+                                        if (isPinEnabled) {
+                                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                            selectedBitmap?.let { bmp ->
+                                                CircleToSearchAccessibilityService.pinArea(bmp, selectionRect ?: android.graphics.Rect())
+                                                // Close CTS UI after pinning
+                                                (context as? android.app.Activity)?.finish()
+                                            }
                                         }
                                     },
-                                    enabled = isPinEnabled,
                                     modifier = Modifier.size(52.dp),
                                     colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                        containerColor = if (isPinEnabled) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.5f),
+                                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
                                         contentColor = if (isPinEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                                     )
                                 ) { 
@@ -1550,22 +1541,62 @@ fun CircleToSearchScreen(
                                 )
                             }
 
-                            // Image Extractor (Phase 41)
-                            BottomBarButton("Extract", { Icon(Icons.Default.Image, null, modifier = Modifier.size(22.dp)) }) {
-                                isExtractMode = true
-                                scope.launch {
-                                    // Trigger extraction logic in service
-                                    CircleToSearchAccessibilityService.instance?.extractImages()
+                            // Phase 44: Smart Entity Extractor
+                            BottomBarButton("Smart Extract", { Icon(Icons.Default.Search, null, modifier = Modifier.size(22.dp)) }) {
+                                isEntityExtractMode = true
+                                if (detectedEntities.isEmpty() && !isExtractingEntities) {
+                                    isExtractingEntities = true
+                                    scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                                        val bmp = screenshot ?: return@launch
+                                        val textNodes = com.akslabs.circletosearch.ocr.TesseractEngine.extractText(context, bmp)
+                                        val entities = mutableListOf<SmartEntity>()
+                                        
+                                        val urlRegex = android.util.Patterns.WEB_URL.toRegex()
+                                        val emailRegex = android.util.Patterns.EMAIL_ADDRESS.toRegex()
+                                        val phoneRegexLine = Regex("""(\+?[\d\s\-\(\).]{9,20})""")
+                                        val upiRegex = Regex("""[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z]{2,64}""")
+
+                                        textNodes.forEach { node ->
+                                            val lineText = node.fullText
+                                            phoneRegexLine.findAll(lineText).forEach { match ->
+                                                val phoneCandidate = match.value.trim()
+                                                if (phoneCandidate.count { it.isDigit() } >= 10) {
+                                                    val startIdx = match.range.first
+                                                    val endIdx = match.range.last + 1
+                                                    val ratioStart = startIdx.toFloat() / lineText.length.coerceAtLeast(1)
+                                                    val ratioEnd = endIdx.toFloat() / lineText.length.coerceAtLeast(1)
+                                                    val entityBounds = android.graphics.RectF(
+                                                        node.bounds.left.toFloat() + (ratioStart * node.bounds.width().toFloat()),
+                                                        node.bounds.top.toFloat(),
+                                                        node.bounds.left.toFloat() + (ratioEnd * node.bounds.width().toFloat()),
+                                                        node.bounds.bottom.toFloat()
+                                                    )
+                                                    entities.add(SmartEntity.Phone(phoneCandidate, entityBounds))
+                                                }
+                                            }
+                                            node.words.forEach { word ->
+                                                val txt = word.text.trim()
+                                                if (emailRegex.matches(txt)) entities.add(SmartEntity.Email(txt, word.bounds))
+                                                else if (upiRegex.matches(txt)) entities.add(SmartEntity.Upi(txt, word.bounds))
+                                                else if (urlRegex.matches(txt)) entities.add(SmartEntity.Url(txt, word.bounds))
+                                            }
+                                        }
+                                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                            detectedEntities = entities
+                                            isExtractingEntities = false
+                                        }
+                                    }
                                 }
                             }
 
                             // Donate
                             BottomBarButton("Donate", { Icon(painterResource(id = com.akslabs.circletosearch.R.drawable.donation), null, modifier = Modifier.size(22.dp)) }) {
-                                showSupportSheet = true
+                                showDonateSheet = true
                             }
 
                             // Copy Text
-                            BottomBarButton("Copy Text", { Icon(Icons.Default.TextFields, null) }) {
+                            BottomBarButton("Copy Text", { Icon(painterResource(id = com.akslabs.circletosearch.R.drawable.ocr), null, modifier = Modifier.size(20.dp)) }) {
+                                copyTextManager?.setOcrOnlyMode()
                                 isCopyMode = true
                                 isCopyTextTriggered = true
                             }
@@ -1587,6 +1618,20 @@ fun CircleToSearchScreen(
                         }
                     }
                 }
+            }
+
+            // Phase 44: Smart Entity Extractor Exit Overlay (Full Screen tap capture)
+            if (isEntityExtractMode) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .zIndex(2550f)
+                        .pointerInput(Unit) {
+                            detectTapGestures {
+                                isEntityExtractMode = false
+                            }
+                        }
+                )
             }
 
             // Copy Text overlay integration (Activity-based)
@@ -1803,6 +1848,97 @@ fun CircleToSearchScreen(
             }
         }
 
+        // --- Phase 44: Smart Entity Extractor Overlay Chips ---
+        if (isEntityExtractMode && screenshot != null && !isCopyMode) {
+            BoxWithConstraints(modifier = Modifier.fillMaxSize().zIndex(2600f)) {
+                val screenWidth = maxWidth
+                val screenHeight = maxHeight
+                val bitmapWidth = screenshot.width.toFloat()
+                val bitmapHeight = screenshot.height.toFloat()
+
+                if (isExtractingEntities) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            androidx.compose.material3.CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                            Spacer(Modifier.height(16.dp))
+                            Text("Extracting links & info...", color = Color.White)
+                        }
+                    }
+                }
+
+                detectedEntities.forEach { entity ->
+                    val chipX = (entity.bounds.centerX() / bitmapWidth) * screenWidth.value
+                    val chipY = (entity.bounds.centerY() / bitmapHeight) * screenHeight.value
+
+                    // Main Chip Icon
+                    Box(
+                        modifier = Modifier
+                            .offset(x = chipX.dp - 24.dp, y = chipY.dp - 24.dp)
+                            .size(48.dp)
+                            .shadow(6.dp, CircleShape)
+                            .background(Color.White, CircleShape)
+                            .border(1.5.dp, entity.sourceColor, CircleShape)
+                            .clickable {
+                                try {
+                                    // Auto-copy clicked content to clipboard
+                                    val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                    val clip = android.content.ClipData.newPlainText(entity.typeName, entity.text)
+                                    clipboard.setPrimaryClip(clip)
+
+                                    val intent = when(entity) {
+                                        is SmartEntity.Url -> android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(if (!entity.text.startsWith("http")) "http://${entity.text}" else entity.text))
+                                        is SmartEntity.Email -> android.content.Intent(android.content.Intent.ACTION_SENDTO, android.net.Uri.parse("mailto:${entity.text}"))
+                                        is SmartEntity.Phone -> android.content.Intent(android.content.Intent.ACTION_DIAL, android.net.Uri.parse("tel:${entity.text}"))
+                                        is SmartEntity.Upi -> android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("upi://pay?pa=${entity.text}"))
+                                    }
+                                    intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    context.startActivity(intent)
+                                    isEntityExtractMode = false
+                                } catch (e: Exception) {}
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(entity.icon, null, tint = entity.sourceColor, modifier = Modifier.size(24.dp))
+                    }
+                    
+                    // Label Chip
+                    Surface(
+                        modifier = Modifier
+                            .offset(x = chipX.dp + 28.dp, y = chipY.dp - 12.dp)
+                            .clickable {
+                                try {
+                                    val intent = when(entity) {
+                                        is SmartEntity.Url -> android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(if (!entity.text.startsWith("http")) "http://${entity.text}" else entity.text))
+                                        is SmartEntity.Email -> android.content.Intent(android.content.Intent.ACTION_SENDTO, android.net.Uri.parse("mailto:${entity.text}"))
+                                        is SmartEntity.Phone -> android.content.Intent(android.content.Intent.ACTION_DIAL, android.net.Uri.parse("tel:${entity.text}"))
+                                        is SmartEntity.Upi -> android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("upi://pay?pa=${entity.text}"))
+                                    }
+                                    intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    context.startActivity(intent)
+                                    isEntityExtractMode = false
+                                } catch (e: Exception) {}
+                            },
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color.White.copy(alpha = 0.95f),
+                        tonalElevation = 4.dp,
+                        shadowElevation = 4.dp,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, entity.sourceColor.copy(alpha = 0.3f))
+                    ) {
+                        Text(
+                            text = entity.text,
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                color = entity.sourceColor,
+                                fontWeight = FontWeight.Bold
+                            ),
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+        }
+
         // QR Code Result Sheet
         if (showQrSheet) {
             // Full-screen invisible overlay to catch "click outside"
@@ -1848,17 +1984,26 @@ fun CircleToSearchScreen(
             }
         }
 
-        if (showSupportSheet) {
-            com.akslabs.circletosearch.SupportSheet(
-                sheetState = supportSheetState,
-                onDismissRequest = {
-                    scope.launch {
-                        supportSheetState.hide()
-                    }.invokeOnCompletion {
-                        if (!supportSheetState.isVisible) {
-                            showSupportSheet = false
-                        }
-                    }
+        if (showMoreAppsSheet) {
+            MoreAppsBottomSheet(
+                onDismiss = { showMoreAppsSheet = false },
+                onAppSelected = { url ->
+                    try {
+                        context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, Uri.parse(url)).apply { addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK) })
+                    } catch (e: Exception) {}
+                    showMoreAppsSheet = false
+                }
+            )
+        }
+
+        if (showDonateSheet) {
+            DonateBottomSheet(
+                onDismiss = { showDonateSheet = false },
+                onDonateOptionSelected = { url ->
+                    try {
+                        context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, Uri.parse(url)).apply { addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK) })
+                    } catch (e: Exception) {}
+                    showDonateSheet = false
                 }
             )
         }
@@ -1869,50 +2014,17 @@ fun CircleToSearchScreen(
                 onDismissRequest = { showSettingsScreen = false }
             )
         }
-
-        // --- Phase 43: Image Extraction Highlights ---
-        if (isExtractMode) {
-            Canvas(modifier = Modifier.fillMaxSize().zIndex(4000f)) {
-                extractedImages.forEach { rect ->
-                    val localRect = androidx.compose.ui.geometry.Rect(
-                        rect.left.toFloat(),
-                        rect.top.toFloat(),
-                        rect.right.toFloat(),
-                        rect.bottom.toFloat()
-                    )
-                    // Draw translucent highlight
-                    drawRect(
-                        color = Color.White.copy(alpha = 0.3f),
-                        topLeft = localRect.topLeft,
-                        size = localRect.size
-                    )
-                    // Draw subtle border
-                    drawRect(
-                        color = Color.White,
-                        topLeft = localRect.topLeft,
-                        size = localRect.size,
-                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx())
-                    )
-                }
-            }
-            
-            // Exit button for Extract Mode
-            Box(modifier = Modifier.fillMaxSize().padding(16.dp).statusBarsPadding().zIndex(5000f)) {
-                androidx.compose.material3.FilledTonalIconButton(
-                    onClick = { isExtractMode = false; extractedImages.clear() },
-                    modifier = Modifier.align(Alignment.TopStart).size(40.dp),
-                    colors = androidx.compose.material3.IconButtonDefaults.filledTonalIconButtonColors(
-                        containerColor = Color.Black.copy(alpha = 0.6f),
-                        contentColor = Color.White
-                    )
-                ) {
-                    Icon(Icons.Default.Close, contentDescription = "Exit Extraction Mode")
-                }
-            }
-        }
     }
 }
 }
+}
+
+// --- Phase 44: Smart Entity Extractor Models ---
+sealed class SmartEntity(val text: String, val bounds: android.graphics.RectF, val typeName: String, val icon: androidx.compose.ui.graphics.vector.ImageVector, val sourceColor: Color) {
+    class Url(text: String, bounds: android.graphics.RectF) : SmartEntity(text, bounds, "Link", Icons.Default.Link, Color(0xFF1A73E8))
+    class Email(text: String, bounds: android.graphics.RectF) : SmartEntity(text, bounds, "Email", Icons.Default.Email, Color(0xFF1A73E8))
+    class Phone(text: String, bounds: android.graphics.RectF) : SmartEntity(text, bounds, "Phone", Icons.Default.Phone, Color(0xFF43A047))
+    class Upi(text: String, bounds: android.graphics.RectF) : SmartEntity(text, bounds, "UPI", Icons.Default.Person, Color(0xFF8E24AA))
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)

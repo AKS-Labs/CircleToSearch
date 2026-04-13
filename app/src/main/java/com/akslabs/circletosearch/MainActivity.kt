@@ -41,14 +41,18 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
 import com.akslabs.circletosearch.ui.components.PrivacyDialog
 import com.akslabs.circletosearch.ui.theme.CircleToSearchTheme
 import com.akslabs.circletosearch.utils.PrivacyPreferences
+import com.akslabs.circletosearch.ui.components.DonateBottomSheet
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -108,7 +112,15 @@ fun SetupScreen(onSettingsClick: () -> Unit, onOcrSettingsClick: () -> Unit) {
     val showSupportDialog = remember { mutableStateOf(!prefs.getBoolean("support_dialog_dismissed", false)) }
     val dontShowAgain = remember { mutableStateOf(false) }
     
-    var showSupportSheet by remember { mutableStateOf(false) }
+    // Manage Support Dialog Show Count
+    val showCount = remember { prefs.getInt("support_dialog_show_count", 0) }
+    LaunchedEffect(showSupportDialog.value) {
+        if (showSupportDialog.value) {
+            prefs.edit().putInt("support_dialog_show_count", showCount + 1).apply()
+        }
+    }
+    
+    var showDonateSheet by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState()
     val scope = rememberCoroutineScope()
     
@@ -357,7 +369,7 @@ fun SetupScreen(onSettingsClick: () -> Unit, onOcrSettingsClick: () -> Unit) {
             // 5. Footer
             SocialLinksRow(
                 context = context,
-                onDonateClick = { showSupportSheet = true }
+                onDonateClick = { showDonateSheet = true }
             )
             Spacer(modifier = Modifier.height(20.dp))
             Box(
@@ -385,6 +397,7 @@ fun SetupScreen(onSettingsClick: () -> Unit, onOcrSettingsClick: () -> Unit) {
     // Support Dialog & Sheet
     if (showSupportDialog.value) {
         SupportDialog(
+            showCount = showCount + 1,
             onDismiss = {
                 showSupportDialog.value = false
                 if (dontShowAgain.value) {
@@ -392,7 +405,7 @@ fun SetupScreen(onSettingsClick: () -> Unit, onOcrSettingsClick: () -> Unit) {
                 }
             },
             onDonate = {
-                showSupportSheet = true
+                showDonateSheet = true
                 showSupportDialog.value = false
                 if (dontShowAgain.value) {
                     prefs.edit().putBoolean("support_dialog_dismissed", true).apply()
@@ -402,17 +415,17 @@ fun SetupScreen(onSettingsClick: () -> Unit, onOcrSettingsClick: () -> Unit) {
         )
     }
     
-    if (showSupportSheet) {
-        SupportSheet(
-            sheetState = sheetState,
-            onDismissRequest = {
-                scope.launch {
-                    sheetState.hide()
-                }.invokeOnCompletion {
-                    if (!sheetState.isVisible) {
-                        showSupportSheet = false
-                    }
+    if (showDonateSheet) {
+        DonateBottomSheet(
+            onDismiss = { showDonateSheet = false },
+            onDonateOptionSelected = { url ->
+                try {
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                    context.startActivity(intent)
+                } catch (e: Exception) {
+                    android.widget.Toast.makeText(context, "Could not open link", android.widget.Toast.LENGTH_SHORT).show()
                 }
+                showDonateSheet = false
             }
         )
     }
@@ -446,10 +459,10 @@ fun isDefaultAssistant(context: android.content.Context): Boolean {
     // A reliable check is to see if we are arguably the voice interaction service.
     
     val assistant = Settings.Secure.getString(context.contentResolver, "voice_interaction_service")
-    val component = android.content.ComponentName(context, CircleToSearchRecognitionService::class.java)
+    val component = android.content.ComponentName(context, CircleToSearchVoiceService::class.java)
     val myComponentString = component.flattenToString()
     
-    // Fallback: Checks if our service is the one set.
+    // Check if our VoiceInteractionService is the one currently set as default
     return assistant == myComponentString
 }
 
@@ -513,77 +526,157 @@ fun SocialLinksRow(
 
 @Composable
 fun SupportDialog(
+    showCount: Int,
     onDismiss: () -> Unit,
     onDonate: () -> Unit,
     dontShowAgain: MutableState<Boolean>
 ) {
-    AlertDialog(
+    androidx.compose.ui.window.Dialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(
-            dismissOnBackPress = true,
-            dismissOnClickOutside = true
-        ),
-        icon = {
-            Icon(
-                painter = painterResource(id = com.akslabs.circletosearch.R.drawable.donation),
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(48.dp)
-            )
-        },
-        title = {
-            Text(
-                text = "Support App Developer",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold
-            )
-        },
-        text = {
-            Column {
-                Text(
-                    text = "If anything I’ve made has ever made your day a little easier or smoother,\n" +
-                            "\n" +
-                            "I’d be grateful if you considered supporting my work ☺\uFE0F.\n" +
-                            "\n" +
-                            "Your support helps me keep improving these apps\n" +
-                            "and stay motivated,\n" +
-                            
-                            "\n" +
-                            "Thank you for supporting independent developers.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    lineHeight = 20.sp
+        properties = androidx.compose.ui.window.DialogProperties(
+            usePlatformDefaultWidth = false
+        )
+    ) {
+        androidx.compose.material3.Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                .clip(androidx.compose.foundation.shape.RoundedCornerShape(28.dp)),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Icon(
+                    painter = painterResource(id = com.akslabs.circletosearch.R.drawable.donation),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(48.dp)
                 )
                 
                 Spacer(modifier = Modifier.height(16.dp))
                 
-//                 Don't show again checkbox
-//                Row(
-//                    verticalAlignment = Alignment.CenterVertically,
-//                    modifier = Modifier.fillMaxWidth().clickable { dontShowAgain.value = !dontShowAgain.value }
-//                ) {
-//                    Checkbox(
-//                        checked = dontShowAgain.value,
-//                        onCheckedChange = { dontShowAgain.value = it }
-//                    )
-//                    Text(
-//                        text = "Don't show this again",
-//                        style = MaterialTheme.typography.bodySmall,
-//                        modifier = Modifier.padding(start = 8.dp)
-//                    )
-//                }
-            }
-        },
-        confirmButton = {
-            Button(onClick = onDonate) {
-                Text("Donate")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Close")
+                Text(
+                    text = "Keep this Project Alive! ❤️",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.ExtraBold,
+                    textAlign = TextAlign.Center
+                )
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = buildAnnotatedString {
+                            withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
+                                append("I am a solo developer")
+                            }
+                            append(" working hard to keep this project free, alive, and open source. Your support is the ")
+                            withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)) {
+                                append("only way I can continue")
+                            }
+                            append(" building and improving this app for everyone.")
+                        },
+                        style = MaterialTheme.typography.bodyLarge,
+                        lineHeight = 22.sp,
+                        textAlign = TextAlign.Center
+                    )
+                    
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                            .padding(16.dp)
+                    ) {
+                        Text(
+                            text = "Planned Features:",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        
+                        val features = listOf(
+                            "Privacy Boost (removing cloud deps)",
+                            "Offline Translation & Text Detection",
+                            "New Triggers & Gesture Actions",
+                            "Universal Language Support & UI Polish"
+                        )
+                        
+                        features.forEach { feature ->
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Default.Check,
+                                    null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(
+                                    text = feature,
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                            }
+                        }
+                    }
+
+                    Text(
+                        text = "If this app has made your day a little easier, please consider supporting my work! 🙏",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                    )
+                }
+                
+                if (showCount >= 7) {
+                    Spacer(modifier = Modifier.height(24.dp))
+                    
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                            .clickable { dontShowAgain.value = !dontShowAgain.value }
+                            .padding(vertical = 4.dp)
+                    ) {
+                        Checkbox(
+                            checked = dontShowAgain.value,
+                            onCheckedChange = { dontShowAgain.value = it }
+                        )
+                        Text(
+                            text = "Don't show this again",
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(start = 8.dp)
+                        )
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text("Close")
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = onDonate,
+                        shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
+                        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
+                    ) {
+                        Text("Donate", fontWeight = FontWeight.Bold)
+                    }
+                }
             }
         }
-    )
+    }
 }
 
 @Composable

@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.akslabs.circletosearch.ocr.TesseractEngine
 import java.io.File
 import java.io.FileOutputStream
 
@@ -32,16 +33,16 @@ fun OcrSettingsScreen(onBack: () -> Unit) {
     val prefs = context.getSharedPreferences("OcrSettings", Context.MODE_PRIVATE)
 
     var currentLang by remember { mutableStateOf(prefs.getString("selected_lang", "eng") ?: "eng") }
-    var availableModels by remember { mutableStateOf(getAvailableModels(context)) }
+    var availableModels by remember { mutableStateOf(TesseractEngine.getAvailableModels(context)) }
 
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         if (uri != null) {
-            importModel(context, uri) { success, msg ->
+            TesseractEngine.importModel(context, uri) { success, msg ->
                 Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                 if (success) {
-                    availableModels = getAvailableModels(context)
+                    availableModels = TesseractEngine.getAvailableModels(context)
                 }
             }
         }
@@ -108,55 +109,5 @@ fun OcrSettingsScreen(onBack: () -> Unit) {
                 }
             }
         }
-    }
-}
-
-private fun getAvailableModels(context: Context): List<String> {
-    val dir = File(context.filesDir, "tessdata")
-    if (!dir.exists()) {
-        // Ensure bundle copied
-        com.akslabs.circletosearch.ocr.TesseractEngine.prepareTessData(context)
-    }
-    
-    val files = dir.listFiles() ?: return listOf("eng")
-    return files.filter { it.name.endsWith(".traineddata") }
-        .map { it.name.removeSuffix(".traineddata") }
-        .sorted()
-}
-
-private fun importModel(context: Context, uri: Uri, callback: (Boolean, String) -> Unit) {
-    try {
-        val cursor = context.contentResolver.query(uri, null, null, null, null)
-        var fileName = "unknown.traineddata"
-        if (cursor != null && cursor.moveToFirst()) {
-            val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
-            if (nameIndex != -1) {
-                fileName = cursor.getString(nameIndex)
-            }
-            cursor.close()
-        }
-
-        if (!fileName.endsWith(".traineddata")) {
-            callback(false, "File must be a .traineddata Tesseract model.")
-            return
-        }
-
-        val tessDir = File(context.filesDir, "tessdata")
-        if (!tessDir.exists()) tessDir.mkdirs()
-
-        val destFile = File(tessDir, fileName)
-        
-        context.contentResolver.openInputStream(uri)?.use { input ->
-            FileOutputStream(destFile).use { output ->
-                input.copyTo(output)
-            }
-        }
-
-        Log.d("OcrSettings", "Imported model to ${destFile.absolutePath}")
-        callback(true, "Successfully imported ${fileName.removeSuffix(".traineddata").uppercase()} model!")
-
-    } catch (e: Exception) {
-        Log.e("OcrSettings", "Error importing model: ${e.message}")
-        callback(false, "Failed to import model")
     }
 }
