@@ -1487,7 +1487,7 @@ fun CircleToSearchScreen(
                                 .fillMaxWidth()
                                 .padding(horizontal = 8.dp)
                                 .horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             @Composable
@@ -1617,10 +1617,7 @@ fun CircleToSearchScreen(
                             // Fullscreen
                             BottomBarButton("Fullscreen", { Icon(Icons.Default.Fullscreen, null) }) {
                                 if (screenshot != null) {
-                                    // Use a consistent frame (slight inset so brackets are visible)
-                                    val iX = (12 * context.resources.displayMetrics.density).toInt()
-                                    val iY = (12 * context.resources.displayMetrics.density).toInt()
-                                    selectionRect = Rect(iX, iY, screenshot.width - iX, screenshot.height - iY)
+                                    selectionRect = Rect(0, 0, screenshot.width, screenshot.height)
                                     currentPathPoints.clear()
                                     scope.launch { 
                                         selectionAnim.snapTo(0f)

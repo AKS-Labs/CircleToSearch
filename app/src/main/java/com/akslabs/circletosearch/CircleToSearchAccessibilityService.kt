@@ -894,36 +894,39 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
                             if (Math.abs(vx) > 300 || Math.abs(vy) > 300) {
                                 // Start physics fling
                                 flingAnimator = android.animation.ValueAnimator.ofFloat(0f, 1f).apply {
-                                    duration = 1000
-                                    interpolator = android.view.animation.DecelerateInterpolator()
+                                    duration = 2000
+                                    interpolator = android.view.animation.LinearInterpolator()
                                     var lastTime = 0f
-                                    var currVx = vx
-                                    var currVy = vy
+                                    var currVx = vx * 2.2f
+                                    var currVy = vy * 2.2f
                                     
                                     addUpdateListener { anim ->
                                         val faction = anim.animatedFraction
                                         val dt = faction - lastTime
                                         lastTime = faction
                                         
-                                        params.x += (currVx * dt * 0.05f).toInt()
-                                        params.y += (currVy * dt * 0.05f).toInt()
+                                        params.x += (currVx * dt * 0.95f).toInt()
+                                        params.y += (currVy * dt * 0.95f).toInt()
                                         
-                                        // Bounce off edges
+                                        // Bounce off edges (Bouncy!)
                                         val display = resources.displayMetrics
                                         if (params.x < 0 || params.x + params.width > display.widthPixels) {
-                                            currVx = -currVx * 0.6f
+                                            currVx = -currVx * 0.9f 
                                             params.x = params.x.coerceIn(0, display.widthPixels - params.width)
                                         }
                                         if (params.y < 0 || params.y + params.height > display.heightPixels) {
-                                            currVy = -currVy * 0.6f
+                                            currVy = -currVy * 0.9f
                                             params.y = params.y.coerceIn(0, display.heightPixels - params.height)
                                         }
                                         
                                         try { windowManager?.updateViewLayout(v, params) } catch(e: Exception) { anim.cancel() }
                                         
-                                        // Friction
-                                        currVx *= 0.95f
-                                        currVy *= 0.95f
+                                        // Lower friction for fun play
+                                        currVx *= 0.992f
+                                        currVy *= 0.992f
+                                        
+                                        // Stop if too slow
+                                        if (Math.abs(currVx) < 40 && Math.abs(currVy) < 40) anim.cancel()
                                     }
                                     start()
                                 }
