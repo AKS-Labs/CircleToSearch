@@ -71,42 +71,42 @@ fun OcrSettingsScreen(onBack: () -> Unit) {
             )
         }
     ) { padding ->
-        Column(
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            Text(
-                text = "Tesseract Optical Character Recognition uses .traineddata models to accurately read text from screen captures. English is bundled by default.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(16.dp)
-            )
+            item {
+                Text(
+                    text = "Tesseract Optical Character Recognition uses .traineddata models to accurately read text from screen captures. English is bundled by default.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(16.dp)
+                )
+            }
 
-            LazyColumn(modifier = Modifier.fillMaxWidth()) {
-                items(availableModels) { lang ->
-                    val isSelected = lang == currentLang
-                    ListItem(
-                        headlineContent = { Text(lang.uppercase(), fontWeight = FontWeight.SemiBold) },
-                        supportingContent = { Text("Model file: $lang.traineddata") },
-                        leadingContent = {
-                            Icon(Icons.Default.Language, contentDescription = null)
-                        },
-                        trailingContent = {
-                            if (isSelected) {
-                                Icon(Icons.Default.Check, contentDescription = "Selected", tint = MaterialTheme.colorScheme.primary)
-                            }
-                        },
-                        modifier = Modifier.clickable {
-                            currentLang = lang
-                            prefs.edit().putString("selected_lang", lang).apply()
-                        },
-                        colors = ListItemDefaults.colors(
-                            containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
-                        )
+            items(availableModels) { lang ->
+                val isSelected = lang == currentLang
+                ListItem(
+                    headlineContent = { Text(lang.uppercase(), fontWeight = FontWeight.SemiBold) },
+                    supportingContent = { Text("Model file: $lang.traineddata") },
+                    leadingContent = {
+                        Icon(Icons.Default.Language, contentDescription = null)
+                    },
+                    trailingContent = {
+                        if (isSelected) {
+                            Icon(Icons.Default.Check, contentDescription = "Selected", tint = MaterialTheme.colorScheme.primary)
+                        }
+                    },
+                    modifier = Modifier.clickable {
+                        currentLang = lang
+                        prefs.edit().putString("selected_lang", lang).apply()
+                    },
+                    colors = ListItemDefaults.colors(
+                        containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface
                     )
-                    HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
-                }
+                )
+                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
             }
         }
     }

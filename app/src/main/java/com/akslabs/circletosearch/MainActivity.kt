@@ -30,6 +30,8 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -53,6 +55,7 @@ import com.akslabs.circletosearch.ui.components.PrivacyDialog
 import com.akslabs.circletosearch.ui.theme.CircleToSearchTheme
 import com.akslabs.circletosearch.utils.PrivacyPreferences
 import com.akslabs.circletosearch.ui.components.DonateBottomSheet
+import com.akslabs.circletosearch.ui.components.AccessibilityDisclosureDialog
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -96,6 +99,7 @@ fun SetupScreen(onSettingsClick: () -> Unit, onOcrSettingsClick: () -> Unit) {
     // Permission States
     var isAccessibilityEnabled by remember { mutableStateOf(isAccessibilityServiceEnabled(context)) }
     var isDefaultAssistant by remember { mutableStateOf(isDefaultAssistant(context)) }
+    var showAccessibilityDisclosure by remember { mutableStateOf(false) }
     
     // Check permissions on Resume
     DisposableEffect(lifecycleOwner) {
@@ -142,6 +146,7 @@ fun SetupScreen(onSettingsClick: () -> Unit, onOcrSettingsClick: () -> Unit) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -176,7 +181,7 @@ fun SetupScreen(onSettingsClick: () -> Unit, onOcrSettingsClick: () -> Unit) {
 
             // 2. REQUIRED: Accessibility Service
             Text(
-                text = "REQUIRED",
+                text = "REQUIRED:",
                 style = MaterialTheme.typography.labelSmall,
                 color = if (isAccessibilityEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
                 modifier = Modifier.align(Alignment.Start).padding(bottom = 8.dp)
@@ -220,8 +225,7 @@ fun SetupScreen(onSettingsClick: () -> Unit, onOcrSettingsClick: () -> Unit) {
                  // Action Needed State
                 Card(
                     onClick = {
-                        val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
-                        context.startActivity(intent)
+                        showAccessibilityDisclosure = true
                     },
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.errorContainer
@@ -363,7 +367,7 @@ fun SetupScreen(onSettingsClick: () -> Unit, onOcrSettingsClick: () -> Unit) {
                 textAlign = TextAlign.Center
             )
 
-            Spacer(modifier = Modifier.weight(1f))
+            Spacer(modifier = Modifier.height(32.dp))
 
 
             // 5. Footer
@@ -426,6 +430,23 @@ fun SetupScreen(onSettingsClick: () -> Unit, onOcrSettingsClick: () -> Unit) {
                     android.widget.Toast.makeText(context, "Could not open link", android.widget.Toast.LENGTH_SHORT).show()
                 }
                 showDonateSheet = false
+            }
+        )
+    }
+
+    if (showAccessibilityDisclosure) {
+        AccessibilityDisclosureDialog(
+            onAccept = {
+                showAccessibilityDisclosure = false
+                try {
+                    val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                    context.startActivity(intent)
+                } catch (e: Exception) {
+                    android.widget.Toast.makeText(context, "Could not open Accessibility Settings", android.widget.Toast.LENGTH_LONG).show()
+                }
+            },
+            onDismiss = {
+                showAccessibilityDisclosure = false
             }
         )
     }

@@ -1495,10 +1495,10 @@ fun CircleToSearchScreen(
                             @Composable
                             fun BottomBarButton(label: String, icon: @Composable () -> Unit, onClick: () -> Unit) {
                                 Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.BottomCenter) {
-                                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
                                         FilledTonalIconButton(
                                             onClick = { haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress); onClick() },
-                                            modifier = Modifier.size(46.dp),
+                                            modifier = Modifier.size(48.dp),
                                             colors = IconButtonDefaults.filledTonalIconButtonColors(
                                                 containerColor = MaterialTheme.colorScheme.surfaceContainer,
                                                 contentColor = MaterialTheme.colorScheme.onSurface
@@ -1506,11 +1506,13 @@ fun CircleToSearchScreen(
                                         ) { icon() }
                                         Text(
                                             text = label, 
-                                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp), 
+                                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, lineHeight = 13.sp), 
                                             color = MaterialTheme.colorScheme.onSurfaceVariant, 
                                             textAlign = TextAlign.Center, 
-                                            maxLines = 1, 
-                                            softWrap = false
+                                            maxLines = 1,
+                                            minLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.padding(bottom = 0.dp)
                                         )
                                     }
                                 }
@@ -1524,7 +1526,7 @@ fun CircleToSearchScreen(
                             // Pin
                             val isPinEnabled = selectedBitmap != null
                             Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.BottomCenter) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
                                     FilledTonalIconButton(
                                         onClick = { 
                                             if (isPinEnabled) {
@@ -1535,7 +1537,7 @@ fun CircleToSearchScreen(
                                                 }
                                             }
                                         },
-                                        modifier = Modifier.size(46.dp),
+                                        modifier = Modifier.size(48.dp),
                                         colors = IconButtonDefaults.filledTonalIconButtonColors(
                                             containerColor = MaterialTheme.colorScheme.surfaceContainer,
                                             contentColor = if (isPinEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
@@ -1546,22 +1548,24 @@ fun CircleToSearchScreen(
                                         Icon(
                                             Icons.Default.PushPin, 
                                             contentDescription = "Pin Selection",
-                                            modifier = Modifier.size(20.dp)
+                                            modifier = Modifier.size(22.dp)
                                         ) 
                                     }
                                     Text(
                                         text = "Pin", 
-                                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 8.sp), 
+                                        style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, lineHeight = 13.sp), 
                                         color = if (isPinEnabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f), 
                                         textAlign = TextAlign.Center, 
-                                        maxLines = 1, 
-                                        softWrap = false
+                                        maxLines = 1,
+                                        minLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.padding(bottom = 0.dp)
                                     )
                                 }
                             }
 
                             // Smart Entity Extractor
-                            BottomBarButton("Smart Extract", { Icon(Icons.Default.Search, null, modifier = Modifier.size(22.dp)) }) {
+                            BottomBarButton("ScanInfo", { Icon(Icons.Default.Search, null, modifier = Modifier.size(22.dp)) }) {
                                 isEntityExtractMode = true
                                 if (detectedEntities.isEmpty() && !isExtractingEntities) {
                                     isExtractingEntities = true
