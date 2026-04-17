@@ -636,6 +636,7 @@ fun SupportDialog(
                             "Offline on-device translation",
                             "Improved text detection accuracy",
                             "More Search engines support SearXNG, DuckDuckGo, Brave Search",
+                            "Add more QS tiles to directly launch copy text, QR code,SmartScan etc ",
                             "Multi-language support",
                             "More Overlay actions",
                             "Long-press image to download or share",

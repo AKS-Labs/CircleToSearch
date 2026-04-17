@@ -1511,7 +1511,7 @@ fun CircleToSearchScreen(
                                             textAlign = TextAlign.Center, 
                                             maxLines = 1,
                                             minLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
+                                            overflow = TextOverflow.Visible,
                                             modifier = Modifier.padding(bottom = 0.dp)
                                         )
                                     }
@@ -1565,7 +1565,7 @@ fun CircleToSearchScreen(
                             }
 
                             // Smart Entity Extractor
-                            BottomBarButton("ScanInfo", { Icon(Icons.Default.Search, null, modifier = Modifier.size(22.dp)) }) {
+                            BottomBarButton("SmartScan", { Icon(Icons.Default.Search, null, modifier = Modifier.size(22.dp)) }) {
                                 isEntityExtractMode = true
                                 if (detectedEntities.isEmpty() && !isExtractingEntities) {
                                     isExtractingEntities = true

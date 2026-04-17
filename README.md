@@ -52,20 +52,31 @@ Think of it as having Google Lens, Bing Visual Search, Yandex, and TinEye all in
 
 
 ---
-## ✨ Features
+## 🌟 Why Circle To Search?
+- **100% Independent**: Works flawlessly on **any Android phone** (Android 10+), without requiring Google Play Services or OEM-specific software.
+- **Privacy-First**: No background tracking or logs—just pure on-device selection and secure API-driven capabilities.
 
--   **Universal Compatibility**: Works on any Android device (Android 10+).
--   **Instant Search**: Double-tap the status bar or use the floating bubble to trigger.
--   **Multi-Engine Support**: Search using Google Lens, Bing, Yandex, TinEye.
--   **Set As Default Assistant**: Use As Default Assistant to Search Images Using Circle To Search.
--   **It Can Talk With Humour**: Show Friendly Playful Message Every Time User Uses Circle To Search.
--   **Desktop Mode**: See Results In Desktop Mode.
--   **Dark Mode**: Browse Search Results in Dark Mode.
--   **Copy Url**: Copy Url Of Search Results.
--   **Open In Browser**: Open Search Results In Favourite Browser.
--   **Smart Selection**: Draw a circle, scribble to select.
--   **Beautiful UI**: Modern Material 3 design with dark mode support and smooth animations.
--   **Customizable**: Toggle dark mode, desktop mode, and UI elements like the gradient border.
+## ✨ Core Features
+
+### 🔍 Smart Search & AI
+- **Multi-Engine Support**: Instant reverse image search using Google Lens, Bing, Yandex, TinEye, **ChatGPT**, and **Perplexity**.
+- **Smart Native "Copy Text"**: Extract and copy text from any screen using **Offline OCR (Tesseract)** or **Hybrid Assist Mode**.
+- **Customizable OCR Models**: Import external high-accuracy Tesseract language models for specialized detection.
+- **Smart Entity Extraction**: Intelligent on-device scanning to seamlessly detect and manage smart content (like barcodes or key info).
+
+### 📱 Seamless OS Integration
+- **Universal Trigger**: Double-tap the status bar or configure the floating bubble to trigger instantly over any app.
+- **Set As Default Assistant**: Configure as your system's default Android Assistant to trigger directly via home button long-press or diagonal swipe.
+- **Smart Selection**: Draw a circle or scribble on the screen to seamlessly crop and select what you want to search.
+
+### 🎨 Beautiful & Customizable UI
+- **Modern Design**: Built from the ground up with elegant Material 3 components, smooth animations, and a highly polished interface.
+- **Playful Interactions**: Shows friendly, playful, and humorous messages whenever you use the app.
+- **Customizable Aesthetics**: Toggle UI elements, gradient borders, Dark Mode, and Desktop Mode for rendering search results.
+
+### 🌐 Quick Actions
+- **Fast Sharing**: Instantly copy URLs of search results.
+- **Open In Browser**: Bounce directly from the internal in-app viewer to your favorite external browser in one tap.
 
 ---
 
