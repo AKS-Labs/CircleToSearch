@@ -46,6 +46,8 @@ fun OcrSettingsScreen(onBack: () -> Unit) {
     var isNoteVisible by remember { mutableStateOf(prefs.getBoolean("ocr_note_dismissed", false).not()) }
     val uriHandler = LocalUriHandler.current
 
+    androidx.activity.compose.BackHandler(onBack = onBack)
+
     val filePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
