@@ -641,16 +641,22 @@ fun CircleToSearchScreen(
                             val path = ImageUtils.saveBitmap(context, selectedBitmap!!)
                             val uri = android.net.Uri.fromFile(java.io.File(path))
                             
-                            // Prepare content URI for Lens (using existing FileProvider logic in helper)
-                            val success = searchWithGoogleLens(uri, context)
-                            
-                            if (success) {
-                                // Close the overlay since Lens is taking over
-                                onClose()
-                                return@LaunchedEffect
-                            } else {
-                                // Fallback to multi-search if Lens failed
-                                android.util.Log.e("CircleToSearch", "Google Lens launch failed, falling back to multi-search")
+                            val result = searchWithGoogleLens(uri, context)
+                            when (result) {
+                                com.akslabs.circletosearch.ui.components.LensLaunchResult.LAUNCHED_DIRECTLY -> {
+                                    // Lens launched directly — safe to dismiss the overlay
+                                    onClose()
+                                    return@LaunchedEffect
+                                }
+                                com.akslabs.circletosearch.ui.components.LensLaunchResult.LAUNCHED_VIA_CHOOSER -> {
+                                    // Chooser shown — overlay must stay open, user picks the app
+                                    isLoading = false
+                                    return@LaunchedEffect
+                                }
+                                com.akslabs.circletosearch.ui.components.LensLaunchResult.FAILED -> {
+                                    // Fallback to multi-search
+                                    android.util.Log.e("CircleToSearch", "Google Lens launch failed, falling back to multi-search")
+                                }
                             }
                         }
 
