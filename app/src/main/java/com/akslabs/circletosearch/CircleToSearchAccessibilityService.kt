@@ -34,6 +34,14 @@ import android.graphics.Rect
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.hardware.camera2.CameraManager
+import android.graphics.Path
+import android.graphics.RectF
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.BitmapShader
+import android.graphics.Shader
+import android.graphics.Matrix
+import androidx.core.graphics.drawable.toBitmap
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
@@ -631,12 +639,10 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         handler.postDelayed({
             dispatchGesture(gesture, object : android.accessibilityservice.AccessibilityService.GestureResultCallback() {
                 override fun onCompleted(gestureDescription: android.accessibilityservice.GestureDescription?) {
-                    super.onCompleted(gestureDescription)
                     restoreFlags()
                 }
     
                 override fun onCancelled(gestureDescription: android.accessibilityservice.GestureDescription?) {
-                    super.onCancelled(gestureDescription)
                     restoreFlags()
                 }
                 
@@ -736,6 +742,37 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         startActivity(intent)
     }
 
+    // Custom ImageView that clips to rounded corners on the Canvas level
+    // This is much more robust than OutlineProvider for rapid movements and scaling.
+    private class RoundedImageView(context: android.content.Context) : android.widget.ImageView(context) {
+        private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        private val rect = RectF()
+        private val matrix = Matrix()
+        private val radius = 12f * context.resources.displayMetrics.density
+
+        override fun onDraw(canvas: android.graphics.Canvas) {
+            val drawable = drawable ?: return
+            val bitmap = try { 
+                drawable.toBitmap() 
+            } catch (e: Exception) { 
+                return 
+            }
+            
+            val shader = BitmapShader(bitmap, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP)
+            
+            // Adjust shader to current view bounds
+            matrix.reset()
+            matrix.setScale(width.toFloat() / bitmap.width, height.toFloat() / bitmap.height)
+            shader.setLocalMatrix(matrix)
+            
+            paint.shader = shader
+            rect.set(0f, 0f, width.toFloat(), height.toFloat())
+            
+            // This never "looses roundness" because it's rendering at the pixel level on each frame
+            canvas.drawRoundRect(rect, radius, radius, paint)
+        }
+    }
+
     private fun showPinnedArea(bitmap: Bitmap, rect: android.graphics.Rect) {
         android.util.Log.d("CircleToSearch", "showPinnedArea called for rect: $rect")
         
@@ -764,16 +801,10 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         params.x = centerX - width / 2
         params.y = centerY - height / 2
 
-        val pinnedView = android.widget.ImageView(this).apply {
+        val pinnedView = RoundedImageView(this).apply {
             setImageBitmap(bitmap)
             scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
-            elevation = 0f // Phase 35: Remove shadows
-            outlineProvider = object : ViewOutlineProvider() {
-                override fun getOutline(view: View, outline: android.graphics.Outline) {
-                    // Phase 35: Fixed corner radius to be consistent with lens
-                    outline.setRoundRect(0, 0, view.width, view.height, 12f * resources.displayMetrics.density)
-                }
-            }
+            elevation = 0f
             clipToOutline = true
             
             var initialX = 0
@@ -783,6 +814,15 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
             var isDragging = false
             var isScaling = false
             var currentMenu: View? = null
+            
+            // --- Phase 45: Sticker Physics ---
+            var velocityTracker: android.view.VelocityTracker? = null
+            var flingAnimator: android.animation.ValueAnimator? = null
+            
+            val stopFling = {
+                flingAnimator?.cancel()
+                flingAnimator = null
+            }
 
             // --- Phase 33: ScaleGestureDetector for pinch zoom ---
             val scaleDetector = ScaleGestureDetector(context, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
@@ -808,8 +848,6 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
                         params.width = newWidth
                         params.height = newHeight
                         windowManager?.updateViewLayout(this@apply, params)
-                        // Phase 39: Force outline invalidation to keep corners rounded during resize
-                        this@apply.invalidateOutline()
                     }
                     return true
                 }
@@ -843,7 +881,10 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
                         initialTouchY = event.rawY
                         isDragging = false
                         isScaling = false
-                        // Phase 37: Removed scale-up animation to prevent corner issues
+                        stopFling()
+                        velocityTracker?.recycle()
+                        velocityTracker = android.view.VelocityTracker.obtain()
+                        velocityTracker?.addMovement(event)
                         true
                     }
                     MotionEvent.ACTION_POINTER_DOWN -> {
@@ -865,11 +906,76 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
                         params.x = initialX + dx
                         params.y = initialY + dy
                         windowManager?.updateViewLayout(v, params)
+                        velocityTracker?.addMovement(event)
                         true
                     }
                     MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                        // Phase 37: Removed scale-down animation
                         isScaling = false
+                        if (isDragging) {
+                            velocityTracker?.computeCurrentVelocity(1000)
+                            val vx = velocityTracker?.xVelocity ?: 0f
+                            val vy = velocityTracker?.yVelocity ?: 0f
+                            
+                            if (Math.abs(vx) > 300 || Math.abs(vy) > 300) {
+                                // Start physics fling
+                                flingAnimator = android.animation.ValueAnimator.ofFloat(0f, 1f).apply {
+                                    duration = 2000
+                                    interpolator = android.view.animation.LinearInterpolator()
+                                    var lastTime = 0f
+                                    var currVx = vx * 2.2f
+                                    var currVy = vy * 2.2f
+                                    
+                                    addUpdateListener { anim ->
+                                        val faction = anim.animatedFraction
+                                        val dt = faction - lastTime
+                                        lastTime = faction
+                                        
+                                        params.x += (currVx * dt * 0.95f).toInt()
+                                        params.y += (currVy * dt * 0.95f).toInt()
+                                        
+                                        // Bounce off edges (Bouncy!)
+                                        val display = resources.displayMetrics
+                                        if (params.x < 0 || params.x + params.width > display.widthPixels) {
+                                            currVx = -currVx * 0.9f 
+                                            params.x = params.x.coerceIn(0, display.widthPixels - params.width)
+                                        }
+                                        if (params.y < 0 || params.y + params.height > display.heightPixels) {
+                                            currVy = -currVy * 0.9f
+                                            params.y = params.y.coerceIn(0, display.heightPixels - params.height)
+                                        }
+                                        
+                                        try { 
+                                            windowManager?.updateViewLayout(v, params)
+                                            // v.invalidateOutline() // No longer needed with canvas clipping
+                                        } catch(e: Exception) { 
+                                            anim.cancel()
+                                            flingAnimator = null
+                                        }
+                                        
+                                        // Lower friction for fun play
+                                        currVx *= 0.992f
+                                        currVy *= 0.992f
+                                        
+                                        // Safety check: if velocity is zero or view is gone, stop
+                                        if (Math.abs(currVx) < 10 && Math.abs(currVy) < 10) {
+                                            anim.cancel()
+                                            flingAnimator = null
+                                        }
+                                    }
+                                    addListener(object : android.animation.AnimatorListenerAdapter() {
+                                        override fun onAnimationEnd(animation: android.animation.Animator) {
+                                            flingAnimator = null
+                                        }
+                                        override fun onAnimationCancel(animation: android.animation.Animator) {
+                                            flingAnimator = null
+                                        }
+                                    })
+                                    start()
+                                }
+                            }
+                        }
+                        velocityTracker?.recycle()
+                        velocityTracker = null
                         true
                     }
                     else -> false
@@ -881,20 +987,22 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
             windowManager?.addView(pinnedView, params)
             
             // --- Beautiful Pin Animation ---
-            pinnedView.scaleX = 0.5f
-            pinnedView.scaleY = 0.5f
+            pinnedView.scaleX = 0f
+            pinnedView.scaleY = 0f
+            pinnedView.rotation = -15f
             pinnedView.alpha = 0f
             pinnedView.animate()
-                .scaleX(1.05f)
-                .scaleY(1.05f)
+                .scaleX(1.1f)
+                .scaleY(1.1f)
+                .rotation(0f)
                 .alpha(1f)
-                .setDuration(400)
-                .setInterpolator(android.view.animation.OvershootInterpolator())
+                .setDuration(450)
+                .setInterpolator(android.view.animation.OvershootInterpolator(1.4f))
                 .withEndAction {
                     pinnedView.animate()
                         .scaleX(1f)
                         .scaleY(1f)
-                        .setDuration(200)
+                        .setDuration(150)
                         .start()
                 }
                 .start()
@@ -958,9 +1066,7 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
             layoutParams = android.widget.LinearLayout.LayoutParams(
                 android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
                 (36 * displayMetrics.density).toInt()
-            ).apply {
-                marginEnd = (8 * displayMetrics.density).toInt()
-            }
+            )
             setOnClickListener { onClick() }
         }
 
@@ -992,11 +1098,18 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         })
 
         // --- Action: Save ---
-        menuLayout.addView(createTextActionButton("SAVE") {
+        val saveBtn = createTextActionButton("SAVE") {
             val success = ImageUtils.saveToGallery(this@CircleToSearchAccessibilityService, bitmap)
             android.widget.Toast.makeText(this@CircleToSearchAccessibilityService, if (success) "Saved to Gallery" else "Save failed", android.widget.Toast.LENGTH_SHORT).show()
             try { windowManager?.removeView(menuLayout) } catch (e: Exception) {}
-        })
+        }
+        // Add spacing only if needed (not on the last item)
+        menuLayout.addView(saveBtn)
+        
+        // Ensure buttons have proper spacing between them but not after the last one
+        for (i in 0 until menuLayout.childCount - 1) {
+            (menuLayout.getChildAt(i).layoutParams as android.widget.LinearLayout.LayoutParams).marginEnd = (8 * displayMetrics.density).toInt()
+        }
 
         // Measure properly and clamp to screen bounds to avoid cutoff
         menuLayout.measure(View.MeasureSpec.makeMeasureSpec(displayMetrics.widthPixels, View.MeasureSpec.AT_MOST), View.MeasureSpec.UNSPECIFIED)
@@ -1013,14 +1126,15 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         menuParams.gravity = Gravity.TOP or Gravity.START
         
         // Perfectly center the menu above the sticker
-        var targetX = anchorParams.x + (anchorParams.width - measuredMenuWidth) / 2
+        // anchorParams.x is start of sticker, add stickerWidth/2 to get center, then subtract menuWidth/2
+        var targetX = anchorParams.x + (anchorParams.width / 2) - (measuredMenuWidth / 2)
         
         // Clamp to screen edges to prevent cutoff on left/right
-        if (targetX < menuPadding) targetX = menuPadding
+        if (targetX < menuPadding) targetX = (menuPadding).toInt()
         if (targetX + measuredMenuWidth > displayMetrics.widthPixels - menuPadding) {
-            targetX = displayMetrics.widthPixels - measuredMenuWidth - menuPadding
+            targetX = (displayMetrics.widthPixels - measuredMenuWidth - menuPadding).toInt()
         }
-        menuParams.x = targetX
+        menuParams.x = targetX.toInt()
         
         val yPadding = (12 * displayMetrics.density).toInt()
         menuParams.y = if (anchorParams.y > measuredMenuHeight + yPadding) {

@@ -30,15 +30,18 @@ class TileTriggerActivity : Activity() {
         
         android.util.Log.d("CircleToSearchTile", "TileTriggerActivity started")
         
-        // Trigger capture immediately
-        CircleToSearchAccessibilityService.triggerCapture()
-        finish()
-        
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            overrideActivityTransition(OVERRIDE_TRANSITION_CLOSE, 0, 0)
-        } else {
-            @Suppress("DEPRECATION")
-            overridePendingTransition(0, 0)
-        }
+        // Wait 500ms for the quick settings panel to collapse cleanly across all Android OEM skins (OneUI, MIUI/HyperOS, ColorOS)
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+            // Trigger capture
+            CircleToSearchAccessibilityService.triggerCapture()
+            finish()
+            
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                overrideActivityTransition(OVERRIDE_TRANSITION_CLOSE, 0, 0)
+            } else {
+                @Suppress("DEPRECATION")
+                overridePendingTransition(0, 0)
+            }
+        }, 500L)
     }
 }

@@ -34,8 +34,8 @@ android {
         applicationId = "com.akslabs.circletosearch"
         minSdk = 29
         targetSdk = 36
-        versionCode = 6
-        versionName = "0.4"
+        versionCode = 7
+        versionName = "0.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         
@@ -53,8 +53,8 @@ android {
         }
         
         getByName("debug") {
-            isMinifyEnabled = true
-            isShrinkResources = true
+            isMinifyEnabled = false
+            isShrinkResources = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
