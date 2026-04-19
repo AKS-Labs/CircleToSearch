@@ -9,7 +9,9 @@ import android.annotation.SuppressLint
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
 import android.graphics.*
+import android.net.Uri
 import android.util.Log
 import android.view.*
 import android.widget.FrameLayout
@@ -444,7 +446,7 @@ class CopyTextOverlayManager(
         }
 
         private fun drawFloatingToolbar(canvas: Canvas, anchor: RectF) {
-            val buttonLabels = listOf("Copy", "Share", "All", "Cancel")
+            val buttonLabels = listOf("Copy", "Share", "Translate", "All", "Cancel")
             val btnPadding = 16f * density
             val btnHeight = 36f * density
             val btnSpacing = 6f * density
@@ -580,7 +582,22 @@ class CopyTextOverlayManager(
                 }
                 "All" -> { globalSelectionStart = 0; globalSelectionEnd = allWords.lastIndex; invalidate() }
                 "Cancel" -> { globalSelectionStart = -1; globalSelectionEnd = -1; invalidate() }
+                "Translate" -> { openUrl(context, "https://translate.google.com/?text=${Uri.encode(selectedText)}") }
             }
+        }
+    }
+
+    private fun openUrl(context: Context, url: String) {
+        var finalUrl = url
+        if (!finalUrl.startsWith("http://") && !finalUrl.startsWith("https://")) {
+            finalUrl = "https://" + finalUrl
+        }
+        try {
+            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(finalUrl)).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            })
+        } catch (e: Exception) {
+            Toast.makeText(context, "Cannot open link", Toast.LENGTH_SHORT).show()
         }
     }
 }

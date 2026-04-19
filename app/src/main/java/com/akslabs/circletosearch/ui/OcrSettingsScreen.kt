@@ -130,7 +130,7 @@ fun OcrSettingsScreen(onBack: () -> Unit) {
                                         fontWeight = FontWeight.Bold,
                                         textDecoration = TextDecoration.Underline
                                     )) {
-                                        append("developer's Telegram group")
+                                        append("dev's Telegram group")
                                     }
                                     pop()
                                     

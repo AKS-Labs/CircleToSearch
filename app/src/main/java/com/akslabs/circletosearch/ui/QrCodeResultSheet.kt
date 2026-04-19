@@ -383,7 +383,7 @@ private fun PlainTextResult(context: Context, result: QrResult.PlainText) {
         ActionRow {
             PrimaryAction("Search") { openUrl(context, "https://www.google.com/search?q=${Uri.encode(result.text)}") }
             SecondaryAction("Copy") { copyToClipboard(context, "Text", result.text) }
-            SecondaryAction("Trans") { openUrl(context, "https://translate.google.com/?text=${Uri.encode(result.text)}") }
+            SecondaryAction("Translate") { openUrl(context, "https://translate.google.com/?text=${Uri.encode(result.text)}") }
         }
     }
 }

@@ -677,20 +677,12 @@ fun CircleToSearchScreen(
                         // 2. Generate URLs for ALL engines (lightweight string op)
                         searchEngines.forEach { engine ->
                             if (!preloadedUrls.containsKey(engine)) {
-                                val url = if (engine.isDirectUpload) {
-                                     when (engine) {
-                                        SearchEngine.Perplexity -> ImageSearchUploader.getPerplexityUrl(hostedImageUrl!!)
-                                        SearchEngine.ChatGPT -> ImageSearchUploader.getChatGPTUrl(hostedImageUrl!!)
-                                        else -> null
-                                    }
-                                } else {
-                                     when (engine) {
-                                        SearchEngine.Google -> ImageSearchUploader.getGoogleLensUrl(hostedImageUrl!!)
-                                        SearchEngine.Bing -> ImageSearchUploader.getBingUrl(hostedImageUrl!!)
-                                        SearchEngine.Yandex -> ImageSearchUploader.getYandexUrl(hostedImageUrl!!)
-                                        SearchEngine.TinEye -> ImageSearchUploader.getTinEyeUrl(hostedImageUrl!!)
-                                        else -> null
-                                    }
+                                val url = when (engine) {
+                                    SearchEngine.Google -> ImageSearchUploader.getGoogleLensUrl(hostedImageUrl!!)
+                                    SearchEngine.Bing -> ImageSearchUploader.getBingUrl(hostedImageUrl!!)
+                                    SearchEngine.Yandex -> ImageSearchUploader.getYandexUrl(hostedImageUrl!!)
+                                    SearchEngine.TinEye -> ImageSearchUploader.getTinEyeUrl(hostedImageUrl!!)
+                                    else -> null
                                 }
                                 if (url != null) preloadedUrls[engine] = url
                             }
