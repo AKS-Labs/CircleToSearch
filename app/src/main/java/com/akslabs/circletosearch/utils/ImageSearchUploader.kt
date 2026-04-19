@@ -209,14 +209,4 @@ object ImageSearchUploader {
         val encodedUrl = URLEncoder.encode(imageUrl, "UTF-8")
         return "https://tineye.com/search?url=$encodedUrl"
     }
-
-    fun getPerplexityUrl(imageUrl: String): String {
-        // Perplexity doesn't support URL params for image search directly yet
-        return "https://www.perplexity.ai/"
-    }
-
-    fun getChatGPTUrl(imageUrl: String): String {
-        // ChatGPT doesn't support URL params for image search directly yet
-        return "https://chatgpt.com/"
-    }
 }

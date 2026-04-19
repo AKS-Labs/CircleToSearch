@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.akslabs.circletosearch.data.SearchEngine
 import com.akslabs.circletosearch.utils.UIPreferences
+import com.akslabs.circletosearch.ui.components.SearchMethodSelector
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -121,13 +122,16 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Search Method Section
+            // Search Method Selector
             SearchMethodSelector(
                 isLensOnly = useGoogleLensOnly,
-                onMethodChange = { useGoogleLensOnly = it }
+                onMethodChange = { 
+                    useGoogleLensOnly = it
+                    uiPreferences.setUseGoogleLensOnly(it)
+                }
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(24.dp))
             
             // Explanatory Note
             Surface(
@@ -317,61 +321,6 @@ fun EngineOrderItem(
                 contentDescription = "Move Down",
                 tint = if (!isLast) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
             )
-        }
-    }
-}
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun SearchMethodSelector(
-    isLensOnly: Boolean,
-    onMethodChange: (Boolean) -> Unit
-) {
-    Column {
-        Text(
-            text = "SEARCH METHOD",
-            style = MaterialTheme.typography.labelLarge.copy(
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.sp
-            ),
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(bottom = 12.dp)
-        )
-
-        SingleChoiceSegmentedButtonRow(
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            SegmentedButton(
-                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
-                onClick = { onMethodChange(false) },
-                selected = !isLensOnly,
-                icon = { SegmentedButtonDefaults.Icon(!isLensOnly) },
-                colors = SegmentedButtonDefaults.colors(
-                    activeContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                    activeContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.ManageSearch, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Multi-Search", style = MaterialTheme.typography.labelLarge)
-                }
-            }
-            SegmentedButton(
-                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
-                onClick = { onMethodChange(true) },
-                selected = isLensOnly,
-                icon = { SegmentedButtonDefaults.Icon(isLensOnly) },
-                colors = SegmentedButtonDefaults.colors(
-                    activeContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                    activeContentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                )
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.AutoFixHigh, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Google Lens", style = MaterialTheme.typography.labelLarge)
-                }
-            }
         }
     }
 }

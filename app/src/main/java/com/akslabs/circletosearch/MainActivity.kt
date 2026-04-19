@@ -57,6 +57,7 @@ import com.akslabs.circletosearch.ui.theme.CircleToSearchTheme
 import com.akslabs.circletosearch.utils.PrivacyPreferences
 import com.akslabs.circletosearch.ui.components.DonateBottomSheet
 import com.akslabs.circletosearch.ui.components.AccessibilityDisclosureDialog
+import com.akslabs.circletosearch.ui.components.SearchMethodSelector
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -349,7 +350,45 @@ fun SetupScreen(onSettingsClick: () -> Unit, onOcrSettingsClick: () -> Unit) {
                 modifier = Modifier.align(Alignment.Start)
             )
             BubbleSwitch(context)
-            LensOnlySwitch(context)
+            
+            val uiPreferences = remember { com.akslabs.circletosearch.utils.UIPreferences(context) }
+            var isLensOnly by remember { mutableStateOf(uiPreferences.isUseGoogleLensOnly()) }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 16.dp)
+                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(20.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+                    .padding(16.dp)
+            ) {
+                SearchMethodSelector(
+                    isLensOnly = isLensOnly,
+                    onMethodChange = {
+                        isLensOnly = it
+                        uiPreferences.setUseGoogleLensOnly(it)
+                    }
+                )
+                
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = androidx.compose.material.icons.Icons.Default.Info,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Lens needs Google App Installed. But Degoogled friends can stick with the versatile Multi-Search Engine mode.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
             
             ListItem(
                 headlineContent = { Text("OCR Language Settings") },
@@ -567,149 +606,161 @@ fun SupportDialog(
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 6.dp
         ) {
-            Column(
-                modifier = Modifier.padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+            // Outer column: wraps content naturally but caps height at 85% screen height
+            // using BoxWithConstraints so the scroll only kicks in when needed
+            androidx.compose.foundation.layout.BoxWithConstraints(
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Icon(
-                    painter = painterResource(id = com.akslabs.circletosearch.R.drawable.donation),
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(48.dp)
-                )
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                Text(
-                    text = "Help Keep this Project \n Alive! ❤️",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.ExtraBold,
-                    textAlign = TextAlign.Center
-                )
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                var isExpanded by remember { mutableStateOf(false) }
+                val maxDialogHeight = maxHeight * 0.85f
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = maxDialogHeight),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // ── Fixed header (always visible) ──────────────────────────
+                    Column(
+                        modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            painter = painterResource(id = com.akslabs.circletosearch.R.drawable.donation),
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(48.dp)
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "Help Keep this Project \n Alive! ❤️",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.ExtraBold,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
 
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(
-                        text = "Please consider donating to this project Your\n support helps keep this project alive and \n enable us to add amazing \nnew features.",
-                        style = MaterialTheme.typography.bodyLarge,
-                        lineHeight = 22.sp,
-                        textAlign = TextAlign.Center,
-                        fontWeight = FontWeight.Medium
-                    )
-                    
+                    // ── Scrollable body ────────────────────────────────────────
+                    var isExpanded by remember { mutableStateOf(false) }
                     Column(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                            .padding(16.dp)
-                            .animateContentSize()
+                            .weight(1f, fill = false)
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 24.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().clickable { isExpanded = !isExpanded },
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
+                        Text(
+                            text = "Please consider donating to this project Your\n support helps keep this project alive and \n enable us to add amazing \nnew features.",
+                            style = MaterialTheme.typography.bodyLarge,
+                            lineHeight = 22.sp,
+                            textAlign = TextAlign.Center,
+                            fontWeight = FontWeight.Medium
+                        )
+
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                                .padding(16.dp)
+                                .animateContentSize()
                         ) {
-                            Text(
-                                text = "Planned Features:",
-                                style = MaterialTheme.typography.titleSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                            
-                            TextButton(onClick = { isExpanded = !isExpanded }, contentPadding = PaddingValues(0.dp)) {
-                                Icon(
-                                    imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                                    contentDescription = if (isExpanded) "Collapse" else "Expand",
-                                    tint = MaterialTheme.colorScheme.primary
+                            Row(
+                                modifier = Modifier.fillMaxWidth().clickable { isExpanded = !isExpanded },
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "Planned Features:",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
                                 )
+                                TextButton(onClick = { isExpanded = !isExpanded }, contentPadding = PaddingValues(0.dp)) {
+                                    Icon(
+                                        imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                        contentDescription = if (isExpanded) "Collapse" else "Expand",
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
+
+                            val allFeatures = listOf(
+                                "Self-hosted image upload (remove catbox/litterbox dependency)",
+                                "More triggers: volume button, power button, shake gesture etc.",
+                                "Add more actions to trigger with overlay",
+                                "Offline on-device translation",
+                                "Improved text detection accuracy",
+                                "More Search engines support SearXNG, DuckDuckGo, Brave Search",
+                                "Add more QS tiles to directly launch copy text, QR code, SmartScan etc.",
+                                "Multi-language support",
+                                "More Overlay actions",
+                                "Long-press image to download or share",
+                                "Image result context menu (reverse search, save, open etc.)",
+                                "Material You dynamic theming improvements",
+                                "Floating bubble customization (size, opacity, position)",
+                            )
+
+                            val features = if (isExpanded) allFeatures else allFeatures.take(5)
+
+                            Spacer(modifier = Modifier.height(12.dp))
+                            features.forEach { feature ->
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(vertical = 4.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Check, null,
+                                        modifier = Modifier.size(16.dp),
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Text(text = feature, style = MaterialTheme.typography.bodyMedium)
+                                }
                             }
                         }
-                        
-                        val allFeatures = listOf(
-                            "Self-hosted image upload (remove catbox/litterbox dependency)",
-                            "More triggers: volume button, power button, shake gesture etc.",
-                            "Add more actions to trigger with overlay",
-                            "Offline on-device translation",
-                            "Improved text detection accuracy",
-                            "More Search engines support SearXNG, DuckDuckGo, Brave Search",
-                            "Add more QS tiles to directly launch copy text, QR code,SmartScan etc ",
-                            "Multi-language support",
-                            "More Overlay actions",
-                            "Long-press image to download or share",
-                            "Image result context menu (reverse search, save, open etc.)",
-                            "Material You dynamic theming improvements",
-                            "Floating bubble customization (size, opacity, position)",
-                        )
-                        
-                        val features = if (isExpanded) allFeatures else allFeatures.take(5)
-                        
-                        Spacer(modifier = Modifier.height(12.dp))
-                        
-                        features.forEach { feature ->
+
+                        if (showCount >= 7) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(vertical = 4.dp)
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                                    .clickable { dontShowAgain.value = !dontShowAgain.value }
+                                    .padding(vertical = 4.dp)
                             ) {
-                                Icon(
-                                    Icons.Default.Check,
-                                    null,
-                                    modifier = Modifier.size(16.dp),
-                                    tint = MaterialTheme.colorScheme.primary
+                                Checkbox(
+                                    checked = dontShowAgain.value,
+                                    onCheckedChange = { dontShowAgain.value = it }
                                 )
-                                Spacer(modifier = Modifier.width(12.dp))
                                 Text(
-                                    text = feature,
-                                    style = MaterialTheme.typography.bodyMedium
+                                    text = "Don't show this again",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.padding(start = 8.dp)
                                 )
                             }
                         }
+                        Spacer(modifier = Modifier.height(4.dp))
                     }
-                }
-                
-                if (showCount >= 7) {
-                    Spacer(modifier = Modifier.height(24.dp))
-                    
+
+                    // ── Fixed bottom buttons (always visible) ──────────────────
                     Row(
-                        verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
-                            .clickable { dontShowAgain.value = !dontShowAgain.value }
-                            .padding(vertical = 4.dp)
+                            .padding(horizontal = 24.dp, vertical = 16.dp),
+                        horizontalArrangement = Arrangement.End,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Checkbox(
-                            checked = dontShowAgain.value,
-                            onCheckedChange = { dontShowAgain.value = it }
-                        )
-                        Text(
-                            text = "Don't show this again",
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.padding(start = 8.dp)
-                        )
-                    }
-                }
-                
-                Spacer(modifier = Modifier.height(24.dp))
-                
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    TextButton(onClick = onDismiss) {
-                        Text("Close")
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Button(
-                        onClick = onDonate,
-                        shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
-                        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
-                    ) {
-                        Text("Donate", fontWeight = FontWeight.Bold)
+                        TextButton(onClick = onDismiss) {
+                            Text("Close")
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Button(
+                            onClick = onDonate,
+                            shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
+                            contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
+                        ) {
+                            Text("Donate", fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }
@@ -740,71 +791,3 @@ fun BubbleSwitch(context: android.content.Context) {
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun LensOnlySwitch(context: android.content.Context) {
-    val uiPreferences = remember { com.akslabs.circletosearch.utils.UIPreferences(context) }
-    var isLensOnlyEnabled by remember { mutableStateOf(uiPreferences.isUseGoogleLensOnly()) }
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(androidx.compose.foundation.shape.RoundedCornerShape(20.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
-            .padding(16.dp)
-    ) {
-        Text(
-            text = "Search Method",
-            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(bottom = 12.dp)
-        )
-
-        SingleChoiceSegmentedButtonRow(
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            SegmentedButton(
-                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
-                onClick = {
-                    isLensOnlyEnabled = false
-                    uiPreferences.setUseGoogleLensOnly(false)
-                },
-                selected = !isLensOnlyEnabled,
-                icon = { SegmentedButtonDefaults.Icon(!isLensOnlyEnabled) }
-            ) {
-                Text("Multi-Search Engines", style = MaterialTheme.typography.labelLarge)
-            }
-            SegmentedButton(
-                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
-                onClick = {
-                    isLensOnlyEnabled = true
-                    uiPreferences.setUseGoogleLensOnly(true)
-                },
-                selected = isLensOnlyEnabled,
-                icon = { SegmentedButtonDefaults.Icon(isLensOnlyEnabled) }
-            ) {
-                Text("Google Lens", style = MaterialTheme.typography.labelLarge)
-            }
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(top = 8.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Default.Info,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.secondary,
-                modifier = Modifier.size(16.dp)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = "Lens needs Google App Installed. But Degoogled friends can stick with the versatile Multi-Search Engine mode.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}

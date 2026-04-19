@@ -183,7 +183,7 @@ fun MoreAppsBottomSheet(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(160.dp)
+                    .wrapContentHeight()
                     .background(
                         Brush.verticalGradient(
                             colors = listOf(
@@ -191,7 +191,8 @@ fun MoreAppsBottomSheet(
                                 MaterialTheme.colorScheme.surface
                             )
                         )
-                    ),
+                    )
+                    .padding(vertical = 28.dp, horizontal = 16.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Column(
@@ -200,10 +201,10 @@ fun MoreAppsBottomSheet(
                     Icon(
                         imageVector = Icons.Default.Apps,
                         contentDescription = null,
-                        modifier = Modifier.size(56.dp),
+                        modifier = Modifier.size(48.dp),
                         tint = MaterialTheme.colorScheme.primary
                     )
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
                     Text(
                         text = "More Apps by AKS-Labs",
                         style = MaterialTheme.typography.headlineSmall,
@@ -316,7 +317,7 @@ fun DonateBottomSheet(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(160.dp)
+                    .wrapContentHeight()
                     .background(
                         Brush.verticalGradient(
                             colors = listOf(
@@ -324,7 +325,8 @@ fun DonateBottomSheet(
                                 MaterialTheme.colorScheme.surface
                             )
                         )
-                    ),
+                    )
+                    .padding(vertical = 28.dp, horizontal = 16.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Column(
@@ -333,10 +335,10 @@ fun DonateBottomSheet(
                     Icon(
                         painter = painterResource(id = R.drawable.donation),
                         contentDescription = null,
-                        modifier = Modifier.size(56.dp),
+                        modifier = Modifier.size(48.dp),
                         tint = MaterialTheme.colorScheme.primary
                     )
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
                     Text(
                         text = "Support Our Work",
                         style = MaterialTheme.typography.headlineSmall,

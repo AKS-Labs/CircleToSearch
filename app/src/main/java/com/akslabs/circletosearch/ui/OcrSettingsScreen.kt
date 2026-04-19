@@ -130,11 +130,11 @@ fun OcrSettingsScreen(onBack: () -> Unit) {
                                         fontWeight = FontWeight.Bold,
                                         textDecoration = TextDecoration.Underline
                                     )) {
-                                        append("developer's Telegram group")
+                                        append("dev's Telegram group")
                                     }
                                     pop()
                                     
-                                    append(" and import them below.")
+                                    append("with /model and import them below.")
                                 }
 
                                 ClickableText(

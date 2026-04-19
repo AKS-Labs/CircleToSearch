@@ -28,10 +28,13 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.unit.Density
 import androidx.core.view.WindowCompat
 
 private val DarkColorScheme = darkColorScheme(
@@ -55,6 +58,9 @@ private val LightColorScheme = lightColorScheme(
     onSurface = Color(0xFF1C1B1F),
     */
 )
+
+/** Maximum font scale factor the app will honour (1.3 = 130% of normal text size). */
+private const val MAX_FONT_SCALE = 1.3f
 
 @Composable
 fun CircleToSearchTheme(
@@ -80,9 +86,23 @@ fun CircleToSearchTheme(
         }
     }
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
-        content = content
-    )
+    // Cap fontScale so that sp-based text doesn't grow unboundedly on devices
+    // where the user has set very large display scale (150-200%).
+    val currentDensity = LocalDensity.current
+    val cappedDensity = if (currentDensity.fontScale > MAX_FONT_SCALE) {
+        Density(
+            density = currentDensity.density,
+            fontScale = MAX_FONT_SCALE
+        )
+    } else {
+        currentDensity
+    }
+
+    CompositionLocalProvider(LocalDensity provides cappedDensity) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = Typography,
+            content = content
+        )
+    }
 }
