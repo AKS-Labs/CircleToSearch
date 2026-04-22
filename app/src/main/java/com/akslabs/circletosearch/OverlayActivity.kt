@@ -38,6 +38,7 @@ class OverlayActivity : ComponentActivity() {
     
     private val screenshotBitmap = androidx.compose.runtime.mutableStateOf<android.graphics.Bitmap?>(null)
     private val copyTextManager = androidx.compose.runtime.mutableStateOf<CopyTextOverlayManager?>(null)
+    private val searchModeOverride = androidx.compose.runtime.mutableStateOf<Boolean?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(0))
@@ -50,6 +51,7 @@ class OverlayActivity : ComponentActivity() {
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN)
         
         loadScreenshot()
+        updateOverride(intent)
 
         // Initialize manager for Activity-based layout
         copyTextManager.value = CopyTextOverlayManager(
@@ -67,6 +69,7 @@ class OverlayActivity : ComponentActivity() {
                 ) {
                     CircleToSearchScreen(
                         screenshot = screenshotBitmap.value,
+                        searchModeOverride = searchModeOverride.value,
                         onClose = { 
                             BitmapRepository.clear()
                             com.akslabs.circletosearch.data.AssistDataRepository.clear()
@@ -92,8 +95,10 @@ class OverlayActivity : ComponentActivity() {
         screenshotBitmap.value = null
         copyTextManager.value?.dismiss()
         copyTextManager.value = null
+        searchModeOverride.value = null
         
         loadScreenshot()
+        updateOverride(intent)
         
         // Recreate manager with new screenshot
         copyTextManager.value = CopyTextOverlayManager(
@@ -101,6 +106,14 @@ class OverlayActivity : ComponentActivity() {
             screenshotBitmap = screenshotBitmap.value
         )
         CircleToSearchAccessibilityService.setCopyTextManager(copyTextManager.value)
+    }
+
+    private fun updateOverride(intent: android.content.Intent) {
+        if (intent.hasExtra("EXTRA_SEARCH_MODE_OVERRIDE")) {
+            searchModeOverride.value = intent.getBooleanExtra("EXTRA_SEARCH_MODE_OVERRIDE", false)
+        } else {
+            searchModeOverride.value = null
+        }
     }
 
     private fun loadScreenshot() {

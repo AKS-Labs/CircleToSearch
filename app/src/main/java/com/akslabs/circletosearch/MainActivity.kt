@@ -57,7 +57,7 @@ import com.akslabs.circletosearch.ui.theme.CircleToSearchTheme
 import com.akslabs.circletosearch.utils.PrivacyPreferences
 import com.akslabs.circletosearch.ui.components.DonateBottomSheet
 import com.akslabs.circletosearch.ui.components.AccessibilityDisclosureDialog
-import com.akslabs.circletosearch.ui.components.SearchMethodSelector
+import com.akslabs.circletosearch.ui.components.UnifiedSearchMethodSelector
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -352,7 +352,6 @@ fun SetupScreen(onSettingsClick: () -> Unit, onOcrSettingsClick: () -> Unit) {
             BubbleSwitch(context)
             
             val uiPreferences = remember { com.akslabs.circletosearch.utils.UIPreferences(context) }
-            var isLensOnly by remember { mutableStateOf(uiPreferences.isUseGoogleLensOnly()) }
 
             Column(
                 modifier = Modifier
@@ -362,12 +361,8 @@ fun SetupScreen(onSettingsClick: () -> Unit, onOcrSettingsClick: () -> Unit) {
                     .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
                     .padding(16.dp)
             ) {
-                SearchMethodSelector(
-                    isLensOnly = isLensOnly,
-                    onMethodChange = {
-                        isLensOnly = it
-                        uiPreferences.setUseGoogleLensOnly(it)
-                    }
+                UnifiedSearchMethodSelector(
+                    uiPreferences = uiPreferences
                 )
                 
                 Spacer(modifier = Modifier.height(12.dp))

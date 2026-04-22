@@ -66,48 +66,73 @@ fun searchWithGoogleLens(uri: Uri, context: Context): LensLaunchResult {
 
         Log.d(TAG, "Content URI: $contentUri")
 
-        // Approach 1: Use Google Lens directly with ACTION_SEND
+        // Helper to apply robust permissions
+        fun Intent.applyRobustPermissions(uri: Uri): Intent {
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            // ClipData is critical for permission propagation on Android 10+
+            clipData = android.content.ClipData.newRawUri("Lens Image", uri)
+            return this
+        }
+
+        // Approach 1: Standalone Google Lens App (often more reliable)
         try {
             val lensIntent = Intent(Intent.ACTION_SEND).apply {
                 type = "image/*"
                 putExtra(Intent.EXTRA_STREAM, contentUri)
-                setPackage("com.google.android.googlequicksearchbox")
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                setPackage("com.google.ar.lens")
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                applyRobustPermissions(contentUri)
             }
             context.startActivity(lensIntent)
             vibrateDevice(context)
-            Log.d(TAG, "Google Lens launched with ACTION_SEND")
+            Log.d(TAG, "Standalone Google Lens launched")
             return LensLaunchResult.LAUNCHED_DIRECTLY
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to launch Google Lens with ACTION_SEND: ${e.message}")
+            Log.d(TAG, "Standalone Lens app not available")
         }
 
-        // Approach 2: Use Google Gallery with ACTION_SEND
+        // Approach 2: Google Search App (Integrated Lens)
+        try {
+            val gSearchIntent = Intent(Intent.ACTION_SEND).apply {
+                type = "image/*"
+                putExtra(Intent.EXTRA_STREAM, contentUri)
+                setPackage("com.google.android.googlequicksearchbox")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                applyRobustPermissions(contentUri)
+            }
+            context.startActivity(gSearchIntent)
+            vibrateDevice(context)
+            Log.d(TAG, "Google Search App (Lens) launched")
+            return LensLaunchResult.LAUNCHED_DIRECTLY
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to launch Google App: ${e.message}")
+        }
+
+        // Approach 3: Google Gallery (Lens Integration)
         try {
             val galleryIntent = Intent(Intent.ACTION_SEND).apply {
                 type = "image/*"
                 putExtra(Intent.EXTRA_STREAM, contentUri)
                 setPackage("com.google.android.apps.Gallery")
                 putExtra("lens", true)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                applyRobustPermissions(contentUri)
             }
             context.startActivity(galleryIntent)
             vibrateDevice(context)
-            Log.d(TAG, "Google Gallery launched with ACTION_SEND")
+            Log.d(TAG, "Google Gallery launched")
             return LensLaunchResult.LAUNCHED_DIRECTLY
         } catch (e: Exception) {
             Log.e(TAG, "Failed to launch Google Gallery: ${e.message}")
         }
 
-        // Approach 3: Use Google app with ACTION_VIEW
+        // Approach 4: Google app with ACTION_VIEW (Legacy/Alternative)
         try {
             val googleIntent = Intent(Intent.ACTION_VIEW).apply {
                 setPackage("com.google.android.googlequicksearchbox")
                 data = contentUri
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                applyRobustPermissions(contentUri)
             }
             context.startActivity(googleIntent)
             vibrateDevice(context)
@@ -117,25 +142,24 @@ fun searchWithGoogleLens(uri: Uri, context: Context): LensLaunchResult {
             Log.e(TAG, "Failed to launch Google app with ACTION_VIEW: ${e.message}")
         }
 
-        // Approach 4 (Fallback): System chooser — overlay must stay open
+        // Approach 5: System chooser fallback
         try {
             val sendIntent = Intent(Intent.ACTION_SEND).apply {
                 type = "image/*"
                 putExtra(Intent.EXTRA_STREAM, contentUri)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                applyRobustPermissions(contentUri)
             }
             val chooser = Intent.createChooser(sendIntent, "Search with Google Lens")
             chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             context.startActivity(chooser)
             vibrateDevice(context)
-            Log.d(TAG, "Chooser launched — overlay stays open")
+            Log.d(TAG, "Chooser launched")
             return LensLaunchResult.LAUNCHED_VIA_CHOOSER
         } catch (e: Exception) {
             Log.e(TAG, "Failed to launch chooser: ${e.message}")
         }
 
         Toast.makeText(context, "Google Lens is not available on this device", Toast.LENGTH_SHORT).show()
-        Log.e(TAG, "Google Lens not available - all approaches failed")
         return LensLaunchResult.FAILED
     } catch (e: Exception) {
         Log.e(TAG, "Error launching Google Lens", e)

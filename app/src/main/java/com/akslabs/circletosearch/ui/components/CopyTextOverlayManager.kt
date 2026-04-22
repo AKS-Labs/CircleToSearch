@@ -187,7 +187,7 @@ class CopyTextOverlayManager(
             IconButton(
                 onClick = onClose,
                 modifier = Modifier
-                    .background(android.graphics.Color.GRAY.toComposeColor().copy(alpha = 0.5f), CircleShape)
+                    .background(ComposeColor.Black.copy(alpha = 0.35f), CircleShape)
                     .size(40.dp)
             ) {
                 Icon(Icons.Default.Close, contentDescription = "Exit Copy Mode", tint = ComposeColor.White)
@@ -200,7 +200,7 @@ class CopyTextOverlayManager(
                 IconButton(
                     onClick = { showMenu = true },
                     modifier = Modifier
-                        .background(android.graphics.Color.GRAY.toComposeColor().copy(alpha = 0.5f), CircleShape)
+                        .background(ComposeColor.Black.copy(alpha = 0.35f), CircleShape)
                         .size(40.dp)
                 ) {
                     Icon(Icons.Default.MoreVert, contentDescription = "Menu", tint = ComposeColor.White)
@@ -208,7 +208,9 @@ class CopyTextOverlayManager(
 
                 DropdownMenu(
                     expanded = showMenu,
-                    onDismissRequest = { showMenu = false }
+                    onDismissRequest = { showMenu = false },
+                    shape = RoundedCornerShape(28.dp),
+                    tonalElevation = 6.dp
                 ) {
                     DropdownMenuItem(
                         text = { Text("Select Language / Model") },

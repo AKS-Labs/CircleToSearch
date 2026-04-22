@@ -508,17 +508,17 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
                     }
                 }
             }
+            ActionType.CTS_AUTO -> {
+                 // Respect Global Preference
+                 performCapture(null)
+            }
             ActionType.CTS_LENS -> {
-                 // Force Lens Mode
-                 val uiPrefs = com.akslabs.circletosearch.utils.UIPreferences(this)
-                 uiPrefs.setUseGoogleLensOnly(true)
-                 performCapture()
+                 // Force Lens Mode for this session only
+                 performCapture(true)
             }
             ActionType.CTS_MULTI -> {
-                 // Force Multi Mode
-                 val uiPrefs = com.akslabs.circletosearch.utils.UIPreferences(this)
-                 uiPrefs.setUseGoogleLensOnly(false)
-                 performCapture()
+                 // Force Multi Mode for this session only
+                 performCapture(false)
             }
             ActionType.SPLIT_SCREEN -> {
                  val success = performGlobalAction(GLOBAL_ACTION_TOGGLE_SPLIT_SCREEN)
@@ -684,7 +684,7 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         }
     }
 
-    private fun performCapture() {
+    private fun performCapture(searchModeOverride: Boolean? = null) {
         android.util.Log.d("CircleToSearch", "performCapture called. hasWindowManager=${windowManager != null}")
         
         // Clear repository at the source to prevent any "ghost" flash of old data
@@ -718,7 +718,7 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
                             BitmapRepository.setScreenshot(copy)
                             
                             // Launch Overlay Immediately
-                            launchOverlay()
+                            launchOverlay(searchModeOverride)
                             
                         } catch (e: Exception) {
                             e.printStackTrace()
@@ -733,11 +733,12 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         }
     }
 
-    fun launchOverlay() {
+    fun launchOverlay(searchModeOverride: Boolean? = null) {
         android.util.Log.d("CircleToSearchAccess", "AccessibilityService launching OverlayActivity")
         val intent = Intent(this, OverlayActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION) // Disable animation for faster feel
+            searchModeOverride?.let { putExtra("EXTRA_SEARCH_MODE_OVERRIDE", it) }
         }
         startActivity(intent)
     }
@@ -1173,7 +1174,7 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
 
         fun triggerCapture() {
             android.util.Log.d("CircleToSearch", "triggerCapture static called. instance=${instance != null}")
-            instance?.performCapture()
+            instance?.performCapture(null)
         }
 
         fun pinArea(bitmap: Bitmap, rect: android.graphics.Rect) {

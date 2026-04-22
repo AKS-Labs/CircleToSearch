@@ -41,7 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.akslabs.circletosearch.data.SearchEngine
 import com.akslabs.circletosearch.utils.UIPreferences
-import com.akslabs.circletosearch.ui.components.SearchMethodSelector
+import com.akslabs.circletosearch.ui.components.UnifiedSearchMethodSelector
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -52,7 +52,6 @@ fun SettingsScreen(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     
     var showFriendlyMessages by remember { mutableStateOf(uiPreferences.isShowFriendlyMessages()) }
-    var useGoogleLensOnly by remember { mutableStateOf(uiPreferences.isUseGoogleLensOnly()) }
     val initialOrderString = uiPreferences.getSearchEngineOrder()
     val allEngines = SearchEngine.values()
     
@@ -75,10 +74,6 @@ fun SettingsScreen(
 
     LaunchedEffect(showFriendlyMessages) {
         uiPreferences.setShowFriendlyMessages(showFriendlyMessages)
-    }
-
-    LaunchedEffect(useGoogleLensOnly) {
-        uiPreferences.setUseGoogleLensOnly(useGoogleLensOnly)
     }
 
     LaunchedEffect(engineOrder.toList()) {
@@ -122,14 +117,7 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Search Method Selector
-            SearchMethodSelector(
-                isLensOnly = useGoogleLensOnly,
-                onMethodChange = { 
-                    useGoogleLensOnly = it
-                    uiPreferences.setUseGoogleLensOnly(it)
-                }
-            )
+            UnifiedSearchMethodSelector(uiPreferences = uiPreferences)
 
             Spacer(modifier = Modifier.height(24.dp))
             

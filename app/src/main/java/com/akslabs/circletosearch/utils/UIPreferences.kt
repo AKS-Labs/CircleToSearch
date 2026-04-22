@@ -21,9 +21,12 @@ package com.akslabs.circletosearch.utils
 
 import android.content.Context
 import android.content.SharedPreferences
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.channels.awaitClose
 
 class UIPreferences(context: Context) {
-    private val prefs: SharedPreferences = context.getSharedPreferences("ui_prefs", Context.MODE_PRIVATE)
+    private val prefs: SharedPreferences = context.applicationContext.getSharedPreferences("ui_prefs", Context.MODE_PRIVATE)
     
     companion object {
         private const val KEY_DESKTOP_MODE = "is_desktop_mode"
@@ -34,12 +37,26 @@ class UIPreferences(context: Context) {
         private const val KEY_USE_GOOGLE_LENS_ONLY = "use_google_lens_only"
     }
 
+    fun observeUseGoogleLensOnly(): Flow<Boolean> = callbackFlow {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { prefs, key ->
+            if (key == KEY_USE_GOOGLE_LENS_ONLY) {
+                trySend(prefs.getBoolean(KEY_USE_GOOGLE_LENS_ONLY, false))
+            }
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        // Keep a strong reference to the listener as long as the flow is active
+        trySend(isUseGoogleLensOnly())
+        awaitClose {
+            prefs.unregisterOnSharedPreferenceChangeListener(listener)
+        }
+    }
+
     fun isUseGoogleLensOnly(): Boolean {
         return prefs.getBoolean(KEY_USE_GOOGLE_LENS_ONLY, false)
     }
 
     fun setUseGoogleLensOnly(isEnabled: Boolean) {
-        prefs.edit().putBoolean(KEY_USE_GOOGLE_LENS_ONLY, isEnabled).apply()
+        prefs.edit().putBoolean(KEY_USE_GOOGLE_LENS_ONLY, isEnabled).commit()
     }
     
     fun isDesktopMode(): Boolean {

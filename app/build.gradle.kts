@@ -39,7 +39,9 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         
-        resourceConfigurations += listOf("en")
+        androidResources {
+            localeFilters += "en"
+        }
     }
 
     buildTypes {
@@ -70,6 +72,7 @@ android {
             isUniversalApk = false
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
@@ -86,6 +89,23 @@ android {
     }
     buildFeatures {
         compose = true
+    }
+}
+
+// ABI-specific version codes for F-Droid and multi-APK support
+// arm64-v8a gets a higher code than armeabi-v7a so it's prioritized on compatible devices
+androidComponents {
+    onVariants { variant ->
+        val abiCodes = mapOf("armeabi-v7a" to 1, "arm64-v8a" to 2)
+        variant.outputs.forEach { output ->
+            val abi = output.filters.find { 
+                it.filterType == com.android.build.api.variant.FilterConfiguration.FilterType.ABI 
+            }?.identifier
+            if (abi != null) {
+                val baseCode = android.defaultConfig.versionCode ?: 0
+                output.versionCode.set(baseCode * 10 + (abiCodes[abi] ?: 0))
+            }
+        }
     }
 }
 

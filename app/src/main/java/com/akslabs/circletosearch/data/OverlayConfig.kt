@@ -22,7 +22,7 @@ data class OverlaySegment(
     @SerializedName("height") val height: Int = 60, // Pixels
     @SerializedName("xOffset") val xOffset: Int = 0, // Pixels from left
     @SerializedName("yOffset") val yOffset: Int = 0, // Pixels from top
-    @SerializedName("gestures") val gestures: MutableMap<GestureType, ActionType> = mutableMapOf(GestureType.DOUBLE_TAP to ActionType.CTS_MULTI),
+    @SerializedName("gestures") val gestures: MutableMap<GestureType, ActionType> = mutableMapOf(GestureType.DOUBLE_TAP to ActionType.CTS_AUTO),
     @SerializedName("gestureData") val gestureData: MutableMap<GestureType, String> = mutableMapOf() // Stores extra data like package name for OPEN_APP
 )
 
@@ -46,6 +46,7 @@ enum class ActionType {
     LOCK_SCREEN,
     OPEN_NOTIFICATIONS,
     OPEN_QUICK_SETTINGS,
+    CTS_AUTO,
     CTS_LENS,
     CTS_MULTI,
     SPLIT_SCREEN,
@@ -69,8 +70,9 @@ fun ActionType.getFriendlyName(): String = when (this) {
     ActionType.LOCK_SCREEN -> "Lock Screen"
     ActionType.OPEN_NOTIFICATIONS -> "Open Notifications"
     ActionType.OPEN_QUICK_SETTINGS -> "Quick Settings"
+    ActionType.CTS_AUTO -> "Circle to Search"
     ActionType.CTS_LENS -> "Google Lens Search"
-    ActionType.CTS_MULTI -> "Multi-Search (All Search Engines)"
+    ActionType.CTS_MULTI -> "Multi-Search"
     ActionType.SPLIT_SCREEN -> "Split Screen"
     ActionType.OPEN_APP -> "Open Application"
     ActionType.SCROLL_TOP -> "Scroll to Top"

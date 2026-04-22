@@ -518,6 +518,7 @@ fun getActionIcon(action: ActionType): ImageVector = when (action) {
     ActionType.SCROLL_TOP -> Icons.Default.VerticalAlignTop
     ActionType.SCROLL_BOTTOM -> Icons.Default.VerticalAlignBottom
     ActionType.SCREEN_OFF -> Icons.Default.PowerSettingsNew
+    ActionType.CTS_AUTO -> Icons.Default.SettingsSuggest
     ActionType.TOGGLE_AUTO_ROTATE -> Icons.Default.ScreenRotation
     ActionType.MEDIA_PLAY_PAUSE -> Icons.Default.PlayArrow
     ActionType.MEDIA_NEXT -> Icons.Default.SkipNext
