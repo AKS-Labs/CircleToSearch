@@ -103,14 +103,20 @@ Think of it as having Google Lens, Bing Visual Search, Yandex, and TinEye all in
 
 <div align="center">
     <p align="center">
+  <a href="https://github.com/AKS-Labs/CircleToSearch/releases">
+    <img alt="Get it on GitHub" src="https://user-images.githubusercontent.com/69304392/148696068-0cfea65d-b18f-4685-82b5-329a330b1c0d.png" height="80px">
+  </a>
   <a href="https://f-droid.org/packages/com.akslabs.circletosearch/">
     <img src="https://fdroid.gitlab.io/artwork/badge/get-it-on.png"
          alt="Get it on F-Droid"
          height="80">
   </a>
-  <a href="https://github.com/AKS-Labs/CircleToSearch/releases">
-    <img alt="Get it on GitHub" src="https://user-images.githubusercontent.com/69304392/148696068-0cfea65d-b18f-4685-82b5-329a330b1c0d.png" height="80px">
+  <a href="https://play.google.com/store/apps/details?id=com.akslabs.circletosearch">
+    <img alt='Get it on Google Play'
+         src='https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png'
+         height="80" />
   </a>
+  
   <br>
   <p><strong>• 🔓 Open Source    • 🚀 Ready to Use</strong></p>
 </div>
