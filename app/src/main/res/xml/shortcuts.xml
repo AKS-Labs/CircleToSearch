@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="trigger_search"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_trigger_search_short"
+        android:shortcutLongLabel="@string/shortcut_trigger_search_long">
+        <intent
+            android:action="com.akslabs.circletosearch.action.TRIGGER_SEARCH"
+            android:targetPackage="com.akslabs.circletosearch"
+            android:targetClass="com.akslabs.circletosearch.SearchTriggerActivity" />
+    </shortcut>
+</shortcuts>

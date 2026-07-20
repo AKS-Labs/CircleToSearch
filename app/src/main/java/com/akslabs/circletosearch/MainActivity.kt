@@ -99,7 +99,7 @@ fun SetupScreen(onSettingsClick: () -> Unit, onOcrSettingsClick: () -> Unit) {
     var showPrivacyDialog by remember { mutableStateOf(!privacyPreferences.hasAcceptedPrivacyPolicy()) }
     
     // Permission States
-    var isAccessibilityEnabled by remember { mutableStateOf(isAccessibilityServiceEnabled(context)) }
+    var isAccessibilityEnabled by remember { mutableStateOf(com.akslabs.circletosearch.utils.SearchTrigger.isAccessibilityEnabled(context)) }
     var isDefaultAssistant by remember { mutableStateOf(isDefaultAssistant(context)) }
     var showAccessibilityDisclosure by remember { mutableStateOf(false) }
     
@@ -107,7 +107,7 @@ fun SetupScreen(onSettingsClick: () -> Unit, onOcrSettingsClick: () -> Unit) {
     DisposableEffect(lifecycleOwner) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
             if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
-                isAccessibilityEnabled = isAccessibilityServiceEnabled(context)
+                isAccessibilityEnabled = com.akslabs.circletosearch.utils.SearchTrigger.isAccessibilityEnabled(context)
                 isDefaultAssistant = isDefaultAssistant(context)
             }
         }
@@ -342,7 +342,47 @@ fun SetupScreen(onSettingsClick: () -> Unit, onOcrSettingsClick: () -> Unit) {
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // 4. Settings (Bubble)
+            // 4. OTHER WAYS TO OPEN
+            Text(
+                text = "OTHER WAYS TO OPEN",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.secondary,
+                modifier = Modifier.align(Alignment.Start).padding(bottom = 8.dp)
+            )
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+                ),
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "No default assistant required",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "• App shortcut \"Circle to Search\" for launchers and gesture apps to bind\n" +
+                            "• Quick Settings tile for one-tap capture from the shade\n" +
+                            "• Gesture apps / Tasker Intent:\n" +
+                            "  com.akslabs.circletosearch.action.TRIGGER_SEARCH",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Work profile: install the app and enable Accessibility in that profile, then use the same shortcut, tile, or Intent there.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // 5. Settings (Bubble)
             Text(
                 text = "CUSTOMIZATION",
                 style = MaterialTheme.typography.labelSmall,
@@ -405,7 +445,7 @@ fun SetupScreen(onSettingsClick: () -> Unit, onOcrSettingsClick: () -> Unit) {
             Spacer(modifier = Modifier.height(32.dp))
 
 
-            // 5. Footer
+            // 6. Footer
             SocialLinksRow(
                 context = context,
                 onDonateClick = { showDonateSheet = true }
@@ -489,22 +529,7 @@ fun SetupScreen(onSettingsClick: () -> Unit, onOcrSettingsClick: () -> Unit) {
 
 // Helper Functions
 fun isAccessibilityServiceEnabled(context: android.content.Context): Boolean {
-    val expectedComponentName = android.content.ComponentName(context, CircleToSearchAccessibilityService::class.java)
-    val enabledServicesSetting = Settings.Secure.getString(
-        context.contentResolver,
-        Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
-    ) ?: return false
-    
-    val colonSplitter = android.text.TextUtils.SimpleStringSplitter(':')
-    colonSplitter.setString(enabledServicesSetting)
-    
-    while (colonSplitter.hasNext()) {
-        val componentNameString = colonSplitter.next()
-        val enabledComponent = android.content.ComponentName.unflattenFromString(componentNameString)
-        if (enabledComponent != null && enabledComponent == expectedComponentName)
-            return true
-    }
-    return false
+    return com.akslabs.circletosearch.utils.SearchTrigger.isAccessibilityEnabled(context)
 }
 
 fun isDefaultAssistant(context: android.content.Context): Boolean {

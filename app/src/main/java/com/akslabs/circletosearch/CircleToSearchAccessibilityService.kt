@@ -56,11 +56,13 @@ import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import com.akslabs.circletosearch.data.ActionType
+import com.akslabs.circletosearch.data.AssistDataRepository
 import com.akslabs.circletosearch.data.BitmapRepository
 import com.akslabs.circletosearch.data.GestureType
 import com.akslabs.circletosearch.data.OverlayConfigurationManager
 import com.akslabs.circletosearch.data.OverlaySegment
 import com.akslabs.circletosearch.ui.components.CopyTextOverlayManager
+import com.akslabs.circletosearch.utils.AccessibilityNodeHarvester
 import com.akslabs.circletosearch.utils.ImageUtils
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
@@ -689,6 +691,7 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         
         // Clear repository at the source to prevent any "ghost" flash of old data
         BitmapRepository.clear()
+        AssistDataRepository.clear()
         
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             takeScreenshot(
@@ -716,6 +719,15 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
                             
                             // Store in Repository (In-Memory)
                             BitmapRepository.setScreenshot(copy)
+
+                            // Harvest UI text for hybrid CopyText
+                            try {
+                                val nodes = AccessibilityNodeHarvester.harvest(this@CircleToSearchAccessibilityService)
+                                AssistDataRepository.setNodes(nodes)
+                                android.util.Log.d("CircleToSearch", "Harvested ${nodes.size} accessibility text nodes")
+                            } catch (e: Exception) {
+                                android.util.Log.e("CircleToSearch", "Accessibility text harvest failed", e)
+                            }
                             
                             // Launch Overlay Immediately
                             launchOverlay(searchModeOverride)
@@ -1172,9 +1184,12 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
             instance?.copyTextManager = manager
         }
 
-        fun triggerCapture() {
-            android.util.Log.d("CircleToSearch", "triggerCapture static called. instance=${instance != null}")
-            instance?.performCapture(null)
+        fun triggerCapture(searchModeOverride: Boolean? = null) {
+            android.util.Log.d(
+                "CircleToSearch",
+                "triggerCapture static called. instance=${instance != null} mode=$searchModeOverride"
+            )
+            instance?.performCapture(searchModeOverride)
         }
 
         fun pinArea(bitmap: Bitmap, rect: android.graphics.Rect) {

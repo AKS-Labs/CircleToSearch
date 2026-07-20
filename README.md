@@ -73,6 +73,45 @@ Think of it as having Google Lens, Bing Visual Search, Yandex, and TinEye all in
 - **100% Independent**: Works flawlessly on **any Android phone** (Android 10+), without requiring Google Play Services or OEM-specific software.
 - **Privacy-First**: No background tracking or logs—just pure on-device selection.
 
+## Automation / Gestures
+
+### Quick ways to open
+
+| Method | Purpose |
+|--------|---------|
+| App shortcut | System shortcut **Circle to Search** for launchers and gesture apps to bind |
+| Quick Settings tile | One-tap capture from the shade (**Circle to Search** / **CTS**) |
+| Status bar / bubble | In-app Accessibility triggers (double-tap status bar, or floating bubble) |
+| Gesture apps / Tasker | Fire the Intent below (same capture path as the shortcut and tile) |
+
+Accessibility must be enabled for every path except the optional default-assistant gesture.
+
+### Intent for gesture apps and Tasker
+
+```text
+Action:  com.akslabs.circletosearch.action.TRIGGER_SEARCH
+Package: com.akslabs.circletosearch
+Class:   com.akslabs.circletosearch.SearchTriggerActivity
+```
+
+Optional extras:
+
+| Extra | Values | Meaning |
+|-------|--------|---------|
+| `search_mode` | `auto` (default), `lens`, `multi` | Force Google Lens only, multi-engine UI, or follow in-app preference |
+| `collapse_shade` | `true` / `false` | Wait briefly before capture (used by the QS tile so the shade can collapse) |
+
+Example (`adb`):
+
+```bash
+adb shell am start -a com.akslabs.circletosearch.action.TRIGGER_SEARCH
+adb shell am start -a com.akslabs.circletosearch.action.TRIGGER_SEARCH --es search_mode lens
+```
+
+### Work profile
+
+Install Circle to Search in the work profile, enable Accessibility inside that profile, then use the shortcut, tile, or Intent from work-profile apps. Capture only sees apps in the same profile; personal-profile CTS cannot screenshot work apps (and vice versa).
+
 ## ✨ Core Features
 
 ### 🔍 Smart Search & AI
