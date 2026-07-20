@@ -49,6 +49,22 @@
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
+        </activity>
+
+        <activity
+            android:name=".SearchTriggerActivity"
+            android:exported="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:launchMode="singleInstance">
+            <intent-filter>
+                <action android:name="com.akslabs.circletosearch.action.TRIGGER_SEARCH" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
         </activity>
 
         <service
@@ -98,14 +114,6 @@
             android:exported="false"
             android:theme="@style/Theme.CircleToSearch.Transparent"
             android:excludeFromRecents="true"
-            android:launchMode="singleInstance" />
-
-        <activity
-            android:name=".TileTriggerActivity"
-            android:exported="false"
-            android:theme="@android:style/Theme.Translucent.NoTitleBar"
-            android:excludeFromRecents="true"
-            android:taskAffinity=""
             android:launchMode="singleInstance" />
 
         <service

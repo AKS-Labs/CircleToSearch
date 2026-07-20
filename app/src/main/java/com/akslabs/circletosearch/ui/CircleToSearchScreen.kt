@@ -1471,8 +1471,12 @@ fun CircleToSearchScreen(
                                         isCopyMode = true
                                         isCopyTextTriggered = true
                                     } else {
-                                        // Data not ready (likely bubble trigger)
-                                        android.widget.Toast.makeText(context, "Comming Soon: launch CTS as assistant to try Hybrid text detection.", android.widget.Toast.LENGTH_LONG).show()
+                                        // Data not ready yet
+                                        android.widget.Toast.makeText(
+                                            context,
+                                            "Hybrid text is still loading. Try again in a moment.",
+                                            android.widget.Toast.LENGTH_LONG
+                                        ).show()
                                     }
                                 },
                                 modifier = Modifier

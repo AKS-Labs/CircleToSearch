@@ -19,4 +19,6 @@
 
 <resources>
     <string name="app_name">CircleToSearch</string>
+    <string name="shortcut_trigger_search_short">Circle to Search</string>
+    <string name="shortcut_trigger_search_long">Start Circle to Search</string>
 </resources>
