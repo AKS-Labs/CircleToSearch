@@ -209,4 +209,9 @@ object ImageSearchUploader {
         val encodedUrl = URLEncoder.encode(imageUrl, "UTF-8")
         return "https://tineye.com/search?url=$encodedUrl"
     }
+
+    fun getDuckDuckGoUrl(imageUrl: String): String {
+        val encodedUrl = URLEncoder.encode(imageUrl, "UTF-8")
+        return "https://duckduckgo.com/?q=$encodedUrl&iar=images&ia=images"
+    }
 }
