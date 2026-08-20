@@ -697,6 +697,7 @@ fun CircleToSearchScreen(
                                     SearchEngine.Bing -> ImageSearchUploader.getBingUrl(hostedImageUrl!!)
                                     SearchEngine.Yandex -> ImageSearchUploader.getYandexUrl(hostedImageUrl!!)
                                     SearchEngine.TinEye -> ImageSearchUploader.getTinEyeUrl(hostedImageUrl!!)
+                                    SearchEngine.DuckDuckGo -> ImageSearchUploader.getDuckDuckGoUrl(hostedImageUrl!!)
                                     else -> null
                                 }
                                 if (url != null) preloadedUrls[engine] = url
