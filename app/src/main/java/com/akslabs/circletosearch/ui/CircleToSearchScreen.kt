@@ -86,7 +86,6 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.QrCode
-import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Send
@@ -144,7 +143,9 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import com.akslabs.circletosearch.R
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -181,6 +182,7 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import android.os.Build
 import androidx.compose.material.icons.filled.Apps
+import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material3.Surface
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -602,7 +604,7 @@ fun CircleToSearchScreen(
                             },
                             text = {
                                 Text(
-                                    engine.name,
+                                    engine.getDisplayName(context),
                                     style = MaterialTheme.typography.labelLarge.copy(
                                         fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
                                     ),
@@ -896,7 +898,7 @@ fun CircleToSearchScreen(
                 ) {
                     Image(
                         bitmap = screenshot.asImageBitmap(),
-                        contentDescription = "Screenshot",
+                        contentDescription = stringResource(R.string.cd_screenshot),
                         contentScale = ContentScale.FillBounds,
                         modifier = Modifier.fillMaxSize()
                     )
@@ -1191,21 +1193,21 @@ fun CircleToSearchScreen(
                             .background(Color.Gray.copy(alpha = 0.5f), CircleShape)
                             .size(40.dp)
                     ) {
-                        Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
+                        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.cd_close), tint = Color.White)
                     }
                     Spacer(modifier = Modifier.weight(1f))
                     if (selectedEngine.name == "Google") {
                         // Si c'est Google, on affiche ta belle typo officielle
                         Image(
                             painter = painterResource(id = com.akslabs.circletosearch.R.drawable.googletypo),
-                            contentDescription = "Google Search",
+                            contentDescription = stringResource(R.string.cd_google_search),
                             modifier = Modifier.height(50.dp), // Hauteur ajustable selon ton PNG
                             colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(Color.White)
                         )
                     } else {
                         // Si c'est Bing, Yandex, etc., on garde le texte stylé d'origine
                         Text(
-                            text = selectedEngine.name,
+                            text = selectedEngine.getDisplayName(context),
                             style = MaterialTheme.typography.headlineMedium.copy(
                                 fontWeight = FontWeight.Bold,
                                 color = Color.White
@@ -1228,7 +1230,7 @@ fun CircleToSearchScreen(
                         }) {
                             Icon(
                                 Icons.Default.MoreVert,
-                                contentDescription = "Menu",
+                                contentDescription = stringResource(R.string.cd_menu),
                                 tint = Color.White
                             )
                         }
@@ -1241,7 +1243,7 @@ fun CircleToSearchScreen(
                         ) {
                             val isDesktop = isDesktop(selectedEngine)
                             androidx.compose.material3.DropdownMenuItem(
-                                text = { Text(if (isDesktop) "Mobile Mode" else "Desktop Mode") },
+                                text = { Text(if (isDesktop) stringResource(R.string.menu_mobile_mode) else stringResource(R.string.menu_desktop_mode)) },
                                 leadingIcon = {
                                     Icon(
                                         if (isDesktop) Icons.Default.Smartphone else Icons.Default.DesktopWindows,
@@ -1260,7 +1262,7 @@ fun CircleToSearchScreen(
                                 }
                             )
                             androidx.compose.material3.DropdownMenuItem(
-                                text = { Text(if (isDarkMode) "Light Mode" else "Dark Mode") },
+                                text = { Text(if (isDarkMode) stringResource(R.string.menu_light_mode) else stringResource(R.string.menu_dark_mode)) },
                                 leadingIcon = {
                                     Icon(
                                         if (isDarkMode) Icons.Default.LightMode else Icons.Default.DarkMode,
@@ -1273,7 +1275,7 @@ fun CircleToSearchScreen(
                                 }
                             )
                             androidx.compose.material3.DropdownMenuItem(
-                                text = { Text(if (showGradientBorder) "Hide Border" else "Show Border") },
+                                text = { Text(if (showGradientBorder) stringResource(R.string.menu_hide_border) else stringResource(R.string.menu_show_border)) },
                                 leadingIcon = {
                                     Icon(Icons.Default.BorderOuter, contentDescription = null)
                                 },
@@ -1283,7 +1285,7 @@ fun CircleToSearchScreen(
                                 }
                             )
                             androidx.compose.material3.DropdownMenuItem(
-                                text = { Text("Refresh") },
+                                text = { Text(stringResource(R.string.menu_refresh)) },
                                 leadingIcon = {
                                     Icon(Icons.Default.Refresh, contentDescription = null)
                                 },
@@ -1293,7 +1295,7 @@ fun CircleToSearchScreen(
                                 }
                             )
                             androidx.compose.material3.DropdownMenuItem(
-                                text = { Text("Copy URL") },
+                                text = { Text(stringResource(R.string.menu_copy_url)) },
                                 leadingIcon = {
                                     Icon(Icons.Default.ContentCopy, contentDescription = null)
                                 },
@@ -1311,7 +1313,7 @@ fun CircleToSearchScreen(
                                 }
                             )
                             androidx.compose.material3.DropdownMenuItem(
-                                text = { Text("Open in Browser") },
+                                text = { Text(stringResource(R.string.menu_open_in_browser)) },
                                 leadingIcon = {
                                     Icon(Icons.Default.OpenInNew, contentDescription = null)
                                 },
@@ -1336,7 +1338,7 @@ fun CircleToSearchScreen(
                                 }
                             )
                             androidx.compose.material3.DropdownMenuItem(
-                                text = { Text("Settings") },
+                                text = { Text(stringResource(R.string.menu_settings)) },
                                 leadingIcon = {
                                     Icon(Icons.Default.Settings, contentDescription = null)
                                 },
@@ -1407,7 +1409,7 @@ fun CircleToSearchScreen(
                                     // App logo
                                     Image(
                                         painter = painterResource(id = com.akslabs.circletosearch.R.drawable.circletosearch),
-                                        contentDescription = "Logo",
+                                        contentDescription = stringResource(R.string.cd_logo),
                                         modifier = Modifier
                                             .size(44.dp)
                                             .clickable {
@@ -1432,7 +1434,7 @@ fun CircleToSearchScreen(
                                         },
                                         modifier = Modifier.size(44.dp)
                                     ) {
-                                        Icon(Icons.Default.Mic, contentDescription = "Voice Search")
+                                        Icon(Icons.Default.Mic, contentDescription = stringResource(R.string.cd_voice_search))
                                     }
 
                                     Spacer(modifier = Modifier.width(4.dp))
@@ -1452,41 +1454,31 @@ fun CircleToSearchScreen(
                                         },
                                         modifier = Modifier.size(44.dp)
                                     ) {
-                                        Icon(painterResource(id = com.akslabs.circletosearch.R.drawable.circletosearch), contentDescription = "Lens", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(26.dp))
+                                        Icon(painterResource(id = com.akslabs.circletosearch.R.drawable.circletosearch), contentDescription = stringResource(R.string.cd_lens), tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(26.dp))
                                     }
                                 }
                             }
 
                             // Circular Button: Assist Copy (Music Icon)
-                            val assistNodes by com.akslabs.circletosearch.data.AssistDataRepository.assistNodes.collectAsState()
-                            val isAssistDataReady by com.akslabs.circletosearch.data.AssistDataRepository.isDataReady.collectAsState()
-
                             IconButton(
                                 onClick = {
                                     haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                                    
-                                    if (isAssistDataReady) {
-                                        // Use high-accuracy AssistStructure data + OCR merge
-                                        copyTextManager?.setHybridMode(assistNodes)
-                                        isCopyMode = true
-                                        isCopyTextTriggered = true
-                                    } else {
-                                        // Data not ready (likely bubble trigger)
-                                        android.widget.Toast.makeText(context, "Comming Soon: launch CTS as assistant to try Hybrid text detection.", android.widget.Toast.LENGTH_LONG).show()
-                                    }
+                                    copyTextManager?.setOcrOnlyMode()
+                                    isCopyMode = true
+                                    isCopyTextTriggered = true
                                 },
                                 modifier = Modifier
                                     .size(60.dp)
                                     .background(MaterialTheme.colorScheme.surfaceContainer, CircleShape),
                             ) {
-                                Icon(Icons.Default.MusicNote, contentDescription = "Assist Copy", tint = if (isAssistDataReady) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+                                Icon(Icons.Default.MusicNote, contentDescription = stringResource(R.string.cd_assist_copy), tint = MaterialTheme.colorScheme.onSurface)
                             }
 
                             // Circular Button: Translate
                             IconButton(
                                 onClick = {
                                     haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                                    android.widget.Toast.makeText(context, "Coming soon", android.widget.Toast.LENGTH_SHORT).show()
+                                    android.widget.Toast.makeText(context, context.getString(R.string.toast_coming_soon), android.widget.Toast.LENGTH_SHORT).show()
                                     /*
                                     try {
                                         val intent = context.packageManager.getLaunchIntentForPackage("com.google.android.apps.translate")?.apply { addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK) }
@@ -1499,7 +1491,7 @@ fun CircleToSearchScreen(
                                     .size(60.dp)
                                     .background(MaterialTheme.colorScheme.surfaceContainer, CircleShape),
                             ) {
-                                Icon(Icons.Default.Translate, contentDescription = "Translate")
+                                Icon(Icons.Default.Translate, contentDescription = stringResource(R.string.cd_translate))
                             }
                         }
 
@@ -1556,25 +1548,25 @@ fun CircleToSearchScreen(
                             }
 
                             // More Apps
-                            BottomBarButton("More Apps", { Icon(Icons.Default.Apps, null) }) {
-                                showMoreAppsSheet = true
-                            }
+//                            BottomBarButton("More Apps", { Icon(Icons.Default.Apps, null) }) {
+//                                showMoreAppsSheet = true
+//                            }
 
                             // Pin
-                            val isPinEnabled = selectedBitmap != null
-                            BottomBarButton(
-                                label = "Pin", 
-                                icon = { Icon(Icons.Default.PushPin, contentDescription = null, modifier = Modifier.size(22.dp)) },
-                                enabled = isPinEnabled
-                            ) {
-                                selectedBitmap?.let { bmp ->
-                                    CircleToSearchAccessibilityService.pinArea(bmp, selectionRect ?: android.graphics.Rect())
-                                    (context as? android.app.Activity)?.finish()
-                                }
-                            }
+//                            val isPinEnabled = selectedBitmap != null
+//                            BottomBarButton(
+//                                label = "Pin",
+//                                icon = { Icon(Icons.Default.PushPin, contentDescription = null, modifier = Modifier.size(22.dp)) },
+//                                enabled = isPinEnabled
+//                            ) {
+//                                selectedBitmap?.let { bmp ->
+//                                    CircleToSearchAccessibilityService.pinArea(bmp, selectionRect ?: android.graphics.Rect())
+//                                    (context as? android.app.Activity)?.finish()
+//                                }
+//                            }
 
                             // Smart Entity Extractor
-                            BottomBarButton("SmartScan", { Icon(Icons.Default.Search, null, modifier = Modifier.size(22.dp)) }) {
+                            BottomBarButton(stringResource(R.string.label_smartscan), { Icon(Icons.Default.Search, null, modifier = Modifier.size(22.dp)) }) {
                                 isEntityExtractMode = true
                                 if (detectedEntities.isEmpty() && !isExtractingEntities) {
                                     isExtractingEntities = true
@@ -1603,14 +1595,14 @@ fun CircleToSearchScreen(
                                                         node.bounds.left.toFloat() + (ratioEnd * node.bounds.width().toFloat()),
                                                         node.bounds.bottom.toFloat()
                                                     )
-                                                    entities.add(SmartEntity.Phone(phoneCandidate, entityBounds))
+                                                    entities.add(SmartEntity.Phone(phoneCandidate, entityBounds, context.getString(R.string.entity_type_phone)))
                                                 }
                                             }
                                             node.words.forEach { word ->
                                                 val txt = word.text.trim()
-                                                if (emailRegex.matches(txt)) entities.add(SmartEntity.Email(txt, word.bounds))
-                                                else if (upiRegex.matches(txt)) entities.add(SmartEntity.Upi(txt, word.bounds))
-                                                else if (urlRegex.matches(txt)) entities.add(SmartEntity.Url(txt, word.bounds))
+                                                if (emailRegex.matches(txt)) entities.add(SmartEntity.Email(txt, word.bounds, context.getString(R.string.entity_type_email)))
+                                                else if (upiRegex.matches(txt)) entities.add(SmartEntity.Upi(txt, word.bounds, context.getString(R.string.entity_type_upi)))
+                                                else if (urlRegex.matches(txt)) entities.add(SmartEntity.Url(txt, word.bounds, context.getString(R.string.entity_type_link)))
                                             }
                                         }
                                         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
@@ -1622,25 +1614,25 @@ fun CircleToSearchScreen(
                             }
 
                             // Donate
-                            BottomBarButton("Donate", { Icon(painterResource(id = com.akslabs.circletosearch.R.drawable.donation), null, modifier = Modifier.size(22.dp)) }) {
-                                showDonateSheet = true
-                            }
+//                            BottomBarButton("Donate", { Icon(painterResource(id = com.akslabs.circletosearch.R.drawable.donation), null, modifier = Modifier.size(22.dp)) }) {
+//                                showDonateSheet = true
+//                            }
 
                             // Copy Text
-                            BottomBarButton("Copy Text", { Icon(painterResource(id = com.akslabs.circletosearch.R.drawable.ocr), null, modifier = Modifier.size(20.dp)) }) {
+                            BottomBarButton(stringResource(R.string.label_copy_text), { Icon(painterResource(id = com.akslabs.circletosearch.R.drawable.ocr), null, modifier = Modifier.size(20.dp)) }) {
                                 copyTextManager?.setOcrOnlyMode()
                                 isCopyMode = true
                                 isCopyTextTriggered = true
                             }
 
                             // QR Scan
-                            BottomBarButton("Scan QR", { Icon(Icons.Default.QrCode, null) }) {
+                            BottomBarButton(stringResource(R.string.label_scan_qr), { Icon(Icons.Default.QrCode, null) }) {
                                 qrScanBitmap = selectedBitmap ?: screenshot
                                 showQrSheet = true
                             }
 
                             // Fullscreen
-                            BottomBarButton("Fullscreen", { Icon(Icons.Default.Fullscreen, null) }) {
+                            BottomBarButton(stringResource(R.string.label_fullscreen), { Icon(Icons.Default.Fullscreen, null) }) {
                                 if (screenshot != null) {
                                     selectionRect = Rect(0, 0, screenshot.width, screenshot.height)
                                     currentPathPoints.clear()
@@ -1712,10 +1704,10 @@ fun CircleToSearchScreen(
                     Box(
                         modifier = Modifier
                             .offset(
-                                x = (centerX - 125.dp).coerceIn(0.dp, screenWidth - 250.dp),
+                                x = (centerX - 160.dp).coerceIn(0.dp, screenWidth - 320.dp),
                                 y = if (topPx > 200f) (topDp - 72.dp).coerceAtLeast(16.dp) else (bottomDp + 16.dp).coerceAtMost(screenHeight - 80.dp)
                             )
-                            .width(250.dp),
+                            .width(320.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         // Wrapped in Surface to match Bottom Bar tonal environment
@@ -1743,7 +1735,7 @@ fun CircleToSearchScreen(
                                                         addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                                         addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
                                                     }
-                                                    context.startActivity(android.content.Intent.createChooser(shareIntent, "Share Selection").apply { 
+                                                    context.startActivity(android.content.Intent.createChooser(shareIntent, context.getString(R.string.share_chooser_title)).apply { 
                                                         addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK) 
                                                     })
                                                 } catch (e: Exception) {
@@ -1762,12 +1754,14 @@ fun CircleToSearchScreen(
                                     contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp)
                                 ) {
                                     Text(
-                                        "Share", 
+                                        stringResource(R.string.label_share), 
                                         style = MaterialTheme.typography.labelLarge.copy(
                                             fontWeight = androidx.compose.ui.text.font.FontWeight.Normal
                                         )
                                     )
                                 }
+
+
 
                                 // Separator
                                 androidx.compose.material3.VerticalDivider(
@@ -1782,9 +1776,9 @@ fun CircleToSearchScreen(
                                             val success = ImageUtils.saveToGallery(context, selectedBitmap!!)
                                             if (success) {
                                                 haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                                                android.widget.Toast.makeText(context, "Saved to Gallery", android.widget.Toast.LENGTH_SHORT).show()
+                                                android.widget.Toast.makeText(context, context.getString(R.string.toast_saved_to_gallery), android.widget.Toast.LENGTH_SHORT).show()
                                             } else {
-                                                android.widget.Toast.makeText(context, "Failed to save", android.widget.Toast.LENGTH_SHORT).show()
+                                                android.widget.Toast.makeText(context, context.getString(R.string.toast_failed_to_save), android.widget.Toast.LENGTH_SHORT).show()
                                             }
                                         }
                                     },
@@ -1798,7 +1792,42 @@ fun CircleToSearchScreen(
                                     contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp)
                                 ) {
                                     Text(
-                                        "Save", 
+                                        stringResource(R.string.save), 
+                                        style = MaterialTheme.typography.labelLarge.copy(
+                                            fontWeight = androidx.compose.ui.text.font.FontWeight.Normal
+                                        )
+                                    )
+                                }
+
+                                // Separator
+                                androidx.compose.material3.VerticalDivider(
+                                    modifier = Modifier.height(24.dp).padding(horizontal = 2.dp),
+                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                                )
+
+                                // 3. PIN BUTTON
+                                androidx.compose.material3.FilledTonalButton(
+                                    onClick = {
+                                        if (selectedBitmap != null && selectionRect != null) {
+                                            val pinned = CircleToSearchAccessibilityService.pinArea(selectedBitmap!!, selectionRect!!)
+                                            if (pinned) {
+                                                (context as? android.app.Activity)?.finish()
+                                            } else {
+                                                android.widget.Toast.makeText(context, context.getString(R.string.toast_accessibility_permission_needed), android.widget.Toast.LENGTH_LONG).show()
+                                            }
+                                        }
+                                    },
+                                    modifier = Modifier.height(48.dp),
+                                    shape = CircleShape,
+                                    colors = androidx.compose.material3.ButtonDefaults.filledTonalButtonColors(
+                                        containerColor = Color.Transparent,
+                                        contentColor = MaterialTheme.colorScheme.onSurface
+                                    ),
+                                    elevation = null,
+                                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp)
+                                ) {
+                                    Text(
+                                        stringResource(R.string.pin),
                                         style = MaterialTheme.typography.labelLarge.copy(
                                             fontWeight = androidx.compose.ui.text.font.FontWeight.Normal
                                         )
@@ -1850,7 +1879,7 @@ fun CircleToSearchScreen(
                             )
                         }
                         
-                        val label = qrResultShortLabel(qr.result)
+                        val label = qrResultShortLabel(qr.result, context)
                         if (label.isNotEmpty()) {
                             Surface(
                                 modifier = Modifier
@@ -1898,7 +1927,7 @@ fun CircleToSearchScreen(
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             androidx.compose.material3.CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                             Spacer(Modifier.height(16.dp))
-                            Text("Extracting links & info...", color = Color.White)
+                            Text(stringResource(R.string.label_extracting_entities), color = Color.White)
                         }
                     }
                 }
@@ -2058,10 +2087,10 @@ fun CircleToSearchScreen(
 
 // --- Phase 44: Smart Entity Extractor Models ---
 sealed class SmartEntity(val text: String, val bounds: android.graphics.RectF, val typeName: String, val icon: androidx.compose.ui.graphics.vector.ImageVector, val sourceColor: Color) {
-    class Url(text: String, bounds: android.graphics.RectF) : SmartEntity(text, bounds, "Link", Icons.Default.Link, Color(0xFF1A73E8))
-    class Email(text: String, bounds: android.graphics.RectF) : SmartEntity(text, bounds, "Email", Icons.Default.Email, Color(0xFF1A73E8))
-    class Phone(text: String, bounds: android.graphics.RectF) : SmartEntity(text, bounds, "Phone", Icons.Default.Phone, Color(0xFF43A047))
-    class Upi(text: String, bounds: android.graphics.RectF) : SmartEntity(text, bounds, "UPI", Icons.Default.Person, Color(0xFF8E24AA))
+    class Url(text: String, bounds: android.graphics.RectF, typeName: String) : SmartEntity(text, bounds, typeName, Icons.Default.Link, Color(0xFF1A73E8))
+    class Email(text: String, bounds: android.graphics.RectF, typeName: String) : SmartEntity(text, bounds, typeName, Icons.Default.Email, Color(0xFF1A73E8))
+    class Phone(text: String, bounds: android.graphics.RectF, typeName: String) : SmartEntity(text, bounds, typeName, Icons.Default.Phone, Color(0xFF43A047))
+    class Upi(text: String, bounds: android.graphics.RectF, typeName: String) : SmartEntity(text, bounds, typeName, Icons.Default.Person, Color(0xFF8E24AA))
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)

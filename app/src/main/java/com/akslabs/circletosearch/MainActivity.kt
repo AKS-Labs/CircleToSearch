@@ -44,6 +44,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -63,7 +64,7 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Toast.makeText(this, "Double tap status bar or use floating bubble to start.", Toast.LENGTH_LONG).show()
+        Toast.makeText(this, getString(R.string.toast_getting_started), Toast.LENGTH_LONG).show()
         setContent {
             CircleToSearchTheme {
                 Surface(
@@ -159,7 +160,7 @@ fun SetupScreen(onSettingsClick: () -> Unit, onOcrSettingsClick: () -> Unit) {
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
-                    text = "Circle to Search",
+                    text = stringResource(R.string.header_title),
                     style = MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.align(Alignment.Center)
@@ -168,12 +169,12 @@ fun SetupScreen(onSettingsClick: () -> Unit, onOcrSettingsClick: () -> Unit) {
                     onClick = onSettingsClick,
                     modifier = Modifier.align(Alignment.CenterEnd)
                 ) {
-                     Icon(Icons.Default.Settings, contentDescription = "Overlay Settings", tint = MaterialTheme.colorScheme.primary)
+                     Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.cd_overlay_settings), tint = MaterialTheme.colorScheme.primary)
                 }
             }
             Spacer(modifier = Modifier.height(16.dp))
             Text(
-                text = "Search anything on your screen instantly.",
+                text = stringResource(R.string.subtitle_main),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Start
@@ -183,7 +184,7 @@ fun SetupScreen(onSettingsClick: () -> Unit, onOcrSettingsClick: () -> Unit) {
 
             // 2. REQUIRED: Accessibility Service
             Text(
-                text = "REQUIRED:",
+                text = stringResource(R.string.label_required),
                 style = MaterialTheme.typography.labelSmall,
                 color = if (isAccessibilityEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
                 modifier = Modifier.align(Alignment.Start).padding(bottom = 8.dp)
@@ -204,19 +205,19 @@ fun SetupScreen(onSettingsClick: () -> Unit, onOcrSettingsClick: () -> Unit) {
                     ) {
                         Icon(
                             imageVector = Icons.Default.CheckCircle,
-                            contentDescription = "Granted",
+                            contentDescription = stringResource(R.string.cd_granted),
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(24.dp)
                         )
                         Spacer(modifier = Modifier.width(16.dp))
                         Column {
                             Text(
-                                text = "Accessibility Service Active",
+                                text = stringResource(R.string.label_accessibility_active),
                                 style = MaterialTheme.typography.titleMedium,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer
                             )
                             Text(
-                                text = "Double tap status bar to launch CircleToSearch",
+                                text = stringResource(R.string.label_accessibility_active_subtitle),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                             )
@@ -248,13 +249,12 @@ fun SetupScreen(onSettingsClick: () -> Unit, onOcrSettingsClick: () -> Unit) {
                         Spacer(modifier = Modifier.width(16.dp))
                         Column {
                             Text(
-                                text = "Enable Accessibility",
+                                text = stringResource(R.string.label_enable_accessibility),
                                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                                 color = MaterialTheme.colorScheme.onErrorContainer
                             )
                              Text(
-                                text = "To do its job properly, the app needs this permission.\n" +
-                                        "Tap allow and we’re good to go! \uD83D\uDC4D",
+                                text = stringResource(R.string.label_enable_accessibility_subtitle),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f)
                             )
@@ -267,7 +267,7 @@ fun SetupScreen(onSettingsClick: () -> Unit, onOcrSettingsClick: () -> Unit) {
 
             // 3. OPTIONAL: Default Assistant
             Text(
-                text = "OPTIONAL: For Home Button Trigger",
+                text = stringResource(R.string.label_optional_assistant),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.secondary,
                 modifier = Modifier.align(Alignment.Start).padding(bottom = 8.dp)
@@ -288,13 +288,13 @@ fun SetupScreen(onSettingsClick: () -> Unit, onOcrSettingsClick: () -> Unit) {
                     ) {
                         Icon(
                             imageVector = Icons.Default.CheckCircle,
-                            contentDescription = "Active",
+                            contentDescription = stringResource(R.string.cd_active),
                             tint = MaterialTheme.colorScheme.secondary,
                             modifier = Modifier.size(24.dp)
                         )
                         Spacer(modifier = Modifier.width(16.dp))
                          Text(
-                            text = "Default Assistant Set",
+                            text = stringResource(R.string.label_default_assistant_set),
                             style = MaterialTheme.typography.titleMedium,
                              color = MaterialTheme.colorScheme.onSecondaryContainer
                         )
@@ -326,12 +326,12 @@ fun SetupScreen(onSettingsClick: () -> Unit, onOcrSettingsClick: () -> Unit) {
                         Spacer(modifier = Modifier.width(16.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Set as Default Assistant",
+                                text = stringResource(R.string.label_set_default_assistant),
                                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                                 color = MaterialTheme.colorScheme.onPrimaryContainer
                             )
                             Text(
-                                text = "Hold the Home button or edge-swipe up to summon CircleToSearch — like calling your Pokémon.",
+                                text = stringResource(R.string.label_set_default_assistant_subtitle),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
                             )
@@ -344,7 +344,7 @@ fun SetupScreen(onSettingsClick: () -> Unit, onOcrSettingsClick: () -> Unit) {
 
             // 4. Settings (Bubble)
             Text(
-                text = "CUSTOMIZATION",
+                text = stringResource(R.string.section_customization),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.secondary,
                 modifier = Modifier.align(Alignment.Start)
@@ -378,7 +378,7 @@ fun SetupScreen(onSettingsClick: () -> Unit, onOcrSettingsClick: () -> Unit) {
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Lens needs Google App Installed. But Degoogled friends can stick with the versatile Multi-Search Engine mode.",
+                        text = stringResource(R.string.info_lens_needs_google),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -386,23 +386,23 @@ fun SetupScreen(onSettingsClick: () -> Unit, onOcrSettingsClick: () -> Unit) {
             }
             
             ListItem(
-                headlineContent = { Text("OCR Language Settings") },
-                supportingContent = { Text("Import custom Tesseract OCR models") },
+                headlineContent = { Text(stringResource(R.string.label_ocr_settings)) },
+                supportingContent = { Text(stringResource(R.string.label_ocr_settings_subtitle)) },
                 trailingContent = { Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(16.dp)) },
                 modifier = Modifier.clickable(onClick = onOcrSettingsClick),
                 colors = ListItemDefaults.colors(containerColor = Color.Transparent)
             )
-            Spacer(modifier = Modifier.height(25.dp))
+//            Spacer(modifier = Modifier.height(25.dp))
+//
+//            // Privacy Note
+//            Text(
+//                text = "That’s it. No more permissions.\n We’re not trying to adopt your phone.",
+//                style = MaterialTheme.typography.bodySmall,
+//                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+//                textAlign = TextAlign.Center
+//            )
 
-            // Privacy Note
-            Text(
-                text = "That’s it. No more permissions.\n We’re not trying to adopt your phone.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                textAlign = TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(22.dp))
 
 
             // 5. Footer
@@ -422,7 +422,7 @@ fun SetupScreen(onSettingsClick: () -> Unit, onOcrSettingsClick: () -> Unit) {
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "From AKS-Labs With ❤️",
+                    text = stringResource(R.string.label_from_akslabs),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
                     textAlign = TextAlign.Center,
@@ -462,7 +462,7 @@ fun SetupScreen(onSettingsClick: () -> Unit, onOcrSettingsClick: () -> Unit) {
                     val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
                     context.startActivity(intent)
                 } catch (e: Exception) {
-                    android.widget.Toast.makeText(context, "Could not open link", android.widget.Toast.LENGTH_SHORT).show()
+                    android.widget.Toast.makeText(context, context.getString(R.string.toast_could_not_open_link), android.widget.Toast.LENGTH_SHORT).show()
                 }
                 showDonateSheet = false
             }
@@ -477,7 +477,7 @@ fun SetupScreen(onSettingsClick: () -> Unit, onOcrSettingsClick: () -> Unit) {
                     val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
                     context.startActivity(intent)
                 } catch (e: Exception) {
-                    android.widget.Toast.makeText(context, "Could not open Accessibility Settings", android.widget.Toast.LENGTH_LONG).show()
+                    android.widget.Toast.makeText(context, context.getString(R.string.toast_accessibility_settings_error), android.widget.Toast.LENGTH_LONG).show()
                 }
             },
             onDismiss = {
@@ -543,7 +543,7 @@ fun SocialLinksRow(
         ) {
             Icon(
                 painter = painterResource(id = com.akslabs.circletosearch.R.drawable.github),
-                contentDescription = "Github",
+                contentDescription = stringResource(R.string.cd_github),
                 tint = MaterialTheme.colorScheme.onSecondaryContainer,
                 modifier = Modifier.padding(8.dp)
             )
@@ -556,7 +556,7 @@ fun SocialLinksRow(
         ) {
             Icon(
                 painter = painterResource(id = com.akslabs.circletosearch.R.drawable.donation),
-                contentDescription = "Donate",
+                contentDescription = stringResource(R.string.cd_donate),
                 tint = MaterialTheme.colorScheme.onSecondaryContainer,
                 modifier = Modifier.padding(8.dp)
             )
@@ -572,7 +572,7 @@ fun SocialLinksRow(
         ) {
             Icon(
                 painter = painterResource(id = com.akslabs.circletosearch.R.drawable.telegram),
-                contentDescription = "Telegram",
+                contentDescription = stringResource(R.string.cd_telegram),
                 tint = MaterialTheme.colorScheme.onSecondaryContainer,
                 modifier = Modifier.padding(8.dp).size(23.dp)
             )
@@ -626,7 +626,7 @@ fun SupportDialog(
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            text = "Help Keep this Project \n Alive! ❤️",
+                            text = stringResource(R.string.support_title),
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.ExtraBold,
                             textAlign = TextAlign.Center
@@ -644,7 +644,7 @@ fun SupportDialog(
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Text(
-                            text = "Please consider donating to this project Your\n support helps keep this project alive and \n enable us to add amazing \nnew features.",
+                            text = stringResource(R.string.support_body),
                             style = MaterialTheme.typography.bodyLarge,
                             lineHeight = 22.sp,
                             textAlign = TextAlign.Center,
@@ -665,7 +665,7 @@ fun SupportDialog(
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Text(
-                                    text = "Planned Features:",
+                                    text = stringResource(R.string.support_planned_features),
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.primary
@@ -673,26 +673,26 @@ fun SupportDialog(
                                 TextButton(onClick = { isExpanded = !isExpanded }, contentPadding = PaddingValues(0.dp)) {
                                     Icon(
                                         imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                                        contentDescription = if (isExpanded) "Collapse" else "Expand",
+                                        contentDescription = stringResource(if (isExpanded) R.string.cd_collapse else R.string.cd_expand),
                                         tint = MaterialTheme.colorScheme.primary
                                     )
                                 }
                             }
 
                             val allFeatures = listOf(
-                                "Self-hosted image upload (remove catbox/litterbox dependency)",
-                                "More triggers: volume button, power button, shake gesture etc.",
-                                "Add more actions to trigger with overlay",
-                                "Offline on-device translation",
-                                "Improved text detection accuracy",
-                                "More Search engines support SearXNG, DuckDuckGo, Brave Search",
-                                "Add more QS tiles to directly launch copy text, QR code, SmartScan etc.",
-                                "Multi-language support",
-                                "More Overlay actions",
-                                "Long-press image to download or share",
-                                "Image result context menu (reverse search, save, open etc.)",
-                                "Material You dynamic theming improvements",
-                                "Floating bubble customization (size, opacity, position)",
+                                stringResource(R.string.feature_1),
+                                stringResource(R.string.feature_2),
+                                stringResource(R.string.feature_3),
+                                stringResource(R.string.feature_4),
+                                stringResource(R.string.feature_5),
+                                stringResource(R.string.feature_6),
+                                stringResource(R.string.feature_7),
+                                stringResource(R.string.feature_8),
+                                stringResource(R.string.feature_9),
+                                stringResource(R.string.feature_10),
+                                stringResource(R.string.feature_11),
+                                stringResource(R.string.feature_12),
+                                stringResource(R.string.feature_13),
                             )
 
                             val features = if (isExpanded) allFeatures else allFeatures.take(5)
@@ -728,7 +728,7 @@ fun SupportDialog(
                                     onCheckedChange = { dontShowAgain.value = it }
                                 )
                                 Text(
-                                    text = "Don't show this again",
+                                    text = stringResource(R.string.label_dont_show_again),
                                     style = MaterialTheme.typography.bodySmall,
                                     modifier = Modifier.padding(start = 8.dp)
                                 )
@@ -746,7 +746,7 @@ fun SupportDialog(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         TextButton(onClick = onDismiss) {
-                            Text("Close")
+                            Text(stringResource(R.string.close))
                         }
                         Spacer(modifier = Modifier.width(8.dp))
                         Button(
@@ -754,7 +754,7 @@ fun SupportDialog(
                             shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
                             contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp)
                         ) {
-                            Text("Donate", fontWeight = FontWeight.Bold)
+                            Text(stringResource(R.string.btn_donate), fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -769,8 +769,8 @@ fun BubbleSwitch(context: android.content.Context) {
     val isBubbleEnabled = remember { mutableStateOf(prefs.getBoolean("bubble_enabled", false)) }
 
     ListItem(
-        headlineContent = { Text("Floating Bubble") },
-        supportingContent = { Text("Show a floating button triggers search") },
+        headlineContent = { Text(stringResource(R.string.label_floating_bubble)) },
+        supportingContent = { Text(stringResource(R.string.label_floating_bubble_subtitle)) },
         trailingContent = {
             Switch(
                 checked = isBubbleEnabled.value,

@@ -29,7 +29,9 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.*
+import com.akslabs.circletosearch.R
 import com.akslabs.circletosearch.ocr.TesseractEngine
 import java.io.File
 import java.io.FileOutputStream
@@ -64,10 +66,10 @@ fun OcrSettingsScreen(onBack: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("OCR Language Models", fontWeight = FontWeight.Bold) },
+                title = { Text(stringResource(R.string.title_ocr_settings), fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.cd_back))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -79,8 +81,8 @@ fun OcrSettingsScreen(onBack: () -> Unit) {
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = { filePickerLauncher.launch("*/*") },
-                icon = { Icon(Icons.Default.Add, contentDescription = "Import Model") },
-                text = { Text("Import Model") }
+                icon = { Icon(Icons.Default.Add, contentDescription = stringResource(R.string.cd_import_model)) },
+                text = { Text(stringResource(R.string.btn_import_model)) }
             )
         }
     ) { padding ->
@@ -112,7 +114,7 @@ fun OcrSettingsScreen(onBack: () -> Unit) {
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
-                                        text = "Language Models Guide",
+                                        text = stringResource(R.string.title_language_models_guide),
                                         style = MaterialTheme.typography.titleSmall,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.primary
@@ -122,7 +124,7 @@ fun OcrSettingsScreen(onBack: () -> Unit) {
                                 Spacer(modifier = Modifier.height(8.dp))
                                 
                                 val annotatedString = buildAnnotatedString {
-                                    append("This app uses language models to detect text. By default, it uses a fast English model which may miss some text. To use high-accuracy models or detect other languages, download them from the ")
+                                    append(stringResource(R.string.info_ocr_guide_part1))
                                     
                                     pushStringAnnotation(tag = "URL", annotation = "https://t.me/AKSLabs")
                                     withStyle(style = SpanStyle(
@@ -130,11 +132,11 @@ fun OcrSettingsScreen(onBack: () -> Unit) {
                                         fontWeight = FontWeight.Bold,
                                         textDecoration = TextDecoration.Underline
                                     )) {
-                                        append("developer's Telegram group")
+                                        append(stringResource(R.string.info_ocr_guide_telegram_link))
                                     }
                                     pop()
                                     
-                                    append(" with /model command, e.g. /model english and import them below.")
+                                    append(stringResource(R.string.info_ocr_guide_part2))
                                 }
 
                                 ClickableText(
@@ -162,7 +164,7 @@ fun OcrSettingsScreen(onBack: () -> Unit) {
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Close,
-                                    contentDescription = "Dismiss",
+                                    contentDescription = stringResource(R.string.cd_dismiss),
                                     modifier = Modifier.size(16.dp)
                                 )
                             }
@@ -173,7 +175,7 @@ fun OcrSettingsScreen(onBack: () -> Unit) {
 
             item {
                 Text(
-                    text = "Installed Models",
+                    text = stringResource(R.string.title_installed_models),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
@@ -208,7 +210,7 @@ fun OcrSettingsScreen(onBack: () -> Unit) {
                             if (isSelected) {
                                 Icon(
                                     Icons.Default.CheckCircle, 
-                                    contentDescription = "Selected", 
+                                    contentDescription = stringResource(R.string.cd_selected), 
                                     tint = MaterialTheme.colorScheme.primary
                                 )
                             }

@@ -30,14 +30,17 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Alignment
+import com.akslabs.circletosearch.R
 import com.akslabs.circletosearch.data.BitmapRepository
 import com.akslabs.circletosearch.ocr.TesseractEngine
 import com.akslabs.circletosearch.utils.ImageUtils
 import kotlinx.coroutines.*
 import java.util.UUID
 
+private enum class ToolbarAction { COPY, SHARE, TRANSLATE, ALL, CANCEL }
+
 /** Simple holder for a floating-toolbar button's label and screen hit-rect. */
-private class ToolbarButton(val label: String, val rect: Rect)
+private class ToolbarButton(val label: String, val rect: Rect, val action: ToolbarAction)
 
 /**
  * Manages the dim+punch-out Copy Text overlay with OCR capabilities.
@@ -58,32 +61,16 @@ class CopyTextOverlayManager(
     
     // Status message for the user
     private val statusMessage = mutableStateOf<String?>(null)
-    
-    // Assistant Data support
-    var isAssistMode: Boolean = false
-        private set
-    
-    private var nativeNodes: List<TextNode> = emptyList()
 
-    fun setHybridMode(nodes: List<TextNode>) {
-        isAssistMode = true
-        nativeNodes = nodes
-        textNodes.clear()
-        textNodes.addAll(nodes)
-        updateAllWords()
-    }
-    
     fun setOcrOnlyMode() {
-        isAssistMode = false
-        nativeNodes = emptyList()
         textNodes.clear()
         allWords = emptyList()
         statusMessage.value = null
     }
-    
+
     private fun updateAllWords() {
-        allWords = textNodes.flatMap { node -> 
-            node.words.map { word -> 
+        allWords = textNodes.flatMap { node ->
+            node.words.map { word ->
                 word
             }
         }
@@ -124,7 +111,7 @@ class CopyTextOverlayManager(
                                 )
                                 Spacer(Modifier.height(16.dp))
                                 Text(
-                                    if (isAssistMode) "Hybrid Deep Scan..." else "Scanning text...", 
+                                    context.getString(R.string.label_scanning_text),
                                     style = MaterialTheme.typography.titleMedium,
                                     color = ComposeColor.White,
                                     modifier = Modifier
@@ -155,12 +142,7 @@ class CopyTextOverlayManager(
         }
         container.addView(topBar)
 
-        if (isAssistMode) {
-            // Trigger parallel OCR scan even if we have native nodes
-            scanNodes(view, isHybrid = true)
-        } else {
-            scanNodes(view, isHybrid = false)
-        }
+        scanNodes(view)
         return container
     }
 
@@ -190,7 +172,7 @@ class CopyTextOverlayManager(
                     .background(ComposeColor.Black.copy(alpha = 0.35f), CircleShape)
                     .size(40.dp)
             ) {
-                Icon(Icons.Default.Close, contentDescription = "Exit Copy Mode", tint = ComposeColor.White)
+                Icon(Icons.Default.Close, contentDescription = context.getString(R.string.cd_exit_copy_mode), tint = ComposeColor.White)
             }
             
             Spacer(modifier = Modifier.weight(1f))
@@ -203,7 +185,7 @@ class CopyTextOverlayManager(
                         .background(ComposeColor.Black.copy(alpha = 0.35f), CircleShape)
                         .size(40.dp)
                 ) {
-                    Icon(Icons.Default.MoreVert, contentDescription = "Menu", tint = ComposeColor.White)
+                    Icon(Icons.Default.MoreVert, contentDescription = context.getString(R.string.cd_menu), tint = ComposeColor.White)
                 }
 
                 DropdownMenu(
@@ -213,14 +195,14 @@ class CopyTextOverlayManager(
                     tonalElevation = 6.dp
                 ) {
                     DropdownMenuItem(
-                        text = { Text("Select Language / Model") },
+                        text = { Text(context.getString(R.string.menu_select_language_model)) },
                         onClick = {
                             showMenu = false
                             showLanguageModelSelector()
                         }
                     )
                     DropdownMenuItem(
-                        text = { Text("Import Model (.traineddata)") },
+                        text = { Text(context.getString(R.string.menu_import_model)) },
                         onClick = {
                             showMenu = false
                             filePickerLauncher.launch("*/*")
@@ -239,15 +221,15 @@ class CopyTextOverlayManager(
         val current = prefs.getString("selected_lang", "eng") ?: "eng"
         
         android.app.AlertDialog.Builder(context)
-            .setTitle("Select OCR Model")
+            .setTitle(context.getString(R.string.title_select_ocr_model))
             .setSingleChoiceItems(models.toTypedArray(), models.indexOf(current)) { dialog, which ->
                 val selected = models[which]
                 prefs.edit().putString("selected_lang", selected).apply()
-                Toast.makeText(context, "Selected: ${selected.uppercase()}. Restarting scan...", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.toast_ocr_model_selected, selected.uppercase()), Toast.LENGTH_SHORT).show()
                 dialog.dismiss()
                 rescanNodes()
             }
-            .setNegativeButton("Cancel", null)
+            .setNegativeButton(context.getString(R.string.cancel), null)
             .show()
     }
 
@@ -262,7 +244,7 @@ class CopyTextOverlayManager(
         dimView?.let { scanNodes(it) }
     }
 
-    private fun scanNodes(view: View, isHybrid: Boolean = false) {
+    private fun scanNodes(view: View) {
         scanJob?.cancel()
         statusMessage.value = null
         scanJob = scope.launch(Dispatchers.Main) {
@@ -270,9 +252,6 @@ class CopyTextOverlayManager(
             val bitmap = screenshotBitmap ?: BitmapRepository.getScreenshot()
             
             if (bitmap == null) {
-                if (isAssistMode && textNodes.isEmpty()) {
-                    statusMessage.value = "This app doesn't allow reading screen content."
-                }
                 isScanning.value = false
                 view.invalidate()
                 return@launch
@@ -282,17 +261,13 @@ class CopyTextOverlayManager(
                 // OCR scan runs on background thread
                 val ocrNodes = TesseractEngine.extractText(context, bitmap)
                 
-                if (isHybrid) {
-                    mergeHybridNodes(ocrNodes)
-                } else {
-                    val sortedNodes = ocrNodes.sortedWith(compareBy({ it.bounds.top }, { it.bounds.left }))
-                    textNodes.clear()
-                    textNodes.addAll(sortedNodes)
-                    updateAllWords()
-                }
+                val sortedNodes = ocrNodes.sortedWith(compareBy({ it.bounds.top }, { it.bounds.left }))
+                textNodes.clear()
+                textNodes.addAll(sortedNodes)
+                updateAllWords()
                 
                 if (textNodes.isEmpty()) {
-                    statusMessage.value = "No text found on screen."
+                    statusMessage.value = context.getString(R.string.label_no_text_found)
                 }
                 
                 Log.d("CopyTextOverlay", "Capture complete: ${textNodes.size} total nodes")
@@ -303,47 +278,6 @@ class CopyTextOverlayManager(
                 view.invalidate()
             }
         }
-    }
-
-    private fun mergeHybridNodes(ocrNodes: List<TextNode>) {
-        val newNodes = mutableListOf<TextNode>()
-        // Start with existing native nodes
-        newNodes.addAll(nativeNodes)
-        
-        for (ocr in ocrNodes) {
-            if (!isDuplicate(ocr, nativeNodes)) {
-                // Only add if OCR node is within screen bounds (roughly)
-                if (ocr.bounds.left >= -50 && ocr.bounds.top >= -50) {
-                    newNodes.add(ocr)
-                }
-            }
-        }
-        
-        val sortedNodes = newNodes.sortedWith(compareBy({ it.bounds.top }, { it.bounds.left }))
-        textNodes.clear()
-        textNodes.addAll(sortedNodes)
-        updateAllWords()
-    }
-
-    private fun isDuplicate(ocr: TextNode, natives: List<TextNode>): Boolean {
-        for (native in natives) {
-            // 1. Coordinate Overlap Check (> 50% overlap)
-            val ocrRect = ocr.bounds
-            val nativeRect = native.bounds
-            
-            val intersect = Rect(ocrRect)
-            if (intersect.intersect(nativeRect)) {
-                val intersectArea = intersect.width() * intersect.height()
-                val ocrArea = ocrRect.width() * ocrRect.height()
-                if (intersectArea > ocrArea * 0.5) return true
-            }
-            
-            // 2. Text Similarity Check
-            val ocrT = ocr.fullText.lowercase().trim()
-            val nativeT = native.fullText.lowercase().trim()
-            if (nativeT.contains(ocrT) || ocrT.contains(nativeT)) return true
-        }
-        return false
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -448,7 +382,14 @@ class CopyTextOverlayManager(
         }
 
         private fun drawFloatingToolbar(canvas: Canvas, anchor: RectF) {
-            val buttonLabels = listOf("Copy", "Share", "Translate", "All", "Cancel")
+            val toolbarItems = listOf(
+                ToolbarAction.COPY to context.getString(R.string.toolbar_btn_copy),
+                ToolbarAction.SHARE to context.getString(R.string.toolbar_btn_share),
+                ToolbarAction.TRANSLATE to context.getString(R.string.toolbar_btn_translate),
+                ToolbarAction.ALL to context.getString(R.string.toolbar_btn_all),
+                ToolbarAction.CANCEL to context.getString(R.string.toolbar_btn_cancel)
+            )
+            val buttonLabels = toolbarItems.map { it.second }
             val btnPadding = 16f * density
             val btnHeight = 36f * density
             val btnSpacing = 6f * density
@@ -491,7 +432,7 @@ class CopyTextOverlayManager(
                 canvas.drawText(label, bRect.centerX(), bRect.centerY() + textOffset, toolbarActionPaint.apply { 
                     color = Color.WHITE; style = Paint.Style.FILL; textSize = 30f; typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD); textAlign = Paint.Align.CENTER
                 })
-                newButtons.add(ToolbarButton(label, Rect(bRect.left.toInt(), bRect.top.toInt(), bRect.right.toInt(), bRect.bottom.toInt())))
+                newButtons.add(ToolbarButton(label, Rect(bRect.left.toInt(), bRect.top.toInt(), bRect.right.toInt(), bRect.bottom.toInt()), toolbarItems[i].first))
                 currentX += bWidth + btnSpacing
             }
             toolbarButtons = newButtons
@@ -504,7 +445,7 @@ class CopyTextOverlayManager(
                     lastTouchX = lx; lastTouchY = ly
                     for (btn in toolbarButtons) {
                         if (Rect(btn.rect).apply { inset(-24, -24) }.contains(lx.toInt(), ly.toInt())) {
-                            handleToolbarAction(btn.label); return true
+                            handleToolbarAction(btn.action); return true
                         }
                     }
                     if (dragHandleRect.contains(lx, ly)) { isDraggingToolbar = true; return true }
@@ -562,29 +503,29 @@ class CopyTextOverlayManager(
             return dx * dx + dy * dy < 80 * 80
         }
 
-        private fun handleToolbarAction(label: String) {
+        private fun handleToolbarAction(action: ToolbarAction) {
             val start = globalSelectionStart.coerceAtMost(globalSelectionEnd)
             val end = globalSelectionStart.coerceAtLeast(globalSelectionEnd)
             if (start == -1) return
             val selectedText = (start..end).mapNotNull { allWords.getOrNull(it) }.joinToString(" ") { it.text }
 
-            when (label) {
-                "Copy" -> {
+            when (action) {
+                ToolbarAction.COPY -> {
                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                     clipboard.setPrimaryClip(ClipData.newPlainText("Copied Text", selectedText))
-                    Toast.makeText(context, "Text copied ✓", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, context.getString(R.string.toast_text_copied), Toast.LENGTH_SHORT).show()
                     dismiss()
                 }
-                "Share" -> {
+                ToolbarAction.SHARE -> {
                     val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
                         type = "text/plain"; putExtra(android.content.Intent.EXTRA_TEXT, selectedText); addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
                     }
-                    context.startActivity(android.content.Intent.createChooser(intent, "Share text via").apply { addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK) })
+                    context.startActivity(android.content.Intent.createChooser(intent, context.getString(R.string.share_chooser_text)).apply { addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK) })
                     dismiss()
                 }
-                "All" -> { globalSelectionStart = 0; globalSelectionEnd = allWords.lastIndex; invalidate() }
-                "Cancel" -> { globalSelectionStart = -1; globalSelectionEnd = -1; invalidate() }
-                "Translate" -> { openUrl(context, "https://translate.google.com/?text=${Uri.encode(selectedText)}") }
+                ToolbarAction.ALL -> { globalSelectionStart = 0; globalSelectionEnd = allWords.lastIndex; invalidate() }
+                ToolbarAction.CANCEL -> { globalSelectionStart = -1; globalSelectionEnd = -1; invalidate() }
+                ToolbarAction.TRANSLATE -> { openUrl(context, "https://translate.google.com/?text=${Uri.encode(selectedText)}") }
             }
         }
     }
@@ -599,7 +540,7 @@ class CopyTextOverlayManager(
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             })
         } catch (e: Exception) {
-            Toast.makeText(context, "Cannot open link", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.toast_cannot_open_link), Toast.LENGTH_SHORT).show()
         }
     }
 }

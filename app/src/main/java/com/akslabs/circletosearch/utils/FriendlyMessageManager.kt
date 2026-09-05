@@ -21,35 +21,36 @@ package com.akslabs.circletosearch.utils
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.akslabs.circletosearch.R
 
 class FriendlyMessageManager(context: Context) {
     private val prefs: SharedPreferences = context.getSharedPreferences("friendly_msg_prefs", Context.MODE_PRIVATE)
     private val messages = listOf(
-        "Ready when you are, boss. What’s the mission today? 🕵️‍♂️😂",
-        "Say the word, chief. What are we hunting for now? 🔍😄",
-        "Alright boss, what mystery are we solving this time? 🧐😂",
-        "I’m here, captain! What’s the next target? 🎯🤣",
-        "Reporting for duty, boss. What do we search? 💼😆",
-        "Okayyy boss, what are we looking up this time—something normal or chaos again? 😂🔥",
-        "Search mode activated! What’s the order, boss? 🤖😄",
-        "Ready, boss! Who are we stalking—uhh… searching today? 👀😂",
-        "Here I am, boss. Drop the keyword. 😎🔍",
-        "Alright boss, hit me. What are we digging up now? 🪖🤣",
-        "Show me the pic, boss. Let’s go detective mode! 🔍😄",
-        "Drop the image, chief. I’ll find its secrets! 🖼️✨😂",
-        "Alright boss, what are we zooming into today? 📸👀🤣",
-        "Got a picture? Hand it over. I’m in full CSI mode. 🕵️‍♂️📷😂",
-        "What visual mystery are we cracking today, boss? 👁️🧩😆",
-        "Show me the image. I promise I won’t judge… much. 😭📸😂",
-        "Ready to search! Bring me your weirdest picture. 🤣🖼️🔍",
-        "Picture, please! Let me work my magic. ✨📷😄",
-        "Boss, got another random image for me to analyze? 😆🖼️🧐",
-        "New photo? Awesome. Let me eye-spy everything in it. 👀😂",
-        "Give me an image and I’ll dig up its whole life story. 📸📜🤣",
-        "Image detective reporting! What’s today’s case? 🕵️‍♂️🔍😄",
-        "Hand me the pic, boss. Time for some visual chaat-masala! 🌶️📷😂",
-        "What are we zooming, scanning, stalking— I mean, searching today? 👀🤣",
-        "Drop the image, boss. Let’s find where it came from… and where it’s been. 😂📸🌍"
+        context.getString(R.string.friendly_msg_1),
+        context.getString(R.string.friendly_msg_2),
+        context.getString(R.string.friendly_msg_3),
+        context.getString(R.string.friendly_msg_4),
+        context.getString(R.string.friendly_msg_5),
+        context.getString(R.string.friendly_msg_6),
+        context.getString(R.string.friendly_msg_7),
+        context.getString(R.string.friendly_msg_8),
+        context.getString(R.string.friendly_msg_9),
+        context.getString(R.string.friendly_msg_10),
+        context.getString(R.string.friendly_msg_11),
+        context.getString(R.string.friendly_msg_12),
+        context.getString(R.string.friendly_msg_13),
+        context.getString(R.string.friendly_msg_14),
+        context.getString(R.string.friendly_msg_15),
+        context.getString(R.string.friendly_msg_16),
+        context.getString(R.string.friendly_msg_17),
+        context.getString(R.string.friendly_msg_18),
+        context.getString(R.string.friendly_msg_19),
+        context.getString(R.string.friendly_msg_20),
+        context.getString(R.string.friendly_msg_21),
+        context.getString(R.string.friendly_msg_22),
+        context.getString(R.string.friendly_msg_23),
+        context.getString(R.string.friendly_msg_24),
+        context.getString(R.string.friendly_msg_25)
     )
 
     fun getNextMessage(): String {

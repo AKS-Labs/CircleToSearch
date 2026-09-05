@@ -51,9 +51,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.akslabs.circletosearch.R
 
 @Composable
 fun PrivacyDialog(
@@ -72,14 +74,14 @@ fun PrivacyDialog(
         icon = {
             Icon(
                 imageVector = Icons.Filled.Security,
-                contentDescription = "Privacy",
+                contentDescription = stringResource(R.string.cd_privacy),
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(48.dp)
             )
         },
         title = {
             Text(
-                text = "Privacy & Data Usage Transparency",
+                text = stringResource(R.string.title_privacy),
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center
@@ -95,17 +97,16 @@ fun PrivacyDialog(
                 // Where It Goes Section
                 PrivacySection(
                     icon = Icons.Filled.Info,
-                    question = "Does this app upload my searched images anywhere other than search engines?",
-                    answer = "Yes! ✅\nYour images are uploaded to LitterBox and Catbox third-party services to generate image url.\n\n• Litterbox → Auto-delete image after 1 hour\n• Catbox → Used only when Litterbox fails (stores image forever\n\nImportant: Litterbox is actually part of Catbox.\n" +
-                            "They belong to the same service family and may use similar infrastructure.)"
+                    question = stringResource(R.string.privacy_q_upload),
+                    answer = stringResource(R.string.privacy_a_upload)
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
                 // Why Upload Section
                 PrivacySection(
                     icon = Icons.Filled.Info,
-                    question = "Why does this app upload my image at all?",
-                    answer = "Search engines don't allow apps to directly upload images Programmatically (to prevent misuse & abuse). So the app uploads your image first to create a safe, usable link/url of image."
+                    question = stringResource(R.string.privacy_q_why_upload),
+                    answer = stringResource(R.string.privacy_a_why_upload)
                 )
                 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -113,16 +114,16 @@ fun PrivacyDialog(
 
                 PrivacySection(
                     icon = Icons.Filled.Warning,
-                    question = "Are Catbox and Litterbox safe?",
-                    answer = "They’re widely trusted for temporary file hosting because:\n\n• No account & API is required\n• Anonymous uploads are supported\n• Simple, fast and reliable\n\nThey are not open-source, so please read their official data and privacy policies to fully understand how your data is handled.",
+                    question = stringResource(R.string.privacy_q_safe),
+                    answer = stringResource(R.string.privacy_a_safe),
                     isWarning = true
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 // Warning Section
                 PrivacySection(
                     icon = Icons.Filled.Warning,
-                    question = "Should I search personal or private images?",
-                    answer = "Please don't! 🙏\n\nAvoid uploading personal photos, private documents, IDs, or anything sensitive. Only search images that are safe and non-personal.",
+                    question = stringResource(R.string.privacy_q_personal),
+                    answer = stringResource(R.string.privacy_a_personal),
                     isWarning = true
                 )
                 
@@ -131,8 +132,8 @@ fun PrivacyDialog(
                 // App Storage Section
                 PrivacySection(
                     icon = Icons.Filled.CheckCircle,
-                    question = "Does the app store my images or links?",
-                    answer = "Nope! ✅\n\nYour images and URLs are not stored, tracked, or logged by this app.",
+                    question = stringResource(R.string.privacy_q_store),
+                    answer = stringResource(R.string.privacy_a_store),
                     isPositive = true
                 )
                 
@@ -141,8 +142,8 @@ fun PrivacyDialog(
                 // Developer Access Section
                 PrivacySection(
                     icon = Icons.Filled.CheckCircle,
-                    question = "Can the developer see my images or links?",
-                    answer = "No. Never.\n\nThis App:\n• Has no server\n• Does not store images\n• Does not store image URLs\n• Does not track what you search\n• Does not collect data\n\nYour data stays between you → Catbox/Litterbox → Search engine.",
+                    question = stringResource(R.string.privacy_q_developer),
+                    answer = stringResource(R.string.privacy_a_developer),
                     isPositive = true
                 )
                 
@@ -160,14 +161,14 @@ fun PrivacyDialog(
                         modifier = Modifier.padding(12.dp)
                     ) {
                         Text(
-                            text = "🔔 Important Reminder",
+                            text = stringResource(R.string.privacy_reminder_title),
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.error
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "Your searched images can remain on search engine servers, Catbox servers, caches, and backups. This is why you should never upload private or personal images.",
+                            text = stringResource(R.string.privacy_reminder_body),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurface
                         )
@@ -182,7 +183,7 @@ fun PrivacyDialog(
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Text(
-                    text = "I Understand & Accept",
+                    text = stringResource(R.string.btn_privacy_accept),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(8.dp)

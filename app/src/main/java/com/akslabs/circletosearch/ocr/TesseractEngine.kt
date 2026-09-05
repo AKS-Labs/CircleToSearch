@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.Rect
 import android.graphics.RectF
 import android.util.Log
+import com.akslabs.circletosearch.R
 import com.akslabs.circletosearch.ui.components.TextNode
 import com.akslabs.circletosearch.ui.components.Word
 import com.googlecode.tesseract.android.TessBaseAPI
@@ -70,7 +71,7 @@ object TesseractEngine {
             }
 
             if (!fileName.endsWith(".traineddata")) {
-                callback(false, "File must be a .traineddata Tesseract model.")
+                callback(false, context.getString(R.string.toast_invalid_model_file))
                 return
             }
 
@@ -86,11 +87,11 @@ object TesseractEngine {
             }
 
             Log.d(TAG, "Imported model to ${destFile.absolutePath}")
-            callback(true, "Successfully imported ${fileName.removeSuffix(".traineddata").uppercase()} model!")
+            callback(true, context.getString(R.string.toast_model_imported, fileName.removeSuffix(".traineddata").uppercase()))
 
         } catch (e: Exception) {
             Log.e(TAG, "Error importing model: ${e.message}")
-            callback(false, "Failed to import model")
+            callback(false, context.getString(R.string.toast_model_import_failed))
         }
     }
 

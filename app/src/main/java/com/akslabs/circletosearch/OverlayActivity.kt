@@ -72,7 +72,6 @@ class OverlayActivity : ComponentActivity() {
                         searchModeOverride = searchModeOverride.value,
                         onClose = { 
                             BitmapRepository.clear()
-                            com.akslabs.circletosearch.data.AssistDataRepository.clear()
                             finish() 
                         },
                         copyTextManager = copyTextManager.value,
@@ -132,7 +131,6 @@ class OverlayActivity : ComponentActivity() {
         copyTextManager.value = null
         if (isFinishing) {
              com.akslabs.circletosearch.data.BitmapRepository.clear()
-             com.akslabs.circletosearch.data.AssistDataRepository.clear()
              com.akslabs.circletosearch.utils.StorageUtils.clearAppCache(this)
         }
     }

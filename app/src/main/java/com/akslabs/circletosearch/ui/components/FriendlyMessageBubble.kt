@@ -48,6 +48,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.akslabs.circletosearch.R
@@ -79,7 +80,7 @@ fun FriendlyMessageBubble(
             ) {
                 Icon(
                     painter = painterResource(id = R.drawable.circletosearch),
-                    contentDescription = "Search Icon",
+                    contentDescription = stringResource(R.string.cd_search_icon),
                     tint = Color.Unspecified,
                     modifier = Modifier.size(38.dp)
                 )

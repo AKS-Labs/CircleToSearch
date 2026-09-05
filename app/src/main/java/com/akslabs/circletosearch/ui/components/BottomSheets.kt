@@ -61,6 +61,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.akslabs.circletosearch.R
@@ -206,13 +207,13 @@ fun MoreAppsBottomSheet(
                     )
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
-                        text = "More Apps by AKS-Labs",
+                        text = stringResource(R.string.title_more_apps),
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "Explore our other projects",
+                        text = stringResource(R.string.subtitle_explore_projects),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
@@ -229,7 +230,7 @@ fun MoreAppsBottomSheet(
                     .padding(bottom = 32.dp, top = 16.dp)
             ) {
                 Text(
-                    text = "OUR APPS",
+                    text = stringResource(R.string.section_our_apps),
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Black,
                     color = MaterialTheme.colorScheme.primary,
@@ -243,40 +244,40 @@ fun MoreAppsBottomSheet(
                 ) {
                     AppItemWithDrawable(
                         iconRes = R.drawable.logo,
-                        title = "Pixel Screenshots",
-                        subtitle = "Screenshot Manager: Organize Screenshots via drag-and-drop instantly.",
+                        title = stringResource(R.string.app_name_pixel_screenshots),
+                        subtitle = stringResource(R.string.app_desc_pixel_screenshots),
 //                        isFoss = true,
                         onClick = { onAppSelected("https://play.google.com/store/apps/details?id=com.akslabs.pixelscreenshots") }
                     )
 
                     AppItemWithDrawable(
                         iconRes = R.drawable.tulsi,
-                        title = "Tulsi Gallery",
-                        subtitle = "A sweet looking gallery app with OCR Text Search",
+                        title = stringResource(R.string.app_name_tulsi_gallery),
+                        subtitle = stringResource(R.string.app_desc_tulsi_gallery),
                         isFoss = true,
                         onClick = { onAppSelected("https://play.google.com/store/apps/details?id=com.aks_labs.tulsi") }
                     )
 
                     AppItemWithDrawable(
                         iconRes = R.drawable.cts1,
-                        title = "Circle To Search",
-                        subtitle = "Circle To Search with multi search engine support",
+                        title = stringResource(R.string.app_name_circle_to_search_entry),
+                        subtitle = stringResource(R.string.app_desc_circle_to_search_entry),
                         isFoss = true,
                         onClick = { onAppSelected("https://github.com/AKS-Labs/CircleToSearch") }
                     )
 
                     AppItemWithDrawable(
                         iconRes = R.drawable.chitralaya1,
-                        title = "Chitralaya Cloudgallery",
-                        subtitle = "Privacy-focused Unlimited cloud storage",
+                        title = stringResource(R.string.app_name_chitralaya),
+                        subtitle = stringResource(R.string.app_desc_chitralaya),
                         isFoss = true,
                         onClick = { onAppSelected("https://github.com/AKS-Labs/CloudGallery") }
                     )
 
                     AppItemWithDrawable(
                         iconRes = R.drawable.sandeshvahak,
-                        title = "SandeshVahak",
-                        subtitle = "Securely sync messages from your secondary device to your primary device using Telegram",
+                        title = stringResource(R.string.app_name_sandeshvahak),
+                        subtitle = stringResource(R.string.app_desc_sandeshvahak),
                         isFoss = true,
                         onClick = { onAppSelected("https://github.com/AKS-Labs/SandeshVahak") }
                     )
@@ -284,8 +285,8 @@ fun MoreAppsBottomSheet(
                     // View all apps
                     FeedbackChannelOption(
                         icon = Icons.Default.Apps,
-                        title = "View in Play Store",
-                        subtitle = "See apps on Play Store",
+                        title = stringResource(R.string.btn_view_in_play_store),
+                        subtitle = stringResource(R.string.subtitle_view_in_play_store),
                         onClick = { onAppSelected("https://play.google.com/store/apps/dev?id=5379443231912092235") }
                     )
                 }
@@ -340,13 +341,13 @@ fun DonateBottomSheet(
                     )
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
-                        text = "Support Our Work",
+                        text = stringResource(R.string.title_support_our_work),
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "Your support helps us build better apps",
+                        text = stringResource(R.string.subtitle_support),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
@@ -363,7 +364,7 @@ fun DonateBottomSheet(
                     .padding(bottom = 32.dp, top = 16.dp)
             ) {
                 Text(
-                    text = "CHOOSE PAYMENT METHOD",
+                    text = stringResource(R.string.section_choose_payment),
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Black,
                     color = MaterialTheme.colorScheme.primary,
@@ -377,16 +378,16 @@ fun DonateBottomSheet(
                 ) {
                     FeedbackChannelOption(
                         icon = Icons.Default.Code,
-                        title = "GitHub Sponsors",
-                        subtitle = "Little to no fees",
+                        title = stringResource(R.string.donate_github_sponsors),
+                        subtitle = stringResource(R.string.donate_github_sponsors_subtitle),
                         onClick = { onDonateOptionSelected("https://github.com/sponsors/AKS-Labs") }
                     )
 
                     val clipboardManager = LocalClipboardManager.current
                     FeedbackChannelOption(
                         icon = Icons.Default.CurrencyRupee,
-                        title = "UPI (India) akslabs@upi",
-                        subtitle = "Instant • No fees • Pay via UPI",
+                        title = stringResource(R.string.donate_upi),
+                        subtitle = stringResource(R.string.donate_upi_subtitle),
                         onClick = {
                             clipboardManager.setText(AnnotatedString("akslabs@upi"))
                             onDonateOptionSelected("upi://pay?pa=akslabs@upi&pn=AKS-Labs&cu=INR")
@@ -395,8 +396,8 @@ fun DonateBottomSheet(
 
                     FeedbackChannelOption(
                         icon = Icons.Default.Payment,
-                        title = "PayPal",
-                        subtitle = "Fixed fee up to 5% • Conversion loss ≈ 5% per dollar",
+                        title = stringResource(R.string.donate_paypal),
+                        subtitle = stringResource(R.string.donate_paypal_subtitle),
                         onClick = { onDonateOptionSelected("https://paypal.me/akslabsOfficial") }
                     )
                 }
@@ -460,7 +461,7 @@ fun AppItemWithDrawable(
                             shape = RoundedCornerShape(6.dp)
                         ) {
                             Text(
-                                text = "FOSS",
+                                text = stringResource(R.string.label_foss),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),

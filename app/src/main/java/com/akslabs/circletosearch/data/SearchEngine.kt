@@ -19,17 +19,28 @@
 
 package com.akslabs.circletosearch.data
 
-sealed class SearchEngine(val displayName: String) {
-    object Google : SearchEngine("Google")
-    object Bing : SearchEngine("Bing")
-    object Yandex : SearchEngine("Yandex")
-    object TinEye : SearchEngine("TinEye")
+import android.content.Context
+import androidx.annotation.StringRes
+import com.akslabs.circletosearch.R
+
+sealed class SearchEngine(@StringRes val displayNameRes: Int) {
+    object Google : SearchEngine(R.string.engine_google)
+    object Bing : SearchEngine(R.string.engine_bing)
+    object Yandex : SearchEngine(R.string.engine_yandex)
+    object TinEye : SearchEngine(R.string.engine_tineye)
 
     companion object {
         fun values(): List<SearchEngine> = listOf(Google, Bing, Yandex, TinEye)
     }
-    
-    val name: String get() = displayName
+
+    fun getDisplayName(context: Context): String = context.getString(displayNameRes)
+
+    val name: String get() = when (this) {
+        is Google -> "Google"
+        is Bing -> "Bing"
+        is Yandex -> "Yandex"
+        is TinEye -> "TinEye"
+    }
 }
 
 val SearchEngine.isDirectUpload: Boolean

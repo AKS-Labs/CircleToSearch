@@ -73,18 +73,20 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.akslabs.circletosearch.utils.QrResult
 import com.akslabs.circletosearch.utils.QrResultWithBounds
+import com.akslabs.circletosearch.R
 import com.akslabs.circletosearch.utils.QrScanner
+import androidx.compose.ui.res.stringResource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private fun copyToClipboard(context: Context, label: String, text: String) {
+private fun copyToClipboard(context: Context, label: String, text: String, toastMessage: String) {
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     clipboard.setPrimaryClip(ClipData.newPlainText(label, text))
-    Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
+    Toast.makeText(context, toastMessage, Toast.LENGTH_SHORT).show()
 }
 
-private fun openUrl(context: Context, url: String) {
+private fun openUrl(context: Context, url: String, toastMessage: String) {
     var finalUrl = url
     if (!finalUrl.startsWith("http://") && !finalUrl.startsWith("https://")) {
         finalUrl = "https://" + finalUrl
@@ -94,16 +96,16 @@ private fun openUrl(context: Context, url: String) {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         })
     } catch (e: Exception) {
-        Toast.makeText(context, "Cannot open link", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, toastMessage, Toast.LENGTH_SHORT).show()
     }
 }
 
-fun qrResultShortLabel(result: QrResult): String = when (result) {
+fun qrResultShortLabel(result: QrResult, context: Context): String = when (result) {
     is QrResult.Url       -> result.displayUrl.take(25)
     is QrResult.WiFi      -> result.ssid
     is QrResult.Phone     -> result.number
     is QrResult.Product   -> result.barcode
-    is QrResult.VCard     -> result.name ?: "Contact"
+    is QrResult.VCard     -> result.name ?: context.getString(R.string.qr_vcard_fallback_name)
     is QrResult.GeoPoint  -> "%.2f, %.2f".format(result.lat, result.lng)
     is QrResult.PlainText -> result.text.take(25)
 }
@@ -165,10 +167,10 @@ fun QrCodeResultSheet(
                 Icon(Icons.Default.QrCode, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(8.dp))
                 val titleText = when {
-                    isScanning -> "Scanning…"
-                    notFound -> "No QR Found"
-                    results.size > 1 -> "Result ${pagerState.currentPage + 1} of ${results.size}"
-                    else -> "QR / Barcode"
+                    isScanning -> stringResource(R.string.qr_title_scanning)
+                    notFound -> stringResource(R.string.qr_title_not_found)
+                    results.size > 1 -> stringResource(R.string.qr_title_result_of, pagerState.currentPage + 1, results.size)
+                    else -> stringResource(R.string.qr_title_default)
                 }
                 Text(titleText, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold), modifier = Modifier.weight(1f))
                 
@@ -238,7 +240,7 @@ fun ScanningIndicator(scanlineY: Float) {
             )
         }
         Spacer(Modifier.height(8.dp))
-        Text("Scanning…", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(stringResource(R.string.qr_scanning), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -247,7 +249,7 @@ fun NotFoundContent() {
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(vertical = 4.dp)) {
         Text("🔎", fontSize = 32.sp)
         Spacer(Modifier.height(8.dp))
-        Text("No QR code detected", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+        Text(stringResource(R.string.qr_not_found), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
     }
 }
 
@@ -268,6 +270,10 @@ fun QrResultContent(context: Context, result: QrResult) {
 
 @Composable
 private fun UrlResult(context: Context, result: QrResult.Url) {
+    val toastCannotOpenLink = stringResource(R.string.toast_cannot_open_link)
+    val toastCopied = stringResource(R.string.toast_copied)
+    val qrActionOpenLink = stringResource(R.string.qr_action_open_link)
+    val qrActionCopy = stringResource(R.string.qr_action_copy)
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text("🔗", fontSize = 42.sp)
         Spacer(Modifier.height(4.dp))
@@ -280,57 +286,72 @@ private fun UrlResult(context: Context, result: QrResult.Url) {
             ),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.clickable { openUrl(context, result.url) }.padding(2.dp)
+            modifier = Modifier.clickable { openUrl(context, result.url, toastCannotOpenLink) }.padding(2.dp)
         )
         Spacer(Modifier.height(20.dp))
-        ActionRow { PrimaryAction("Open Link") { openUrl(context, result.url) }; SecondaryAction("Copy") { copyToClipboard(context, "URL", result.url) } }
+        ActionRow { PrimaryAction(qrActionOpenLink) { openUrl(context, result.url, toastCannotOpenLink) }; SecondaryAction(qrActionCopy) { copyToClipboard(context, "URL", result.url, toastCopied) } }
     }
 }
 
 @Composable
 private fun WifiResult(context: Context, result: QrResult.WiFi) {
+    val qrActionCopyPass = stringResource(R.string.qr_action_copy_pass)
+    val toastCopied = stringResource(R.string.toast_copied)
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Icon(Icons.Default.Wifi, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(40.dp))
         Spacer(Modifier.height(6.dp))
         Text(result.ssid, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
         Text("${result.security}${if (result.password != null) " · ${result.password}" else ""}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(20.dp))
-        ActionRow { if (result.password != null) PrimaryAction("Copy Pass") { copyToClipboard(context, "WiFi Password", result.password) } }
+        ActionRow { if (result.password != null) PrimaryAction(qrActionCopyPass) { copyToClipboard(context, "WiFi Password", result.password, toastCopied) } }
     }
 }
 
 @Composable
 private fun PhoneResult(context: Context, result: QrResult.Phone) {
+    val toastCannotOpenLink = stringResource(R.string.toast_cannot_open_link)
+    val toastCopied = stringResource(R.string.toast_copied)
+    val qrActionCall = stringResource(R.string.qr_action_call)
+    val qrActionSms = stringResource(R.string.qr_action_sms)
+    val qrActionCopy = stringResource(R.string.qr_action_copy)
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Icon(Icons.Default.Phone, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(40.dp))
         Spacer(Modifier.height(6.dp))
         Text(result.number, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
         Spacer(Modifier.height(20.dp))
         ActionRow {
-            PrimaryAction("Call") { openUrl(context, "tel:${result.number}") }
-            SecondaryAction("SMS") { openUrl(context, "sms:${result.number}") }
-            SecondaryAction("Copy") { copyToClipboard(context, "Phone", result.number) }
+            PrimaryAction(qrActionCall) { openUrl(context, "tel:${result.number}", toastCannotOpenLink) }
+            SecondaryAction(qrActionSms) { openUrl(context, "sms:${result.number}", toastCannotOpenLink) }
+            SecondaryAction(qrActionCopy) { copyToClipboard(context, "Phone", result.number, toastCopied) }
         }
     }
 }
 
 @Composable
 private fun ProductResult(context: Context, result: QrResult.Product) {
+    val toastCannotOpenLink = stringResource(R.string.toast_cannot_open_link)
+    val toastCopied = stringResource(R.string.toast_copied)
+    val qrActionAmazon = stringResource(R.string.qr_action_amazon)
+    val qrActionGoogle = stringResource(R.string.qr_action_google)
+    val qrActionCopy = stringResource(R.string.qr_action_copy)
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Icon(Icons.Default.ShoppingBag, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(40.dp))
         Spacer(Modifier.height(6.dp))
         Text(result.barcode, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
         Spacer(Modifier.height(20.dp))
         ActionRow {
-            PrimaryAction("Amazon") { openUrl(context, "https://www.amazon.com/s?k=${result.barcode}") }
-            SecondaryAction("Google") { openUrl(context, "https://www.google.com/search?q=${result.barcode}") }
-            SecondaryAction("Copy") { copyToClipboard(context, "Barcode", result.barcode) }
+            PrimaryAction(qrActionAmazon) { openUrl(context, "https://www.amazon.com/s?k=${result.barcode}", toastCannotOpenLink) }
+            SecondaryAction(qrActionGoogle) { openUrl(context, "https://www.google.com/search?q=${result.barcode}", toastCannotOpenLink) }
+            SecondaryAction(qrActionCopy) { copyToClipboard(context, "Barcode", result.barcode, toastCopied) }
         }
     }
 }
 
 @Composable
 private fun VCardResult(context: Context, result: QrResult.VCard) {
+    val toastCopied = stringResource(R.string.toast_copied)
+    val qrActionCopy = stringResource(R.string.qr_action_copy)
+    val saveLabel = stringResource(R.string.save)
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text("👤", fontSize = 42.sp)
         if (result.name != null) Text(result.name, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
@@ -338,7 +359,7 @@ private fun VCardResult(context: Context, result: QrResult.VCard) {
         if (sub.isNotEmpty()) Text(sub, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(Modifier.height(20.dp))
         ActionRow {
-            PrimaryAction("Save") {
+            PrimaryAction(saveLabel) {
                 context.startActivity(Intent(Intent.ACTION_INSERT).apply {
                     type = ContactsContract.RawContacts.CONTENT_TYPE
                     result.name?.let { putExtra(ContactsContract.Intents.Insert.NAME, it) }
@@ -347,7 +368,7 @@ private fun VCardResult(context: Context, result: QrResult.VCard) {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 })
             }
-            SecondaryAction("Copy") { copyToClipboard(context, "Contact", result.raw) }
+            SecondaryAction(qrActionCopy) { copyToClipboard(context, "Contact", result.raw, toastCopied) }
         }
     }
 }
@@ -355,20 +376,29 @@ private fun VCardResult(context: Context, result: QrResult.VCard) {
 @Composable
 private fun GeoResult(context: Context, result: QrResult.GeoPoint) {
     val coord = "%.4f, %.4f".format(result.lat, result.lng)
+    val toastCannotOpenLink = stringResource(R.string.toast_cannot_open_link)
+    val toastCopied = stringResource(R.string.toast_copied)
+    val qrActionMaps = stringResource(R.string.qr_action_maps)
+    val qrActionCopy = stringResource(R.string.qr_action_copy)
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Icon(Icons.Default.LocationOn, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(40.dp))
         Spacer(Modifier.height(6.dp))
         Text(coord, style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold))
         Spacer(Modifier.height(20.dp))
         ActionRow {
-            PrimaryAction("Maps") { openUrl(context, "geo:${result.lat},${result.lng}?q=${result.lat},${result.lng}") }
-            SecondaryAction("Copy") { copyToClipboard(context, "Coordinates", coord) }
+            PrimaryAction(qrActionMaps) { openUrl(context, "geo:${result.lat},${result.lng}?q=${result.lat},${result.lng}", toastCannotOpenLink) }
+            SecondaryAction(qrActionCopy) { copyToClipboard(context, "Coordinates", coord, toastCopied) }
         }
     }
 }
 
 @Composable
 private fun PlainTextResult(context: Context, result: QrResult.PlainText) {
+    val toastCannotOpenLink = stringResource(R.string.toast_cannot_open_link)
+    val toastCopied = stringResource(R.string.toast_copied)
+    val qrActionSearch = stringResource(R.string.qr_action_search)
+    val qrActionCopy = stringResource(R.string.qr_action_copy)
+    val qrActionTranslate = stringResource(R.string.qr_action_translate)
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text("📝", fontSize = 42.sp)
         Spacer(Modifier.height(4.dp))
@@ -381,9 +411,9 @@ private fun PlainTextResult(context: Context, result: QrResult.PlainText) {
         )
         Spacer(Modifier.height(20.dp))
         ActionRow {
-            PrimaryAction("Search") { openUrl(context, "https://www.google.com/search?q=${Uri.encode(result.text)}") }
-            SecondaryAction("Copy") { copyToClipboard(context, "Text", result.text) }
-            SecondaryAction("Translate") { openUrl(context, "https://translate.google.com/?text=${Uri.encode(result.text)}") }
+            PrimaryAction(qrActionSearch) { openUrl(context, "https://www.google.com/search?q=${Uri.encode(result.text)}", toastCannotOpenLink) }
+            SecondaryAction(qrActionCopy) { copyToClipboard(context, "Text", result.text, toastCopied) }
+            SecondaryAction(qrActionTranslate) { openUrl(context, "https://translate.google.com/?text=${Uri.encode(result.text)}", toastCannotOpenLink) }
         }
     }
 }

@@ -10,6 +10,7 @@ import android.os.VibratorManager
 import android.util.Log
 import android.widget.Toast
 import androidx.core.content.FileProvider
+import com.akslabs.circletosearch.R
 import java.io.File
 
 
@@ -48,7 +49,7 @@ fun searchWithGoogleLens(uri: Uri, context: Context): LensLaunchResult {
                 val file = File(uri.path ?: return LensLaunchResult.FAILED)
                 if (!file.exists()) {
                     Log.e(TAG, "Image file does not exist: ${file.absolutePath}")
-                    Toast.makeText(context, "Image file not found", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, context.getString(R.string.toast_image_not_found), Toast.LENGTH_SHORT).show()
                     return LensLaunchResult.FAILED
                 }
 
@@ -59,7 +60,7 @@ fun searchWithGoogleLens(uri: Uri, context: Context): LensLaunchResult {
                 )
             } catch (e: Exception) {
                 Log.e(TAG, "Error creating content URI: ${e.message}")
-                Toast.makeText(context, "Error preparing image for Google Lens", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.toast_lens_error_preparing), Toast.LENGTH_SHORT).show()
                 return LensLaunchResult.FAILED
             }
         }
@@ -149,7 +150,7 @@ fun searchWithGoogleLens(uri: Uri, context: Context): LensLaunchResult {
                 putExtra(Intent.EXTRA_STREAM, contentUri)
                 applyRobustPermissions(contentUri)
             }
-            val chooser = Intent.createChooser(sendIntent, "Search with Google Lens")
+            val chooser = Intent.createChooser(sendIntent, context.getString(R.string.chooser_google_lens))
             chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             context.startActivity(chooser)
             vibrateDevice(context)
@@ -159,11 +160,11 @@ fun searchWithGoogleLens(uri: Uri, context: Context): LensLaunchResult {
             Log.e(TAG, "Failed to launch chooser: ${e.message}")
         }
 
-        Toast.makeText(context, "Google Lens is not available on this device", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, context.getString(R.string.toast_lens_not_available), Toast.LENGTH_SHORT).show()
         return LensLaunchResult.FAILED
     } catch (e: Exception) {
         Log.e(TAG, "Error launching Google Lens", e)
-        Toast.makeText(context, "Error launching Google Lens", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, context.getString(R.string.toast_lens_launch_error), Toast.LENGTH_SHORT).show()
         return LensLaunchResult.FAILED
     }
 }

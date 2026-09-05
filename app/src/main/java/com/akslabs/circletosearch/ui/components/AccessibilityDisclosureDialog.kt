@@ -8,9 +8,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
+import com.akslabs.circletosearch.R
 
 @Composable
 fun AccessibilityDisclosureDialog(
@@ -27,7 +29,7 @@ fun AccessibilityDisclosureDialog(
         ),
         title = {
             Text(
-                text = "Grant Accessibility Permission",
+                text = stringResource(R.string.title_accessibility_permission),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold
             )
@@ -35,7 +37,7 @@ fun AccessibilityDisclosureDialog(
         text = {
             Column {
                 Text(
-                    text = "This permission is needed to capture the screen and detect the double tap gesture to trigger Circle to Search or other actions. If the app is used as your default assistant, this permission is optional.",
+                    text = stringResource(R.string.body_accessibility_permission),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -51,7 +53,7 @@ fun AccessibilityDisclosureDialog(
                         onCheckedChange = { hasAgreed = it }
                     )
                     Text(
-                        text = "I understand how this permission will be used and agree to proceed",
+                        text = stringResource(R.string.label_accessibility_agree),
                         style = MaterialTheme.typography.labelSmall,
                         modifier = Modifier.padding(start = 4.dp),
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -64,12 +66,12 @@ fun AccessibilityDisclosureDialog(
                 onClick = onAccept,
                 enabled = hasAgreed
             ) {
-                Text("Grant", fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.btn_grant), fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(stringResource(R.string.btn_cancel))
             }
         }
     )

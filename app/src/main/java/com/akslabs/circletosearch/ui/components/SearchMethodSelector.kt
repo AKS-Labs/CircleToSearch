@@ -15,8 +15,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.akslabs.circletosearch.R
 import com.akslabs.circletosearch.utils.UIPreferences
 
 /**
@@ -32,7 +34,7 @@ fun SearchMethodSelector(
 ) {
     Column(modifier = modifier) {
         Text(
-            text = "SEARCH METHOD",
+            text = stringResource(R.string.section_search_method),
             style = MaterialTheme.typography.labelLarge.copy(
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 1.sp
@@ -61,7 +63,7 @@ fun SearchMethodSelector(
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Multi-Search", style = MaterialTheme.typography.labelLarge)
+                    Text(stringResource(R.string.search_method_multi), style = MaterialTheme.typography.labelLarge)
                 }
             }
             SegmentedButton(
@@ -81,7 +83,7 @@ fun SearchMethodSelector(
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Google Lens", style = MaterialTheme.typography.labelLarge)
+                    Text(stringResource(R.string.search_method_lens), style = MaterialTheme.typography.labelLarge)
                 }
             }
         }

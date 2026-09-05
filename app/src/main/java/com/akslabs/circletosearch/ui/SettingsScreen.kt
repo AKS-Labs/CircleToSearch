@@ -37,8 +37,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
+import com.akslabs.circletosearch.R
 import com.akslabs.circletosearch.data.SearchEngine
 import com.akslabs.circletosearch.utils.UIPreferences
 import com.akslabs.circletosearch.ui.components.UnifiedSearchMethodSelector
@@ -94,7 +97,7 @@ fun SettingsScreen(
                 .padding(bottom = 32.dp)
         ) {
             Text(
-                text = "Settings",
+                text = stringResource(R.string.settings),
                 style = MaterialTheme.typography.headlineMedium.copy(
                     fontWeight = FontWeight.ExtraBold,
                     letterSpacing = (-0.5).sp
@@ -105,11 +108,11 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(24.dp))
 
             // General Section
-            SettingsSectionHeader(title = "General")
+            SettingsSectionHeader(title = stringResource(R.string.general))
             
             SettingsToggleItem(
-                title = "Friendly Messages",
-                subtitle = "Show random greeting messages on trigger",
+                title = stringResource(R.string.setting_friendly_messages_title),
+                subtitle = stringResource(R.string.setting_friendly_messages_subtitle),
                 icon = Icons.Default.ChatBubbleOutline,
                 checked = showFriendlyMessages,
                 onCheckedChange = { showFriendlyMessages = it }
@@ -139,7 +142,7 @@ fun SettingsScreen(
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Text(
-                        text = "Lens mode needs the Google App to work its magic! 🪄 Degoogled? Multi-Search mode has your back! 🚀",
+                        text = stringResource(R.string.info_lens_mode_note),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSecondaryContainer,
                         lineHeight = 16.sp,
@@ -151,9 +154,9 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(24.dp))
 
             // Search Engines Section
-            SettingsSectionHeader(title = "Search Engines")
+            SettingsSectionHeader(title = stringResource(R.string.section_search_engines))
             Text(
-                text = "Tap arrows to change tab sequence",
+                text = stringResource(R.string.hint_tab_sequence),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 8.dp)
@@ -277,6 +280,7 @@ fun EngineOrderItem(
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit
 ) {
+    val context = LocalContext.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -284,7 +288,7 @@ fun EngineOrderItem(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = engine.displayName,
+            text = engine.getDisplayName(context),
             style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
             modifier = Modifier.weight(1f)
         )
@@ -295,7 +299,7 @@ fun EngineOrderItem(
         ) {
             Icon(
                 Icons.Default.KeyboardArrowUp,
-                contentDescription = "Move Up",
+                contentDescription = stringResource(R.string.cd_move_up),
                 tint = if (!isFirst) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
             )
         }
@@ -306,7 +310,7 @@ fun EngineOrderItem(
         ) {
             Icon(
                 Icons.Default.KeyboardArrowDown,
-                contentDescription = "Move Down",
+                contentDescription = stringResource(R.string.cd_move_down),
                 tint = if (!isLast) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
             )
         }

@@ -55,6 +55,7 @@ import android.view.ViewOutlineProvider
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import com.akslabs.circletosearch.R
 import com.akslabs.circletosearch.data.ActionType
 import com.akslabs.circletosearch.data.BitmapRepository
 import com.akslabs.circletosearch.data.GestureType
@@ -523,7 +524,7 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
             ActionType.SPLIT_SCREEN -> {
                  val success = performGlobalAction(GLOBAL_ACTION_TOGGLE_SPLIT_SCREEN)
                  if (!success) {
-                     android.widget.Toast.makeText(this, "Split Screen not supported or failed", android.widget.Toast.LENGTH_SHORT).show()
+                     android.widget.Toast.makeText(this, getString(R.string.toast_split_screen_failed), android.widget.Toast.LENGTH_SHORT).show()
                  }
             }
             ActionType.SCROLL_TOP -> performScroll(true)
@@ -532,7 +533,7 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                     performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN)
                 } else {
-                     android.widget.Toast.makeText(this, "Screen Off requires Android 9+", android.widget.Toast.LENGTH_SHORT).show()
+                     android.widget.Toast.makeText(this, getString(R.string.toast_screen_off_requires_api), android.widget.Toast.LENGTH_SHORT).show()
                 }
             }
             ActionType.TOGGLE_AUTO_ROTATE -> toggleAutoRotate()
@@ -604,9 +605,9 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
             val current = android.provider.Settings.System.getInt(contentResolver, android.provider.Settings.System.ACCELEROMETER_ROTATION, 0)
             val next = if (current == 1) 0 else 1
             android.provider.Settings.System.putInt(contentResolver, android.provider.Settings.System.ACCELEROMETER_ROTATION, next)
-            android.widget.Toast.makeText(this, "Auto Rotate: ${if (next == 1) "ON" else "OFF"}", android.widget.Toast.LENGTH_SHORT).show()
+            android.widget.Toast.makeText(this, getString(R.string.toast_auto_rotate, if (next == 1) getString(R.string.status_on) else getString(R.string.status_off)), android.widget.Toast.LENGTH_SHORT).show()
         } else {
-             android.widget.Toast.makeText(this, "Permission required for Auto Rotate", android.widget.Toast.LENGTH_SHORT).show()
+             android.widget.Toast.makeText(this, getString(R.string.toast_auto_rotate_permission), android.widget.Toast.LENGTH_SHORT).show()
              val intent = android.content.Intent(android.provider.Settings.ACTION_MANAGE_WRITE_SETTINGS).apply {
                  data = android.net.Uri.parse("package:$packageName")
                  addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -1072,7 +1073,7 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         }
 
         // --- Action: Share ---
-        menuLayout.addView(createTextActionButton("SHARE") {
+        menuLayout.addView(createTextActionButton(getString(R.string.pinned_btn_share)) {
             try {
                 val fileName = "share_pin_${java.util.UUID.randomUUID()}.png"
                 val path = ImageUtils.saveBitmap(this@CircleToSearchAccessibilityService, bitmap, fileName)
@@ -1083,7 +1084,7 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
                     putExtra(Intent.EXTRA_STREAM, uri)
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
-                startActivity(Intent.createChooser(shareIntent, "Share Pin").apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) })
+                startActivity(Intent.createChooser(shareIntent, getString(R.string.share_chooser_pin)).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) })
             } catch (e: Exception) {
                 android.util.Log.e("CircleToSearch", "Failed to share pinned image", e)
             }
@@ -1091,7 +1092,7 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         })
 
         // --- Action: Delete ---
-        menuLayout.addView(createTextActionButton("DELETE") {
+        menuLayout.addView(createTextActionButton(getString(R.string.pinned_btn_delete)) {
             try {
                 windowManager?.removeView(anchorView)
                 windowManager?.removeView(menuLayout)
@@ -1099,9 +1100,9 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         })
 
         // --- Action: Save ---
-        val saveBtn = createTextActionButton("SAVE") {
+        val saveBtn = createTextActionButton(getString(R.string.pinned_btn_save)) {
             val success = ImageUtils.saveToGallery(this@CircleToSearchAccessibilityService, bitmap)
-            android.widget.Toast.makeText(this@CircleToSearchAccessibilityService, if (success) "Saved to Gallery" else "Save failed", android.widget.Toast.LENGTH_SHORT).show()
+            android.widget.Toast.makeText(this@CircleToSearchAccessibilityService, if (success) getString(R.string.toast_saved_to_gallery) else getString(R.string.toast_save_failed), android.widget.Toast.LENGTH_SHORT).show()
             try { windowManager?.removeView(menuLayout) } catch (e: Exception) {}
         }
         // Add spacing only if needed (not on the last item)
@@ -1177,9 +1178,11 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
             instance?.performCapture(null)
         }
 
-        fun pinArea(bitmap: Bitmap, rect: android.graphics.Rect) {
+        fun pinArea(bitmap: Bitmap, rect: android.graphics.Rect): Boolean {
             android.util.Log.d("CircleToSearch", "pinArea static called. instance=${instance != null}")
+            if (instance == null) return false
             instance?.showPinnedArea(bitmap, rect)
+            return true
         }
     }
 

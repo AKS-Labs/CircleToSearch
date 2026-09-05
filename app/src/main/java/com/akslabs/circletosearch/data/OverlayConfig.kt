@@ -6,6 +6,7 @@ package com.akslabs.circletosearch.data
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.akslabs.circletosearch.R
 import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
 
@@ -60,38 +61,38 @@ enum class ActionType {
     MEDIA_PREVIOUS
 }
 
-fun ActionType.getFriendlyName(): String = when (this) {
-    ActionType.NONE -> "No Action"
-    ActionType.SCREENSHOT -> "Take Screenshot"
-    ActionType.FLASHLIGHT -> "Flashlight"
-    ActionType.HOME -> "Go Home"
-    ActionType.BACK -> "Go Back"
-    ActionType.RECENTS -> "Recent Apps"
-    ActionType.LOCK_SCREEN -> "Lock Screen"
-    ActionType.OPEN_NOTIFICATIONS -> "Open Notifications"
-    ActionType.OPEN_QUICK_SETTINGS -> "Quick Settings"
-    ActionType.CTS_AUTO -> "Circle to Search"
-    ActionType.CTS_LENS -> "Google Lens Search"
-    ActionType.CTS_MULTI -> "Multi-Search"
-    ActionType.SPLIT_SCREEN -> "Split Screen"
-    ActionType.OPEN_APP -> "Open Application"
-    ActionType.SCROLL_TOP -> "Scroll to Top"
-    ActionType.SCROLL_BOTTOM -> "Scroll to Bottom"
-    ActionType.SCREEN_OFF -> "Turn Off Screen"
-    ActionType.TOGGLE_AUTO_ROTATE -> "Toggle Auto Rotate"
-    ActionType.MEDIA_PLAY_PAUSE -> "Media Play/Pause"
-    ActionType.MEDIA_NEXT -> "Media Next"
-    ActionType.MEDIA_PREVIOUS -> "Media Previous"
+fun ActionType.getFriendlyName(context: Context): String = when (this) {
+    ActionType.NONE -> context.getString(R.string.action_none)
+    ActionType.SCREENSHOT -> context.getString(R.string.action_screenshot)
+    ActionType.FLASHLIGHT -> context.getString(R.string.action_flashlight)
+    ActionType.HOME -> context.getString(R.string.action_home)
+    ActionType.BACK -> context.getString(R.string.action_back)
+    ActionType.RECENTS -> context.getString(R.string.action_recents)
+    ActionType.LOCK_SCREEN -> context.getString(R.string.action_lock_screen)
+    ActionType.OPEN_NOTIFICATIONS -> context.getString(R.string.action_open_notifications)
+    ActionType.OPEN_QUICK_SETTINGS -> context.getString(R.string.action_quick_settings)
+    ActionType.CTS_AUTO -> context.getString(R.string.action_cts_auto)
+    ActionType.CTS_LENS -> context.getString(R.string.action_cts_lens)
+    ActionType.CTS_MULTI -> context.getString(R.string.action_cts_multi)
+    ActionType.SPLIT_SCREEN -> context.getString(R.string.action_split_screen)
+    ActionType.OPEN_APP -> context.getString(R.string.action_open_app)
+    ActionType.SCROLL_TOP -> context.getString(R.string.action_scroll_top)
+    ActionType.SCROLL_BOTTOM -> context.getString(R.string.action_scroll_bottom)
+    ActionType.SCREEN_OFF -> context.getString(R.string.action_screen_off)
+    ActionType.TOGGLE_AUTO_ROTATE -> context.getString(R.string.action_toggle_auto_rotate)
+    ActionType.MEDIA_PLAY_PAUSE -> context.getString(R.string.action_media_play_pause)
+    ActionType.MEDIA_NEXT -> context.getString(R.string.action_media_next)
+    ActionType.MEDIA_PREVIOUS -> context.getString(R.string.action_media_previous)
 }
 
-fun GestureType.getFriendlyName(): String = when (this) {
-    GestureType.DOUBLE_TAP -> "Double Tap"
-    GestureType.LONG_PRESS -> "Long Press"
-    GestureType.TRIPLE_TAP -> "Triple Tap"
-    GestureType.SWIPE_UP -> "Swipe Up"
-    GestureType.SWIPE_DOWN -> "Swipe Down"
-    GestureType.SWIPE_LEFT -> "Swipe Left"
-    GestureType.SWIPE_RIGHT -> "Swipe Right"
+fun GestureType.getFriendlyName(context: Context): String = when (this) {
+    GestureType.DOUBLE_TAP -> context.getString(R.string.gesture_double_tap)
+    GestureType.LONG_PRESS -> context.getString(R.string.gesture_long_press)
+    GestureType.TRIPLE_TAP -> context.getString(R.string.gesture_triple_tap)
+    GestureType.SWIPE_UP -> context.getString(R.string.gesture_swipe_up)
+    GestureType.SWIPE_DOWN -> context.getString(R.string.gesture_swipe_down)
+    GestureType.SWIPE_LEFT -> context.getString(R.string.gesture_swipe_left)
+    GestureType.SWIPE_RIGHT -> context.getString(R.string.gesture_swipe_right)
 }
 
 class OverlayConfigurationManager(context: Context) {

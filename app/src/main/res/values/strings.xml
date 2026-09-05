@@ -19,4 +19,360 @@
 
 <resources>
     <string name="app_name">CircleToSearch</string>
+
+    <!-- General -->
+    <string name="settings">Settings</string>
+    <string name="general">General</string>
+    <string name="back">Back</string>
+    <string name="close">Close</string>
+    <string name="cancel">Cancel</string>
+    <string name="grant">Grant</string>
+    <string name="dismiss">Dismiss</string>
+    <string name="reset">Reset</string>
+    <string name="save">Save</string>
+    <string name="copy">Copy</string>
+    <string name="share">Share</string>
+    <string name="search">Search</string>
+    <string name="delete">Delete</string>
+    <string name="pin">Pin</string>
+    <string name="label_selected">Selected</string>
+    <string name="cd_dismiss">Dismiss</string>
+    <string name="cd_selected">Selected</string>
+    <string name="cd_reset">Reset</string>
+    <string name="btn_close">Close</string>
+    <string name="btn_cancel">Cancel</string>
+    <string name="btn_grant">Grant</string>
+    <string name="qr_action_copy">Copy</string>
+    <string name="qr_vcard_fallback_name">Contact</string>
+    <string name="status_on">ON</string>
+    <string name="status_off">OFF</string>
+    <string name="unknown_app">Unknown App</string>
+
+    <!-- Main Screen -->
+    <string name="header_title">Circle to Search</string>
+    <string name="toast_getting_started">Double tap status bar or use floating bubble to start.</string>
+    <string name="subtitle_main">Search anything on your screen instantly.</string>
+    <string name="label_required">REQUIRED:</string>
+    <string name="label_accessibility_active">Accessibility Service Active</string>
+    <string name="label_accessibility_active_subtitle">Double tap status bar to launch CircleToSearch</string>
+    <string name="label_enable_accessibility">Enable Accessibility</string>
+    <string name="label_enable_accessibility_subtitle">To do its job properly, the app needs this permission.\nTap allow and we\'re good to go! &#x1F44D;</string>
+    <string name="label_optional_assistant">OPTIONAL: For Home Button Trigger</string>
+    <string name="label_default_assistant_set">Default Assistant Set</string>
+    <string name="label_set_default_assistant">Set as Default Assistant</string>
+    <string name="label_set_default_assistant_subtitle">Hold the Home button or edge-swipe up to summon CircleToSearch.</string>
+    <string name="section_customization">CUSTOMIZATION</string>
+    <string name="info_lens_needs_google">Lens needs Google App Installed. But Degoogled friends can stick with the versatile Multi-Search Engine mode.</string>
+    <string name="label_ocr_settings">OCR Language Settings</string>
+    <string name="label_ocr_settings_subtitle">Import custom Tesseract OCR models</string>
+    <string name="label_from_akslabs">From AKS-Labs With \u2764\uFE0F</string>
+    <string name="toast_could_not_open_link">Could not open link</string>
+    <string name="toast_accessibility_settings_error">Could not open Accessibility Settings</string>
+    <string name="label_floating_bubble">Floating Bubble</string>
+    <string name="label_floating_bubble_subtitle">Show a floating button triggers search</string>
+    <string name="label_dont_show_again">Don\'t show this again</string>
+    <string name="btn_donate">Donate</string>
+
+    <!-- Content Descriptions -->
+    <string name="cd_granted">Granted</string>
+    <string name="cd_active">Active</string>
+    <string name="cd_collapse">Collapse</string>
+    <string name="cd_expand">Expand</string>
+    <string name="cd_overlay_settings">Overlay Settings</string>
+    <string name="cd_screenshot">Screenshot</string>
+    <string name="cd_close">Close</string>
+    <string name="cd_google_search">Google Search</string>
+    <string name="cd_menu">Menu</string>
+    <string name="cd_logo">Logo</string>
+    <string name="cd_voice_search">Voice Search</string>
+    <string name="cd_lens">Lens</string>
+    <string name="cd_assist_copy">Assist Copy</string>
+    <string name="cd_translate">Translate</string>
+    <string name="cd_github">Github</string>
+    <string name="cd_donate">Donate</string>
+    <string name="cd_telegram">Telegram</string>
+    <string name="cd_privacy">Privacy</string>
+    <string name="cd_move_up">Move Up</string>
+    <string name="cd_move_down">Move Down</string>
+    <string name="cd_back">Back</string>
+    <string name="cd_delete">Delete</string>
+    <string name="cd_exit_copy_mode">Exit Copy Mode</string>
+    <string name="cd_search_icon">Search Icon</string>
+    <string name="cd_import_model">Import Model</string>
+
+    <!-- Search Screen Labels -->
+    <string name="label_smartscan">SmartScan</string>
+    <string name="label_copy_text">Copy Text</string>
+    <string name="label_scan_qr">Scan QR</string>
+    <string name="label_fullscreen">Fullscreen</string>
+    <string name="label_share">Share</string>
+    <string name="label_extracting_entities">Extracting links &amp; info\u2026</string>
+    <string name="label_open_app">Open: %1$s</string>
+
+    <!-- Menu Items -->
+    <string name="menu_mobile_mode">Mobile Mode</string>
+    <string name="menu_desktop_mode">Desktop Mode</string>
+    <string name="menu_light_mode">Light Mode</string>
+    <string name="menu_dark_mode">Dark Mode</string>
+    <string name="menu_hide_border">Hide Border</string>
+    <string name="menu_show_border">Show Border</string>
+    <string name="menu_refresh">Refresh</string>
+    <string name="menu_copy_url">Copy URL</string>
+    <string name="menu_open_in_browser">Open in Browser</string>
+    <string name="menu_settings">Settings</string>
+    <string name="menu_select_language_model">Select Language / Model</string>
+    <string name="menu_import_model">Import Model (.traineddata)</string>
+
+    <!-- Toast Messages -->
+    <string name="toast_coming_soon">Coming soon</string>
+    <string name="toast_saved_to_gallery">Saved to Gallery</string>
+    <string name="toast_failed_to_save">Failed to save</string>
+    <string name="toast_accessibility_permission_needed">Allow accessibility permission to use this feature</string>
+    <string name="toast_copied">Copied</string>
+    <string name="toast_cannot_open_link">Cannot open link</string>
+    <string name="toast_text_copied">Text copied \u2713</string>
+    <string name="toast_image_not_found">Image file not found</string>
+    <string name="toast_lens_error_preparing">Error preparing image for Google Lens</string>
+    <string name="toast_lens_not_available">Google Lens is not available on this device</string>
+    <string name="toast_lens_launch_error">Error launching Google Lens</string>
+    <string name="toast_split_screen_failed">Split Screen not supported or failed</string>
+    <string name="toast_screen_off_requires_api">Screen Off requires Android 9+</string>
+    <string name="toast_auto_rotate">Auto Rotate: %1$s</string>
+    <string name="toast_auto_rotate_permission">Permission required for Auto Rotate</string>
+    <string name="toast_enable_accessibility_tile">Please enable Circle to Search Accessibility Service</string>
+    <string name="toast_invalid_model_file">File must be a .traineddata Tesseract model.</string>
+    <string name="toast_model_imported">Successfully imported %1$s model!</string>
+    <string name="toast_model_import_failed">Failed to import model</string>
+    <string name="toast_ocr_model_selected">Selected: %1$s. Restarting scan\u2026</string>
+    <string name="toast_save_failed">Save failed</string>
+
+    <!-- Share -->
+    <string name="share_chooser_title">Share Selection</string>
+    <string name="share_chooser_text">Share text via</string>
+    <string name="share_chooser_pin">Share Pin</string>
+
+    <!-- Entity Types -->
+    <string name="entity_type_link">Link</string>
+    <string name="entity_type_email">Email</string>
+    <string name="entity_type_phone">Phone</string>
+    <string name="entity_type_upi">UPI</string>
+
+    <!-- Settings Screen -->
+    <string name="setting_friendly_messages_title">Friendly Messages</string>
+    <string name="setting_friendly_messages_subtitle">Show random greeting messages on trigger</string>
+    <string name="info_lens_mode_note">Lens mode needs the Google App to work its magic! &#x1FA84; Degoogled? Multi-Search mode has your back! &#x1F680;</string>
+    <string name="section_search_engines">Search Engines</string>
+    <string name="hint_tab_sequence">Tap arrows to change tab sequence</string>
+
+    <!-- Overlay Settings Screen -->
+    <string name="title_overlay_settings">Overlay Settings</string>
+    <string name="overlay_setting_enable_title">Enable StatusBar Overlay</string>
+    <string name="overlay_setting_enable_subtitle">Show trigger zone over status bar</string>
+    <string name="overlay_setting_landscape_title">Landscape Mode</string>
+    <string name="overlay_setting_landscape_subtitle">Keep overlay active in landscape</string>
+    <string name="overlay_setting_show_title">Show Overlay</string>
+    <string name="overlay_setting_show_subtitle">Show overlay to adjust position</string>
+    <string name="section_overlays">Overlays</string>
+    <string name="btn_add_overlay">Add Overlay</string>
+    <string name="label_no_overlays">No overlays added. Click Add Overlay to start.</string>
+    <string name="label_overlay_number">Overlay %1$d</string>
+    <string name="label_x_position">Horizontal Position (X): %1$ddp</string>
+    <string name="label_y_position">Vertical Position (Y): %1$ddp</string>
+    <string name="label_width">Width: %1$ddp</string>
+    <string name="label_height">Height: %1$ddp</string>
+    <string name="section_gestures">Gestures</string>
+    <string name="gestures_subtitle">Configure taps, long press &amp; swipes</string>
+    <string name="title_configure_gestures">Configure Gestures</string>
+    <string name="title_select_action">Select Action</string>
+    <string name="title_select_app">Select App</string>
+    <string name="hint_search_apps">Search apps</string>
+
+    <!-- OCR Settings Screen -->
+    <string name="title_ocr_settings">OCR Language Models</string>
+    <string name="btn_import_model">Import Model</string>
+    <string name="title_language_models_guide">Language Models Guide</string>
+    <string name="info_ocr_guide_part1">This app uses language models to detect text. By default, it uses a fast English model which may miss some text. To use high-accuracy models or detect other languages, download them from the </string>
+    <string name="info_ocr_guide_telegram_link">developer\'s Telegram group</string>
+    <string name="info_ocr_guide_part2"> with /model command, e.g. /model english and import them below.</string>
+    <string name="title_installed_models">Installed Models</string>
+
+    <!-- QR Code Result Sheet -->
+    <string name="label_contact">Contact</string>
+    <string name="qr_title_scanning">Scanning\u2026</string>
+    <string name="qr_title_not_found">No QR Found</string>
+    <string name="qr_title_result_of">Result %1$d of %2$d</string>
+    <string name="qr_title_default">QR / Barcode</string>
+    <string name="qr_scanning">Scanning\u2026</string>
+    <string name="qr_not_found">No QR code detected</string>
+    <string name="qr_action_open_link">Open Link</string>
+    <string name="qr_action_copy_pass">Copy Pass</string>
+    <string name="qr_action_call">Call</string>
+    <string name="qr_action_sms">SMS</string>
+    <string name="qr_action_amazon">Amazon</string>
+    <string name="qr_action_google">Google</string>
+    <string name="qr_action_maps">Maps</string>
+    <string name="qr_action_search">Search</string>
+    <string name="qr_action_translate">Translate</string>
+
+    <!-- Bottom Sheets -->
+    <string name="title_more_apps">More Apps by AKS-Labs</string>
+    <string name="subtitle_explore_projects">Explore our other projects</string>
+    <string name="section_our_apps">OUR APPS</string>
+    <string name="app_name_pixel_screenshots">Pixel Screenshots</string>
+    <string name="app_desc_pixel_screenshots">Screenshot Manager: Organize Screenshots via drag-and-drop instantly.</string>
+    <string name="app_name_tulsi_gallery">Tulsi Gallery</string>
+    <string name="app_desc_tulsi_gallery">A sweet looking gallery app with OCR Text Search</string>
+    <string name="app_name_circle_to_search_entry">Circle To Search</string>
+    <string name="app_desc_circle_to_search_entry">Circle To Search with multi search engine support</string>
+    <string name="app_name_chitralaya">Chitralaya Cloudgallery</string>
+    <string name="app_desc_chitralaya">Privacy-focused Unlimited cloud storage</string>
+    <string name="app_name_sandeshvahak">SandeshVahak</string>
+    <string name="app_desc_sandeshvahak">Securely sync messages from your secondary device to your primary device using Telegram</string>
+    <string name="btn_view_in_play_store">View in Play Store</string>
+    <string name="subtitle_view_in_play_store">See apps on Play Store</string>
+    <string name="title_support_our_work">Support Our Work</string>
+    <string name="subtitle_support">Your support helps us build better apps</string>
+    <string name="section_choose_payment">CHOOSE PAYMENT METHOD</string>
+    <string name="donate_github_sponsors">GitHub Sponsors</string>
+    <string name="donate_github_sponsors_subtitle">Little to no fees</string>
+    <string name="donate_upi">UPI (India) akslabs@upi</string>
+    <string name="donate_upi_subtitle">Instant \u2022 No fees \u2022 Pay via UPI</string>
+    <string name="donate_paypal">PayPal</string>
+    <string name="donate_paypal_subtitle" formatted="false">Fixed fee up to 5% \u2022 Conversion loss \u2248 5% per dollar</string>
+    <string name="label_foss">FOSS</string>
+
+    <!-- Privacy Dialog -->
+    <string name="title_privacy">Privacy &amp; Data Usage Transparency</string>
+    <string name="privacy_q_upload">Does this app upload my searched images anywhere other than search engines?</string>
+    <string name="privacy_a_upload">Yes! \u2705\nYour images are uploaded to LitterBox and Catbox third-party services to generate image url.\n\n\u2022 Litterbox \u2192 Auto-delete image after 1 hour\n\u2022 Catbox \u2192 Used only when Litterbox fails (stores image forever)\n\nImportant: Litterbox is actually part of Catbox.\nThey belong to the same service family and may use similar infrastructure.</string>
+    <string name="privacy_q_why_upload">Why does this app upload my image at all?</string>
+    <string name="privacy_a_why_upload">Search engines don\'t allow apps to directly upload images Programmatically (to prevent misuse &amp; abuse). So the app uploads your image first to create a safe, usable link/url of image.</string>
+    <string name="privacy_q_safe">Are Catbox and Litterbox safe?</string>
+    <string name="privacy_a_safe">They\'re widely trusted for temporary file hosting because:\n\n\u2022 No account &amp; API is required\n\u2022 Anonymous uploads are supported\n\u2022 Simple, fast and reliable\n\nThey are not open-source, so please read their official data and privacy policies to fully understand how your data is handled.</string>
+    <string name="privacy_q_personal">Should I search personal or private images?</string>
+    <string name="privacy_a_personal">Please don\'t! &#x1F64F;\n\nAvoid uploading personal photos, private documents, IDs, or anything sensitive. Only search images that are safe and non-personal.</string>
+    <string name="privacy_q_store">Does the app store my images or links?</string>
+    <string name="privacy_a_store">Nope! \u2705\n\nYour images and URLs are not stored, tracked, or logged by this app.</string>
+    <string name="privacy_q_developer">Can the developer see my images or links?</string>
+    <string name="privacy_a_developer">No. Never.\n\nThis App:\n\u2022 Has no server\n\u2022 Does not store images\n\u2022 Does not store image URLs\n\u2022 Does not track what you search\n\u2022 Does not collect data\n\nYour data stays between you \u2192 Catbox/Litterbox \u2192 Search engine.</string>
+    <string name="privacy_reminder_title">&#x1F514; Important Reminder</string>
+    <string name="privacy_reminder_body">Your searched images can remain on search engine servers, Catbox servers, caches, and backups. This is why you should never upload private or personal images.</string>
+    <string name="btn_privacy_accept">I Understand &amp; Accept</string>
+
+    <!-- Accessibility Disclosure Dialog -->
+    <string name="title_accessibility_permission">Grant Accessibility Permission</string>
+    <string name="body_accessibility_permission">This permission is needed to capture the screen and detect the double tap gesture to trigger Circle to Search or other actions. If the app is used as your default assistant, this permission is optional.</string>
+    <string name="label_accessibility_agree">I understand how this permission will be used and agree to proceed</string>
+
+    <!-- Copy Text Overlay -->
+    <string name="label_scanning_text">Scanning text\u2026</string>
+    <string name="title_select_ocr_model">Select OCR Model</string>
+    <string name="label_no_text_found">No text found on screen.</string>
+    <string name="toolbar_btn_copy">Copy</string>
+    <string name="toolbar_btn_share">Share</string>
+    <string name="toolbar_btn_translate">Translate</string>
+    <string name="toolbar_btn_all">All</string>
+    <string name="toolbar_btn_cancel">Cancel</string>
+
+    <!-- Search Method Selector -->
+    <string name="section_search_method">SEARCH METHOD</string>
+    <string name="search_method_multi">Multi-Search</string>
+    <string name="search_method_lens">Google Lens</string>
+
+    <!-- Google Lens Helper -->
+    <string name="chooser_google_lens">Search with Google Lens</string>
+
+    <!-- Accessibility Service -->
+    <string name="pinned_btn_share">SHARE</string>
+    <string name="pinned_btn_delete">DELETE</string>
+    <string name="pinned_btn_save">SAVE</string>
+
+    <!-- Tile Service -->
+    <string name="tile_label">Circle to Search</string>
+
+    <!-- Support / Donate Dialog -->
+    <string name="support_title">Help Keep this Project \n Alive! \u2764\uFE0F</string>
+    <string name="support_body">Please consider donating to this project Your\n support helps keep this project alive and \n enable us to add amazing \nnew features.</string>
+    <string name="support_planned_features">Planned Features:</string>
+    <string name="feature_1">Self-hosted image upload (remove catbox/litterbox dependency)</string>
+    <string name="feature_2">More triggers: volume button, power button, shake gesture etc.</string>
+    <string name="feature_3">Add more actions to trigger with overlay</string>
+    <string name="feature_4">Offline on-device translation</string>
+    <string name="feature_5">Improved text detection accuracy</string>
+    <string name="feature_6">More Search engines support SearXNG, DuckDuckGo, Brave Search</string>
+    <string name="feature_7">Add more QS tiles to directly launch copy text, QR code, SmartScan etc.</string>
+    <string name="feature_8">Multi-language support</string>
+    <string name="feature_9">More Overlay actions</string>
+    <string name="feature_10">Long-press image to download or share</string>
+    <string name="feature_11">Image result context menu (reverse search, save, open etc.)</string>
+    <string name="feature_12">Material You dynamic theming improvements</string>
+    <string name="feature_13">Floating bubble customization (size, opacity, position)</string>
+
+    <!-- Friendly Messages -->
+    <string name="friendly_msg_1">Ready when you are, boss. What\'s the mission today? &#x1F575;&#xFE0F;&#x200D;&#x2642;&#xFE0F;&#x1F602;</string>
+    <string name="friendly_msg_2">Say the word, chief. What are we hunting for now? &#x1F50D;&#x1F604;</string>
+    <string name="friendly_msg_3">Alright boss, what mystery are we solving this time? &#x1F9D0;&#x1F602;</string>
+    <string name="friendly_msg_4">I\'m here, captain! What\'s the next target? &#x1F3AF;&#x1F923;</string>
+    <string name="friendly_msg_5">Reporting for duty, boss. What do we search? &#x1F4EC;&#x1F606;</string>
+    <string name="friendly_msg_6">Okayyy boss, what are we looking up this time\u2014something normal or chaos again? &#x1F602;&#x1F525;</string>
+    <string name="friendly_msg_7">Search mode activated! What\'s the order, boss? &#x1F916;&#x1F604;</string>
+    <string name="friendly_msg_8">Ready, boss! Who are we stalking\u2014uhh\u2026 searching today? &#x1F440;&#x1F602;</string>
+    <string name="friendly_msg_9">Here I am, boss. Drop the keyword. &#x1F60E;&#x1F50D;</string>
+    <string name="friendly_msg_10">Alright boss, hit me. What are we digging up now? &#x1FA96;&#x1F923;</string>
+    <string name="friendly_msg_11">Show me the pic, boss. Let\'s go detective mode! &#x1F50D;&#x1F604;</string>
+    <string name="friendly_msg_12">Drop the image, chief. I\'ll find its secrets! &#x1F5BC;&#xFE0F;\u2728;&#x1F602;</string>
+    <string name="friendly_msg_13">Alright boss, what are we zooming into today? &#x1F4F8;&#x1F444;&#x1F923;</string>
+    <string name="friendly_msg_14">Got a picture? Hand it over. I\'m in full CSI mode. &#x1F575;&#xFE0F;&#x200D;&#x2642;&#xFE0F;&#x1F4F7;&#x1F602;</string>
+    <string name="friendly_msg_15">What visual mystery are we cracking today, boss? &#x1F441;&#xFE0F;&#x1F9E9;&#x1F606;</string>
+    <string name="friendly_msg_16">Show me the image. I promise I won\'t judge\u2026 much. &#x1F62D;&#x1F4F8;&#x1F602;</string>
+    <string name="friendly_msg_17">Ready to search! Bring me your weirdest picture. &#x1F923;&#x1F5BC;&#xFE0F;&#x1F50D;</string>
+    <string name="friendly_msg_18">Picture, please! Let me work my magic. \u2728&#x1F4F7;&#x1F604;</string>
+    <string name="friendly_msg_19">Boss, got another random image for me to analyze? &#x1F606;&#x1F5BC;&#xFE0F;&#x1F9D0;</string>
+    <string name="friendly_msg_20">New photo? Awesome. Let me eye-spy everything in it. &#x1F440;&#x1F602;</string>
+    <string name="friendly_msg_21">Give me an image and I\'ll dig up its whole life story. &#x1F4F8;&#x1F4DC;&#x1F923;</string>
+    <string name="friendly_msg_22">Image detective reporting! What\'s today\'s case? &#x1F575;&#xFE0F;&#x200D;&#x2642;&#xFE0F;&#x1F50D;&#x1F604;</string>
+    <string name="friendly_msg_23">Hand me the pic, boss. Time for some visual chaat-masala! &#x1F336;&#x1F4F7;&#x1F602;</string>
+    <string name="friendly_msg_24">What are we zooming, scanning, stalking\u2014 I mean, searching today? &#x1F444;&#x1F923;</string>
+    <string name="friendly_msg_25">Drop the image, boss. Let\'s find where it came from\u2026 and where it\'s been. &#x1F602;&#x1F4F8;&#x1F30D;</string>
+
+    <!-- Action Type Friendly Names -->
+    <string name="action_none">No Action</string>
+    <string name="action_screenshot">Take Screenshot</string>
+    <string name="action_flashlight">Flashlight</string>
+    <string name="action_home">Go Home</string>
+    <string name="action_back">Go Back</string>
+    <string name="action_recents">Recent Apps</string>
+    <string name="action_lock_screen">Lock Screen</string>
+    <string name="action_open_notifications">Open Notifications</string>
+    <string name="action_quick_settings">Quick Settings</string>
+    <string name="action_cts_auto">Circle to Search</string>
+    <string name="action_cts_lens">Google Lens Search</string>
+    <string name="action_cts_multi">Multi-Search</string>
+    <string name="action_split_screen">Split Screen</string>
+    <string name="action_open_app">Open Application</string>
+    <string name="action_scroll_top">Scroll to Top</string>
+    <string name="action_scroll_bottom">Scroll to Bottom</string>
+    <string name="action_screen_off">Turn Off Screen</string>
+    <string name="action_toggle_auto_rotate">Toggle Auto Rotate</string>
+    <string name="action_media_play_pause">Media Play/Pause</string>
+    <string name="action_media_next">Media Next</string>
+    <string name="action_media_previous">Media Previous</string>
+
+    <!-- Gesture Type Friendly Names -->
+    <string name="gesture_double_tap">Double Tap</string>
+    <string name="gesture_long_press">Long Press</string>
+    <string name="gesture_triple_tap">Triple Tap</string>
+    <string name="gesture_swipe_up">Swipe Up</string>
+    <string name="gesture_swipe_down">Swipe Down</string>
+    <string name="gesture_swipe_left">Swipe Left</string>
+    <string name="gesture_swipe_right">Swipe Right</string>
+
+    <!-- Search Engine Display Names -->
+    <string name="engine_google">Google</string>
+    <string name="engine_bing">Bing</string>
+    <string name="engine_yandex">Yandex</string>
+    <string name="engine_tineye">TinEye</string>
+
+    <!-- Quick Settings Tile -->
+    <string name="qs_tile_label">CTS</string>
 </resources>

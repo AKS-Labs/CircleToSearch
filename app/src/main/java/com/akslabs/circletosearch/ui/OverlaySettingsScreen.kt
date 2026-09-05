@@ -29,6 +29,8 @@ import android.os.Build
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.res.stringResource
+import com.akslabs.circletosearch.R
 import com.akslabs.circletosearch.data.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -54,17 +56,17 @@ fun OverlaySettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Overlay Settings", fontWeight = FontWeight.Bold) },
+                title = { Text(stringResource(R.string.title_overlay_settings), fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.cd_back))
                     }
                 },
                 actions = {
                     IconButton(onClick = { 
                         updateConfig(OverlayConfig()) // Reset
                     }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Reset")
+                        Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.cd_reset))
                     }
                 }
             )
@@ -78,26 +80,26 @@ fun OverlaySettingsScreen(
                 .padding(16.dp)
         ) {
             // 1. Main Toggles
-            SettingsSectionHeader(title = "General")
+            SettingsSectionHeader(title = stringResource(R.string.general))
             SettingsToggleItem(
-                title = "Enable StatusBar Overlay",
-                subtitle = "Show trigger zone over status bar",
+                title = stringResource(R.string.overlay_setting_enable_title),
+                subtitle = stringResource(R.string.overlay_setting_enable_subtitle),
                 icon = Icons.Default.Layers,
                 checked = config.isEnabled,
                 onCheckedChange = { updateConfig(config.copy(isEnabled = it)) }
             )
             Spacer(modifier = Modifier.height(12.dp))
             SettingsToggleItem(
-                title = "Landscape Mode",
-                subtitle = "Keep overlay active in landscape",
+                title = stringResource(R.string.overlay_setting_landscape_title),
+                subtitle = stringResource(R.string.overlay_setting_landscape_subtitle),
                 icon = Icons.Default.ScreenRotation,
                 checked = config.isEnabledInLandscape,
                 onCheckedChange = { updateConfig(config.copy(isEnabledInLandscape = it)) }
             )
             Spacer(modifier = Modifier.height(12.dp))
             SettingsToggleItem(
-                title = "Show Overlay",
-                subtitle = "Show overlay to adjust position",
+                title = stringResource(R.string.overlay_setting_show_title),
+                subtitle = stringResource(R.string.overlay_setting_show_subtitle),
                 icon = Icons.Default.Visibility,
                 checked = config.isVisible,
                 onCheckedChange = { updateConfig(config.copy(isVisible = it)) }
@@ -111,7 +113,7 @@ fun OverlaySettingsScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                SettingsSectionHeader(title = "Overlays")
+                SettingsSectionHeader(title = stringResource(R.string.section_overlays))
                 TextButton(onClick = {
                     // Add new overlay segment
                     val currentSegments = config.segments.toMutableList()
@@ -120,13 +122,13 @@ fun OverlaySettingsScreen(
                 }) {
                     Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Add Overlay")
+                    Text(stringResource(R.string.btn_add_overlay))
                 }
             }
             
             if (config.segments.isEmpty()) {
                 Text(
-                    "No overlays added. Click Add Overlay to start.",
+                    stringResource(R.string.label_no_overlays),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -175,6 +177,7 @@ fun SegmentEditorItem(
     onDelete: () -> Unit
 ) {
     var showGestureDialog by remember { mutableStateOf(false) }
+    val context = LocalContext.current
     
     // Get screen dimensions for sliders
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
@@ -209,11 +212,11 @@ fun SegmentEditorItem(
                     modifier = Modifier.size(24.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Overlay ${index + 1}", fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.label_overlay_number, index + 1), fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.weight(1f))
                 
                 IconButton(onClick = onDelete) {
-                     Icon(Icons.Default.Delete, contentDescription = "Delete", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp))
+                     Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.cd_delete), tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp))
                 }
                 Icon(
                     if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
@@ -228,35 +231,34 @@ fun SegmentEditorItem(
                 // Dimensions Sliders - Limited to Screen
                 // Only Height is discrete (10px steps) per user request
                 
-                Text("Horizontal Position (X): ${segment.xOffset}px", style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(R.string.label_x_position, segment.xOffset), style = MaterialTheme.typography.labelMedium)
                 Slider(
                     value = segment.xOffset.toFloat().coerceIn(0f, maxWidth),
                     onValueChange = { onUpdate(segment.copy(xOffset = it.toInt())) },
                     valueRange = 0f..maxWidth
                 )
                 
-                Text("Vertical Position (Y): ${segment.yOffset}px", style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(R.string.label_y_position, segment.yOffset), style = MaterialTheme.typography.labelMedium)
                 Slider(
                     value = segment.yOffset.toFloat().coerceIn(0f, maxHeight),
                     onValueChange = { onUpdate(segment.copy(yOffset = it.toInt())) },
                     valueRange = 0f..maxHeight
                 )
                 
-                Text("Width: ${segment.width}px", style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(R.string.label_width, segment.width), style = MaterialTheme.typography.labelMedium)
                 Slider(
                     value = segment.width.toFloat().coerceIn(10f, maxWidth),
                     onValueChange = { onUpdate(segment.copy(width = it.toInt())) },
                     valueRange = 10f..maxWidth
                 )
                 
-                Text("Height: ${segment.height}px", style = MaterialTheme.typography.labelMedium)
-                val hRange = 10f..400f
+                Text(stringResource(R.string.label_height, segment.height), style = MaterialTheme.typography.labelMedium)
+                val hRange = 10f..3000f
                 val hSteps = ((hRange.endInclusive - hRange.start) / 10).toInt() - 1
                 Slider(
-                    value = segment.height.toFloat().coerceIn(hRange),
+                    value = segment.height.toFloat().coerceIn(10f, maxHeight),
                     onValueChange = { onUpdate(segment.copy(height = it.toInt())) },
-                    valueRange = hRange,
-                    steps = if (hSteps > 0) hSteps else 0
+                    valueRange = 10f..maxHeight
                 )
 
                 
@@ -272,8 +274,8 @@ fun SegmentEditorItem(
                     Icon(Icons.Default.TouchApp, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
-                         Text("Gestures", fontWeight = FontWeight.Bold)
-                         Text("Configure taps, long press & swipes", style = MaterialTheme.typography.bodySmall)
+                         Text(stringResource(R.string.section_gestures), fontWeight = FontWeight.Bold)
+                         Text(stringResource(R.string.gestures_subtitle), style = MaterialTheme.typography.bodySmall)
                     }
                     Spacer(modifier = Modifier.weight(1f))
                     Icon(Icons.Default.ArrowForwardIos, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -285,7 +287,7 @@ fun SegmentEditorItem(
                 Column {
                     segment.gestures.entries.filter { it.value != ActionType.NONE }.take(3).forEach {
                         Text(
-                            "${it.key.getFriendlyName()}: ${it.value.getFriendlyName()}", 
+                            "${it.key.getFriendlyName(context)}: ${it.value.getFriendlyName(context)}", 
                             style = MaterialTheme.typography.bodySmall, 
                             color = MaterialTheme.colorScheme.secondary
                         )
@@ -345,7 +347,7 @@ fun GestureConfigDialog(
             Column(
                 modifier = Modifier.padding(24.dp).verticalScroll(rememberScrollState())
             ) {
-                Text("Configure Gestures", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.title_configure_gestures), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(16.dp))
                 
                 GestureType.values().forEach { gesture ->
@@ -358,7 +360,7 @@ fun GestureConfigDialog(
                             .padding(vertical = 4.dp)
                     ) {
                         Text(
-                            gesture.getFriendlyName(), 
+                            gesture.getFriendlyName(context), 
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.padding(start = 4.dp, bottom = 4.dp)
@@ -378,14 +380,14 @@ fun GestureConfigDialog(
                                 Icon(actionIcon, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Spacer(modifier = Modifier.width(12.dp))
                                 
-                                var label = currentAction.getFriendlyName()
+                                var label = currentAction.getFriendlyName(context)
                                 if (currentAction == ActionType.OPEN_APP) {
                                     val pkg = segment.gestureData[gesture]
                                     val appName = runCatching { 
                                         val info = context.packageManager.getApplicationInfo(pkg ?: "", 0)
                                         context.packageManager.getApplicationLabel(info).toString()
-                                    }.getOrDefault(pkg ?: "Unknown App")
-                                    label = "Open: $appName"
+                                    }.getOrDefault(pkg ?: context.getString(R.string.unknown_app))
+                                    label = stringResource(R.string.label_open_app, appName)
                                 }
                                 
                                 Text(
@@ -425,7 +427,7 @@ fun GestureConfigDialog(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
                 ) {
-                    Text("Close")
+                    Text(stringResource(R.string.btn_close))
                 }
             }
         }
@@ -439,6 +441,7 @@ fun ActionPickerDialog(
     onDismiss: () -> Unit,
     onActionSelected: (ActionType) -> Unit
 ) {
+    val context = LocalContext.current
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -452,7 +455,7 @@ fun ActionPickerDialog(
                 .fillMaxHeight(0.8f)
         ) {
             Column(modifier = Modifier.padding(24.dp)) {
-                Text("Select Action", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.title_select_action), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(16.dp))
                 
                 androidx.compose.foundation.lazy.LazyColumn(modifier = Modifier.weight(1f)) {
@@ -478,7 +481,7 @@ fun ActionPickerDialog(
                                 )
                                 Spacer(modifier = Modifier.width(16.dp))
                                 Text(
-                                    action.getFriendlyName(),
+                                    action.getFriendlyName(context),
                                     style = MaterialTheme.typography.bodyLarge,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                                     color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
@@ -494,7 +497,7 @@ fun ActionPickerDialog(
                 
                 Spacer(modifier = Modifier.height(16.dp))
                 TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End)) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.btn_cancel))
                 }
             }
         }
@@ -576,7 +579,7 @@ fun AppPickerDialog(onDismiss: () -> Unit, onAppSelected: (String) -> Unit) {
                 .fillMaxHeight(0.85f)
         ) {
             Column(modifier = Modifier.padding(24.dp)) {
-                Text("Select App", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.title_select_app), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(16.dp))
                 
                 // Search Bar
@@ -584,7 +587,7 @@ fun AppPickerDialog(onDismiss: () -> Unit, onAppSelected: (String) -> Unit) {
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Search apps") },
+                    label = { Text(stringResource(R.string.hint_search_apps)) },
                     leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                     singleLine = true,
                     shape = RoundedCornerShape(12.dp)

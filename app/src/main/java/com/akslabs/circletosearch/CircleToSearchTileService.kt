@@ -15,6 +15,7 @@ import android.service.quicksettings.TileService
 import android.view.accessibility.AccessibilityManager
 import android.widget.Toast
 import android.util.Log
+import com.akslabs.circletosearch.R
 
 class CircleToSearchTileService : TileService() {
 
@@ -39,7 +40,7 @@ class CircleToSearchTileService : TileService() {
             }
         } else {
             // Guide user to enable accessibility
-            Toast.makeText(this, "Please enable Circle to Search Accessibility Service", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, getString(R.string.toast_enable_accessibility_tile), Toast.LENGTH_LONG).show()
             val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
@@ -65,7 +66,7 @@ class CircleToSearchTileService : TileService() {
         val isEnabled = isAccessibilityServiceEnabled()
         
         tile.state = if (isEnabled) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
-        tile.label = "Circle to Search"
+        tile.label = getString(R.string.tile_label)
         tile.updateTile()
     }
 
