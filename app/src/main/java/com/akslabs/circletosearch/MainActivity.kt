@@ -53,6 +53,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
+import com.akslabs.circletosearch.onboarding.PixelCircleSearchOnboardingScreen
 import com.akslabs.circletosearch.ui.components.PrivacyDialog
 import com.akslabs.circletosearch.ui.theme.CircleToSearchTheme
 import com.akslabs.circletosearch.utils.PrivacyPreferences
@@ -71,15 +72,31 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    var currentScreen by remember { mutableStateOf("home") }
-                    androidx.compose.animation.Crossfade(targetState = currentScreen) { screen ->
-                        when (screen) {
-                            "settings" -> com.akslabs.circletosearch.ui.OverlaySettingsScreen(onBack = { currentScreen = "home" })
-                            "ocr_settings" -> com.akslabs.circletosearch.ui.OcrSettingsScreen(onBack = { currentScreen = "home" })
-                            else -> SetupScreen(
-                                onSettingsClick = { currentScreen = "settings" },
-                                onOcrSettingsClick = { currentScreen = "ocr_settings" }
-                            )
+                    val context = LocalContext.current
+                    val appPrefs = remember {
+                        context.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
+                    }
+                    var showOnboarding by remember {
+                        mutableStateOf(!appPrefs.getBoolean("onboarding_completed", false))
+                    }
+                    if (showOnboarding) {
+                        PixelCircleSearchOnboardingScreen(
+                            onFinish = {
+                                appPrefs.edit().putBoolean("onboarding_completed", true).apply()
+                                showOnboarding = false
+                            }
+                        )
+                    } else {
+                        var currentScreen by remember { mutableStateOf("home") }
+                        androidx.compose.animation.Crossfade(targetState = currentScreen) { screen ->
+                            when (screen) {
+                                "settings" -> com.akslabs.circletosearch.ui.OverlaySettingsScreen(onBack = { currentScreen = "home" })
+                                "ocr_settings" -> com.akslabs.circletosearch.ui.OcrSettingsScreen(onBack = { currentScreen = "home" })
+                                else -> SetupScreen(
+                                    onSettingsClick = { currentScreen = "settings" },
+                                    onOcrSettingsClick = { currentScreen = "ocr_settings" }
+                                )
+                            }
                         }
                     }
                 }
