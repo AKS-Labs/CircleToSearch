@@ -124,6 +124,7 @@ androidComponents {
 }
 
 dependencies {
+    implementation(project(":OCR-translation"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
@@ -143,6 +144,6 @@ dependencies {
     implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
     implementation("androidx.webkit:webkit:1.9.0")
     implementation("com.google.code.gson:gson:2.10.1")
-    implementation("com.github.adaptech-cz.Tesseract4Android:tesseract4android:4.7.0")
+    implementation("com.github.adaptech-cz.Tesseract4Android:tesseract4android:4.8.0")
     implementation("com.google.zxing:core:3.5.4")
 }

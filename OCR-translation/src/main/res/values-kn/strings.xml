@@ -1,0 +1,217 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="stop">ನಿಲ್ಲಿಸಿ</string>
+    <string name="pause">ತಡೆಹಿಡಿ</string>
+    <string name="resume">ಮುಂದುವರಿಸಿ</string>
+    <string name="region_select_menu">ಅನುವಾದ ಪ್ರದೇಶವನ್ನು ಹೊಂದಿಸಿ</string>
+    <string name="screen_translate_needs_source">ಮೂಲ ಭಾಷೆಯನ್ನು ಸೂಚಿಸಿ</string>
+    <string name="live_tile_label">ಪರದೆಯನ್ನು ಲೈವ್ ಆಗಿ ಅನುವಾದಿಸಿ</string>
+    <string name="translate_text">ಅನುವಾದಿಸಿ</string>
+    <string name="translate_link">ಲಿಂಕ್ ಅನುವಾದಿಸಿ</string>
+    <string name="accessibility_service_description">ಪರದೆಯ ಮೇಲಿನ ಪಠ್ಯವನ್ನು ಅನುವಾದಿಸಲು ಈ ಸೇವೆಯನ್ನು ಆನ್ ಮಾಡಿ. ಈಗಿನ ಪರದೆಯನ್ನು ಅನುವಾದಿಸಲು ತೇಲುವ ಅನುವಾದ ಬಟನ್ ಒತ್ತಿ, ಅಥವಾ ಲೈವ್ ಪರದೆ ಅನುವಾದವನ್ನು ಪ್ರಾರಂಭಿಸಿ.</string>
+    <string name="tap_to_translate_title">ತ್ವರಿತ ಅನುವಾದ ಆನ್ ಆಗಿದೆ</string>
+    <string name="tap_to_translate_body">ಅನುವಾದಕ ಪಾಪ್‌ಅಪ್ ತೆರೆಯಲು ಟ್ಯಾಪ್ ಮಾಡಿ</string>
+    <string name="tap_to_translate_channel">ತ್ವರಿತ ಅನುವಾದ</string>
+    <string name="tap_to_translate_channel_description">ಅನುವಾದಕ ಪಾಪ್‌ಅಪ್‌ಗೆ ಬೇಗ ಹೋಗಲು ಇರುವ ನಿರಂತರ ಅಧಿಸೂಚನೆ</string>
+    <string name="quick_tile_label">ಅನುವಾದಿಸಿ</string>
+    <!-- common -->
+    <string name="common_ok">ಸರಿ</string>
+    <string name="common_cancel">ರದ್ದುಮಾಡಿ</string>
+    <string name="common_done">ಮುಗಿಯಿತು</string>
+    <string name="common_grant">ಅನುಮತಿಸಿ</string>
+    <string name="common_manage">ನಿರ್ವಹಿಸಿ</string>
+    <!-- settings -->
+    <string name="settings_title">ಸೆಟ್ಟಿಂಗ್‌ಗಳು</string>
+    <string name="settings_languages">ಭಾಷೆಗಳು</string>
+    <string name="settings_language_packs">ಭಾಷಾ ಪ್ಯಾಕ್‌ಗಳು</string>
+    <string name="settings_general">ಸಾಮಾನ್ಯ</string>
+    <string name="settings_font_size">ಫಾಂಟ್ ಗಾತ್ರ</string>
+    <string name="settings_font_sample">ಇದು ಉದಾಹರಣೆಗಾಗಿ ಒಂದಿಷ್ಟು ಪಠ್ಯ</string>
+    <string name="settings_tap_notification">ತ್ವರಿತ ಅನುವಾದ ಅಧಿಸೂಚನೆ</string>
+    <string name="settings_tap_notification_desc">ಪಾಪ್‌ಅಪ್ ತೆರೆಯುವ ನಿರಂತರ ಅಧಿಸೂಚನೆ.</string>
+    <string name="settings_web_translator">ವೆಬ್ ಅನುವಾದಕ</string>
+    <string name="settings_clear_browsing">ಮುಚ್ಚುವಾಗ ಬ್ರೌಸಿಂಗ್ ಡೇಟಾ ಅಳಿಸಿ</string>
+    <string name="settings_clear_browsing_desc">ಕುಕೀಗಳು, ಕ್ಯಾಶ್ ಮತ್ತು ಲೋಕಲ್ ಸ್ಟೋರೇಜ್ ಅನ್ನು ಅಳಿಸುತ್ತದೆ.</string>
+    <string name="settings_tts_section">ಪಠ್ಯದಿಂದ ಧ್ವನಿ</string>
+    <string name="settings_tts_read_urls_hashtags">URL ಮತ್ತು ಹ್ಯಾಶ್‌ಟ್ಯಾಗ್‌ಗಳನ್ನು ಓದಿ</string>
+    <string name="settings_popup_settings">ಪಾಪ್‌ಅಪ್</string>
+    <string name="settings_popup_desc">ಪಠ್ಯ ಆಯ್ಕೆ ಮೆನುವಿನಿಂದ \'ಅನುವಾದಿಸಿ\' ಆರಿಸಿದಾಗ ಪಾಪ್‌ಅಪ್ ಕಾಣಿಸಿಕೊಳ್ಳುತ್ತದೆ</string>
+    <string name="settings_hide_input">ಇನ್‌ಪುಟ್ ಮರೆಮಾಡಿ</string>
+    <string name="settings_popup_position">ಪಾಪ್‌ಅಪ್ ಸ್ಥಾನ</string>
+    <string name="settings_popup_size">ಪಾಪ್‌ಅಪ್ ಗಾತ್ರ: %1$d%%</string>
+    <string name="settings_screen_translation">ಪರದೆ ಅನುವಾದ</string>
+    <string name="settings_screen_translation_desc">ಬೇರೆ ಆ್ಯಪ್‌ಗಳ ಮೇಲೆ ನೇರವಾಗಿ ಪಠ್ಯವನ್ನು ಅನುವಾದಿಸಿ.</string>
+    <string name="settings_floating_button">ಯಾವಾಗಲೂ ಇರುವ ಬಟನ್</string>
+    <string name="settings_floating_button_desc">ಆ್ಯಕ್ಸೆಸಿಬಿಲಿಟಿ ಅನುಮತಿ ಬೇಕು</string>
+    <string name="settings_shortcut">ಶಾರ್ಟ್‌ಕಟ್‌ನಲ್ಲಿ ಪರದೆ ಅನುವಾದಿಸಿ</string>
+    <string name="settings_shortcut_desc">ಪ್ರಾರಂಭಿಸಲು ಹೋಮ್ ಅಥವಾ ಪವರ್ ಬಟನ್ ಒತ್ತಿ ಹಿಡಿಯಿರಿ</string>
+    <string name="settings_on_shortcut">ಶಾರ್ಟ್‌ಕಟ್ ಬಳಸಿದಾಗ</string>
+    <string name="settings_ocr">ಚಿತ್ರಗಳು</string>
+    <string name="settings_background_mode">ಪಠ್ಯವನ್ನು ಇದರಿಂದ ಬದಲಿಸಿ</string>
+    <string name="settings_min_confidence">ಕನಿಷ್ಠ ವಿಶ್ವಾಸಾರ್ಹತೆ: %1$d%%</string>
+    <string name="settings_max_image_size">ಗರಿಷ್ಠ ಚಿತ್ರ ಗಾತ್ರ: %1$dpx</string>
+    <string name="settings_advanced">ಸುಧಾರಿತ</string>
+    <string name="settings_catalog_url">ಕ್ಯಾಟಲಾಗ್ URL</string>
+    <string name="settings_external_storage">ಬಾಹ್ಯ ಸ್ಟೋರೇಜ್ ಬಳಸಿ</string>
+    <string name="settings_disable_autodetect">ಸ್ವಯಂಚಾಲಿತ ಭಾಷಾ ಪತ್ತೆಯನ್ನು ಆಫ್ ಮಾಡಿ</string>
+    <string name="settings_translit_output">ಅನುವಾದಿಸಿದ ಪಠ್ಯಕ್ಕೆ ಲಿಪ್ಯಂತರಣ ತೋರಿಸಿ</string>
+    <string name="settings_translit_input">ಮೂಲ ಪಠ್ಯಕ್ಕೆ ಲಿಪ್ಯಂತರಣ ತೋರಿಸಿ</string>
+    <string name="settings_translit_japanese_spaces">ಜಪಾನೀಸ್ ಲಿಪ್ಯಂತರಣಕ್ಕೆ ಸ್ಪೇಸ್‌ಗಳನ್ನು ಸೇರಿಸಿ</string>
+    <string name="settings_translate_pdf_images">PDF ಗಳಲ್ಲಿನ ಚಿತ್ರಗಳನ್ನು ಅನುವಾದಿಸಿ</string>
+    <string name="settings_camera_live_default">ಪೂರ್ವನಿಯೋಜಿತವಾಗಿ ಕ್ಯಾಮೆರಾವನ್ನು ಲೈವ್ ಆಗಿ ಅನುವಾದಿಸಿ</string>
+    <string name="settings_register_browser">ಬ್ರೌಸರ್ ಆಗಿ ನೋಂದಾಯಿಸಿ</string>
+    <string name="settings_register_browser_desc">ಬೇರೆ ಆ್ಯಪ್‌ಗಳ ಲಿಂಕ್‌ಗಳನ್ನು ಅನುವಾದಿಸುವ ಆಯ್ಕೆ ನೀಡಿ.</string>
+    <string name="settings_external_storage_perm_title">ಬಾಹ್ಯ ಸ್ಟೋರೇಜ್ ಅನುಮತಿ</string>
+    <string name="settings_about">ಕುರಿತು</string>
+    <string name="settings_version">ಆವೃತ್ತಿ %1$s</string>
+    <string name="settings_no_languages_available">ಯಾವುದೇ ಭಾಷೆಗಳು ಲಭ್ಯವಿಲ್ಲ</string>
+    <string name="settings_default_from">ಪೂರ್ವನಿಯೋಜಿತ \'ಯಿಂದ\' ಭಾಷೆ</string>
+    <string name="settings_default_to">ಪೂರ್ವನಿಯೋಜಿತ \'ಗೆ\' ಭಾಷೆ</string>
+    <string name="settings_adblock_support">ಜಾಹೀರಾತು ತಡೆ</string>
+    <string name="settings_about_get_help">ಸಹಾಯ ಪಡೆಯಿರಿ / ಸಮಸ್ಯೆ ತಿಳಿಸಿ</string>
+    <string name="settings_logs_copied">ಆ್ಯಪ್ ಲಾಗ್‌ಗಳನ್ನು ಕ್ಲಿಪ್‌ಬೋರ್ಡ್‌ಗೆ ನಕಲಿಸಲಾಗಿದೆ</string>
+    <string name="settings_about_support">ಅಭಿವೃದ್ಧಿಗೆ ಬೆಂಬಲ ನೀಡಿ</string>
+    <string name="settings_external_storage_perm_body">ಅನುವಾದ ಫೈಲ್‌ಗಳನ್ನು ನಿಮ್ಮ Documents ಫೋಲ್ಡರ್‌ನಲ್ಲಿ ಇರಿಸಲು, ಈ ಆ್ಯಪ್‌ಗೆ ಎಲ್ಲಾ ಫೈಲ್‌ಗಳನ್ನು ನಿರ್ವಹಿಸುವ ಅನುಮತಿ ಬೇಕು.\nಸೆಟ್ಟಿಂಗ್‌ಗಳಿಗೆ ನಿಮ್ಮನ್ನು ಕೊಂಡೊಯ್ಯಲಾಗುತ್ತದೆ, ಅಲ್ಲಿ ನೀವು \'ಎಲ್ಲಾ ಫೈಲ್‌ಗಳನ್ನು ನಿರ್ವಹಿಸಲು ಪ್ರವೇಶ ಅನುಮತಿಸಿ\' ಅನುಮತಿಯನ್ನು ನೀಡಬಹುದು.</string>
+    <!-- language manager / setup / how-to -->
+    <string name="langmgr_voices">ಧ್ವನಿಗಳು</string>
+    <string name="voice_section_downloaded">ಡೌನ್‌ಲೋಡ್ ಆಗಿದೆ</string>
+    <string name="voice_section_available">ಲಭ್ಯವಿದೆ</string>
+    <string name="langmgr_default">ಪೂರ್ವನಿಯೋಜಿತ</string>
+    <string name="langmgr_filter">ಭಾಷೆಗಳನ್ನು ಫಿಲ್ಟರ್ ಮಾಡಿ</string>
+    <string name="langmgr_ocr_upgrade_available">ಚಿತ್ರಗಳಲ್ಲಿನ ಪಠ್ಯ ಪತ್ತೆಗೆ ಸುಧಾರಿತ ಮಾದರಿ ಲಭ್ಯವಿದೆ.</string>
+    <string name="langmgr_delete_shared_title">ಹಂಚಿಕೊಂಡ ನಿಘಂಟು ಅಳಿಸುವುದೇ?</string>
+    <string name="langmgr_delete_shared_body">ಈ ನಿಘಂಟನ್ನು %1$s ಜೊತೆ ಹಂಚಿಕೊಳ್ಳಲಾಗಿದೆ.\nಇದನ್ನು ಅಳಿಸಿದರೆ ಅವರೆಲ್ಲರಿಗೂ ನಿಘಂಟು ತೆಗೆದುಹಾಕಲ್ಪಡುತ್ತದೆ.</string>
+    <string name="langmgr_download_size">%1$s ಡೌನ್‌ಲೋಡ್ ಮಾಡಿ</string>
+    <string name="langmgr_repair_needed">ಕೆಲವು ಡೌನ್‌ಲೋಡ್ ಮಾಡಿದ ವೈಶಿಷ್ಟ್ಯಗಳಿಗೆ ಫೈಲ್‌ಗಳು ಕಾಣೆಯಾಗಿವೆ ಮತ್ತು ದುರಸ್ತಿ ಮಾಡುವವರೆಗೆ ಕೆಲಸ ಮಾಡುವುದಿಲ್ಲ.</string>
+    <string name="langmgr_repair_size">%1$s ದುರಸ್ತಿ ಮಾಡಿ</string>
+    <string name="nolang_title">ಭಾಷಾ ಸೆಟಪ್</string>
+    <string name="nolang_prompt">ಅನುವಾದ ಪ್ರಾರಂಭಿಸಲು ಭಾಷಾ ಪ್ಯಾಕ್‌ಗಳನ್ನು ಡೌನ್‌ಲೋಡ್ ಮಾಡಿ</string>
+    <string name="howto_title">ಬಳಸುವುದು ಹೇಗೆ</string>
+    <!-- image capture / voice / dictionary / language selector -->
+    <string name="image_no_crop_remote">ರಿಮೋಟ್ ಚಿತ್ರಗಳನ್ನು ನೇರವಾಗಿ ಕ್ರಾಪ್ ಮಾಡಲಾಗದು</string>
+    <string name="image_open_failed">ಫೈಲ್ ತೆರೆಯಲು ವಿಫಲವಾಯಿತು</string>
+    <string name="image_source_screen">ಪರದೆ</string>
+    <string name="image_source_document">ಡಾಕ್ಯುಮೆಂಟ್</string>
+    <string name="image_source_photos">ಫೋಟೋಗಳು</string>
+    <string name="image_source_gallery">ಗ್ಯಾಲರಿ</string>
+    <string name="image_source_camera">ಕ್ಯಾಮೆರಾ</string>
+    <string name="voice_playback_speed">ಪ್ಲೇಬ್ಯಾಕ್ ವೇಗ</string>
+    <string name="voice_label">ಧ್ವನಿ</string>
+    <string name="voice_default">ಪೂರ್ವನಿಯೋಜಿತ ಧ್ವನಿ</string>
+    <string name="langsel_auto">✨ ಸ್ವಯಂ</string>
+    <string name="dict_also_as">ಹೀಗೂ:</string>
+    <!-- camera / browser / screen translate -->
+    <string name="camera_permission_rationale">ಲೈವ್ ಅನುವಾದಕ್ಕೆ ಕ್ಯಾಮೆರಾ ಅನುಮತಿ ಬೇಕು.</string>
+    <string name="camera_need_ocr_models">ಈ ಭಾಷೆಗೆ ಚಿತ್ರಗಳಲ್ಲಿನ ಪಠ್ಯ ಗುರುತಿಸುವ ಮಾದರಿಗಳನ್ನು ನೀವು ಡೌನ್‌ಲೋಡ್ ಮಾಡಬೇಕು</string>
+    <string name="browser_no_source_language">ಯಾವುದೇ ಮೂಲ ಭಾಷೆ ಲಭ್ಯವಿಲ್ಲ. ಮೊದಲು ಮುಖ್ಯ ಪರದೆಯಿಂದ ಒಂದನ್ನು ಇನ್‌ಸ್ಟಾಲ್ ಮಾಡಿ, ಅಥವಾ ಸೆಟ್ಟಿಂಗ್‌ಗಳಲ್ಲಿ ಪೂರ್ವನಿಯೋಜಿತ ಮೂಲ ಭಾಷೆಯನ್ನು ಹೊಂದಿಸಿ.</string>
+    <string name="browser_reader_unavailable">ಈ ಪುಟಕ್ಕೆ ರೀಡರ್ ಮೋಡ್ ಲಭ್ಯವಿಲ್ಲ</string>
+    <string name="browser_translate_image">ಚಿತ್ರ ಅನುವಾದಿಸಿ</string>
+    <string name="screen_translating_notification">ಪರದೆ ಅನುವಾದಿಸಲಾಗುತ್ತಿದೆ</string>
+    <!-- enums -->
+    <string name="align_top">ಮೇಲ್ಭಾಗ</string>
+    <string name="align_middle">ಮಧ್ಯ</string>
+    <string name="align_bottom">ಕೆಳಭಾಗ</string>
+    <string name="assistant_action_still_image">ಒಮ್ಮೆ ಅನುವಾದಿಸಿ</string>
+    <string name="assistant_action_live_screen">ಲೈವ್ ಅನುವಾದ ಪ್ರಾರಂಭಿಸಿ</string>
+    <string name="background_mode_white_on_black">ಕಪ್ಪಿನ ಮೇಲೆ ಬಿಳಿ</string>
+    <string name="background_mode_black_on_white">ಬಿಳಿಯ ಮೇಲೆ ಕಪ್ಪು</string>
+    <string name="background_mode_auto_detect">ಮೂಲ ಚಿತ್ರದ ಬಣ್ಣಗಳು</string>
+    <!-- tts / speech errors -->
+    <string name="tts_nothing_to_speak">ಓದಲು ಏನೂ ಇಲ್ಲ</string>
+    <string name="tts_catalog_unavailable">ಕ್ಯಾಟಲಾಗ್ ಲಭ್ಯವಿಲ್ಲ</string>
+    <string name="tts_no_voice">%1$s ಗೆ ಯಾವುದೇ ಧ್ವನಿ ಇನ್‌ಸ್ಟಾಲ್ ಆಗಿಲ್ಲ</string>
+    <string name="tts_synthesis_failed">%1$s ಗೆ ಧ್ವನಿ ಸಂಯೋಜನೆ ವಿಫಲವಾಯಿತು</string>
+    <string name="tts_sample_fallback">ಇದು Offline Translator ನಿಂದ ಒಂದು ಧ್ವನಿ ಮಾದರಿ.</string>
+    <!-- translation -->
+    <string name="translation_error">ಅನುವಾದ ದೋಷ: %1$s</string>
+    <!-- download errors -->
+    <string name="download_failed_core">%1$s ಡೌನ್‌ಲೋಡ್ ವಿಫಲವಾಯಿತು</string>
+    <string name="download_failed_ocr">%1$s ಚಿತ್ರ ಪಠ್ಯ ಮಾದರಿ ಡೌನ್‌ಲೋಡ್ ವಿಫಲವಾಯಿತು</string>
+    <string name="download_failed_ocr_batch">ಚಿತ್ರ ಪಠ್ಯ ಮಾದರಿಗಳ ಬ್ಯಾಚ್ ಡೌನ್‌ಲೋಡ್ ವಿಫಲವಾಯಿತು</string>
+    <string name="download_failed_dictionary">%1$s ನಿಘಂಟು ಡೌನ್‌ಲೋಡ್ ವಿಫಲವಾಯಿತು</string>
+    <string name="download_failed_tts">%1$s ಧ್ವನಿ ಡೌನ್‌ಲೋಡ್ ವಿಫಲವಾಯಿತು</string>
+    <string name="download_failed_adblock">ಜಾಹೀರಾತು ತಡೆ ಡೌನ್‌ಲೋಡ್ ವಿಫಲವಾಯಿತು</string>
+    <string name="download_failed_repair">ದುರಸ್ತಿ ಡೌನ್‌ಲೋಡ್ ವಿಫಲವಾಯಿತು</string>
+    <string name="download_catalog_unavailable">ಕ್ಯಾಟಲಾಗ್ ಲಭ್ಯವಿಲ್ಲ</string>
+    <string name="download_catalog_save_failed">ಕ್ಯಾಟಲಾಗ್ ಉಳಿಸಲು ವಿಫಲವಾಯಿತು</string>
+    <string name="download_unknown_error">ಗೊತ್ತಿಲ್ಲದ ದೋಷ</string>
+    <string name="download_catalog_failed">ಕ್ಯಾಟಲಾಗ್ ಡೌನ್‌ಲೋಡ್ ವಿಫಲವಾಯಿತು: %1$s</string>
+    <!-- assistant overlay status -->
+    <string name="assistant_invoke_prompt">ಪಠ್ಯವನ್ನು ಅನುವಾದಿಸಲು ಅದರ ಮೇಲೆ ಈ ಅಸಿಸ್ಟೆಂಟ್ ಅನ್ನು ತೆರೆಯಿರಿ</string>
+    <string name="assistant_collecting_context">ಪರದೆಯ ಸಂದರ್ಭ ಸಂಗ್ರಹಿಸಲಾಗುತ್ತಿದೆ…</string>
+    <string name="assistant_screenshot_disabled">ಈ ಅಸಿಸ್ಟೆಂಟ್‌ಗೆ ಸ್ಕ್ರೀನ್‌ಶಾಟ್ ಪ್ರವೇಶ ಆಫ್ ಆಗಿದೆ. ಸಿಸ್ಟಂ ಅಸಿಸ್ಟೆಂಟ್ ಸೆಟ್ಟಿಂಗ್‌ಗಳಲ್ಲಿ ಅದನ್ನು ಆನ್ ಮಾಡಿ.</string>
+    <string name="assistant_no_screen_data">ಯಾವುದೇ ಪರದೆ ಡೇಟಾ ಸಿಗಲಿಲ್ಲ. ಈ ಅಸಿಸ್ಟೆಂಟ್‌ಗೆ \'ಸ್ಕ್ರೀನ್‌ಶಾಟ್ ಬಳಸಿ\' ಆನ್ ಮಾಡಿ.</string>
+    <string name="assistant_no_screenshot">ಈ ಆ್ಯಪ್ ಸ್ಕ್ರೀನ್‌ಶಾಟ್ ಒದಗಿಸಲಿಲ್ಲ.</string>
+    <string name="assistant_set_source_ocr">ಚಿತ್ರಗಳಲ್ಲಿನ ಪಠ್ಯ ಗುರುತಿಸಲು ಪೂರ್ವನಿಯೋಜಿತ ಮೂಲ ಭಾಷೆಯನ್ನು ಹೊಂದಿಸಿ.</string>
+    <string name="assistant_langs_not_ready">ಅನುವಾದ ಭಾಷೆಗಳು ಇನ್ನೂ ಸಿದ್ಧವಾಗಿಲ್ಲ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.</string>
+    <string name="assistant_ocr_failed">ಚಿತ್ರದಲ್ಲಿನ ಪಠ್ಯ ಗುರುತಿಸಲು ವಿಫಲವಾಯಿತು</string>
+    <string name="ocr_models_missing">ಪಠ್ಯ ಗುರುತಿಸುವಿಕೆ ಮಾದರಿಗಳು ಕಾಣೆಯಾಗಿವೆ. ದುರಸ್ತಿ ಮಾಡಲು ಆ್ಯಪ್‌ನಲ್ಲಿ ಭಾಷಾ ನಿರ್ವಹಣೆ ತೆರೆಯಿರಿ.</string>
+    <string name="assistant_set_source_live">ಲೈವ್ ಪರದೆ ಅನುವಾದ ಬಳಸಲು ಸೆಟ್ಟಿಂಗ್‌ಗಳಲ್ಲಿ ಪೂರ್ವನಿಯೋಜಿತ ಮೂಲ ಭಾಷೆಯನ್ನು ಹೊಂದಿಸಿ.</string>
+    <!-- migration gate -->
+    <string name="migration_updating_speech_models">ಧ್ವನಿ ಮಾದರಿಗಳನ್ನು ಅಪ್‌ಡೇಟ್ ಮಾಡಲಾಗುತ್ತಿದೆ</string>
+    <string name="migration_accept_convert">ಒಪ್ಪಿ ಪರಿವರ್ತಿಸಿ</string>
+    <string name="migration_delete_all">ಬದಲಿಗೆ ಎಲ್ಲವನ್ನೂ ಅಳಿಸಿ</string>
+    <string name="migration_converting">%2$d ರಲ್ಲಿ %1$d ಪರಿವರ್ತಿಸಲಾಗುತ್ತಿದೆ</string>
+    <string name="migration_optimizing">ಮಾದರಿಗಳನ್ನು ಆಪ್ಟಿಮೈಸ್ ಮಾಡಲಾಗುತ್ತಿದೆ</string>
+    <plurals name="migration_convert_prompt">
+        <item quantity="one">ಹೊಸ ಫಾರ್ಮ್ಯಾಟ್‌ಗೆ ಪರಿವರ್ತಿಸಲು ನಿಮ್ಮ ಬಳಿ %1$d ಧ್ವನಿ ಮಾದರಿ ಇದೆ. ಇದಕ್ಕೆ ಸುಮಾರು %2$d ಸೆಕೆಂಡ್‌ಗಳು ಬೇಕಾಗುತ್ತದೆ. ನೀವು %3$.0f MB ಡಿಸ್ಕ್ ಜಾಗವನ್ನು ಉಳಿಸುತ್ತೀರಿ.</item>
+        <item quantity="other">ಹೊಸ ಫಾರ್ಮ್ಯಾಟ್‌ಗೆ ಪರಿವರ್ತಿಸಲು ನಿಮ್ಮ ಬಳಿ %1$d ಧ್ವನಿ ಮಾದರಿಗಳು ಇವೆ. ಇದಕ್ಕೆ ಸುಮಾರು %2$d ಸೆಕೆಂಡ್‌ಗಳು ಬೇಕಾಗುತ್ತದೆ. ನೀವು %3$.0f MB ಡಿಸ್ಕ್ ಜಾಗವನ್ನು ಉಳಿಸುತ್ತೀರಿ.</item>
+    </plurals>
+    <!-- document translation notification + progress -->
+    <string name="doc_notif_translating">ಫೈಲ್ ಅನುವಾದಿಸಲಾಗುತ್ತಿದೆ</string>
+    <string name="doc_notif_translated">ಅನುವಾದಿಸಿದ ಫೈಲ್</string>
+    <string name="doc_notif_phase_text">ಪಠ್ಯ %1$d%%</string>
+    <string name="doc_notif_phase_images">ಚಿತ್ರಗಳು %1$d/%2$d</string>
+    <string name="doc_notif_phase_raster">ಬಿಟ್‌ಮ್ಯಾಪ್ ಪುಟಗಳು %1$d/%2$d</string>
+    <string name="doc_notif_channel_name">ಡಾಕ್ಯುಮೆಂಟ್ ಅನುವಾದ</string>
+    <string name="doc_notif_channel_desc">ಡಾಕ್ಯುಮೆಂಟ್‌ಗಳನ್ನು ಅನುವಾದಿಸುವಾಗ ಪ್ರಗತಿಯನ್ನು ತೋರಿಸುತ್ತದೆ</string>
+    <string name="doc_progress_preparing">ಫೈಲ್ ಸಿದ್ಧಪಡಿಸಲಾಗುತ್ತಿದೆ</string>
+    <string name="doc_progress_translating">ಅನುವಾದಿಸಲಾಗುತ್ತಿದೆ</string>
+    <string name="doc_progress_translated">ಅನುವಾದಿಸಿದ ಫೈಲ್</string>
+    <string name="doc_progress_saving">ಅನುವಾದಿಸಿದ ಫೈಲ್ ಉಳಿಸಲಾಗುತ್ತಿದೆ</string>
+    <string name="doc_translation_failed">ಡಾಕ್ಯುಮೆಂಟ್ ಅನುವಾದ ವಿಫಲವಾಯಿತು</string>
+    <string name="doc_url_unsupported">ಡಾಕ್ಯುಮೆಂಟ್ ಅನ್ನು ಡೌನ್‌ಲೋಡ್ ಮಾಡಿ ಬದಲಿಗೆ ಆ್ಯಪ್‌ನಲ್ಲಿ ತೆರೆಯಿರಿ</string>
+    <!-- document configure sheet -->
+    <string name="document_wrap_columns">%1$d ಕಾಲಮ್‌ಗಳಲ್ಲಿ ಸುತ್ತಿಕೊಳ್ಳಿ</string>
+    <string name="document_translate_pdf_images">PDF ನಲ್ಲಿನ ಚಿತ್ರಗಳನ್ನು ಅನುವಾದಿಸಿ</string>
+    <string name="layout_preserve">ಸಾಲಿನ ವಿರಾಮಗಳನ್ನು ಉಳಿಸಿಕೊಳ್ಳಿ</string>
+    <string name="layout_reflow">ಪ್ಯಾರಾಗಳಾಗಿ ಮರುಜೋಡಿಸಿ</string>
+    <string name="layout_reflow_wrap">ಮರುಜೋಡಿಸಿ ಮತ್ತು ಸುತ್ತಿಕೊಳ್ಳಿ</string>
+    <!-- common (additional) -->
+    <string name="common_open">ತೆರೆಯಿರಿ</string>
+    <string name="common_close">ಮುಚ್ಚಿ</string>
+    <string name="common_save">ಉಳಿಸಿ</string>
+    <!-- translator app -->
+    <string name="translator_translated_file">ಅನುವಾದಿಸಿದ ಫೈಲ್: %1$s</string>
+    <string name="translator_document_saved">ಡಾಕ್ಯುಮೆಂಟ್ ಉಳಿಸಲಾಗಿದೆ</string>
+    <string name="translator_document_save_failed">ಡಾಕ್ಯುಮೆಂಟ್ ಉಳಿಸಲು ವಿಫಲವಾಯಿತು</string>
+    <string name="translator_audio_playback_failed">ಆಡಿಯೋ ಪ್ಲೇಬ್ಯಾಕ್ ವಿಫಲವಾಯಿತು: %1$s</string>
+    <string name="translator_no_app_to_open">ಈ ಫೈಲ್ ತೆರೆಯಲು ಯಾವುದೇ ಆ್ಯಪ್ ಸಿಗಲಿಲ್ಲ</string>
+    <!-- document alignment -->
+    <string name="docalign_decode_failed">ಚಿತ್ರವನ್ನು ಡಿಕೋಡ್ ಮಾಡಲಾಗಲಿಲ್ಲ.</string>
+    <string name="docalign_detecting">ಮೂಲೆಗಳನ್ನು ಪತ್ತೆ ಮಾಡಲಾಗುತ್ತಿದೆ…</string>
+    <string name="docalign_redetecting">ಮತ್ತೆ ಪತ್ತೆ ಮಾಡಲಾಗುತ್ತಿದೆ…</string>
+    <string name="docalign_help">ಡಾಕ್ಯುಮೆಂಟ್‌ನ ಸುತ್ತ ನಿಖರವಾದ ಪರಿಧಿ ಗುರುತಿಸುವಿಕೆಯ ಗುಣಮಟ್ಟವನ್ನು ಸುಧಾರಿಸುತ್ತದೆ. ಸಾಲುಗಳು ಪಠ್ಯಕ್ಕೆ ಸಮಾನಾಂತರವಾಗಿರುವುದು ಮುಖ್ಯ.\n\nಜೂಮ್ ಮಾಡಿದಾಗ ಅಥವಾ ಸರಿಸಿದಾಗ ಸಾಮಾನ್ಯವಾಗಿ ಅಲ್ಗಾರಿದಂ ಡಾಕ್ಯುಮೆಂಟ್ ಅನ್ನು ತಾನಾಗಿಯೇ ಗುರುತಿಸುತ್ತದೆ, ಆದರೆ ಸಿಗದಿದ್ದರೆ ನೀವು ಕೈಯಾರೆ ಹೊಂದಿಸಬಹುದು.</string>
+    <!-- how to use -->
+    <string name="howto_section_other_apps">ಬೇರೆ ಆ್ಯಪ್‌ಗಳಿಂದ</string>
+    <string name="howto_share_title">ಹಂಚಿ ಅನುವಾದಿಸಿ</string>
+    <string name="howto_share_body">ಯಾವುದೇ ಆ್ಯಪ್‌ನಿಂದ ಪಠ್ಯ, ಲಿಂಕ್‌ಗಳು ಅಥವಾ ಚಿತ್ರಗಳನ್ನು ಹಂಚಿಕೊಂಡು ಅನುವಾದಿಸಿ.</string>
+    <string name="howto_copy_title">ಬೇರೆ ಆ್ಯಪ್‌ಗಳಿಂದ ಹೊರಬರದೆ ಅನುವಾದಿಸಿ</string>
+    <string name="howto_copy_body">ಎಲ್ಲಿಯಾದರೂ ಪಠ್ಯವನ್ನು ಆಯ್ಕೆಮಾಡಿ, ನಂತರ ನಕಲು ಟೂಲ್‌ಬಾರ್‌ನಲ್ಲಿ \"ಅನುವಾದಿಸಿ\" ಒತ್ತಿ, ಅನುವಾದವನ್ನು ಸಣ್ಣ ಪಾಪ್‌ಅಪ್‌ನಲ್ಲಿ ನೋಡಿ.</string>
+    <string name="howto_section_in_app">ಆ್ಯಪ್ ಒಳಗೆ</string>
+    <string name="howto_docs_title">ಡಾಕ್ಯುಮೆಂಟ್‌ಗಳು ಮತ್ತು ಚಿತ್ರಗಳನ್ನು ಅನುವಾದಿಸಿ</string>
+    <string name="howto_docs_body">ಚಿತ್ರಗಳು ಅಥವಾ EPUB, PDF ಮತ್ತು TXT ಫೈಲ್‌ಗಳನ್ನು ಅನುವಾದಿಸಲು Documents ಟ್ಯಾಬ್ ತೆರೆಯಿರಿ.</string>
+    <string name="howto_dict_title">ನಿಘಂಟು ಹುಡುಕಾಟ</string>
+    <string name="howto_dict_body">ಅನುವಾದದಲ್ಲಿನ ಯಾವುದೇ ಪದವನ್ನು ಒತ್ತಿ ಹಿಡಿದು ಅದರ ಅರ್ಥವನ್ನು ನೋಡಿ. ಡೇಟಾ Wiktionary ನಿಂದ ಪಡೆಯಲಾಗಿದೆ.</string>
+    <string name="howto_voice_title">ಧ್ವನಿ ಅಥವಾ ವೇಗ ಬದಲಿಸಿ</string>
+    <string name="howto_voice_body">ಬೇರೆ ಧ್ವನಿ ಆಯ್ಕೆ ಮಾಡಲು ಅಥವಾ ಪ್ಲೇಬ್ಯಾಕ್ ವೇಗ ಹೊಂದಿಸಲು ಪ್ಲೇ ಬಟನ್ ಅನ್ನು ಒತ್ತಿ ಹಿಡಿಯಿರಿ.</string>
+    <!-- feature row labels -->
+    <string name="feature_translation">ಅನುವಾದ</string>
+    <string name="feature_dictionary">ನಿಘಂಟು</string>
+    <string name="feature_tts">ಧ್ವನಿ</string>
+    <!-- misc -->
+    <string name="detected_translate_from">ಇದರಿಂದ ಅನುವಾದಿಸಿ</string>
+    <string name="detected_missing_language">ಭಾಷೆ ಇಲ್ಲ</string>
+    <string name="main_input_placeholder">ಪಠ್ಯ ನಮೂದಿಸಿ</string>
+    <string name="aidl_target_unavailable">ಗುರಿ ಭಾಷೆ ಲಭ್ಯವಿಲ್ಲ</string>
+</resources>

@@ -1,0 +1,30 @@
+[package]
+name = "model_converter"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib"]
+name = "model_converter"
+path = "src/lib.rs"
+
+[dependencies]
+jni = { version = "0.21", default-features = false }
+translator-convert = { git = "https://github.com/DavidVentura/translator-rs.git" }
+# translator-convert = { path = "/home/david/git/translator-rs/crates/translator-convert" }
+
+# [patch."https://github.com/DavidVentura/mnn-sys"]
+# mnn-sys = { path = "/home/david/git/mnn-sys" }
+
+[profile.release]
+lto = "thin"
+debug = false
+strip = "debuginfo"
+
+# Match bindings: -sys build scripts (mnn) locate their target dir by matching
+# the PROFILE env var against a path component, so keep the built-in dev/release
+# names rather than a custom profile.
+[profile.dev]
+opt-level = 1
+debug = false
+strip = "debuginfo"

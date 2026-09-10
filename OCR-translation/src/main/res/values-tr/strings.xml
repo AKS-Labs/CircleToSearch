@@ -1,0 +1,217 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="stop">Durdur</string>
+    <string name="pause">Duraklat</string>
+    <string name="resume">Devam et</string>
+    <string name="region_select_menu">Çeviri alanını belirle</string>
+    <string name="screen_translate_needs_source">Kaynak dili belirt</string>
+    <string name="live_tile_label">Ekranı canlı çevir</string>
+    <string name="translate_text">Çevir</string>
+    <string name="translate_link">Bağlantıyı çevir</string>
+    <string name="accessibility_service_description">Ekrandaki metni çevirmek için bu hizmeti etkinleştir. Mevcut ekranı çevirmek için kayan çeviri düğmesine dokun ya da canlı ekran çevirisi başlat.</string>
+    <string name="tap_to_translate_title">Hızlı Çeviri açık</string>
+    <string name="tap_to_translate_body">Çevirmen penceresini açmak için dokun</string>
+    <string name="tap_to_translate_channel">Hızlı Çeviri</string>
+    <string name="tap_to_translate_channel_description">Çevirmen penceresine hızlı erişim için kalıcı bildirim</string>
+    <string name="quick_tile_label">Çevir</string>
+    <!-- common -->
+    <string name="common_ok">Tamam</string>
+    <string name="common_cancel">İptal</string>
+    <string name="common_done">Bitti</string>
+    <string name="common_grant">İzin ver</string>
+    <string name="common_manage">Yönet</string>
+    <!-- settings -->
+    <string name="settings_title">Ayarlar</string>
+    <string name="settings_languages">Diller</string>
+    <string name="settings_language_packs">Dil paketleri</string>
+    <string name="settings_general">Genel</string>
+    <string name="settings_font_size">Yazı tipi boyutu</string>
+    <string name="settings_font_sample">Bu bir örnek metindir</string>
+    <string name="settings_tap_notification">Hızlı Çeviri bildirimi</string>
+    <string name="settings_tap_notification_desc">Pencereyi açan kalıcı bildirim.</string>
+    <string name="settings_web_translator">Web çevirmeni</string>
+    <string name="settings_clear_browsing">Kapatınca tarama verilerini sil</string>
+    <string name="settings_clear_browsing_desc">Çerezleri, önbelleği ve yerel depolamayı siler.</string>
+    <string name="settings_tts_section">Metin okuma</string>
+    <string name="settings_tts_read_urls_hashtags">URL\'leri ve etiketleri oku</string>
+    <string name="settings_popup_settings">Açılır pencere</string>
+    <string name="settings_popup_desc">Metin seçim menüsünden \'Çevir\' seçildiğinde açılır pencere görünür</string>
+    <string name="settings_hide_input">Girişi gizle</string>
+    <string name="settings_popup_position">Açılır pencere konumu</string>
+    <string name="settings_popup_size">Pencere boyutu: %1$d%%</string>
+    <string name="settings_screen_translation">Ekran çevirisi</string>
+    <string name="settings_screen_translation_desc">Metni doğrudan diğer uygulamaların üzerinde çevir.</string>
+    <string name="settings_floating_button">Her zaman açık düğme</string>
+    <string name="settings_floating_button_desc">Erişilebilirlik izni gerektirir</string>
+    <string name="settings_shortcut">Kısayolla ekranı çevir</string>
+    <string name="settings_shortcut_desc">Tetiklemek için ana ekran ya da güç tuşuna basılı tut</string>
+    <string name="settings_on_shortcut">Kısayol çağrıldığında</string>
+    <string name="settings_ocr">Görseller</string>
+    <string name="settings_background_mode">Metnin yerine şunu koy</string>
+    <string name="settings_min_confidence">Min. güven: %1$d%%</string>
+    <string name="settings_max_image_size">Maks. görsel boyutu: %1$dpx</string>
+    <string name="settings_advanced">Gelişmiş</string>
+    <string name="settings_catalog_url">Katalog URL\'si</string>
+    <string name="settings_external_storage">Harici depolamayı kullan</string>
+    <string name="settings_disable_autodetect">Otomatik dil algılamayı kapat</string>
+    <string name="settings_translit_output">Çevrilen metin için harf çevirisini göster</string>
+    <string name="settings_translit_input">Özgün metin için harf çevirisini göster</string>
+    <string name="settings_translit_japanese_spaces">Japonca harf çevirisine boşluk ekle</string>
+    <string name="settings_translate_pdf_images">PDF\'lerdeki görselleri çevir</string>
+    <string name="settings_camera_live_default">Varsayılan olarak kamerayı canlı çevir</string>
+    <string name="settings_register_browser">Tarayıcı olarak kaydet</string>
+    <string name="settings_register_browser_desc">Diğer uygulamalardan gelen bağlantıları çevirmeyi öner.</string>
+    <string name="settings_external_storage_perm_title">Harici depolama izni</string>
+    <string name="settings_about">Hakkında</string>
+    <string name="settings_version">Sürüm %1$s</string>
+    <string name="settings_no_languages_available">Kullanılabilir dil yok</string>
+    <string name="settings_default_from">Varsayılan \'kaynak\' dil</string>
+    <string name="settings_default_to">Varsayılan \'hedef\' dil</string>
+    <string name="settings_adblock_support">Reklam engelleme</string>
+    <string name="settings_about_get_help">Yardım al / sorun bildir</string>
+    <string name="settings_logs_copied">Uygulama günlükleri panoya kopyalandı</string>
+    <string name="settings_about_support">Geliştirmeyi destekle</string>
+    <string name="settings_external_storage_perm_body">Çeviri dosyalarını Belgeler klasörüne kaydetmek için bu uygulamanın tüm dosyaları yönetme erişimine ihtiyacı var.\n\'Tüm dosyaları yönetme erişimine izin ver\' iznini verebileceğin Ayarlar\'a yönlendirileceksin.</string>
+    <!-- language manager / setup / how-to -->
+    <string name="langmgr_voices">Sesler</string>
+    <string name="voice_section_downloaded">İNDİRİLENLER</string>
+    <string name="voice_section_available">KULLANILABİLİR</string>
+    <string name="langmgr_default">VARSAYILAN</string>
+    <string name="langmgr_filter">Dilleri filtrele</string>
+    <string name="langmgr_ocr_upgrade_available">Geliştirilmiş bir metin algılama modeli mevcut.</string>
+    <string name="langmgr_delete_shared_title">Paylaşılan sözlük silinsin mi?</string>
+    <string name="langmgr_delete_shared_body">Bu sözlük %1$s ile paylaşılıyor.\nSilersen sözlük hepsi için kaldırılır.</string>
+    <string name="langmgr_download_size">%1$s indir</string>
+    <string name="langmgr_repair_needed">İndirilen bazı özelliklerin dosyaları eksik ve onarılana kadar çalışmayacak.</string>
+    <string name="langmgr_repair_size">%1$s onar</string>
+    <string name="nolang_title">Dil kurulumu</string>
+    <string name="nolang_prompt">Çevirmeye başlamak için dil paketleri indir</string>
+    <string name="howto_title">Nasıl kullanılır</string>
+    <!-- image capture / voice / dictionary / language selector -->
+    <string name="image_no_crop_remote">Uzaktaki görseller doğrudan kırpılamaz</string>
+    <string name="image_open_failed">Dosya açılamadı</string>
+    <string name="image_source_screen">Ekran</string>
+    <string name="image_source_document">Belge</string>
+    <string name="image_source_photos">Fotoğraflar</string>
+    <string name="image_source_gallery">Galeri</string>
+    <string name="image_source_camera">Kamera</string>
+    <string name="voice_playback_speed">Oynatma hızı</string>
+    <string name="voice_label">Ses</string>
+    <string name="voice_default">Varsayılan ses</string>
+    <string name="langsel_auto">✨ Otomatik</string>
+    <string name="dict_also_as">Şöyle de:</string>
+    <!-- camera / browser / screen translate -->
+    <string name="camera_permission_rationale">Canlı çeviri için kamera izni gerekiyor.</string>
+    <string name="camera_need_ocr_models">Bu dil için görsellerdeki metni tanıma modellerini indirmen gerekiyor</string>
+    <string name="browser_no_source_language">Kullanılabilir kaynak dil yok. Önce ana ekrandan birini yükle ya da ayarlardan varsayılan bir kaynak dil belirle.</string>
+    <string name="browser_reader_unavailable">Bu sayfa için okuyucu modu kullanılamıyor</string>
+    <string name="browser_translate_image">Görseli çevir</string>
+    <string name="screen_translating_notification">Ekran çevriliyor</string>
+    <!-- enums -->
+    <string name="align_top">Üst</string>
+    <string name="align_middle">Orta</string>
+    <string name="align_bottom">Alt</string>
+    <string name="assistant_action_still_image">Bir kez çevir</string>
+    <string name="assistant_action_live_screen">Canlı çeviriyi başlat</string>
+    <string name="background_mode_white_on_black">Siyah üzerine beyaz</string>
+    <string name="background_mode_black_on_white">Beyaz üzerine siyah</string>
+    <string name="background_mode_auto_detect">Özgün görsel renkleri</string>
+    <!-- tts / speech errors -->
+    <string name="tts_nothing_to_speak">Seslendirilecek bir şey yok</string>
+    <string name="tts_catalog_unavailable">Katalog kullanılamıyor</string>
+    <string name="tts_no_voice">%1$s için yüklü ses yok</string>
+    <string name="tts_synthesis_failed">%1$s için ses sentezi başarısız oldu</string>
+    <string name="tts_sample_fallback">Bu, Offline Translator\'dan bir seslendirme örneğidir.</string>
+    <!-- translation -->
+    <string name="translation_error">Çeviri hatası: %1$s</string>
+    <!-- download errors -->
+    <string name="download_failed_core">%1$s indirilemedi</string>
+    <string name="download_failed_ocr">%1$s görsel metin tanıma indirmesi başarısız oldu</string>
+    <string name="download_failed_ocr_batch">Görsel metin tanıma toplu indirmesi başarısız oldu</string>
+    <string name="download_failed_dictionary">%1$s sözlük indirmesi başarısız oldu</string>
+    <string name="download_failed_tts">%1$s ses indirmesi başarısız oldu</string>
+    <string name="download_failed_adblock">Reklam engelleyici indirmesi başarısız oldu</string>
+    <string name="download_failed_repair">Onarım indirmesi başarısız oldu</string>
+    <string name="download_catalog_unavailable">Katalog kullanılamıyor</string>
+    <string name="download_catalog_save_failed">Katalog kaydedilemedi</string>
+    <string name="download_unknown_error">Bilinmeyen hata</string>
+    <string name="download_catalog_failed">Katalog indirilemedi: %1$s</string>
+    <!-- assistant overlay status -->
+    <string name="assistant_invoke_prompt">Bir metni çevirmek için bu asistanı metnin üzerinde çağır</string>
+    <string name="assistant_collecting_context">Ekran içeriği toplanıyor…</string>
+    <string name="assistant_screenshot_disabled">Bu asistan için ekran görüntüsü erişimi kapalı. Sistem asistanı ayarlarından etkinleştir.</string>
+    <string name="assistant_no_screen_data">Ekran verisi alınmadı. Bu asistan için \'Ekran görüntüsü kullan\' seçeneğini etkinleştir.</string>
+    <string name="assistant_no_screenshot">Bu uygulama bir ekran görüntüsü sağlamadı.</string>
+    <string name="assistant_set_source_ocr">Görsellerdeki metni tanıma için varsayılan bir kaynak dil belirle.</string>
+    <string name="assistant_langs_not_ready">Çeviri dilleri henüz hazır değil. Tekrar dene.</string>
+    <string name="assistant_ocr_failed">Görseldeki metin tanınamadı</string>
+    <string name="ocr_models_missing">Metin tanıma modelleri eksik. Onarmak için uygulamada Dilleri yönet\'i açın.</string>
+    <string name="assistant_set_source_live">Canlı ekran çevirisini kullanmak için Ayarlar\'dan varsayılan bir kaynak dil belirle.</string>
+    <!-- migration gate -->
+    <string name="migration_updating_speech_models">Konuşma modelleri güncelleniyor</string>
+    <string name="migration_accept_convert">Kabul et ve dönüştür</string>
+    <string name="migration_delete_all">Bunun yerine hepsini sil</string>
+    <string name="migration_converting">%2$d modelden %1$d. dönüştürülüyor</string>
+    <string name="migration_optimizing">Modeller iyileştiriliyor</string>
+    <plurals name="migration_convert_prompt">
+        <item quantity="one">Yeni bir biçime dönüştürülecek %1$d seslendirme modelin var. Yaklaşık %2$d saniye sürecek. %3$.0f MB disk alanı kazanacaksın.</item>
+        <item quantity="other">Yeni bir biçime dönüştürülecek %1$d seslendirme modelin var. Yaklaşık %2$d saniye sürecek. %3$.0f MB disk alanı kazanacaksın.</item>
+    </plurals>
+    <!-- document translation notification + progress -->
+    <string name="doc_notif_translating">Dosya çevriliyor</string>
+    <string name="doc_notif_translated">Dosya çevrildi</string>
+    <string name="doc_notif_phase_text">Metin %1$d%%</string>
+    <string name="doc_notif_phase_images">Görseller %1$d/%2$d</string>
+    <string name="doc_notif_phase_raster">Bit eşlem sayfaları %1$d/%2$d</string>
+    <string name="doc_notif_channel_name">Belge çevirisi</string>
+    <string name="doc_notif_channel_desc">Belgeler çevrilirken ilerlemeyi gösterir</string>
+    <string name="doc_progress_preparing">Dosya hazırlanıyor</string>
+    <string name="doc_progress_translating">Çevriliyor</string>
+    <string name="doc_progress_translated">Dosya çevrildi</string>
+    <string name="doc_progress_saving">Çevrilen dosya kaydediliyor</string>
+    <string name="doc_translation_failed">Belge çevirisi başarısız oldu</string>
+    <string name="doc_url_unsupported">Bunun yerine belgeyi indirip uygulamayla aç</string>
+    <!-- document configure sheet -->
+    <string name="document_wrap_columns">%1$d sütunda kaydır</string>
+    <string name="document_translate_pdf_images">PDF\'deki görselleri çevir</string>
+    <string name="layout_preserve">Satır sonlarını koru</string>
+    <string name="layout_reflow">Paragraflara dönüştür</string>
+    <string name="layout_reflow_wrap">Paragraflara dönüştür ve kaydır</string>
+    <!-- common (additional) -->
+    <string name="common_open">Aç</string>
+    <string name="common_close">Kapat</string>
+    <string name="common_save">Kaydet</string>
+    <!-- translator app -->
+    <string name="translator_translated_file">Çevrilen dosya: %1$s</string>
+    <string name="translator_document_saved">Belge kaydedildi</string>
+    <string name="translator_document_save_failed">Belge kaydedilemedi</string>
+    <string name="translator_audio_playback_failed">Ses oynatma başarısız oldu: %1$s</string>
+    <string name="translator_no_app_to_open">Bu dosyayı açacak bir uygulama bulunamadı</string>
+    <!-- document alignment -->
+    <string name="docalign_decode_failed">Görsel çözümlenemedi.</string>
+    <string name="docalign_detecting">Köşeler algılanıyor…</string>
+    <string name="docalign_redetecting">Yeniden algılanıyor…</string>
+    <string name="docalign_help">Belgenin çevresindeki kesin bir sınır, tanıma kalitesini artırır. Çizgilerin metne paralel olması önemlidir.\n\nYakınlaştırmak ya da kaydırmak genellikle algoritmanın belgeyi otomatik olarak yakalamasını sağlar, ancak bulunamazsa yine de elle ayarlayabilirsin.</string>
+    <!-- how to use -->
+    <string name="howto_section_other_apps">Diğer uygulamalardan</string>
+    <string name="howto_share_title">Paylaşarak çevir</string>
+    <string name="howto_share_body">Çevirmek için herhangi bir uygulamadan metin, bağlantı ya da görsel paylaş.</string>
+    <string name="howto_copy_title">Diğer uygulamalardan çıkmadan çevir</string>
+    <string name="howto_copy_body">Herhangi bir yerde metni seç, ardından kopyalama araç çubuğundaki \"Çevir\"e dokunarak çeviriyi kompakt bir pencerede gör.</string>
+    <string name="howto_section_in_app">Uygulama içinde</string>
+    <string name="howto_docs_title">Belgeleri ve görselleri çevir</string>
+    <string name="howto_docs_body">Görselleri ya da EPUB, PDF ve TXT dosyalarını çevirmek için Belgeler sekmesini aç.</string>
+    <string name="howto_dict_title">Sözlükte arama</string>
+    <string name="howto_dict_body">Tanımını görmek için bir çevirideki herhangi bir kelimeye basılı tut. Veriler Wiktionary\'den alınmıştır.</string>
+    <string name="howto_voice_title">Sesi ya da hızı değiştir</string>
+    <string name="howto_voice_body">Farklı bir ses seçmek ya da oynatma hızını ayarlamak için oynat düğmesine basılı tut.</string>
+    <!-- feature row labels -->
+    <string name="feature_translation">Çeviri</string>
+    <string name="feature_dictionary">Sözlük</string>
+    <string name="feature_tts">Ses</string>
+    <!-- misc -->
+    <string name="detected_translate_from">Şu dilden çevir</string>
+    <string name="detected_missing_language">Eksik dil</string>
+    <string name="main_input_placeholder">Metin gir</string>
+    <string name="aidl_target_unavailable">Hedef dil kullanılamıyor</string>
+</resources>

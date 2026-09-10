@@ -1,0 +1,217 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="stop">બંધ કરો</string>
+    <string name="pause">થોભો</string>
+    <string name="resume">ફરી શરૂ કરો</string>
+    <string name="region_select_menu">અનુવાદનો વિસ્તાર નક્કી કરો</string>
+    <string name="screen_translate_needs_source">કઈ ભાષામાંથી અનુવાદ કરવો એ જણાવો</string>
+    <string name="live_tile_label">સ્ક્રીન લાઇવ અનુવાદ કરો</string>
+    <string name="translate_text">અનુવાદ કરો</string>
+    <string name="translate_link">લિંકનો અનુવાદ કરો</string>
+    <string name="accessibility_service_description">સ્ક્રીન પરના લખાણનો અનુવાદ કરવા આ સેવા ચાલુ કરો. હાલની સ્ક્રીનનો અનુવાદ કરવા ફ્લોટિંગ અનુવાદ બટન દબાવો, અથવા લાઇવ સ્ક્રીન અનુવાદ શરૂ કરો.</string>
+    <string name="tap_to_translate_title">ઝડપી અનુવાદ ચાલુ છે</string>
+    <string name="tap_to_translate_body">અનુવાદક પોપઅપ ખોલવા દબાવો</string>
+    <string name="tap_to_translate_channel">ઝડપી અનુવાદ</string>
+    <string name="tap_to_translate_channel_description">અનુવાદક પોપઅપ ઝડપથી ખોલવા માટેનું કાયમી નોટિફિકેશન</string>
+    <string name="quick_tile_label">અનુવાદ કરો</string>
+    <!-- common -->
+    <string name="common_ok">OK</string>
+    <string name="common_cancel">રદ કરો</string>
+    <string name="common_done">થઈ ગયું</string>
+    <string name="common_grant">પરવાનગી આપો</string>
+    <string name="common_manage">મેનેજ કરો</string>
+    <!-- settings -->
+    <string name="settings_title">સેટિંગ્સ</string>
+    <string name="settings_languages">ભાષાઓ</string>
+    <string name="settings_language_packs">ભાષા પૅક</string>
+    <string name="settings_general">સામાન્ય</string>
+    <string name="settings_font_size">ફોન્ટ સાઇઝ</string>
+    <string name="settings_font_sample">આ થોડું ઉદાહરણ માટેનું લખાણ છે</string>
+    <string name="settings_tap_notification">ઝડપી અનુવાદ નોટિફિકેશન</string>
+    <string name="settings_tap_notification_desc">પોપઅપ ખોલતું કાયમી નોટિફિકેશન.</string>
+    <string name="settings_web_translator">વેબ અનુવાદક</string>
+    <string name="settings_clear_browsing">બંધ કરતી વખતે બ્રાઉઝિંગ ડેટા સાફ કરો</string>
+    <string name="settings_clear_browsing_desc">કૂકીઝ, કૅશ અને લોકલ સ્ટોરેજ ડિલીટ કરે છે.</string>
+    <string name="settings_tts_section">ટેક્સ્ટ થી સ્પીચ</string>
+    <string name="settings_tts_read_urls_hashtags">URL અને હૅશટૅગ વાંચો</string>
+    <string name="settings_popup_settings">પોપઅપ</string>
+    <string name="settings_popup_desc">લખાણ પસંદ કરવાના મેનૂમાંથી \'અનુવાદ કરો\' પસંદ કરો ત્યારે પોપઅપ દેખાય છે</string>
+    <string name="settings_hide_input">ઇનપુટ છુપાવો</string>
+    <string name="settings_popup_position">પોપઅપ સ્થાન</string>
+    <string name="settings_popup_size">પોપઅપ સાઇઝ: %1$d%%</string>
+    <string name="settings_screen_translation">સ્ક્રીન અનુવાદ</string>
+    <string name="settings_screen_translation_desc">બીજી ઍપ્સની ઉપર સીધેસીધો લખાણનો અનુવાદ કરો.</string>
+    <string name="settings_floating_button">હંમેશાં દેખાતું બટન</string>
+    <string name="settings_floating_button_desc">ઍક્સેસિબિલિટી પરવાનગી જરૂરી છે</string>
+    <string name="settings_shortcut">શૉર્ટકટથી સ્ક્રીન અનુવાદ કરો</string>
+    <string name="settings_shortcut_desc">શરૂ કરવા હોમ કે પાવર બટન દબાવી રાખો</string>
+    <string name="settings_on_shortcut">શૉર્ટકટ વાપરો ત્યારે</string>
+    <string name="settings_ocr">ઇમેજ</string>
+    <string name="settings_background_mode">લખાણ આનાથી બદલો</string>
+    <string name="settings_min_confidence">ઓછામાં ઓછી ખાતરી: %1$d%%</string>
+    <string name="settings_max_image_size">વધુમાં વધુ ઇમેજ સાઇઝ: %1$dpx</string>
+    <string name="settings_advanced">એડવાન્સ્ડ</string>
+    <string name="settings_catalog_url">કૅટલૉગ URL</string>
+    <string name="settings_external_storage">એક્સટર્નલ સ્ટોરેજ વાપરો</string>
+    <string name="settings_disable_autodetect">ભાષા આપમેળે ઓળખવાનું બંધ કરો</string>
+    <string name="settings_translit_output">અનુવાદ કરેલા લખાણનું લિપ્યંતર બતાવો</string>
+    <string name="settings_translit_input">મૂળ લખાણનું લિપ્યંતર બતાવો</string>
+    <string name="settings_translit_japanese_spaces">જાપાનીઝ લિપ્યંતરમાં જગ્યા ઉમેરો</string>
+    <string name="settings_translate_pdf_images">PDF માંની ઇમેજનો અનુવાદ કરો</string>
+    <string name="settings_camera_live_default">ડિફૉલ્ટ રીતે કૅમેરા લાઇવ અનુવાદ કરો</string>
+    <string name="settings_register_browser">બ્રાઉઝર તરીકે રજિસ્ટર કરો</string>
+    <string name="settings_register_browser_desc">બીજી ઍપ્સની લિંકનો અનુવાદ કરવાનું સૂચવો.</string>
+    <string name="settings_external_storage_perm_title">એક્સટર્નલ સ્ટોરેજની પરવાનગી</string>
+    <string name="settings_about">વિશે</string>
+    <string name="settings_version">વર્ઝન %1$s</string>
+    <string name="settings_no_languages_available">કોઈ ભાષા ઉપલબ્ધ નથી</string>
+    <string name="settings_default_from">ડિફૉલ્ટ \'જેમાંથી\' ભાષા</string>
+    <string name="settings_default_to">ડિફૉલ્ટ \'જેમાં\' ભાષા</string>
+    <string name="settings_adblock_support">જાહેરાતો બ્લૉક કરો</string>
+    <string name="settings_about_get_help">મદદ મેળવો / સમસ્યા જણાવો</string>
+    <string name="settings_logs_copied">ઍપના લૉગ ક્લિપબોર્ડ પર કૉપિ થયા</string>
+    <string name="settings_about_support">ડેવલપમેન્ટને સપોર્ટ કરો</string>
+    <string name="settings_external_storage_perm_body">તમારા Documents ફોલ્ડરમાં અનુવાદની ફાઇલો સાચવવા માટે, આ ઍપને બધી ફાઇલો મેનેજ કરવાની પરવાનગી જોઈએ છે.\nતમને સેટિંગ્સમાં લઈ જવાશે, જ્યાં તમે \'બધી ફાઇલો મેનેજ કરવાની પરવાનગી આપો\' એ પરવાનગી આપી શકશો.</string>
+    <!-- language manager / setup / how-to -->
+    <string name="langmgr_voices">અવાજ</string>
+    <string name="voice_section_downloaded">ડાઉનલોડ કરેલા</string>
+    <string name="voice_section_available">ઉપલબ્ધ</string>
+    <string name="langmgr_default">ડિફૉલ્ટ</string>
+    <string name="langmgr_filter">ભાષાઓ ફિલ્ટર કરો</string>
+    <string name="langmgr_ocr_upgrade_available">લખાણ ઓળખવા માટેનું વધુ સારું મૉડેલ ઉપલબ્ધ છે.</string>
+    <string name="langmgr_delete_shared_title">શૅર કરેલો ડિક્શનરી ડિલીટ કરવો છે?</string>
+    <string name="langmgr_delete_shared_body">આ ડિક્શનરી %1$s સાથે શૅર કરેલો છે.\nએ ડિલીટ કરવાથી એ બધા માટે ડિક્શનરી હટી જશે.</string>
+    <string name="langmgr_download_size">%1$s ડાઉનલોડ કરો</string>
+    <string name="langmgr_repair_needed">કેટલીક ડાઉનલોડ કરેલી સુવિધાઓની ફાઇલો ખૂટે છે અને સમારકામ ન થાય ત્યાં સુધી કામ કરશે નહીં.</string>
+    <string name="langmgr_repair_size">%1$s સમારકામ કરો</string>
+    <string name="nolang_title">ભાષા સેટઅપ</string>
+    <string name="nolang_prompt">અનુવાદ શરૂ કરવા ભાષા પૅક ડાઉનલોડ કરો</string>
+    <string name="howto_title">કેવી રીતે વાપરવું</string>
+    <!-- image capture / voice / dictionary / language selector -->
+    <string name="image_no_crop_remote">રિમોટ ઇમેજ સીધેસીધી ક્રૉપ કરી શકાતી નથી</string>
+    <string name="image_open_failed">ફાઇલ ખોલવામાં નિષ્ફળ</string>
+    <string name="image_source_screen">સ્ક્રીન</string>
+    <string name="image_source_document">ડૉક્યુમેન્ટ</string>
+    <string name="image_source_photos">ફોટા</string>
+    <string name="image_source_gallery">ગૅલેરી</string>
+    <string name="image_source_camera">કૅમેરા</string>
+    <string name="voice_playback_speed">પ્લેબૅક સ્પીડ</string>
+    <string name="voice_label">અવાજ</string>
+    <string name="voice_default">ડિફૉલ્ટ અવાજ</string>
+    <string name="langsel_auto">✨ ઑટો</string>
+    <string name="dict_also_as">આ રીતે પણ:</string>
+    <!-- camera / browser / screen translate -->
+    <string name="camera_permission_rationale">લાઇવ અનુવાદ માટે કૅમેરાની પરવાનગી જરૂરી છે.</string>
+    <string name="camera_need_ocr_models">આ ભાષા માટે તમારે લખાણ ઓળખવાનાં મૉડેલ ડાઉનલોડ કરવાં પડશે</string>
+    <string name="browser_no_source_language">કોઈ સ્રોત ભાષા ઉપલબ્ધ નથી. પહેલાં મુખ્ય સ્ક્રીન પરથી એક ઇન્સ્ટૉલ કરો, અથવા સેટિંગ્સમાં ડિફૉલ્ટ સ્રોત ભાષા સેટ કરો.</string>
+    <string name="browser_reader_unavailable">આ પેજ માટે રીડર મોડ ઉપલબ્ધ નથી</string>
+    <string name="browser_translate_image">ઇમેજનો અનુવાદ કરો</string>
+    <string name="screen_translating_notification">સ્ક્રીનનો અનુવાદ થઈ રહ્યો છે</string>
+    <!-- enums -->
+    <string name="align_top">ઉપર</string>
+    <string name="align_middle">વચ્ચે</string>
+    <string name="align_bottom">નીચે</string>
+    <string name="assistant_action_still_image">એક વાર અનુવાદ કરો</string>
+    <string name="assistant_action_live_screen">લાઇવ અનુવાદ શરૂ કરો</string>
+    <string name="background_mode_white_on_black">કાળા પર સફેદ</string>
+    <string name="background_mode_black_on_white">સફેદ પર કાળું</string>
+    <string name="background_mode_auto_detect">મૂળ ઇમેજના રંગ</string>
+    <!-- tts / speech errors -->
+    <string name="tts_nothing_to_speak">બોલવા માટે કંઈ નથી</string>
+    <string name="tts_catalog_unavailable">કૅટલૉગ ઉપલબ્ધ નથી</string>
+    <string name="tts_no_voice">%1$s માટે કોઈ અવાજ ઇન્સ્ટૉલ કરેલો નથી</string>
+    <string name="tts_synthesis_failed">%1$s માટે અવાજ બનાવવામાં નિષ્ફળ</string>
+    <string name="tts_sample_fallback">આ Offline Translator નો અવાજનો નમૂનો છે.</string>
+    <!-- translation -->
+    <string name="translation_error">અનુવાદમાં ભૂલ: %1$s</string>
+    <!-- download errors -->
+    <string name="download_failed_core">%1$s ડાઉનલોડ નિષ્ફળ</string>
+    <string name="download_failed_ocr">%1$s ની લખાણ-ઓળખ ડાઉનલોડ નિષ્ફળ</string>
+    <string name="download_failed_ocr_batch">લખાણ-ઓળખનું બૅચ ડાઉનલોડ નિષ્ફળ</string>
+    <string name="download_failed_dictionary">%1$s ડિક્શનરી ડાઉનલોડ નિષ્ફળ</string>
+    <string name="download_failed_tts">%1$s અવાજ ડાઉનલોડ નિષ્ફળ</string>
+    <string name="download_failed_adblock">જાહેરાત-બ્લૉક ડાઉનલોડ નિષ્ફળ</string>
+    <string name="download_failed_repair">સમારકામ ડાઉનલોડ નિષ્ફળ</string>
+    <string name="download_catalog_unavailable">કૅટલૉગ ઉપલબ્ધ નથી</string>
+    <string name="download_catalog_save_failed">કૅટલૉગ સાચવવામાં નિષ્ફળ</string>
+    <string name="download_unknown_error">અજાણી ભૂલ</string>
+    <string name="download_catalog_failed">કૅટલૉગ ડાઉનલોડ કરવામાં નિષ્ફળ: %1$s</string>
+    <!-- assistant overlay status -->
+    <string name="assistant_invoke_prompt">લખાણનો અનુવાદ કરવા તેની ઉપર આ આસિસ્ટન્ટ ચાલુ કરો</string>
+    <string name="assistant_collecting_context">સ્ક્રીનની માહિતી ભેગી થઈ રહી છે…</string>
+    <string name="assistant_screenshot_disabled">આ આસિસ્ટન્ટ માટે સ્ક્રીનશૉટની ઍક્સેસ બંધ છે. એ સિસ્ટમ આસિસ્ટન્ટ સેટિંગ્સમાં ચાલુ કરો.</string>
+    <string name="assistant_no_screen_data">સ્ક્રીનનો કોઈ ડેટા મળ્યો નથી. આ આસિસ્ટન્ટ માટે \'સ્ક્રીનશૉટ વાપરો\' ચાલુ કરો.</string>
+    <string name="assistant_no_screenshot">આ ઍપે કોઈ સ્ક્રીનશૉટ આપ્યો નથી.</string>
+    <string name="assistant_set_source_ocr">ઇમેજમાંથી લખાણ ઓળખવા માટે ડિફૉલ્ટ સ્રોત ભાષા સેટ કરો.</string>
+    <string name="assistant_langs_not_ready">અનુવાદની ભાષાઓ હજી તૈયાર નથી. ફરી પ્રયત્ન કરો.</string>
+    <string name="assistant_ocr_failed">લખાણ ઓળખવામાં નિષ્ફળ</string>
+    <string name="ocr_models_missing">લખાણ ઓળખવાના મૉડલ ખૂટે છે. સમારકામ માટે એપમાં ભાષા વ્યવસ્થાપન ખોલો.</string>
+    <string name="assistant_set_source_live">લાઇવ સ્ક્રીન અનુવાદ વાપરવા સેટિંગ્સમાં ડિફૉલ્ટ સ્રોત ભાષા સેટ કરો.</string>
+    <!-- migration gate -->
+    <string name="migration_updating_speech_models">અવાજનાં મૉડેલ અપડેટ થઈ રહ્યાં છે</string>
+    <string name="migration_accept_convert">સ્વીકારો અને કન્વર્ટ કરો</string>
+    <string name="migration_delete_all">તેના બદલે બધું ડિલીટ કરો</string>
+    <string name="migration_converting">%2$d માંથી %1$d કન્વર્ટ થઈ રહ્યું છે</string>
+    <string name="migration_optimizing">મૉડેલ ઑપ્ટિમાઇઝ થઈ રહ્યાં છે</string>
+    <plurals name="migration_convert_prompt">
+        <item quantity="one">તમારી પાસે %1$d અવાજનું મૉડેલ નવા ફૉર્મેટમાં કન્વર્ટ કરવાનું છે. એમાં આશરે %2$d સેકન્ડ લાગશે. તમે %3$.0f MB ડિસ્ક જગ્યા બચાવશો.</item>
+        <item quantity="other">તમારી પાસે %1$d અવાજનાં મૉડેલ નવા ફૉર્મેટમાં કન્વર્ટ કરવાનાં છે. એમાં આશરે %2$d સેકન્ડ લાગશે. તમે %3$.0f MB ડિસ્ક જગ્યા બચાવશો.</item>
+    </plurals>
+    <!-- document translation notification + progress -->
+    <string name="doc_notif_translating">ફાઇલનો અનુવાદ થઈ રહ્યો છે</string>
+    <string name="doc_notif_translated">ફાઇલનો અનુવાદ થઈ ગયો</string>
+    <string name="doc_notif_phase_text">લખાણ %1$d%%</string>
+    <string name="doc_notif_phase_images">ઇમેજ %1$d/%2$d</string>
+    <string name="doc_notif_phase_raster">બિટમૅપ પાનાં %1$d/%2$d</string>
+    <string name="doc_notif_channel_name">ડૉક્યુમેન્ટ અનુવાદ</string>
+    <string name="doc_notif_channel_desc">ડૉક્યુમેન્ટનો અનુવાદ થાય ત્યારે પ્રગતિ બતાવે છે</string>
+    <string name="doc_progress_preparing">ફાઇલ તૈયાર થઈ રહી છે</string>
+    <string name="doc_progress_translating">અનુવાદ થઈ રહ્યો છે</string>
+    <string name="doc_progress_translated">ફાઇલનો અનુવાદ થઈ ગયો</string>
+    <string name="doc_progress_saving">અનુવાદ કરેલી ફાઇલ સાચવાઈ રહી છે</string>
+    <string name="doc_translation_failed">ડૉક્યુમેન્ટનો અનુવાદ નિષ્ફળ</string>
+    <string name="doc_url_unsupported">તેના બદલે ડૉક્યુમેન્ટ ડાઉનલોડ કરીને ઍપથી ખોલો</string>
+    <!-- document configure sheet -->
+    <string name="document_wrap_columns">%1$d કૉલમ પર લપેટો</string>
+    <string name="document_translate_pdf_images">PDF માંની ઇમેજનો અનુવાદ કરો</string>
+    <string name="layout_preserve">લાઇન બ્રેક જાળવી રાખો</string>
+    <string name="layout_reflow">ફકરામાં ગોઠવો</string>
+    <string name="layout_reflow_wrap">ગોઠવો અને લપેટો</string>
+    <!-- common (additional) -->
+    <string name="common_open">ખોલો</string>
+    <string name="common_close">બંધ કરો</string>
+    <string name="common_save">સાચવો</string>
+    <!-- translator app -->
+    <string name="translator_translated_file">અનુવાદ કરેલી ફાઇલ: %1$s</string>
+    <string name="translator_document_saved">ડૉક્યુમેન્ટ સચવાયું</string>
+    <string name="translator_document_save_failed">ડૉક્યુમેન્ટ સાચવવામાં નિષ્ફળ</string>
+    <string name="translator_audio_playback_failed">ઑડિયો પ્લેબૅક નિષ્ફળ: %1$s</string>
+    <string name="translator_no_app_to_open">આ ફાઇલ ખોલવા માટે કોઈ ઍપ મળી નથી</string>
+    <!-- document alignment -->
+    <string name="docalign_decode_failed">ઇમેજ ડિકોડ કરી શકાઈ નહીં.</string>
+    <string name="docalign_detecting">ખૂણા શોધાઈ રહ્યા છે…</string>
+    <string name="docalign_redetecting">ફરી શોધાઈ રહ્યું છે…</string>
+    <string name="docalign_help">ડૉક્યુમેન્ટની ફરતે ચોક્કસ કિનારી હોય તો ઓળખ વધુ સારી થાય છે. લાઇન લખાણને સમાંતર હોય એ જરૂરી છે.\n\nઝૂમ કરવાથી કે ખસેડવાથી મોટેભાગે અલ્ગોરિધમ આપમેળે ડૉક્યુમેન્ટ પકડી લે છે, પણ ન મળે તો તમે જાતે પણ ગોઠવી શકો છો.</string>
+    <!-- how to use -->
+    <string name="howto_section_other_apps">બીજી ઍપ્સમાંથી</string>
+    <string name="howto_share_title">શૅર કરીને અનુવાદ કરો</string>
+    <string name="howto_share_body">કોઈપણ ઍપમાંથી લખાણ, લિંક કે ઇમેજ શૅર કરો અને તેનો અનુવાદ કરો.</string>
+    <string name="howto_copy_title">બીજી ઍપ્સ છોડ્યા વગર અનુવાદ કરો</string>
+    <string name="howto_copy_body">ગમે ત્યાં લખાણ પસંદ કરો, પછી કૉપિ ટૂલબારમાં \"અનુવાદ કરો\" દબાવો અને નાના પોપઅપમાં અનુવાદ જુઓ.</string>
+    <string name="howto_section_in_app">ઍપની અંદર</string>
+    <string name="howto_docs_title">ડૉક્યુમેન્ટ અને ઇમેજનો અનુવાદ કરો</string>
+    <string name="howto_docs_body">ઇમેજ અથવા EPUB, PDF અને TXT ફાઇલોનો અનુવાદ કરવા Documents ટૅબ ખોલો.</string>
+    <string name="howto_dict_title">ડિક્શનરીમાં શોધ</string>
+    <string name="howto_dict_body">અનુવાદમાંના કોઈપણ શબ્દ પર તેનો અર્થ જોવા દબાવી રાખો. ડેટા Wiktionary માંથી લીધેલો છે.</string>
+    <string name="howto_voice_title">અવાજ કે સ્પીડ બદલો</string>
+    <string name="howto_voice_body">બીજો અવાજ પસંદ કરવા કે પ્લેબૅક સ્પીડ બદલવા પ્લે બટન દબાવી રાખો.</string>
+    <!-- feature row labels -->
+    <string name="feature_translation">અનુવાદ</string>
+    <string name="feature_dictionary">ડિક્શનરી</string>
+    <string name="feature_tts">અવાજ</string>
+    <!-- misc -->
+    <string name="detected_translate_from">આમાંથી અનુવાદ કરો</string>
+    <string name="detected_missing_language">ભાષા ઉપલબ્ધ નથી</string>
+    <string name="main_input_placeholder">લખાણ લખો</string>
+    <string name="aidl_target_unavailable">લક્ષ્ય ભાષા ઉપલબ્ધ નથી</string>
+</resources>

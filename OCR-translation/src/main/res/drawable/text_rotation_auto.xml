@@ -1,0 +1,13 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="960"
+    android:viewportHeight="960">
+    <!-- The "A" glyph from text_rotation_none, centered, with no direction
+         arrow: reading order is decided automatically. -->
+    <group android:translateY="140">
+        <path
+            android:fillColor="#FF1F1F1F"
+            android:pathData="M276,560l164,-440h80l164,440h-76l-38,-112H392l-40,112h-76zM414,384h132l-64,-182h-4l-64,182z" />
+    </group>
+</vector>

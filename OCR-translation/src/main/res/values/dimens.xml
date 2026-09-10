@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="ucrop_padding_crop_frame" tools:override="true" xmlns:tools="http://schemas.android.com/tools">36dp</dimen>
+</resources>

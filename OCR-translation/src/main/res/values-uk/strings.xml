@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="stop">Зупинити</string>
+    <string name="pause">Пауза</string>
+    <string name="resume">Відновити</string>
+    <string name="region_select_menu">Задати область перекладу</string>
+    <string name="screen_translate_needs_source">Вкажи мову оригіналу</string>
+    <string name="live_tile_label">Перекладати екран наживо</string>
+    <string name="translate_text">Перекласти</string>
+    <string name="translate_link">Перекласти посилання</string>
+    <string name="accessibility_service_description">Увімкни цю службу, щоб перекладати текст на екрані. Торкнися плаваючої кнопки перекладу, щоб перекласти поточний екран, або запусти переклад екрана наживо.</string>
+    <string name="tap_to_translate_title">Швидкий переклад увімкнено</string>
+    <string name="tap_to_translate_body">Торкнися, щоб відкрити вікно перекладача</string>
+    <string name="tap_to_translate_channel">Швидкий переклад</string>
+    <string name="tap_to_translate_channel_description">Постійне сповіщення для швидкого доступу до вікна перекладача</string>
+    <string name="quick_tile_label">Перекласти</string>
+    <!-- common -->
+    <string name="common_ok">Гаразд</string>
+    <string name="common_cancel">Скасувати</string>
+    <string name="common_done">Готово</string>
+    <string name="common_grant">Надати</string>
+    <string name="common_manage">Керувати</string>
+    <!-- settings -->
+    <string name="settings_title">Налаштування</string>
+    <string name="settings_languages">Мови</string>
+    <string name="settings_language_packs">Мовні пакети</string>
+    <string name="settings_general">Загальні</string>
+    <string name="settings_font_size">Розмір шрифту</string>
+    <string name="settings_font_sample">Це приклад тексту</string>
+    <string name="settings_tap_notification">Сповіщення швидкого перекладу</string>
+    <string name="settings_tap_notification_desc">Постійне сповіщення, що відкриває спливаюче вікно.</string>
+    <string name="settings_web_translator">Веб-перекладач</string>
+    <string name="settings_clear_browsing">Очищати дані перегляду при закритті</string>
+    <string name="settings_clear_browsing_desc">Видаляє файли cookie, кеш і локальне сховище.</string>
+    <string name="settings_tts_section">Синтез мовлення</string>
+    <string name="settings_tts_read_urls_hashtags">Читати URL і хештеги</string>
+    <string name="settings_popup_settings">Спливаюче вікно</string>
+    <string name="settings_popup_desc">Спливаюче вікно з\'являється, коли ти вибираєш \'Перекласти\' в меню виділення тексту</string>
+    <string name="settings_hide_input">Приховати ввід</string>
+    <string name="settings_popup_position">Положення спливаючого вікна</string>
+    <string name="settings_popup_size">Розмір вікна: %1$d%%</string>
+    <string name="settings_screen_translation">Переклад екрана</string>
+    <string name="settings_screen_translation_desc">Перекладай текст прямо поверх інших застосунків.</string>
+    <string name="settings_floating_button">Постійна кнопка</string>
+    <string name="settings_floating_button_desc">Потребує доступу до спеціальних можливостей</string>
+    <string name="settings_shortcut">Перекладати екран за ярликом</string>
+    <string name="settings_shortcut_desc">Утримуй кнопку «Додому» або живлення, щоб активувати</string>
+    <string name="settings_on_shortcut">При виклику ярлика</string>
+    <string name="settings_ocr">Зображення</string>
+    <string name="settings_background_mode">Замінювати текст на</string>
+    <string name="settings_min_confidence">Мін. впевненість: %1$d%%</string>
+    <string name="settings_max_image_size">Макс. розмір зображення: %1$dpx</string>
+    <string name="settings_advanced">Розширені</string>
+    <string name="settings_catalog_url">URL каталогу</string>
+    <string name="settings_external_storage">Використовувати зовнішнє сховище</string>
+    <string name="settings_disable_autodetect">Вимкнути автоматичне визначення мови</string>
+    <string name="settings_translit_output">Показувати транслітерацію перекладеного тексту</string>
+    <string name="settings_translit_input">Показувати транслітерацію оригінального тексту</string>
+    <string name="settings_translit_japanese_spaces">Додавати пробіли в транслітерації японської</string>
+    <string name="settings_translate_pdf_images">Перекладати зображення в PDF</string>
+    <string name="settings_camera_live_default">Перекладати камеру наживо за замовчуванням</string>
+    <string name="settings_register_browser">Зареєструвати як браузер</string>
+    <string name="settings_register_browser_desc">Пропонувати переклад посилань з інших застосунків.</string>
+    <string name="settings_external_storage_perm_title">Дозвіл на зовнішнє сховище</string>
+    <string name="settings_about">Про застосунок</string>
+    <string name="settings_version">Версія %1$s</string>
+    <string name="settings_no_languages_available">Немає доступних мов</string>
+    <string name="settings_default_from">Мова оригіналу за замовчуванням</string>
+    <string name="settings_default_to">Мова перекладу за замовчуванням</string>
+    <string name="settings_adblock_support">Блокування реклами</string>
+    <string name="settings_about_get_help">Отримати допомогу / повідомити про проблему</string>
+    <string name="settings_logs_copied">Журнали застосунку скопійовано в буфер обміну</string>
+    <string name="settings_about_support">Підтримати розробку</string>
+    <string name="settings_external_storage_perm_body">Щоб зберігати файли перекладу в твоїй папці «Документи», цьому застосунку потрібен доступ для керування всіма файлами.\nТебе буде перенаправлено в Налаштування, де ти зможеш надати дозвіл \'Дозволити доступ для керування всіма файлами\'.</string>
+    <!-- language manager / setup / how-to -->
+    <string name="langmgr_voices">Голоси</string>
+    <string name="voice_section_downloaded">ЗАВАНТАЖЕНІ</string>
+    <string name="voice_section_available">ДОСТУПНІ</string>
+    <string name="langmgr_default">ЗА ЗАМОВЧ.</string>
+    <string name="langmgr_filter">Фільтрувати мови</string>
+    <string name="langmgr_ocr_upgrade_available">Доступна покращена модель розпізнавання тексту.</string>
+    <string name="langmgr_delete_shared_title">Видалити спільний словник?</string>
+    <string name="langmgr_delete_shared_body">Цей словник спільний з %1$s.\nЯкщо його видалити, словник зникне для всіх них.</string>
+    <string name="langmgr_download_size">Завантажити %1$s</string>
+    <string name="langmgr_repair_needed">У деяких завантажених функцій відсутні файли, і вони не працюватимуть до відновлення.</string>
+    <string name="langmgr_repair_size">Відновити %1$s</string>
+    <string name="nolang_title">Налаштування мов</string>
+    <string name="nolang_prompt">Завантаж мовні пакети, щоб почати перекладати</string>
+    <string name="howto_title">Як користуватися</string>
+    <!-- image capture / voice / dictionary / language selector -->
+    <string name="image_no_crop_remote">Віддалені зображення не можна обрізати напряму</string>
+    <string name="image_open_failed">Не вдалося відкрити файл</string>
+    <string name="image_source_screen">Екран</string>
+    <string name="image_source_document">Документ</string>
+    <string name="image_source_photos">Фото</string>
+    <string name="image_source_gallery">Галерея</string>
+    <string name="image_source_camera">Камера</string>
+    <string name="voice_playback_speed">Швидкість відтворення</string>
+    <string name="voice_label">Голос</string>
+    <string name="voice_default">Голос за замовчуванням</string>
+    <string name="langsel_auto">✨ Авто</string>
+    <string name="dict_also_as">Також як:</string>
+    <!-- camera / browser / screen translate -->
+    <string name="camera_permission_rationale">Для перекладу наживо потрібен дозвіл на камеру.</string>
+    <string name="camera_need_ocr_models">Потрібно завантажити моделі розпізнавання тексту для цієї мови</string>
+    <string name="browser_no_source_language">Немає доступної мови оригіналу. Спочатку встанови одну з головного екрана або задай мову оригіналу за замовчуванням у налаштуваннях.</string>
+    <string name="browser_reader_unavailable">Режим читання недоступний для цієї сторінки</string>
+    <string name="browser_translate_image">Перекласти зображення</string>
+    <string name="screen_translating_notification">Переклад екрана</string>
+    <!-- enums -->
+    <string name="align_top">Зверху</string>
+    <string name="align_middle">По центру</string>
+    <string name="align_bottom">Знизу</string>
+    <string name="assistant_action_still_image">Перекласти один раз</string>
+    <string name="assistant_action_live_screen">Запустити переклад наживо</string>
+    <string name="background_mode_white_on_black">Білий на чорному</string>
+    <string name="background_mode_black_on_white">Чорний на білому</string>
+    <string name="background_mode_auto_detect">Кольори оригінального зображення</string>
+    <!-- tts / speech errors -->
+    <string name="tts_nothing_to_speak">Нема чого озвучувати</string>
+    <string name="tts_catalog_unavailable">Каталог недоступний</string>
+    <string name="tts_no_voice">Немає встановленого голосу для %1$s</string>
+    <string name="tts_synthesis_failed">Не вдалося синтезувати мовлення для %1$s</string>
+    <string name="tts_sample_fallback">Це зразок озвучення від Offline Translator.</string>
+    <!-- translation -->
+    <string name="translation_error">Помилка перекладу: %1$s</string>
+    <!-- download errors -->
+    <string name="download_failed_core">Не вдалося завантажити %1$s</string>
+    <string name="download_failed_ocr">Не вдалося завантажити модель розпізнавання тексту для %1$s</string>
+    <string name="download_failed_ocr_batch">Не вдалося завантажити пакет моделей розпізнавання тексту</string>
+    <string name="download_failed_dictionary">Не вдалося завантажити словник %1$s</string>
+    <string name="download_failed_tts">Не вдалося завантажити голос %1$s</string>
+    <string name="download_failed_adblock">Не вдалося завантажити блокувальник реклами</string>
+    <string name="download_failed_repair">Не вдалося завантажити відновлення</string>
+    <string name="download_catalog_unavailable">Каталог недоступний</string>
+    <string name="download_catalog_save_failed">Не вдалося зберегти каталог</string>
+    <string name="download_unknown_error">Невідома помилка</string>
+    <string name="download_catalog_failed">Не вдалося завантажити каталог: %1$s</string>
+    <!-- assistant overlay status -->
+    <string name="assistant_invoke_prompt">Виклич цього помічника поверх тексту, щоб перекласти його</string>
+    <string name="assistant_collecting_context">Збираю контекст екрана…</string>
+    <string name="assistant_screenshot_disabled">Доступ до знімків екрана вимкнено для цього помічника. Увімкни його в системних налаштуваннях помічника.</string>
+    <string name="assistant_no_screen_data">Не отримано даних екрана. Увімкни \'Використовувати знімок екрана\' для цього помічника.</string>
+    <string name="assistant_no_screenshot">Цей застосунок не надав знімок екрана.</string>
+    <string name="assistant_set_source_ocr">Задай мову оригіналу за замовчуванням для розпізнавання тексту.</string>
+    <string name="assistant_langs_not_ready">Мови перекладу ще не готові. Спробуй ще раз.</string>
+    <string name="assistant_ocr_failed">Не вдалося розпізнати текст</string>
+    <string name="ocr_models_missing">Моделі розпізнавання тексту відсутні. Відкрийте керування мовами в застосунку, щоб відновити їх.</string>
+    <string name="assistant_set_source_live">Задай мову оригіналу за замовчуванням у Налаштуваннях, щоб користуватися перекладом екрана наживо.</string>
+    <!-- migration gate -->
+    <string name="migration_updating_speech_models">Оновлення голосових моделей</string>
+    <string name="migration_accept_convert">Прийняти й конвертувати</string>
+    <string name="migration_delete_all">Натомість видалити все</string>
+    <string name="migration_converting">Конвертування %1$d з %2$d</string>
+    <string name="migration_optimizing">Оптимізація моделей</string>
+    <plurals name="migration_convert_prompt">
+        <item quantity="one">У тебе є %1$d голосова модель, яку потрібно конвертувати в новий формат. Це займе приблизно %2$d секунд. Ти звільниш %3$.0f MB місця на диску.</item>
+        <item quantity="few">У тебе є %1$d голосові моделі, які потрібно конвертувати в новий формат. Це займе приблизно %2$d секунд. Ти звільниш %3$.0f MB місця на диску.</item>
+        <item quantity="many">У тебе є %1$d голосових моделей, які потрібно конвертувати в новий формат. Це займе приблизно %2$d секунд. Ти звільниш %3$.0f MB місця на диску.</item>
+        <item quantity="other">У тебе є %1$d голосової моделі, яку потрібно конвертувати в новий формат. Це займе приблизно %2$d секунд. Ти звільниш %3$.0f MB місця на диску.</item>
+    </plurals>
+    <!-- document translation notification + progress -->
+    <string name="doc_notif_translating">Переклад файлу</string>
+    <string name="doc_notif_translated">Файл перекладено</string>
+    <string name="doc_notif_phase_text">Текст %1$d%%</string>
+    <string name="doc_notif_phase_images">Зображення %1$d/%2$d</string>
+    <string name="doc_notif_phase_raster">Растрові сторінки %1$d/%2$d</string>
+    <string name="doc_notif_channel_name">Переклад документів</string>
+    <string name="doc_notif_channel_desc">Показує прогрес під час перекладу документів</string>
+    <string name="doc_progress_preparing">Підготовка файлу</string>
+    <string name="doc_progress_translating">Переклад</string>
+    <string name="doc_progress_translated">Файл перекладено</string>
+    <string name="doc_progress_saving">Збереження перекладеного файлу</string>
+    <string name="doc_translation_failed">Не вдалося перекласти документ</string>
+    <string name="doc_url_unsupported">Завантаж документ і відкрий його в застосунку</string>
+    <!-- document configure sheet -->
+    <string name="document_wrap_columns">Переносити за %1$d стовпцями</string>
+    <string name="document_translate_pdf_images">Перекладати зображення в PDF</string>
+    <string name="layout_preserve">Зберігати розриви рядків</string>
+    <string name="layout_reflow">Перекомпонувати в абзаци</string>
+    <string name="layout_reflow_wrap">Перекомпонувати й переносити</string>
+    <!-- common (additional) -->
+    <string name="common_open">Відкрити</string>
+    <string name="common_close">Закрити</string>
+    <string name="common_save">Зберегти</string>
+    <!-- translator app -->
+    <string name="translator_translated_file">Перекладений файл: %1$s</string>
+    <string name="translator_document_saved">Документ збережено</string>
+    <string name="translator_document_save_failed">Не вдалося зберегти документ</string>
+    <string name="translator_audio_playback_failed">Не вдалося відтворити аудіо: %1$s</string>
+    <string name="translator_no_app_to_open">Не знайдено застосунку для відкриття цього файлу</string>
+    <!-- document alignment -->
+    <string name="docalign_decode_failed">Не вдалося декодувати зображення.</string>
+    <string name="docalign_detecting">Виявлення кутів…</string>
+    <string name="docalign_redetecting">Повторне виявлення…</string>
+    <string name="docalign_help">Точний периметр навколо документа покращує якість розпізнавання. Важливо, щоб лінії були паралельні тексту.\n\nЗазвичай масштабування або переміщення допомагає алгоритму автоматично знайти документ, але ти все одно можеш налаштувати вручну, якщо його не знайдено.</string>
+    <!-- how to use -->
+    <string name="howto_section_other_apps">З інших застосунків</string>
+    <string name="howto_share_title">Поділися, щоб перекласти</string>
+    <string name="howto_share_body">Поділися текстом, посиланнями або зображеннями з будь-якого застосунку, щоб перекласти їх.</string>
+    <string name="howto_copy_title">Перекладай, не виходячи з інших застосунків</string>
+    <string name="howto_copy_body">Виділи текст будь-де, а потім торкнися \"Перекласти\" на панелі копіювання, щоб побачити переклад у компактному вікні.</string>
+    <string name="howto_section_in_app">Усередині застосунку</string>
+    <string name="howto_docs_title">Перекладай документи та зображення</string>
+    <string name="howto_docs_body">Відкрий вкладку «Документи», щоб перекладати зображення або файли EPUB, PDF і TXT.</string>
+    <string name="howto_dict_title">Пошук у словнику</string>
+    <string name="howto_dict_body">Утримуй будь-яке слово в перекладі, щоб побачити його визначення. Дані з Wiktionary.</string>
+    <string name="howto_voice_title">Зміни голос або швидкість</string>
+    <string name="howto_voice_body">Утримуй кнопку відтворення, щоб вибрати інший голос або змінити швидкість відтворення.</string>
+    <!-- feature row labels -->
+    <string name="feature_translation">Переклад</string>
+    <string name="feature_dictionary">Словник</string>
+    <string name="feature_tts">Голос</string>
+    <!-- misc -->
+    <string name="detected_translate_from">Перекласти з</string>
+    <string name="detected_missing_language">Мова відсутня</string>
+    <string name="main_input_placeholder">Введи текст</string>
+    <string name="aidl_target_unavailable">Мова перекладу недоступна</string>
+</resources>

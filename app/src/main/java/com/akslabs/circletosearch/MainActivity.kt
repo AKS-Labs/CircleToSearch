@@ -31,6 +31,7 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -43,6 +44,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
@@ -56,7 +58,10 @@ import androidx.compose.ui.window.DialogProperties
 import com.akslabs.circletosearch.onboarding.PixelCircleSearchOnboardingScreen
 import com.akslabs.circletosearch.ui.components.PrivacyDialog
 import com.akslabs.circletosearch.ui.theme.CircleToSearchTheme
+import com.akslabs.circletosearch.ui.theme.M3ExpressiveShapes
+import com.akslabs.circletosearch.ui.theme.m3ExpressivePress
 import com.akslabs.circletosearch.utils.PrivacyPreferences
+import dev.davidv.translator.MainActivity as TranslatorMainActivity
 import com.akslabs.circletosearch.ui.components.DonateBottomSheet
 import com.akslabs.circletosearch.ui.components.AccessibilityDisclosureDialog
 import com.akslabs.circletosearch.ui.components.UnifiedSearchMethodSelector
@@ -171,61 +176,98 @@ fun SetupScreen(onSettingsClick: () -> Unit, onOcrSettingsClick: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Spacer(modifier = Modifier.height(32.dp))
-            
-            // 1. Header
-            Box(
-                modifier = Modifier.fillMaxWidth()
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                Text(
-                    text = stringResource(R.string.header_title),
-                    style = MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.align(Alignment.Center)
-                )
-                IconButton(
-                    onClick = onSettingsClick,
-                    modifier = Modifier.align(Alignment.CenterEnd)
+                Surface(
+                    shape = M3ExpressiveShapes.Clover4,
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    modifier = Modifier.size(56.dp)
                 ) {
-                     Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.cd_overlay_settings), tint = MaterialTheme.colorScheme.primary)
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.header_title),
+                        style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    Text(
+                        text = stringResource(R.string.subtitle_main),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f),
+                    modifier = Modifier
+                        .size(48.dp)
+                        .m3ExpressivePress(onClick = onSettingsClick)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            Icons.Default.Settings,
+                            contentDescription = stringResource(R.string.cd_overlay_settings),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
                 }
             }
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = stringResource(R.string.subtitle_main),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Start
-            )
-            
-            Spacer(modifier = Modifier.height(32.dp))
 
-            // 2. REQUIRED: Accessibility Service
-            Text(
-                text = stringResource(R.string.label_required),
-                style = MaterialTheme.typography.labelSmall,
-                color = if (isAccessibilityEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
-                modifier = Modifier.align(Alignment.Start).padding(bottom = 8.dp)
-            )
+            Spacer(modifier = Modifier.height(28.dp))
+
+            Surface(
+                shape = M3ExpressiveShapes.SlantedPill,
+                color = (if (isAccessibilityEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error).copy(alpha = 0.12f),
+                modifier = Modifier.align(Alignment.Start)
+            ) {
+                Text(
+                    text = stringResource(R.string.label_required),
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                    color = if (isAccessibilityEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
+                )
+            }
+            Spacer(modifier = Modifier.height(10.dp))
             
             if (isAccessibilityEnabled) {
-                // Granted State
                 Card(
                      colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
                     ),
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
+                    shape = M3ExpressiveShapes.AsymmetricCard,
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
                         modifier = Modifier.padding(16.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.CheckCircle,
-                            contentDescription = stringResource(R.string.cd_granted),
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(24.dp)
-                        )
+                        Surface(
+                            shape = M3ExpressiveShapes.Clover4,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.CheckCircle,
+                                    contentDescription = stringResource(R.string.cd_granted),
+                                    tint = MaterialTheme.colorScheme.onPrimary,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        }
                         Spacer(modifier = Modifier.width(16.dp))
                         Column {
                             Text(
@@ -242,7 +284,6 @@ fun SetupScreen(onSettingsClick: () -> Unit, onOcrSettingsClick: () -> Unit) {
                     }
                 }
             } else {
-                 // Action Needed State
                 Card(
                     onClick = {
                         showAccessibilityDisclosure = true
@@ -250,19 +291,29 @@ fun SetupScreen(onSettingsClick: () -> Unit, onOcrSettingsClick: () -> Unit) {
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.errorContainer
                     ),
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
-                    modifier = Modifier.fillMaxWidth()
+                    shape = M3ExpressiveShapes.AsymmetricCard,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .m3ExpressivePress()
                 ) {
                     Row(
                         modifier = Modifier.padding(16.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Accessibility,
-                            contentDescription = null,
-                            modifier = Modifier.size(24.dp),
-                            tint = MaterialTheme.colorScheme.onErrorContainer
-                        )
+                        Surface(
+                            shape = M3ExpressiveShapes.Clover4,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.Accessibility,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(24.dp),
+                                    tint = MaterialTheme.colorScheme.onError
+                                )
+                            }
+                        }
                         Spacer(modifier = Modifier.width(16.dp))
                         Column {
                             Text(
@@ -282,33 +333,46 @@ fun SetupScreen(onSettingsClick: () -> Unit, onOcrSettingsClick: () -> Unit) {
             
             Spacer(modifier = Modifier.height(24.dp))
 
-            // 3. OPTIONAL: Default Assistant
-            Text(
-                text = stringResource(R.string.label_optional_assistant),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.secondary,
-                modifier = Modifier.align(Alignment.Start).padding(bottom = 8.dp)
-            )
+            Surface(
+                shape = M3ExpressiveShapes.SlantedPill,
+                color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.12f),
+                modifier = Modifier.align(Alignment.Start)
+            ) {
+                Text(
+                    text = stringResource(R.string.label_optional_assistant),
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
+                )
+            }
+            Spacer(modifier = Modifier.height(10.dp))
 
             if (isDefaultAssistant) {
-                 // Granted State
                 Card(
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f)
                     ),
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
+                    shape = M3ExpressiveShapes.AsymmetricCard,
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
                         modifier = Modifier.padding(16.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.CheckCircle,
-                            contentDescription = stringResource(R.string.cd_active),
-                            tint = MaterialTheme.colorScheme.secondary,
-                            modifier = Modifier.size(24.dp)
-                        )
+                        Surface(
+                            shape = M3ExpressiveShapes.Clover4,
+                            color = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.CheckCircle,
+                                    contentDescription = stringResource(R.string.cd_active),
+                                    tint = MaterialTheme.colorScheme.onSecondary,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        }
                         Spacer(modifier = Modifier.width(16.dp))
                          Text(
                             text = stringResource(R.string.label_default_assistant_set),
@@ -318,7 +382,6 @@ fun SetupScreen(onSettingsClick: () -> Unit, onOcrSettingsClick: () -> Unit) {
                     }
                 }
             } else {
-                 // Action State
                 Card(
                     onClick = {
                         val intent = Intent(Settings.ACTION_VOICE_INPUT_SETTINGS)
@@ -327,19 +390,29 @@ fun SetupScreen(onSettingsClick: () -> Unit, onOcrSettingsClick: () -> Unit) {
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.primaryContainer
                     ),
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp),
-                    modifier = Modifier.fillMaxWidth()
+                    shape = M3ExpressiveShapes.AsymmetricCard,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .m3ExpressivePress()
                 ) {
                     Row(
                         modifier = Modifier.padding(16.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.TouchApp,
-                            contentDescription = null,
-                            modifier = Modifier.size(24.dp),
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
+                        Surface(
+                            shape = M3ExpressiveShapes.Clover4,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.TouchApp,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(24.dp),
+                                    tint = MaterialTheme.colorScheme.onPrimary
+                                )
+                            }
+                        }
                         Spacer(modifier = Modifier.width(16.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
@@ -359,25 +432,33 @@ fun SetupScreen(onSettingsClick: () -> Unit, onOcrSettingsClick: () -> Unit) {
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // 4. Settings (Bubble)
-            Text(
-                text = stringResource(R.string.section_customization),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.secondary,
+            Surface(
+                shape = M3ExpressiveShapes.SlantedPill,
+                color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.12f),
                 modifier = Modifier.align(Alignment.Start)
-            )
+            ) {
+                Text(
+                    text = stringResource(R.string.section_customization),
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
+                )
+            }
+            Spacer(modifier = Modifier.height(10.dp))
             BubbleSwitch(context)
-            
+
             val uiPreferences = remember { com.akslabs.circletosearch.utils.UIPreferences(context) }
 
-            Column(
+            Card(
+                shape = M3ExpressiveShapes.AsymmetricCard,
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+                ),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 16.dp)
-                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(20.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
-                    .padding(16.dp)
             ) {
+                Column(modifier = Modifier.padding(16.dp)) {
                 UnifiedSearchMethodSelector(
                     uiPreferences = uiPreferences
                 )
@@ -400,15 +481,107 @@ fun SetupScreen(onSettingsClick: () -> Unit, onOcrSettingsClick: () -> Unit) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+                }
             }
-            
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.label_ocr_settings)) },
-                supportingContent = { Text(stringResource(R.string.label_ocr_settings_subtitle)) },
-                trailingContent = { Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(16.dp)) },
-                modifier = Modifier.clickable(onClick = onOcrSettingsClick),
-                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Card(
+                onClick = onOcrSettingsClick,
+                shape = M3ExpressiveShapes.AsymmetricCard,
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .m3ExpressivePress()
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Surface(
+                        shape = M3ExpressiveShapes.Clover4,
+                        color = MaterialTheme.colorScheme.tertiaryContainer,
+                        modifier = Modifier.size(48.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                Icons.Default.Settings,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.label_ocr_settings),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = stringResource(R.string.label_ocr_settings_subtitle),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Card(
+                onClick = {
+                    try {
+                        context.startActivity(Intent(context, TranslatorMainActivity::class.java))
+                    } catch (e: Exception) {
+                        android.widget.Toast.makeText(context, "Could not launch translator: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
+                    }
+                },
+                shape = M3ExpressiveShapes.AsymmetricCard,
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.6f)
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .m3ExpressivePress()
+                    .testTag("test_translator_button")
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Surface(
+                        shape = M3ExpressiveShapes.Clover4,
+                        color = MaterialTheme.colorScheme.tertiary,
+                        modifier = Modifier.size(48.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                Icons.Default.Translate,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onTertiary,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Offline Translator (Test)",
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                        )
+                        Text(
+                            text = "Open the translator home screen",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f)
+                        )
+                    }
+                }
+            }
 //            Spacer(modifier = Modifier.height(25.dp))
 //
 //            // Privacy Note
@@ -428,22 +601,21 @@ fun SetupScreen(onSettingsClick: () -> Unit, onOcrSettingsClick: () -> Unit) {
                 onDonateClick = { showDonateSheet = true }
             )
             Spacer(modifier = Modifier.height(20.dp))
-            Box(
-                modifier = Modifier
-                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
-                    .clickable {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/aks-labs"))
-                        context.startActivity(intent)
-                    }
-                    .padding(8.dp),
-                contentAlignment = Alignment.Center
+            Surface(
+                shape = M3ExpressiveShapes.SlantedPill,
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                modifier = Modifier.m3ExpressivePress(onClick = {
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/aks-labs"))
+                    context.startActivity(intent)
+                })
             ) {
                 Text(
                     text = stringResource(R.string.label_from_akslabs),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
                     textAlign = TextAlign.Center,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp)
                 )
             }
             Spacer(modifier = Modifier.height(2.dp))
@@ -785,10 +957,44 @@ fun BubbleSwitch(context: android.content.Context) {
     val prefs = context.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
     val isBubbleEnabled = remember { mutableStateOf(prefs.getBoolean("bubble_enabled", false)) }
 
-    ListItem(
-        headlineContent = { Text(stringResource(R.string.label_floating_bubble)) },
-        supportingContent = { Text(stringResource(R.string.label_floating_bubble_subtitle)) },
-        trailingContent = {
+    Card(
+        shape = M3ExpressiveShapes.AsymmetricCard,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+        ),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                shape = M3ExpressiveShapes.Clover4,
+                color = MaterialTheme.colorScheme.tertiaryContainer,
+                modifier = Modifier.size(48.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.TouchApp,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.label_floating_bubble),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = stringResource(R.string.label_floating_bubble_subtitle),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
             Switch(
                 checked = isBubbleEnabled.value,
                 onCheckedChange = { enabled ->
@@ -796,10 +1002,7 @@ fun BubbleSwitch(context: android.content.Context) {
                     prefs.edit().putBoolean("bubble_enabled", enabled).apply()
                 }
             )
-        },
-        colors = ListItemDefaults.colors(
-            containerColor = Color.Transparent
-        )
-    )
+        }
+    }
 }
 
