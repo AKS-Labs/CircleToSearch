@@ -132,6 +132,11 @@
 
         <!-- WebViewActivity removed - not implemented -->
 
+        <!-- Translator module service: hidden so only this app appears in system settings -->
+        <service
+            android:name="dev.davidv.translator.accessibilityOverlay.TranslatorAccessibilityService"
+            tools:node="remove" />
+
     </application>
 
 </manifest>

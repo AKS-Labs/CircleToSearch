@@ -27,8 +27,9 @@ import dev.davidv.translator.SettingsManager
 
 /**
  *  Quick Settings tile that starts live screen translation with the user's
- *  default languages — needs only the overlay grant + MediaProjection consent
- *  (handled by [ScreenCaptureRequestActivity]), no accessibility or assistant.
+ *  default languages — needs the shared host accessibility permission (which
+ *  covers overlay drawing) + MediaProjection consent (handled by
+ *  [ScreenCaptureRequestActivity]).
  *  Live can't run the per-frame script classifier, so a default source language
  *  must be set.
  */

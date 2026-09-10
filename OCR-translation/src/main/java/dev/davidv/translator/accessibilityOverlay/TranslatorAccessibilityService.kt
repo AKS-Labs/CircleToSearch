@@ -37,7 +37,9 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-class TranslatorAccessibilityService : AccessibilityService() {
+class TranslatorAccessibilityService : AccessibilityService(), TranslatorOverlayHost {
+  override val hostContext: Context
+    get() = this
   private val tag = "TranslatorA11y"
   private lateinit var windowManager: WindowManager
   private var active = false
@@ -62,7 +64,7 @@ class TranslatorAccessibilityService : AccessibilityService() {
   private lateinit var translationCoordinator: TranslationCoordinator
   private var ocrReadingOrder: ReadingOrder? = null
   private lateinit var overlayTextTranslationHelper: OverlayTextTranslationHelper
-  lateinit var langStateManager: LanguageStateManager
+  override lateinit var langStateManager: LanguageStateManager
     private set
 
   lateinit var ui: OverlayUI
@@ -127,7 +129,7 @@ class TranslatorAccessibilityService : AccessibilityService() {
       }
     }
 
-    ui = OverlayUI(this, windowManager, settingsManager)
+    ui = OverlayUI(this, this, windowManager, settingsManager)
 
     androidx.core.content.ContextCompat.registerReceiver(
       this,
@@ -183,7 +185,7 @@ class TranslatorAccessibilityService : AccessibilityService() {
     super.onDestroy()
   }
 
-  fun activate() {
+  override fun activate() {
     if (active) return
     active = true
     serviceInfo = serviceInfo.apply { eventTypes = liveEventTypes() }
@@ -199,7 +201,7 @@ class TranslatorAccessibilityService : AccessibilityService() {
     }
   }
 
-  fun deactivate() {
+  override fun deactivate() {
     active = false
     selectMode = false
     serviceInfo = serviceInfo.apply { eventTypes = 0 }
@@ -213,7 +215,7 @@ class TranslatorAccessibilityService : AccessibilityService() {
     ui.restoreFloatingButton()
   }
 
-  fun toggleSelectMode() {
+  override fun toggleSelectMode() {
     if (selectMode) {
       exitSelectMode()
       return
@@ -250,12 +252,12 @@ class TranslatorAccessibilityService : AccessibilityService() {
     if (selectMode) exitSelectMode()
   }
 
-  fun toggleFlipOriginal() {
+  override fun toggleFlipOriginal() {
     if (!selectMode) return
     ui.setFlipActive(surfaceState.toggleShowOriginal())
   }
 
-  fun swapLanguages() {
+  override fun swapLanguages() {
     val oldSource = forcedSourceLanguage ?: return
     val oldTarget = forcedTargetLanguage ?: langStateManager.languageByCode(settingsManager.settings.value.defaultTargetLanguageCode) ?: return
     if (!langStateManager.canSwapLanguages(oldSource, oldTarget)) return
@@ -269,7 +271,7 @@ class TranslatorAccessibilityService : AccessibilityService() {
     }
   }
 
-  fun showLanguagePicker(isSource: Boolean) {
+  override fun showLanguagePicker(isSource: Boolean) {
     serviceScope.launch {
       langStateManager.refreshLanguageAvailability()
       val availableLangs = overlayTextTranslationHelper.awaitAvailableLanguages(isSource)
@@ -293,7 +295,7 @@ class TranslatorAccessibilityService : AccessibilityService() {
     }
   }
 
-  fun toggleJapaneseOcrMode() {
+  override fun toggleJapaneseOcrMode() {
     if (forcedSourceLanguage?.code != "ja") return
     ocrReadingOrder =
       when (ocrReadingOrder) {
@@ -307,11 +309,16 @@ class TranslatorAccessibilityService : AccessibilityService() {
     }
   }
 
-  fun showDotsMenu() {
+  override fun showDotsMenu() {
     ui.showDotsMenu()
   }
 
-  fun handleFullScreenOcr() {
+  override fun disableService() {
+    deactivate()
+    disableSelf()
+  }
+
+  override fun handleFullScreenOcr() {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
 
     // In select mode the frozen surface covers the screen, so a fresh screenshot would capture

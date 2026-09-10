@@ -157,6 +157,19 @@ class ScreenTranslateService : Service() {
       return START_NOT_STICKY
     }
 
+    // Order matters under targetSdk 35+ enforcement: a running foreground
+    // service is required before getMediaProjection, but the typed
+    // mediaProjection foreground call requires the projection to exist.
+    startForegroundUntyped()
+
+    val pm = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+    val proj = pm.getMediaProjection(resultCode, data)
+    if (proj == null) {
+      Log.e(TAG, "getMediaProjection returned null; stopping")
+      stopEverything()
+      return START_NOT_STICKY
+    }
+
     startForegroundNotification()
 
     val app = applicationContext as TranslatorApplication
@@ -175,13 +188,6 @@ class ScreenTranslateService : Service() {
       return START_NOT_STICKY
     }
 
-    val pm = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-    val proj = pm.getMediaProjection(resultCode, data)
-    if (proj == null) {
-      Log.e(TAG, "getMediaProjection returned null; stopping")
-      stopEverything()
-      return START_NOT_STICKY
-    }
     proj.registerCallback(projectionCallback, null)
     projection = proj
 
@@ -239,12 +245,7 @@ class ScreenTranslateService : Service() {
   }
 
   private fun overlayWindowType(): Int =
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-      WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-    } else {
-      @Suppress("DEPRECATION")
-      WindowManager.LayoutParams.TYPE_PHONE
-    }
+    WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
 
   private fun dpToPx(dp: Int): Int = (dp * resources.displayMetrics.density).toInt()
 
@@ -252,7 +253,7 @@ class ScreenTranslateService : Service() {
     tracker: uniffi.bindings.LiveScreenTracker,
     proj: MediaProjection,
   ) {
-    val wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+    val wm = dev.davidv.translator.RoutedWindowManager(getSystemService(Context.WINDOW_SERVICE) as WindowManager)
     windowManager = wm
 
     val metrics = DisplayMetrics()
@@ -588,7 +589,7 @@ class ScreenTranslateService : Service() {
     removeRegionEditor()
   }
 
-  private fun startForegroundNotification() {
+  private fun buildNotification(): Notification {
     val channelId = "screen_translate"
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
       val nm = getSystemService(NotificationManager::class.java)
@@ -611,14 +612,21 @@ class ScreenTranslateService : Service() {
         stopIntent,
         android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT,
       )
-    val notification: Notification =
-      androidx.core.app.NotificationCompat.Builder(this, channelId)
-        .setContentTitle(getString(R.string.app_name))
-        .setContentText(getString(R.string.screen_translating_notification))
-        .setSmallIcon(R.drawable.ic_translate_button)
-        .setOngoing(true)
-        .addAction(R.drawable.cancel, "Stop", stopPending)
-        .build()
+    return androidx.core.app.NotificationCompat.Builder(this, channelId)
+      .setContentTitle(getString(R.string.app_name))
+      .setContentText(getString(R.string.screen_translating_notification))
+      .setSmallIcon(R.drawable.ic_translate_button)
+      .setOngoing(true)
+      .addAction(R.drawable.cancel, "Stop", stopPending)
+      .build()
+  }
+
+  private fun startForegroundUntyped() {
+    startForeground(NOTIFICATION_ID, buildNotification())
+  }
+
+  private fun startForegroundNotification() {
+    val notification = buildNotification()
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
       startForeground(
         NOTIFICATION_ID,

@@ -73,6 +73,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import dev.davidv.translator.AppSettings
 import dev.davidv.translator.BackgroundMode
 import dev.davidv.translator.DownloadService
@@ -83,6 +84,7 @@ import dev.davidv.translator.LanguageCatalog
 import dev.davidv.translator.LanguageMetadataManager
 import dev.davidv.translator.PermissionHelper
 import dev.davidv.translator.R
+import dev.davidv.translator.isHostAccessibilityGranted
 import dev.davidv.translator.ReadonlyModalOutputAlignment
 import dev.davidv.translator.Script
 import dev.davidv.translator.TapToTranslateNotification
@@ -249,6 +251,11 @@ fun SettingsScreen(
 ) {
   val context = LocalContext.current
   var showPermissionDialog by remember { mutableStateOf(false) }
+  var hostAccessibilityGranted by remember { mutableStateOf(isHostAccessibilityGranted(context)) }
+  LifecycleResumeEffect(Unit) {
+    hostAccessibilityGranted = isHostAccessibilityGranted(context)
+    onPauseOrDispose {}
+  }
 
   val permissionLauncher =
     rememberLauncherForActivityResult(
@@ -678,6 +685,13 @@ fun SettingsScreen(
                   text = stringResource(R.string.settings_floating_button_desc),
                   style = MaterialTheme.typography.bodySmall,
                   color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                  text = stringResource(
+                    if (hostAccessibilityGranted) R.string.common_enabled else R.string.common_disabled,
+                  ),
+                  style = MaterialTheme.typography.bodySmall,
+                  color = if (hostAccessibilityGranted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
                 )
               }
 

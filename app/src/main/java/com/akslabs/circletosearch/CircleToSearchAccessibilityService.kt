@@ -75,6 +75,8 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
     
     /** Kept by companion so scroll events can re-scan copy-text nodes. */
     internal var copyTextManager: CopyTextOverlayManager? = null
+
+    private var translatorBridge: TranslatorOverlayBridge? = null
     
     // Bubble related - Keeping existing logic but refactoring slightly if needed
     // For now, keeping bubble separate as requested in prompt "statusbar overlay customization... but it should work normally like now"
@@ -111,7 +113,20 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         
         prefs.registerOnSharedPreferenceChangeListener(prefsListener)
         overlayPrefs.registerOnSharedPreferenceChangeListener(overlayPrefsListener)
-        
+
+        val wm = windowManager
+        if (wm != null) {
+            runCatching {
+                TranslatorOverlayBridge(this, wm).also {
+                    translatorBridge = it
+                    it.start()
+                }
+            }.onFailure {
+                android.util.Log.e("CircleToSearch", "Translator overlay bridge failed to start", it)
+                translatorBridge = null
+            }
+        }
+
         updateBubbleState()
         updateOverlay()
     }
@@ -1159,6 +1174,7 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         if (event?.eventType == AccessibilityEvent.TYPE_VIEW_SCROLLED) {
             copyTextManager?.rescanNodes()
         }
+        translatorBridge?.onHostAccessibilityEvent(event)
     }
 
     override fun onInterrupt() {}
@@ -1196,6 +1212,8 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
     override fun onDestroy() {
         super.onDestroy()
         instance = null
+        runCatching { translatorBridge?.destroy() }
+        translatorBridge = null
         prefs.unregisterOnSharedPreferenceChangeListener(prefsListener)
         overlayPrefs.unregisterOnSharedPreferenceChangeListener(overlayPrefsListener)
         

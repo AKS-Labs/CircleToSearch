@@ -1,6 +1,7 @@
 package dev.davidv.translator.accessibilityOverlay
 
 import android.app.Dialog
+import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Color
@@ -35,7 +36,8 @@ import dev.davidv.translator.ui.components.SelectionSurfaceState
 import dev.davidv.translator.ui.components.WindowComposeHost
 
 class OverlayUI(
-  private val service: TranslatorAccessibilityService,
+  private val service: TranslatorOverlayHost,
+  private val serviceContext: Context,
   private val windowManager: WindowManager,
   private val settingsManager: SettingsManager,
 ) {
@@ -59,7 +61,7 @@ class OverlayUI(
 
   private val menuManager =
     OverlayMenuManager(
-      service,
+      serviceContext,
       ::dpToPx,
       object : OverlayMenuHost {
         override fun addDismissLayer(view: View) {
@@ -115,7 +117,7 @@ class OverlayUI(
     val bubble = launcherBubble
     if (bubble == null) {
       launcherBubble =
-        FloatingBubble(service, windowManager, WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY, ::dpToPx) {
+        FloatingBubble(serviceContext, windowManager, WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY, ::dpToPx) {
           service.activate()
         }.also { it.show() }
     } else {
@@ -141,7 +143,7 @@ class OverlayUI(
 
     val toolbarViews =
       OverlayChromeFactory.createLanguageToolbar(
-        context = service,
+          context = serviceContext,
         dpToPx = ::dpToPx,
         forcedSourceLanguage = forcedSourceLanguage,
         forcedTargetLanguage = forcedTargetLanguage,
@@ -236,13 +238,13 @@ class OverlayUI(
       listOf(
         "Open App" to {
           service.deactivate()
-          val intent = Intent(service, MainActivity::class.java)
+          val intent = Intent(serviceContext, MainActivity::class.java)
           intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-          service.startActivity(intent)
+          serviceContext.startActivity(intent)
         },
         "Disable Service" to {
           service.deactivate()
-          service.disableSelf()
+          service.disableService()
         },
       ),
     )
@@ -266,7 +268,7 @@ class OverlayUI(
     bitmap: Bitmap,
     bounds: Rect,
   ) {
-    val imageView = ImageView(service)
+    val imageView = ImageView(serviceContext)
     imageView.setImageBitmap(bitmap)
     imageView.scaleType = ImageView.ScaleType.FIT_XY
 
@@ -305,8 +307,8 @@ class OverlayUI(
     onDismiss: () -> Unit,
   ) {
     if (selectDialog != null) return
-    val dialog = Dialog(service, android.R.style.Theme_Material_NoActionBar)
-    val host = WindowComposeHost(service)
+    val dialog = Dialog(serviceContext, android.R.style.Theme_Material_NoActionBar)
+    val host = WindowComposeHost(serviceContext)
     host.setContent { SelectionSurface(state) }
     dialog.setContentView(host.view)
     dialog.setCanceledOnTouchOutside(false)
@@ -353,7 +355,7 @@ class OverlayUI(
   @android.annotation.SuppressLint("ClickableViewAccessibility")
   private fun ensureTouchWatcher() {
     if (touchWatcher != null) return
-    val watcher = View(service)
+    val watcher = View(serviceContext)
     watcher.setOnTouchListener { _, event ->
       // The system zeroes ACTION_OUTSIDE coordinates unless the touched window belongs to our
       // own UID: real coordinates mean the touch landed on our chrome (toolbar, menus, their
@@ -397,7 +399,7 @@ class OverlayUI(
     region: Rect,
   ) {
     if (scanHost != null) return
-    val host = WindowComposeHost(service)
+    val host = WindowComposeHost(serviceContext)
     host.setContent {
       state.regions.value?.let {
         ScanAnimationOverlay(regions = it, modifier = Modifier.fillMaxSize())
@@ -434,7 +436,7 @@ class OverlayUI(
   }
 
   fun showOverlayMessage(message: String) {
-    val textView = TextView(service)
+    val textView = TextView(serviceContext)
     textView.text = message
     textView.setTextColor(Color.WHITE)
     textView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
@@ -479,11 +481,11 @@ class OverlayUI(
     removeTouchWatcher()
   }
 
-  fun getStatusBarHeight(): Int = OverlayInsets.topInset(windowManager, service.resources)
+  fun getStatusBarHeight(): Int = OverlayInsets.topInset(windowManager, serviceContext.resources)
 
   fun showBorderWave() {
     if (borderView != null) return
-    val view = BorderWaveView.create(service)
+    val view = BorderWaveView.create(serviceContext)
     val params =
       WindowManager.LayoutParams(
         WindowManager.LayoutParams.MATCH_PARENT,
@@ -517,5 +519,5 @@ class OverlayUI(
     launcherBubble = null
   }
 
-  internal fun dpToPx(dp: Int): Int = (dp * service.resources.displayMetrics.density).toInt()
+  fun dpToPx(dp: Int): Int = (dp * serviceContext.resources.displayMetrics.density).toInt()
 }

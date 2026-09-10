@@ -21,6 +21,8 @@
     <string name="common_done">Done</string>
     <string name="common_grant">Grant</string>
     <string name="common_manage">Manage</string>
+    <string name="common_enabled">Enabled</string>
+    <string name="common_disabled">Disabled</string>
 
     <!-- settings -->
     <string name="settings_title">Settings</string>

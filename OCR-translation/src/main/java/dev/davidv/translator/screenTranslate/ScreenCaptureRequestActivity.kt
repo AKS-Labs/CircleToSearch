@@ -21,41 +21,35 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.media.projection.MediaProjectionManager
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.util.Log
 import androidx.core.content.ContextCompat
+import dev.davidv.translator.isHostAccessibilityGranted
 
 /**
  *  Transient, invisible activity that turns the screen-translate button into a
  *  running [ScreenTranslateService]. A `VoiceInteractionSession` can't itself
- *  ask for the SYSTEM_ALERT_WINDOW grant or the MediaProjection consent (both
- *  need an Activity result), so the button launches this; once both are
- *  granted it hands the projection token to the service and finishes.
+ *  ask for the MediaProjection consent (needs an Activity result), so the
+ *  button launches this; overlay drawing is covered by the shared host
+ *  accessibility permission, then it hands the projection token to the service
+ *  and finishes.
  */
 class ScreenCaptureRequestActivity : Activity() {
   private val tag = "ScreenCaptureRequest"
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
-    if (!canDrawOverlays()) {
-      requestOverlayPermission()
+    if (!isHostAccessibilityGranted(this)) {
+      requestAccessibilityPermission()
       return
     }
     requestProjection()
   }
 
-  private fun canDrawOverlays(): Boolean = Build.VERSION.SDK_INT < Build.VERSION_CODES.M || Settings.canDrawOverlays(this)
-
-  private fun requestOverlayPermission() {
-    val intent =
-      Intent(
-        Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-        Uri.parse("package:$packageName"),
-      )
-    startActivityForResult(intent, REQ_OVERLAY)
+  private fun requestAccessibilityPermission() {
+    startActivityForResult(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS), REQ_OVERLAY)
   }
 
   private fun requestProjection() {
@@ -81,10 +75,10 @@ class ScreenCaptureRequestActivity : Activity() {
     super.onActivityResult(requestCode, resultCode, data)
     when (requestCode) {
       REQ_OVERLAY -> {
-        if (canDrawOverlays()) {
+        if (isHostAccessibilityGranted(this)) {
           requestProjection()
         } else {
-          Log.i(tag, "Overlay permission denied")
+          Log.i(tag, "Accessibility permission denied")
           finishAndRemoveTask()
         }
       }
