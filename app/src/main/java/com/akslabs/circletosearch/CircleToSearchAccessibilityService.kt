@@ -1190,6 +1190,20 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         return true
     }
 
+    /**
+     * Translates [screenshot] in place via the translator module's pipeline without
+     * drawing overlay windows; [onDone] receives the translated bitmap (null on
+     * failure). Invoked on the main thread.
+     */
+    fun translateCapturedScreenInPlace(screenshot: Bitmap, onDone: (Bitmap?) -> Unit) {
+        val bridge = translatorBridge
+        if (bridge == null) {
+            onDone(null)
+            return
+        }
+        bridge.translateInPlace(screenshot, onDone)
+    }
+
     companion object {
         var instance: CircleToSearchAccessibilityService? = null
             private set

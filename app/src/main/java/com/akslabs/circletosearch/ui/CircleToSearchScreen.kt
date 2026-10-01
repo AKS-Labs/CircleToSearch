@@ -43,6 +43,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -413,7 +414,11 @@ fun CircleToSearchScreen(
     var isSearching by remember { mutableStateOf(false) }
     var selectionRect by remember { mutableStateOf<Rect?>(null) }
     val selectionAnim = remember { androidx.compose.animation.core.Animatable(0f) }
-    
+
+    // In-place translation of the captured screenshot (Translate button, short press)
+    var translatedScreenshot by remember { mutableStateOf<Bitmap?>(null) }
+    var isTranslating by remember { mutableStateOf(false) }
+
     // Lifecycle reset: When screenshot changes, reset selection and modes
     LaunchedEffect(screenshot) {
         if (screenshot != null) {
@@ -423,6 +428,8 @@ fun CircleToSearchScreen(
             isSearching = false
             currentPathPoints.clear()
             selectionAnim.snapTo(0f)
+            translatedScreenshot = null
+            isTranslating = false
         }
     }
     
@@ -906,6 +913,16 @@ fun CircleToSearchScreen(
                         modifier = Modifier.fillMaxSize()
                     )
 
+                    // In-place translated view of the same capture (toggle via Translate button)
+                    translatedScreenshot?.let { translated ->
+                        Image(
+                            bitmap = translated.asImageBitmap(),
+                            contentDescription = null,
+                            contentScale = ContentScale.FillBounds,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+
 
                     // Tint Overlay (Punch-out style)
                     Canvas(modifier = Modifier.fillMaxSize()) {
@@ -939,6 +956,11 @@ fun CircleToSearchScreen(
                                 cornerRadius = CornerRadius(48f),
                                 blendMode = androidx.compose.ui.graphics.BlendMode.Clear
                             )
+                        }
+                    }
+                    if (isTranslating) {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            androidx.compose.material3.CircularProgressIndicator(color = Color.White)
                         }
                     }
                 }
@@ -1478,23 +1500,51 @@ fun CircleToSearchScreen(
                             }
 
                             // Circular Button: Translate
-                            IconButton(
-                                onClick = {
-                                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                                    val bmp = screenshot
-                                    val translatorService = CircleToSearchAccessibilityService.instance
-                                    if (bmp == null || translatorService == null) {
-                                        android.widget.Toast.makeText(context, context.getString(R.string.toast_translate_unavailable), android.widget.Toast.LENGTH_SHORT).show()
-                                    } else {
-                                        onClose()
-                                        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                                            translatorService.translateCapturedScreen(bmp)
-                                        }, TRANSLATE_TRIGGER_DELAY_MS)
-                                    }
-                                },
+                            // Short press: translate in place over the captured screenshot (stays open, tap again for original)
+                            // Long press: close and draw the translator's overlay on the screen (bubble behavior)
+                            Box(
                                 modifier = Modifier
                                     .size(60.dp)
-                                    .background(MaterialTheme.colorScheme.surfaceContainer, CircleShape),
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.surfaceContainer)
+                                    .combinedClickable(
+                                        onClick = {
+                                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                            val bmp = screenshot
+                                            val translatorService = CircleToSearchAccessibilityService.instance
+                                            when {
+                                                bmp == null || translatorService == null ->
+                                                    android.widget.Toast.makeText(context, context.getString(R.string.toast_translate_unavailable), android.widget.Toast.LENGTH_SHORT).show()
+                                                isTranslating -> Unit
+                                                translatedScreenshot != null -> translatedScreenshot = null
+                                                else -> {
+                                                    isTranslating = true
+                                                    translatorService.translateCapturedScreenInPlace(bmp) { translated ->
+                                                        isTranslating = false
+                                                        if (translated != null) {
+                                                            translatedScreenshot = translated
+                                                        } else {
+                                                            android.widget.Toast.makeText(context, context.getString(R.string.toast_translate_unavailable), android.widget.Toast.LENGTH_SHORT).show()
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        onLongClick = {
+                                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                            val bmp = screenshot
+                                            val translatorService = CircleToSearchAccessibilityService.instance
+                                            if (bmp == null || translatorService == null) {
+                                                android.widget.Toast.makeText(context, context.getString(R.string.toast_translate_unavailable), android.widget.Toast.LENGTH_SHORT).show()
+                                            } else {
+                                                onClose()
+                                                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                                                    translatorService.translateCapturedScreen(bmp)
+                                                }, TRANSLATE_TRIGGER_DELAY_MS)
+                                            }
+                                        }
+                                    ),
+                                contentAlignment = Alignment.Center
                             ) {
                                 Icon(Icons.Default.Translate, contentDescription = stringResource(R.string.cd_translate))
                             }

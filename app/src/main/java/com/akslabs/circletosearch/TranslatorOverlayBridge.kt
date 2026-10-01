@@ -469,6 +469,40 @@ class TranslatorOverlayBridge(
     }
   }
 
+  /**
+   * Runs the module's OCR + translate pipeline on [screenshot] without drawing any
+   * overlay windows, reporting the corrected bitmap (original with translated text
+   * painted in) for in-place display. [onDone] is invoked on the main thread with
+   * null on failure.
+   */
+  fun translateInPlace(screenshot: Bitmap, onDone: (Bitmap?) -> Unit) {
+    serviceScope.launch {
+      val coordinator = translationCoordinator
+      val targetLang =
+        forcedTargetLanguage
+          ?: langStateManager.languageByCode(settingsManager.settings.value.defaultTargetLanguageCode)
+      if (coordinator == null || targetLang == null) {
+        onDone(null)
+        return@launch
+      }
+      val sourceLang = ocrSourceLanguage()
+      val result =
+        withContext(Dispatchers.IO) {
+          coordinator.translateImageWithOverlay(
+            sourceLang ?: targetLang,
+            targetLang,
+            screenshot,
+            onMessage = {},
+            readingOrder = currentReadingOrderFor(sourceLang),
+            isAutoSource = isAutoSource,
+            onOcrUnavailable = {},
+            onDetectedRegions = { _, _, _ -> },
+          )
+        }
+      onDone(result?.correctedBitmap)
+    }
+  }
+
   private fun ocrSourceLanguage(): Language? =
     forcedSourceLanguage ?: settingsManager.settings.value.defaultSourceLanguageCode?.let {
       langStateManager.languageByCode(it)
