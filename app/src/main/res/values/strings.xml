@@ -124,7 +124,7 @@
     <string name="menu_import_model">Import Model (.traineddata)</string>
 
     <!-- Toast Messages -->
-    <string name="toast_coming_soon">Coming soon</string>
+    <string name="toast_translate_unavailable">Translation unavailable. Check accessibility service.</string>
     <string name="toast_saved_to_gallery">Saved to Gallery</string>
     <string name="toast_failed_to_save">Failed to save</string>
     <string name="toast_accessibility_permission_needed">Allow accessibility permission to use this feature</string>

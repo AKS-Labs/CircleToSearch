@@ -1179,6 +1179,17 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
 
     override fun onInterrupt() {}
 
+    /**
+     * Translates the screenshot captured when Circle to Search launched using the
+     * translator module's overlay (same path as its floating bubble).
+     * Returns false if the overlay bridge is not running.
+     */
+    fun translateCapturedScreen(screenshot: Bitmap): Boolean {
+        val bridge = translatorBridge ?: return false
+        bridge.activateWithScreenshot(screenshot)
+        return true
+    }
+
     companion object {
         var instance: CircleToSearchAccessibilityService? = null
             private set

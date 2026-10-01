@@ -181,17 +181,34 @@ class TranslatorOverlayBridge(
 
   override fun activate() {
     if (active) return
+    enterActiveState()
+    android.os.Handler(android.os.Looper.getMainLooper()).post {
+      if (active) {
+        handleFullScreenOcr()
+      }
+    }
+  }
+
+  /**
+   * Same activation as the module's floating bubble ([activate]), but translates the
+   * screenshot captured when Circle to Search launched instead of capturing a new one.
+   */
+  fun activateWithScreenshot(screenshot: Bitmap) {
+    if (active) {
+      if (selectMode) exitSelectMode()
+    } else {
+      enterActiveState()
+    }
+    translateProvidedScreen(screenshot)
+  }
+
+  private fun enterActiveState() {
     active = true
     langStateManager.refreshLanguageAvailability()
     ui.removeFloatingButton()
     ui.removeTranslationOverlays()
     ui.showBorderWave()
     ui.showToolbar(forcedSourceLanguage, forcedTargetLanguage, currentReadingOrderFor(forcedSourceLanguage), isAutoSource)
-    android.os.Handler(android.os.Looper.getMainLooper()).post {
-      if (active) {
-        handleFullScreenOcr()
-      }
-    }
   }
 
   override fun deactivate() {
@@ -320,19 +337,53 @@ class TranslatorOverlayBridge(
       return
     }
 
-    val content = dev.davidv.translator.overlayChrome.OverlayInsets.contentBounds(windowManager)
-    val region =
-      Rect(
-        content.left,
-        content.top + ui.dpToPx(48),
-        content.right,
-        content.bottom,
-      )
+    val region = currentCaptureRegion()
 
     ui.dismissMenu()
     android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
       captureFullScreen(region)
     }, SCREENSHOT_RENDER_DELAY_MS)
+  }
+
+  /** The screen area under the toolbar — capture and overlay region. */
+  private fun currentCaptureRegion(): Rect {
+    val content = dev.davidv.translator.overlayChrome.OverlayInsets.contentBounds(windowManager)
+    return Rect(
+      content.left,
+      content.top + ui.dpToPx(48),
+      content.right,
+      content.bottom,
+    )
+  }
+
+  /** OCR + translate an already-captured screenshot, skipping the accessibility capture. */
+  private fun translateProvidedScreen(screenshot: Bitmap) {
+    ui.removeTranslationOverlays()
+
+    val sourceLang = ocrSourceLanguage()
+    if (!isAutoSource && sourceLang == null) {
+      ui.showOverlayMessage("Set source language first")
+      return
+    }
+
+    val region = currentCaptureRegion()
+    ui.dismissMenu()
+
+    val cropped = cropToRegion(screenshot, region) ?: return
+    surfaceState.regions.value = null
+    ui.showScanOverlay(surfaceState, region)
+    serviceScope.launch {
+      translateRegionBitmap(cropped, region)
+    }
+  }
+
+  private fun cropToRegion(full: Bitmap, region: Rect): Bitmap? {
+    val cropLeft = region.left.coerceIn(0, full.width - 1)
+    val cropTop = region.top.coerceIn(0, full.height - 1)
+    val cropWidth = region.width().coerceAtMost(full.width - cropLeft)
+    val cropHeight = region.height().coerceAtMost(full.height - cropTop)
+    if (cropWidth <= 0 || cropHeight <= 0) return null
+    return Bitmap.createBitmap(full, cropLeft, cropTop, cropWidth, cropHeight)
   }
 
   private fun captureFullScreen(region: Rect) {
@@ -347,17 +398,9 @@ class TranslatorOverlayBridge(
           val fullBitmap = hwBitmap.copy(Bitmap.Config.ARGB_8888, false)
           hwBitmap.recycle()
 
-          val cropLeft = region.left.coerceIn(0, fullBitmap.width - 1)
-          val cropTop = region.top.coerceIn(0, fullBitmap.height - 1)
-          val cropWidth = region.width().coerceAtMost(fullBitmap.width - cropLeft)
-          val cropHeight = region.height().coerceAtMost(fullBitmap.height - cropTop)
-          if (cropWidth <= 0 || cropHeight <= 0) {
-            fullBitmap.recycle()
-            return
-          }
-
-          val croppedBitmap = Bitmap.createBitmap(fullBitmap, cropLeft, cropTop, cropWidth, cropHeight)
-          fullBitmap.recycle()
+          val croppedBitmap = cropToRegion(fullBitmap, region)
+          if (croppedBitmap !== fullBitmap) fullBitmap.recycle()
+          if (croppedBitmap == null) return
 
           surfaceState.regions.value = null
           ui.showScanOverlay(surfaceState, region)

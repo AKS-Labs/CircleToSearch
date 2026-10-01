@@ -185,6 +185,9 @@ import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material3.Surface
 
+/** Lets the Circle to Search UI finish closing before the translator overlay draws. */
+private const val TRANSLATE_TRIGGER_DELAY_MS = 400L
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CircleToSearchScreen(
@@ -1478,14 +1481,16 @@ fun CircleToSearchScreen(
                             IconButton(
                                 onClick = {
                                     haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                                    android.widget.Toast.makeText(context, context.getString(R.string.toast_coming_soon), android.widget.Toast.LENGTH_SHORT).show()
-                                    /*
-                                    try {
-                                        val intent = context.packageManager.getLaunchIntentForPackage("com.google.android.apps.translate")?.apply { addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK) }
-                                        if (intent != null) context.startActivity(intent)
-                                        else context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://translate.google.com")).apply { addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK) })
-                                    } catch (e: Exception) {}
-                                    */
+                                    val bmp = screenshot
+                                    val translatorService = CircleToSearchAccessibilityService.instance
+                                    if (bmp == null || translatorService == null) {
+                                        android.widget.Toast.makeText(context, context.getString(R.string.toast_translate_unavailable), android.widget.Toast.LENGTH_SHORT).show()
+                                    } else {
+                                        onClose()
+                                        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                                            translatorService.translateCapturedScreen(bmp)
+                                        }, TRANSLATE_TRIGGER_DELAY_MS)
+                                    }
                                 },
                                 modifier = Modifier
                                     .size(60.dp)
