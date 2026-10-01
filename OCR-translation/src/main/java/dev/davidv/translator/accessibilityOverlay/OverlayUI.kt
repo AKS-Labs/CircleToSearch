@@ -44,6 +44,7 @@ class OverlayUI(
   private val handler = Handler(Looper.getMainLooper())
   private var launcherBubble: FloatingBubble? = null
   private var toolbarView: View? = null
+  private var toolbarParams: WindowManager.LayoutParams? = null
   private var sourceLabelView: TextView? = null
   private var targetLabelView: TextView? = null
   private var readingOrderButtonView: View? = null
@@ -187,12 +188,14 @@ class OverlayUI(
 
     windowManager.addView(toolbar, params)
     toolbarView = toolbar
+    toolbarParams = params
   }
 
   fun removeToolbar() {
     toolbarView?.let {
       windowManager.removeView(it)
       toolbarView = null
+      toolbarParams = null
       sourceLabelView = null
       targetLabelView = null
       readingOrderButtonView = null
@@ -291,6 +294,7 @@ class OverlayUI(
 
     windowManager.addView(imageView, params)
     translationOverlays.add(imageView)
+    raiseToolbar()
     ensureTouchWatcher()
   }
 
@@ -336,6 +340,7 @@ class OverlayUI(
     dialog.show()
     selectDialog = dialog
     selectHost = host
+    raiseToolbar()
   }
 
   fun removeSelectSurface() {
@@ -468,6 +473,17 @@ class OverlayUI(
   }
 
   fun hasToolbar(): Boolean = toolbarView != null
+
+  /** Re-inserts the toolbar so it stacks above windows added after it (result bitmap,
+   *  select surface) — windows stack in insertion order. */
+  private fun raiseToolbar() {
+    val tv = toolbarView ?: return
+    val tp = toolbarParams ?: return
+    runCatching {
+      windowManager.removeView(tv)
+      windowManager.addView(tv, tp)
+    }
+  }
 
   fun removeTranslationOverlays() {
     for (view in translationOverlays) {

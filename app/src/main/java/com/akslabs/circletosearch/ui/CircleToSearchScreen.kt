@@ -47,6 +47,8 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -188,6 +190,9 @@ import androidx.compose.material3.Surface
 
 /** Lets the Circle to Search UI finish closing before the translator overlay draws. */
 private const val TRANSLATE_TRIGGER_DELAY_MS = 400L
+
+/** Lets the Circle to Search chrome hide before the translator overlay draws. */
+private const val TRANSLATE_HIDE_DELAY_MS = 150L
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -415,9 +420,9 @@ fun CircleToSearchScreen(
     var selectionRect by remember { mutableStateOf<Rect?>(null) }
     val selectionAnim = remember { androidx.compose.animation.core.Animatable(0f) }
 
-    // In-place translation of the captured screenshot (Translate button, short press)
-    var translatedScreenshot by remember { mutableStateOf<Bitmap?>(null) }
-    var isTranslating by remember { mutableStateOf(false) }
+    // Translator overlay mode: Circle to Search chrome hidden, the frozen screenshot
+    // stays visible as the backdrop under the module's scan/result overlays.
+    var isTranslatorMode by remember { mutableStateOf(false) }
 
     // Lifecycle reset: When screenshot changes, reset selection and modes
     LaunchedEffect(screenshot) {
@@ -428,8 +433,9 @@ fun CircleToSearchScreen(
             isSearching = false
             currentPathPoints.clear()
             selectionAnim.snapTo(0f)
-            translatedScreenshot = null
-            isTranslating = false
+            if (isTranslatorMode) {
+                CircleToSearchAccessibilityService.instance?.closeTranslateOverlay()
+            }
         }
     }
     
@@ -550,6 +556,10 @@ fun CircleToSearchScreen(
 
     // Back Handler Logic
     BackHandler(enabled = true) {
+        if (isTranslatorMode) {
+            CircleToSearchAccessibilityService.instance?.closeTranslateOverlay()
+            return@BackHandler
+        }
         if (isCopyMode) {
             isCopyMode = false
             onExitCopyMode()
@@ -881,7 +891,7 @@ fun CircleToSearchScreen(
             // Close button for Copy Mode (Top Left)
 
             // Friendly Message Overlay (Top Center)
-            if (!isCopyMode) {
+            if (!isCopyMode && !isTranslatorMode) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -913,19 +923,12 @@ fun CircleToSearchScreen(
                         modifier = Modifier.fillMaxSize()
                     )
 
-                    // In-place translated view of the same capture (toggle via Translate button)
-                    translatedScreenshot?.let { translated ->
-                        Image(
-                            bitmap = translated.asImageBitmap(),
-                            contentDescription = null,
-                            contentScale = ContentScale.FillBounds,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    }
 
-
-                    // Tint Overlay (Punch-out style)
-                    Canvas(modifier = Modifier.fillMaxSize()) {
+                    // Tint Overlay (Punch-out style) — dimmed during normal CTS use,
+                    // hidden in translator mode so the frozen backdrop stays undimmed
+                    Canvas(modifier = Modifier.fillMaxSize().graphicsLayer {
+                        alpha = if (isTranslatorMode) 0f else 1f
+                    }) {
                         val strokeWidth = 0f
                         val dimAlpha = 0.15f
                         
@@ -958,16 +961,11 @@ fun CircleToSearchScreen(
                             )
                         }
                     }
-                    if (isTranslating) {
-                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            androidx.compose.material3.CircularProgressIndicator(color = Color.White)
-                        }
-                    }
                 }
             }
 
             // 2. Gradient Border Layer (Overlaying screenshot, clipped to rounded corners)
-            if (showGradientBorder && !isCopyMode) {
+            if (showGradientBorder && !isCopyMode && !isTranslatorMode) {
                 androidx.compose.animation.AnimatedVisibility(
                     visible = isUIVisible,
                     enter = androidx.compose.animation.fadeIn(animationSpec = tween(700))
@@ -988,7 +986,7 @@ fun CircleToSearchScreen(
             }
 
             // 3. Drawing Canvas (Interactive Layer)
-            if (!isCopyMode) {                Canvas(
+            if (!isCopyMode && !isTranslatorMode) {                Canvas(
                     modifier = Modifier
                         .fillMaxSize()
                         .pointerInput(Unit) {
@@ -1193,7 +1191,7 @@ fun CircleToSearchScreen(
 
             // 4. Header (Top)
             androidx.compose.animation.AnimatedVisibility(
-                visible = isUIVisible && !isCopyMode && !isEntityExtractMode,
+                visible = isUIVisible && !isCopyMode && !isEntityExtractMode && !isTranslatorMode,
                 enter = androidx.compose.animation.slideInVertically(
                     initialOffsetY = { -it }, // Commence au-dessus de l'écran (-100%)
                     animationSpec = tween(500, easing = androidx.compose.animation.core.FastOutSlowInEasing)
@@ -1381,7 +1379,7 @@ fun CircleToSearchScreen(
             var isCopyTextTriggered by remember { mutableStateOf(false) }
 
             androidx.compose.animation.AnimatedVisibility(
-                visible = isUIVisible && !isCopyMode && !isEntityExtractMode,
+                visible = isUIVisible && !isCopyMode && !isEntityExtractMode && !isTranslatorMode,
                 enter = slideInVertically(
                     initialOffsetY = { it }, // slides up from below
                     animationSpec = tween(300, easing = androidx.compose.animation.core.CubicBezierEasing(0f, 0f, 0.2f, 1f))
@@ -1500,8 +1498,9 @@ fun CircleToSearchScreen(
                             }
 
                             // Circular Button: Translate
-                            // Short press: translate in place over the captured screenshot (stays open, tap again for original)
-                            // Long press: close and draw the translator's overlay on the screen (bubble behavior)
+                            // Short press: freeze CTS (chrome hides, screenshot stays) and run the module's
+                            //   translator overlay on the capture; close/back returns to Circle to Search.
+                            // Long press: close CTS and run the same overlay on the real screen (bubble behavior).
                             Box(
                                 modifier = Modifier
                                     .size(60.dp)
@@ -1512,22 +1511,22 @@ fun CircleToSearchScreen(
                                             haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
                                             val bmp = screenshot
                                             val translatorService = CircleToSearchAccessibilityService.instance
-                                            when {
-                                                bmp == null || translatorService == null ->
-                                                    android.widget.Toast.makeText(context, context.getString(R.string.toast_translate_unavailable), android.widget.Toast.LENGTH_SHORT).show()
-                                                isTranslating -> Unit
-                                                translatedScreenshot != null -> translatedScreenshot = null
-                                                else -> {
-                                                    isTranslating = true
-                                                    translatorService.translateCapturedScreenInPlace(bmp) { translated ->
-                                                        isTranslating = false
-                                                        if (translated != null) {
-                                                            translatedScreenshot = translated
-                                                        } else {
-                                                            android.widget.Toast.makeText(context, context.getString(R.string.toast_translate_unavailable), android.widget.Toast.LENGTH_SHORT).show()
+                                            if (bmp == null || translatorService == null) {
+                                                android.widget.Toast.makeText(context, context.getString(R.string.toast_translate_unavailable), android.widget.Toast.LENGTH_SHORT).show()
+                                            } else {
+                                                selectionRect = null
+                                                selectedBitmap = null
+                                                isSearching = false
+                                                currentPathPoints.clear()
+                                                scope.launch { selectionAnim.snapTo(0f) }
+                                                isTranslatorMode = true
+                                                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                                                    if (isTranslatorMode) {
+                                                        translatorService.translateCapturedScreen(bmp) {
+                                                            isTranslatorMode = false
                                                         }
                                                     }
-                                                }
+                                                }, TRANSLATE_HIDE_DELAY_MS)
                                             }
                                         },
                                         onLongClick = {
@@ -1734,7 +1733,7 @@ fun CircleToSearchScreen(
             }
 
             // 4. Selection Actions (Share) — Positioned at the very end for absolute top-layer rendering
-            if (selectionRect != null && selectionAnim.value == 1f && !isCopyMode) {
+            if (selectionRect != null && selectionAnim.value == 1f && !isCopyMode && !isTranslatorMode) {
                 val rect = selectionRect!!
                 val density = androidx.compose.ui.platform.LocalDensity.current
                 val leftPx = rect.left.toFloat()
@@ -1895,7 +1894,7 @@ fun CircleToSearchScreen(
             }
 
         // --- NEW: QR Overlay Chips (High Layer) ---
-        if (screenshot != null && !isCopyMode) {
+        if (screenshot != null && !isCopyMode && !isTranslatorMode) {
             BoxWithConstraints(modifier = Modifier.fillMaxSize().zIndex(2500f)) {
                 val screenWidth = maxWidth
                 val screenHeight = maxHeight
@@ -2058,6 +2057,25 @@ fun CircleToSearchScreen(
                     }
                 }
             }
+        }
+
+        // Input shield while the translator overlay owns the screen: consumes touches so
+        // the hidden chrome underneath can't be tapped (module windows sit above this).
+        if (isTranslatorMode) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .zIndex(4000f)
+                    .pointerInput(Unit) {
+                        awaitEachGesture {
+                            awaitFirstDown(requireUnconsumed = false)
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                event.changes.forEach { it.consume() }
+                            }
+                        }
+                    }
+            )
         }
 
         // QR Code Result Sheet

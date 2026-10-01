@@ -47,6 +47,8 @@ class TranslatorOverlayBridge(
   private val tag = "TranslatorBridge"
   private var active = false
   private var selectMode = false
+  private var returnToCaller: (() -> Unit)? = null
+  private var providedScreenshot: Bitmap? = null
   private var forcedSourceLanguage: Language? = null
   private var forcedTargetLanguage: Language? = null
   private var isAutoSource: Boolean = true
@@ -192,8 +194,12 @@ class TranslatorOverlayBridge(
   /**
    * Same activation as the module's floating bubble ([activate]), but translates the
    * screenshot captured when Circle to Search launched instead of capturing a new one.
+   * [returnToCaller] is invoked when the overlay is deactivated (toolbar close, back
+   * press) so the caller can restore its UI.
    */
-  fun activateWithScreenshot(screenshot: Bitmap) {
+  fun activateWithScreenshot(screenshot: Bitmap, returnToCaller: (() -> Unit)? = null) {
+    this.returnToCaller = returnToCaller
+    providedScreenshot = screenshot
     if (active) {
       if (selectMode) exitSelectMode()
     } else {
@@ -222,6 +228,11 @@ class TranslatorOverlayBridge(
     ui.removeTranslationOverlays()
     ui.dismissMenu()
     ui.restoreFloatingButton()
+    providedScreenshot = null
+    returnToCaller?.let { cb ->
+      returnToCaller = null
+      cb()
+    }
   }
 
   override fun toggleSelectMode() {
@@ -356,6 +367,11 @@ class TranslatorOverlayBridge(
     )
   }
 
+  /** Full content area — for a provided capture the result also fills the zone behind
+   *  the translucent toolbar, so translated UI shows through it. */
+  private fun fullCaptureRegion(): Rect =
+    dev.davidv.translator.overlayChrome.OverlayInsets.contentBounds(windowManager)
+
   /** OCR + translate an already-captured screenshot, skipping the accessibility capture. */
   private fun translateProvidedScreen(screenshot: Bitmap) {
     ui.removeTranslationOverlays()
@@ -366,7 +382,7 @@ class TranslatorOverlayBridge(
       return
     }
 
-    val region = currentCaptureRegion()
+    val region = fullCaptureRegion()
     ui.dismissMenu()
 
     val cropped = cropToRegion(screenshot, region) ?: return
@@ -387,6 +403,17 @@ class TranslatorOverlayBridge(
   }
 
   private fun captureFullScreen(region: Rect) {
+    // Entered from Circle to Search: toolbar refresh / language change re-translates the
+    // captured screenshot instead of re-capturing the live screen.
+    val provided = providedScreenshot
+    if (provided != null) {
+      val full = fullCaptureRegion()
+      val cropped = cropToRegion(provided, full) ?: return
+      surfaceState.regions.value = null
+      ui.showScanOverlay(surfaceState, full)
+      serviceScope.launch { translateRegionBitmap(cropped, full) }
+      return
+    }
     host.takeScreenshot(
       Display.DEFAULT_DISPLAY,
       host.mainExecutor,
@@ -466,40 +493,6 @@ class TranslatorOverlayBridge(
       }
     } else {
       ui.showBitmapOverlay(result.correctedBitmap, region)
-    }
-  }
-
-  /**
-   * Runs the module's OCR + translate pipeline on [screenshot] without drawing any
-   * overlay windows, reporting the corrected bitmap (original with translated text
-   * painted in) for in-place display. [onDone] is invoked on the main thread with
-   * null on failure.
-   */
-  fun translateInPlace(screenshot: Bitmap, onDone: (Bitmap?) -> Unit) {
-    serviceScope.launch {
-      val coordinator = translationCoordinator
-      val targetLang =
-        forcedTargetLanguage
-          ?: langStateManager.languageByCode(settingsManager.settings.value.defaultTargetLanguageCode)
-      if (coordinator == null || targetLang == null) {
-        onDone(null)
-        return@launch
-      }
-      val sourceLang = ocrSourceLanguage()
-      val result =
-        withContext(Dispatchers.IO) {
-          coordinator.translateImageWithOverlay(
-            sourceLang ?: targetLang,
-            targetLang,
-            screenshot,
-            onMessage = {},
-            readingOrder = currentReadingOrderFor(sourceLang),
-            isAutoSource = isAutoSource,
-            onOcrUnavailable = {},
-            onDetectedRegions = { _, _, _ -> },
-          )
-        }
-      onDone(result?.correctedBitmap)
     }
   }
 

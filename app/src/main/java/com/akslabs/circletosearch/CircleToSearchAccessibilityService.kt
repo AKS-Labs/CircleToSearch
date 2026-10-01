@@ -1182,26 +1182,18 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
     /**
      * Translates the screenshot captured when Circle to Search launched using the
      * translator module's overlay (same path as its floating bubble).
-     * Returns false if the overlay bridge is not running.
+     * [onClosed] is invoked when the overlay is dismissed (toolbar close / back press)
+     * so the caller can restore its UI. Returns false if the overlay bridge is not running.
      */
-    fun translateCapturedScreen(screenshot: Bitmap): Boolean {
+    fun translateCapturedScreen(screenshot: Bitmap, onClosed: (() -> Unit)? = null): Boolean {
         val bridge = translatorBridge ?: return false
-        bridge.activateWithScreenshot(screenshot)
+        bridge.activateWithScreenshot(screenshot, onClosed)
         return true
     }
 
-    /**
-     * Translates [screenshot] in place via the translator module's pipeline without
-     * drawing overlay windows; [onDone] receives the translated bitmap (null on
-     * failure). Invoked on the main thread.
-     */
-    fun translateCapturedScreenInPlace(screenshot: Bitmap, onDone: (Bitmap?) -> Unit) {
-        val bridge = translatorBridge
-        if (bridge == null) {
-            onDone(null)
-            return
-        }
-        bridge.translateInPlace(screenshot, onDone)
+    /** Dismisses the translator overlay if active, notifying its return callback. */
+    fun closeTranslateOverlay() {
+        translatorBridge?.deactivate()
     }
 
     companion object {
