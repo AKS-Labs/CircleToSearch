@@ -143,6 +143,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -466,6 +467,98 @@ fun CircleToSearchScreen(
     // recognized source words — tap a word to select and copy (original text, no translation).
     var instantWords by remember { mutableStateOf<ImageWordSelection?>(null) }
     var instantRegions by remember { mutableStateOf<DetectedRegions?>(null) }
+
+    // Circle-draw gesture handlers, shared by the drag-detector wrapper above the drawing
+    // layer (see "Circle-draw gestures" below). Plain drags draw; handle grabs and taps are
+    // claimed by the word overlay (child, seen first) so text selection keeps priority.
+    fun beginCircleDrag(offset: Offset) {
+        val rect = selectionRect
+        if (rect != null && selectionAnim.value == 1f) {
+            val handleSize = 64f // px for hit testing
+            val tl = Offset(rect.left.toFloat(), rect.top.toFloat())
+            val tr = Offset(rect.right.toFloat(), rect.top.toFloat())
+            val bl = Offset(rect.left.toFloat(), rect.bottom.toFloat())
+            val br = Offset(rect.right.toFloat(), rect.bottom.toFloat())
+
+            when {
+                (offset - tl).getDistance() < handleSize -> { isResizing = true; activeHandle = "tl" }
+                (offset - tr).getDistance() < handleSize -> { isResizing = true; activeHandle = "tr" }
+                (offset - bl).getDistance() < handleSize -> { isResizing = true; activeHandle = "bl" }
+                (offset - br).getDistance() < handleSize -> { isResizing = true; activeHandle = "br" }
+                else -> { isResizing = false; activeHandle = null }
+            }
+
+            if (isResizing) return
+        }
+
+        // Clear previous state if starting new draw
+        currentPathPoints.clear()
+        currentPathPoints.add(offset)
+        selectionRect = null
+        scope.launch { selectionAnim.snapTo(0f) }
+    }
+
+    fun moveCircleDrag(change: PointerInputChange) {
+        if (isResizing && activeHandle != null) {
+            val rect = selectionRect ?: return
+            val pos = change.position
+            val newRect = android.graphics.Rect(rect)
+            when (activeHandle) {
+                "tl" -> { newRect.left = pos.x.toInt(); newRect.top = pos.y.toInt() }
+                "tr" -> { newRect.right = pos.x.toInt(); newRect.top = pos.y.toInt() }
+                "bl" -> { newRect.left = pos.x.toInt(); newRect.bottom = pos.y.toInt() }
+                "br" -> { newRect.right = pos.x.toInt(); newRect.bottom = pos.y.toInt() }
+            }
+            // Basic validation (min size)
+            if (newRect.width() > 20 && newRect.height() > 20) {
+                selectionRect = newRect
+            }
+        } else {
+            currentPathPoints.add(change.position)
+        }
+    }
+
+    fun endCircleDrag() {
+        if (isResizing) {
+            isResizing = false
+            activeHandle = null
+            // Update cropped bitmap after resize
+            if (screenshot != null && selectionRect != null) {
+                selectedBitmap = ImageUtils.cropBitmap(screenshot, selectionRect!!)
+            }
+        } else if (currentPathPoints.isNotEmpty()) {
+            var minX = Float.MAX_VALUE
+            var minY = Float.MAX_VALUE
+            var maxX = Float.MIN_VALUE
+            var maxY = Float.MIN_VALUE
+            currentPathPoints.forEach { p ->
+                minX = kotlin.math.min(minX, p.x)
+                minY = kotlin.math.min(minY, p.y)
+                maxX = kotlin.math.max(maxX, p.x)
+                maxY = kotlin.math.max(maxY, p.y)
+            }
+
+            val border = 20
+            val rect = android.graphics.Rect(
+                (minX - border).toInt().coerceAtLeast(0),
+                (minY - border).toInt().coerceAtLeast(0),
+                (maxX + border).toInt().coerceAtMost(screenshot?.width ?: 0),
+                (maxY + border).toInt().coerceAtMost(screenshot?.height ?: 0)
+            )
+
+            if (rect.width() > 10 && rect.height() > 10) {
+                selectionRect = rect
+                currentPathPoints.clear() // Hide the drawn circle
+                if (screenshot != null) {
+                    selectedBitmap = ImageUtils.cropBitmap(screenshot!!, rect)
+                }
+                scope.launch {
+                    selectionAnim.animateTo(1f, tween(600))
+                    isSearching = true
+                }
+            }
+        }
+    }
 
     // Lifecycle reset: When screenshot changes, reset selection and modes
     LaunchedEffect(screenshot) {
@@ -1051,98 +1144,7 @@ fun CircleToSearchScreen(
 
             // 3. Drawing Canvas (Interactive Layer)
             if (!isTranslatorMode) {                Canvas(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .pointerInput(Unit) {
-                            detectDragGestures(
-                                onDragStart = { offset ->
-                                    val rect = selectionRect
-                                    if (rect != null && selectionAnim.value == 1f) {
-                                        val handleSize = 64f // px for hit testing
-                                        val tl = Offset(rect.left.toFloat(), rect.top.toFloat())
-                                        val tr = Offset(rect.right.toFloat(), rect.top.toFloat())
-                                        val bl = Offset(rect.left.toFloat(), rect.bottom.toFloat())
-                                        val br = Offset(rect.right.toFloat(), rect.bottom.toFloat())
-                                        
-                                        when {
-                                            (offset - tl).getDistance() < handleSize -> { isResizing = true; activeHandle = "tl" }
-                                            (offset - tr).getDistance() < handleSize -> { isResizing = true; activeHandle = "tr" }
-                                            (offset - bl).getDistance() < handleSize -> { isResizing = true; activeHandle = "bl" }
-                                            (offset - br).getDistance() < handleSize -> { isResizing = true; activeHandle = "br" }
-                                            else -> { isResizing = false; activeHandle = null }
-                                        }
-                                        
-                                        if (isResizing) return@detectDragGestures
-                                    }
-
-                                    // Clear previous state if starting new draw
-                                    currentPathPoints.clear()
-                                    currentPathPoints.add(offset)
-                                    selectionRect = null
-                                    scope.launch { selectionAnim.snapTo(0f) }
-                                },
-                                onDrag = { change, _ ->
-                                    if (isResizing && activeHandle != null) {
-                                        val rect = selectionRect ?: return@detectDragGestures
-                                        val pos = change.position
-                                        val newRect = android.graphics.Rect(rect)
-                                        when (activeHandle) {
-                                            "tl" -> { newRect.left = pos.x.toInt(); newRect.top = pos.y.toInt() }
-                                            "tr" -> { newRect.right = pos.x.toInt(); newRect.top = pos.y.toInt() }
-                                            "bl" -> { newRect.left = pos.x.toInt(); newRect.bottom = pos.y.toInt() }
-                                            "br" -> { newRect.right = pos.x.toInt(); newRect.bottom = pos.y.toInt() }
-                                        }
-                                        // Basic validation (min size)
-                                        if (newRect.width() > 20 && newRect.height() > 20) {
-                                            selectionRect = newRect
-                                        }
-                                    } else {
-                                        currentPathPoints.add(change.position)
-                                    }
-                                },
-                                onDragEnd = {
-                                    if (isResizing) {
-                                        isResizing = false
-                                        activeHandle = null
-                                        // Update cropped bitmap after resize
-                                        if (screenshot != null && selectionRect != null) {
-                                            selectedBitmap = ImageUtils.cropBitmap(screenshot, selectionRect!!)
-                                        }
-                                    } else if (currentPathPoints.isNotEmpty()) {
-                                        var minX = Float.MAX_VALUE
-                                        var minY = Float.MAX_VALUE
-                                        var maxX = Float.MIN_VALUE
-                                        var maxY = Float.MIN_VALUE
-                                        currentPathPoints.forEach { p ->
-                                            minX = kotlin.math.min(minX, p.x)
-                                            minY = kotlin.math.min(minY, p.y)
-                                            maxX = kotlin.math.max(maxX, p.x)
-                                            maxY = kotlin.math.max(maxY, p.y)
-                                        }
-
-                                        val border = 20
-                                        val rect = android.graphics.Rect(
-                                            (minX - border).toInt().coerceAtLeast(0),
-                                            (minY - border).toInt().coerceAtLeast(0),
-                                            (maxX + border).toInt().coerceAtMost(screenshot?.width ?: 0),
-                                            (maxY + border).toInt().coerceAtMost(screenshot?.height ?: 0)
-                                        )
-
-                                        if (rect.width() > 10 && rect.height() > 10) {
-                                            selectionRect = rect
-                                            currentPathPoints.clear() // Hide the drawn circle
-                                            if (screenshot != null) {
-                                                selectedBitmap = ImageUtils.cropBitmap(screenshot!!, rect)
-                                            }
-                                            scope.launch {
-                                                selectionAnim.animateTo(1f, tween(600))
-                                                isSearching = true
-                                            }
-                                        }
-                                    }
-                                }
-                            )
-                        }
+                    modifier = Modifier.fillMaxSize()
                 ) {
                     // Draw current path (Real-time)
                     if (currentPathPoints.size > 1) {
@@ -1253,25 +1255,40 @@ fun CircleToSearchScreen(
 
             }
 
-            // Instant OCR overlays: scan animation while recognizing, then tappable source
-            // words over the frozen screenshot. Sits above the screenshot/drawing layers
-            // (later siblings) and below the chrome — drags still reach the drawing canvas,
-            // so circling a region coexists with word selection.
-            if (screenshot != null && !isTranslatorMode && !isEntityExtractMode) {
-                val words = instantWords
-                if (words != null) {
-                    WordSelectionOverlay(
-                        words = words.sourceWords,
-                        imageWidth = words.imageWidth,
-                        imageHeight = words.imageHeight,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                } else {
-                    instantRegions?.let { regions ->
-                        ScanAnimationOverlay(
-                            regions = regions,
-                            modifier = Modifier.fillMaxSize(),
-                        )
+            // Circle-draw gestures + instant OCR overlays. The drag detector is the PARENT of
+            // the word overlay, not a lower sibling: an ancestor is always in the hit path, the
+            // child sees events first (taps and handle-drags stay with text selection, since it
+            // consumes them), and plain drags fall through to circle drawing — the same
+            // container/overlay split the translator module uses for pan vs. word selection.
+            if (!isTranslatorMode) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .pointerInput(Unit) {
+                            detectDragGestures(
+                                onDragStart = { beginCircleDrag(it) },
+                                onDrag = { change, _ -> moveCircleDrag(change) },
+                                onDragEnd = { endCircleDrag() },
+                            )
+                        }
+                ) {
+                    if (screenshot != null && !isEntityExtractMode) {
+                        val words = instantWords
+                        if (words != null) {
+                            WordSelectionOverlay(
+                                words = words.sourceWords,
+                                imageWidth = words.imageWidth,
+                                imageHeight = words.imageHeight,
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        } else {
+                            instantRegions?.let { regions ->
+                                ScanAnimationOverlay(
+                                    regions = regions,
+                                    modifier = Modifier.fillMaxSize(),
+                                )
+                            }
+                        }
                     }
                 }
             }
