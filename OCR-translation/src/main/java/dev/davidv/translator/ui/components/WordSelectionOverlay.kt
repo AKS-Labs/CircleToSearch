@@ -180,6 +180,7 @@ fun WordSelectionOverlay(
   imageHeight: Int,
   scale: Float = 1f,
   modifier: Modifier = Modifier,
+  onSelectionChanged: (Boolean) -> Unit = {},
 ) {
   val context = LocalContext.current
   val view = LocalView.current
@@ -201,6 +202,11 @@ fun WordSelectionOverlay(
   val scaleState = rememberUpdatedState(scale)
 
   val hasSelection = selStart != null && selEnd != null
+  // Tell the host when a selection starts or is cleared — e.g. Circle to Search hides its
+  // bottom bar while text is selected. Keyed on `words` too: they reset the selection.
+  LaunchedEffect(hasSelection, words) {
+    onSelectionChanged(hasSelection)
+  }
   // Pills, handles, bounds and copy text all come from translator-rs in one call, so this overlay
   // and the Qt one cannot disagree about what a drag selected.
   val selection =

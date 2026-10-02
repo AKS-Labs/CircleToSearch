@@ -467,6 +467,9 @@ fun CircleToSearchScreen(
     // recognized source words — tap a word to select and copy (original text, no translation).
     var instantWords by remember { mutableStateOf<ImageWordSelection?>(null) }
     var instantRegions by remember { mutableStateOf<DetectedRegions?>(null) }
+    // A word selection in the instant-OCR overlay hides the bottom bar; tapping outside the
+    // text clears the selection and the bar comes back.
+    var wordSelected by remember { mutableStateOf(false) }
 
     // Circle-draw gesture handlers, shared by the drag-detector wrapper above the drawing
     // layer (see "Circle-draw gestures" below). Plain drags draw; handle grabs and taps are
@@ -605,8 +608,15 @@ fun CircleToSearchScreen(
     LaunchedEffect(screenshot) {
         instantWords = null
         instantRegions = null
+        wordSelected = false
         val bmp = screenshot ?: return@LaunchedEffect
         instantWords = runInstantScreenshotOcr(context, bmp) { instantRegions = it }
+    }
+
+    // The word overlay unmounts in these modes (dropping its selection) - drop ours too so
+    // the bottom bar doesn't stay hidden after leaving them.
+    LaunchedEffect(isEntityExtractMode, isTranslatorMode) {
+        if (isEntityExtractMode || isTranslatorMode) wordSelected = false
     }
 
     // Helper to create and configure WebView
@@ -1280,6 +1290,7 @@ fun CircleToSearchScreen(
                                 imageWidth = words.imageWidth,
                                 imageHeight = words.imageHeight,
                                 modifier = Modifier.fillMaxSize(),
+                                onSelectionChanged = { wordSelected = it },
                             )
                         } else {
                             instantRegions?.let { regions ->
@@ -1306,7 +1317,7 @@ fun CircleToSearchScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .statusBarsPadding()
-                        .padding(top = 16.dp, start = 16.dp, end = 16.dp)
+                        .padding(top = 4.dp, start = 16.dp, end = 16.dp)
                         .align(Alignment.TopCenter),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -1480,7 +1491,7 @@ fun CircleToSearchScreen(
             }
             // 5. Bottom Bar — Material 3 Expressive two-row card
             androidx.compose.animation.AnimatedVisibility(
-                visible = isUIVisible && !isEntityExtractMode && !isTranslatorMode,
+                visible = isUIVisible && !isEntityExtractMode && !isTranslatorMode && !wordSelected,
                 enter = slideInVertically(
                     initialOffsetY = { it }, // slides up from below
                     animationSpec = tween(300, easing = androidx.compose.animation.core.CubicBezierEasing(0f, 0f, 0.2f, 1f))
