@@ -24,7 +24,6 @@ import dev.davidv.translator.ReadingOrder
 import dev.davidv.translator.TranslatorApplication
 import dev.davidv.translator.accessibilityOverlay.OverlayUI
 import dev.davidv.translator.accessibilityOverlay.TranslatorAccessibilityService
-import dev.davidv.translator.screenTranslate.ScreenTranslateService
 import dev.davidv.translator.ui.components.DetectedRegions
 import dev.davidv.translator.ui.components.ImageWordSelection as WordSelection
 import dev.davidv.translator.ui.components.SelectionSurfaceState
@@ -93,22 +92,6 @@ class TranslatorOverlayBridge(
       }
     }
 
-  private val liveStateReceiver =
-    object : BroadcastReceiver() {
-      override fun onReceive(
-        context: Context?,
-        intent: Intent?,
-      ) {
-        if (!::ui.isInitialized) return
-        val live = intent?.getBooleanExtra(ScreenTranslateService.EXTRA_LIVE_ACTIVE, false) ?: false
-        if (live) {
-          ui.removeFloatingButton()
-        } else if (!active) {
-          ui.restoreFloatingButton()
-        }
-      }
-    }
-
   fun start() {
     langStateManager = LanguageStateManager(serviceScope, app.filePathManager, null)
     overlayTextTranslationHelper =
@@ -125,14 +108,6 @@ class TranslatorOverlayBridge(
       IntentFilter(TranslatorAccessibilityService.ACTION_DISABLE),
       ContextCompat.RECEIVER_NOT_EXPORTED,
     )
-    ContextCompat.registerReceiver(
-      host,
-      liveStateReceiver,
-      IntentFilter(ScreenTranslateService.ACTION_LIVE_STATE),
-      ContextCompat.RECEIVER_NOT_EXPORTED,
-    )
-
-    ui.showFloatingButton()
   }
 
   override fun addOverlayView(
@@ -163,13 +138,8 @@ class TranslatorOverlayBridge(
       host.unregisterReceiver(disableReceiver)
     } catch (_: Exception) {
     }
-    try {
-      host.unregisterReceiver(liveStateReceiver)
-    } catch (_: Exception) {
-    }
     if (::ui.isInitialized) {
       deactivate()
-      ui.removeFloatingButton()
       ui.dismissMenu()
       ui.cleanup()
     }
@@ -225,7 +195,6 @@ class TranslatorOverlayBridge(
     // the caller's hide delay, so Circle to Search disappears first.
     active = true
     langStateManager.refreshLanguageAvailability()
-    ui.removeFloatingButton()
     beginProvidedTranslation(screenshot)
 
     if (uiDelayMs <= 0L) {
@@ -272,7 +241,6 @@ class TranslatorOverlayBridge(
   private fun enterActiveState() {
     active = true
     langStateManager.refreshLanguageAvailability()
-    ui.removeFloatingButton()
     ui.removeTranslationOverlays()
     showTranslatorChrome()
   }
@@ -289,7 +257,6 @@ class TranslatorOverlayBridge(
     ui.removeToolbar()
     ui.removeTranslationOverlays()
     ui.dismissMenu()
-    ui.restoreFloatingButton()
     providedScreenshot = null
     returnToCaller?.let { cb ->
       returnToCaller = null
