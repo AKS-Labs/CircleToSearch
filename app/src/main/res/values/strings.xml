@@ -99,6 +99,8 @@
     <string name="label_smartscan">SmartScan</string>
     <string name="label_scan_qr">Scan QR</string>
     <string name="label_fullscreen">Fullscreen</string>
+    <string name="label_upload">Upload</string>
+    <string name="toast_image_load_failed">Unable to load that image</string>
     <string name="label_share">Share</string>
     <string name="label_extracting_entities">Extracting links &amp; info\u2026</string>
     <string name="label_open_app">Open: %1$s</string>
@@ -249,6 +251,7 @@
     <string name="label_scanning_text">Scanning text\u2026</string>
     <string name="title_select_ocr_model">Select OCR Model</string>
     <string name="label_no_text_found">No text found on screen.</string>
+    <string name="label_language_detect_failed">Failed to auto-detect language.</string>
     <string name="toolbar_btn_copy">Copy</string>
     <string name="toolbar_btn_share">Share</string>
     <string name="toolbar_btn_translate">Translate</string>

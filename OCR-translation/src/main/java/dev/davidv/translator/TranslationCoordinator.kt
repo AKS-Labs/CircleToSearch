@@ -300,6 +300,12 @@ class TranslationCoordinator(
    * [onDetectedRegions] fires as soon as boxes are detected, before recognition finishes
    * (for scan animations). Returns null when OCR failed; [onOcrUnavailable] flags a missing
    * OCR model chain so the caller can prompt for a repair/download.
+   *
+   * When [sourceSelection] is Auto and language detection declines (short/ambiguous text, or
+   * no installed pair to [to]), the plan retries with [to] as an explicit source so word
+   * extraction still succeeds without asking the caller to pick a language. If that retry
+   * also fails, [onAutoSourceFailed] fires so the caller can report the detection problem
+   * rather than a generic no-text failure.
    */
   suspend fun ocrWordsOnly(
     bitmap: Bitmap,
@@ -308,6 +314,7 @@ class TranslationCoordinator(
     readingOrder: ReadingOrder? = null,
     onDetectedRegions: (List<uniffi.translator_core.OrientedRect>, Int, Int) -> Unit = { _, _, _ -> },
     onOcrUnavailable: () -> Unit = {},
+    onAutoSourceFailed: () -> Unit = {},
   ): OcrWordsResult? =
     withContext(Dispatchers.IO) {
       _isOcrInProgress.value = true
@@ -341,27 +348,47 @@ class TranslationCoordinator(
           onDetectedRegions(boxes.map { it.orientedBox }, bitmap.width, bitmap.height)
         }
 
+        val planCall = { sel: OcrSourceSelection ->
+          catalog.ocrImagePlan(
+            ocrImage,
+            maxImageSize,
+            sel,
+            to,
+            minConfidence,
+            readingOrder,
+            backgroundMode,
+            detection,
+          )
+        }
         val plan =
           try {
-            catalog.ocrImagePlan(
-              ocrImage,
-              maxImageSize,
-              sourceSelection,
-              to,
-              minConfidence,
-              readingOrder,
-              backgroundMode,
-              detection,
-            )
-          } catch (e: uniffi.bindings.CatalogException.MissingAsset) {
-            Log.d("OCR", "ocr plan failed: ${e.message}")
-            onOcrUnavailable()
-            ocrImage.close()
-            return@withContext null
+            planCall(sourceSelection)
           } catch (e: uniffi.bindings.CatalogException) {
-            Log.d("OCR", "ocr plan failed: ${e.message}")
-            ocrImage.close()
-            return@withContext null
+            // Auto's CLD pass declines on short/ambiguous text or an uninstalled
+            // detected->target pair, both reported as the same error. Callers that only
+            // need the recognized words (Circle to Search) have no language picker to
+            // resolve it with, so retry once with the target as an explicit source: the
+            // returned words are source words either way, and source == target makes the
+            // translation stage an identity pass that can't fail on a missing pair.
+            val detectedSourceFailed =
+              sourceSelection is OcrSourceSelection.Auto &&
+                e.message.orEmpty().contains("could not detect image source language")
+            if (!detectedSourceFailed) {
+              Log.d("OCR", "ocr plan failed: ${e.message}")
+              if (e is uniffi.bindings.CatalogException.MissingAsset) onOcrUnavailable()
+              ocrImage.close()
+              return@withContext null
+            }
+            Log.d("OCR", "auto source detect failed, retrying as source=${to.code}: ${e.message}")
+            try {
+              planCall(OcrSourceSelection.Specific(uniffi.translator_core.LanguageCode(to.code)))
+            } catch (retry: uniffi.bindings.CatalogException) {
+              Log.d("OCR", "ocr plan failed: ${retry.message}")
+              if (retry is uniffi.bindings.CatalogException.MissingAsset) onOcrUnavailable()
+              onAutoSourceFailed()
+              ocrImage.close()
+              return@withContext null
+            }
           }
         Log.i("TranslationCoordinator", "ocrWordsOnly: ${System.currentTimeMillis() - ocrStart}ms")
         val result =

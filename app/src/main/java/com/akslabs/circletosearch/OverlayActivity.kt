@@ -59,7 +59,7 @@ class OverlayActivity : ComponentActivity() {
                     tonalElevation = 0.dp
                 ) {
                     CircleToSearchScreen(
-                        screenshot = screenshotBitmap.value,
+                        capturedScreenshot = screenshotBitmap.value,
                         searchModeOverride = searchModeOverride.value,
                         onClose = { 
                             BitmapRepository.clear()

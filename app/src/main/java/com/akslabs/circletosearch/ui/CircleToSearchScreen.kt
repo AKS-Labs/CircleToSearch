@@ -31,6 +31,9 @@ import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.PredictiveBackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
@@ -96,6 +99,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.Translate
+import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Phone
@@ -145,6 +149,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -203,7 +209,8 @@ private const val TRANSLATE_HIDE_DELAY_MS = 150L
 /**
  * Runs the translator module's OCR over [bmp] and returns its recognized source words —
  * no translation, no overlay bitmap. [onRegions] fires as soon as detection boxes arrive
- * (for the scan animation). Returns null on failure/missing OCR models (toast shown).
+ * (for the scan animation). Returns null on failure: missing OCR models and no-text both
+ * show a toast.
  */
 private suspend fun runInstantScreenshotOcr(
     context: android.content.Context,
@@ -214,21 +221,27 @@ private suspend fun runInstantScreenshotOcr(
     val coordinator = runCatching { app.translationCoordinator }.getOrNull() ?: return null
     val target = CircleToSearchAccessibilityService.instance?.defaultTargetLanguage() ?: return null
     var ocrMissing = false
+    var sourceDetectFailed = false
     val result = coordinator.ocrWordsOnly(
         bitmap = bmp,
         to = target,
         onDetectedRegions = { boxes, w, h -> onRegions(DetectedRegions(w, h, boxes)) },
         onOcrUnavailable = { ocrMissing = true },
+        onAutoSourceFailed = { sourceDetectFailed = true },
     )
     if (result == null) {
-        if (ocrMissing) {
-            withContext(Dispatchers.Main) {
-                android.widget.Toast.makeText(
-                    context,
-                    context.getString(dev.davidv.translator.R.string.ocr_models_missing),
-                    android.widget.Toast.LENGTH_SHORT,
-                ).show()
+        val messageId =
+            when {
+                ocrMissing -> dev.davidv.translator.R.string.ocr_models_missing
+                sourceDetectFailed -> R.string.label_language_detect_failed
+                else -> R.string.label_no_text_found
             }
+        withContext(Dispatchers.Main) {
+            android.widget.Toast.makeText(
+                context,
+                context.getString(messageId),
+                android.widget.Toast.LENGTH_SHORT,
+            ).show()
         }
         return null
     }
@@ -240,15 +253,79 @@ private suspend fun runInstantScreenshotOcr(
     )
 }
 
+/**
+ * Fit (contain) mapping for a bitmap centered in a view — the app-side mirror of the
+ * module's internal fitTransform, which the word/scan overlays use. Unit-agnostic: pass
+ * view/image sizes in px (crop path) or dp (chip path) consistently for both.
+ */
+private class FitMapping(val scale: Float, val offsetX: Float, val offsetY: Float) {
+    fun unmapX(x: Float) = (x - offsetX) / scale
+    fun unmapY(y: Float) = (y - offsetY) / scale
+}
+
+private fun fitMapping(viewW: Float, viewH: Float, imageW: Float, imageH: Float): FitMapping {
+    val scale = min(viewW / imageW, viewH / imageH)
+    return FitMapping(scale, (viewW - imageW * scale) / 2f, (viewH - imageH * scale) / 2f)
+}
+
+/**
+ * Maps a screen-space rect into bitmap space for the ContentScale.Fit display, clamping to
+ * the bitmap. For screen captures (bitmap size == view size) this is the identity.
+ */
+private fun fitCrop(
+    rect: android.graphics.Rect,
+    t: FitMapping,
+    imageW: Int,
+    imageH: Int,
+): android.graphics.Rect =
+    android.graphics.Rect(
+        t.unmapX(rect.left.toFloat()).toInt().coerceIn(0, imageW),
+        t.unmapY(rect.top.toFloat()).toInt().coerceIn(0, imageH),
+        t.unmapX(rect.right.toFloat()).toInt().coerceIn(0, imageW),
+        t.unmapY(rect.bottom.toFloat()).toInt().coerceIn(0, imageH),
+    )
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CircleToSearchScreen(
-    screenshot: Bitmap?,
+    capturedScreenshot: Bitmap?,
     onClose: () -> Unit,
     searchModeOverride: Boolean? = null,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+
+    // Upload flow: the user can swap the canvas for a gallery image and run Circle to
+    // Search on it. Keyed on the capture param so a fresh capture supersedes a pick.
+    var uploadedImage by remember(capturedScreenshot) { mutableStateOf<Bitmap?>(null) }
+    val screenshot = uploadedImage ?: capturedScreenshot
+
+    // Pixel size of the canvas layer — the image-fit mapping (crop-to-search, chips) needs it.
+    var canvasSizePx by remember { mutableStateOf(IntSize.Zero) }
+
+    val pickImageLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) {
+            // Decode at original proportions (EXIF-rotated, only sampled past a 12 MP budget).
+            // The display fits the bitmap to the screen, so nothing is cropped or stretched.
+            val maxPixels = 12 * 1000 * 1000
+            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                val picked = ImageUtils.loadImageUri(context, uri, maxPixels)
+                if (picked != null) {
+                    uploadedImage = picked
+                } else {
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        android.widget.Toast.makeText(
+                            context,
+                            context.getString(R.string.toast_image_load_failed),
+                            android.widget.Toast.LENGTH_SHORT,
+                        ).show()
+                    }
+                }
+            }
+        }
+    }
     
     // Initialize preferences
     val uiPreferences = remember { UIPreferences(context) }
@@ -328,6 +405,9 @@ fun CircleToSearchScreen(
     var isEntityExtractMode by remember { mutableStateOf(false) }
     var detectedEntities by remember { mutableStateOf<List<SmartEntity>>(emptyList()) }
     var isExtractingEntities by remember { mutableStateOf(false) }
+    // Bumped whenever the canvas image changes so an in-flight SmartScan can't deliver
+    // entities extracted for the previous image.
+    var entityScanGeneration by remember { mutableStateOf(0) }
     
     LaunchedEffect(Unit) {
         if (uiPreferences.isShowFriendlyMessages()) {
@@ -467,6 +547,9 @@ fun CircleToSearchScreen(
     // recognized source words — tap a word to select and copy (original text, no translation).
     var instantWords by remember { mutableStateOf<ImageWordSelection?>(null) }
     var instantRegions by remember { mutableStateOf<DetectedRegions?>(null) }
+    // OCR finished with no words (plan failed / nothing recognized): stop the scan
+    // animation instead of breathing over the image forever.
+    var instantOcrDone by remember { mutableStateOf(false) }
     // A word selection in the instant-OCR overlay hides the bottom bar; tapping outside the
     // text clears the selection and the bar comes back.
     var wordSelected by remember { mutableStateOf(false) }
@@ -522,12 +605,18 @@ fun CircleToSearchScreen(
     }
 
     fun endCircleDrag() {
+        val bmp = screenshot
+        // View size in px — with no bitmap the old behavior (degenerate rect) is kept.
+        val viewW = bmp?.let { if (canvasSizePx.width > 0) canvasSizePx.width else it.width } ?: 0
+        val viewH = bmp?.let { if (canvasSizePx.height > 0) canvasSizePx.height else it.height } ?: 0
         if (isResizing) {
             isResizing = false
             activeHandle = null
-            // Update cropped bitmap after resize
-            if (screenshot != null && selectionRect != null) {
-                selectedBitmap = ImageUtils.cropBitmap(screenshot, selectionRect!!)
+            // Update cropped bitmap after resize. selectionRect is screen-space; map it into
+            // image space first (the Fit display may letterbox/scale the bitmap).
+            if (bmp != null && selectionRect != null) {
+                val t = fitMapping(viewW.toFloat(), viewH.toFloat(), bmp.width.toFloat(), bmp.height.toFloat())
+                selectedBitmap = ImageUtils.cropBitmap(bmp, fitCrop(selectionRect!!, t, bmp.width, bmp.height))
             }
         } else if (currentPathPoints.isNotEmpty()) {
             var minX = Float.MAX_VALUE
@@ -545,15 +634,16 @@ fun CircleToSearchScreen(
             val rect = android.graphics.Rect(
                 (minX - border).toInt().coerceAtLeast(0),
                 (minY - border).toInt().coerceAtLeast(0),
-                (maxX + border).toInt().coerceAtMost(screenshot?.width ?: 0),
-                (maxY + border).toInt().coerceAtMost(screenshot?.height ?: 0)
+                (maxX + border).toInt().coerceAtMost(viewW),
+                (maxY + border).toInt().coerceAtMost(viewH)
             )
 
             if (rect.width() > 10 && rect.height() > 10) {
                 selectionRect = rect
                 currentPathPoints.clear() // Hide the drawn circle
-                if (screenshot != null) {
-                    selectedBitmap = ImageUtils.cropBitmap(screenshot!!, rect)
+                if (bmp != null) {
+                    val t = fitMapping(viewW.toFloat(), viewH.toFloat(), bmp.width.toFloat(), bmp.height.toFloat())
+                    selectedBitmap = ImageUtils.cropBitmap(bmp, fitCrop(rect, t, bmp.width, bmp.height))
                 }
                 scope.launch {
                     selectionAnim.animateTo(1f, tween(600))
@@ -571,6 +661,11 @@ fun CircleToSearchScreen(
             isSearching = false
             currentPathPoints.clear()
             selectionAnim.snapTo(0f)
+            // The canvas image changed: drop entities extracted for the previous image and
+            // invalidate any extraction still in flight.
+            detectedEntities = emptyList()
+            isExtractingEntities = false
+            entityScanGeneration = entityScanGeneration + 1
             if (isTranslatorMode) {
                 CircleToSearchAccessibilityService.instance?.closeTranslateOverlay()
             }
@@ -608,9 +703,11 @@ fun CircleToSearchScreen(
     LaunchedEffect(screenshot) {
         instantWords = null
         instantRegions = null
+        instantOcrDone = false
         wordSelected = false
         val bmp = screenshot ?: return@LaunchedEffect
         instantWords = runInstantScreenshotOcr(context, bmp) { instantRegions = it }
+        instantOcrDone = true
     }
 
     // The word overlay unmounts in these modes (dropping its selection) - drop ours too so
@@ -1078,6 +1175,10 @@ fun CircleToSearchScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
+                        // Letterbox bars behind the Fit image are solid black, not see-through.
+                        .background(Color.Black)
+                        // View size for the image-fit mapping (crop-to-search, chips).
+                        .onSizeChanged { canvasSizePx = it }
                         .graphicsLayer {
                             // Required for BlendMode.Clear to work in child Canvas
                             compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen
@@ -1086,7 +1187,7 @@ fun CircleToSearchScreen(
                     Image(
                         bitmap = screenshot.asImageBitmap(),
                         contentDescription = stringResource(R.string.cd_screenshot),
-                        contentScale = ContentScale.FillBounds,
+                        contentScale = ContentScale.Fit,
                         modifier = Modifier.fillMaxSize()
                     )
 
@@ -1292,7 +1393,7 @@ fun CircleToSearchScreen(
                                 modifier = Modifier.fillMaxSize(),
                                 onSelectionChanged = { wordSelected = it },
                             )
-                        } else {
+                        } else if (!instantOcrDone) {
                             instantRegions?.let { regions ->
                                 ScanAnimationOverlay(
                                     regions = regions,
@@ -1722,6 +1823,7 @@ fun CircleToSearchScreen(
                                 if (detectedEntities.isEmpty() && !isExtractingEntities) {
                                     isExtractingEntities = true
                                     val cachedWords = instantWords?.sourceWords
+                                    val scanGeneration = entityScanGeneration
                                     scope.launch(kotlinx.coroutines.Dispatchers.IO) {
                                         val bmp = screenshot ?: return@launch
                                         val sourceWords = cachedWords ?: runInstantScreenshotOcr(context, bmp) { }?.sourceWords
@@ -1782,8 +1884,11 @@ fun CircleToSearchScreen(
                                             else if (urlRegex.matches(txt)) entities.add(SmartEntity.Url(txt, wordBounds, context.getString(R.string.entity_type_link)))
                                         }
                                         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                                            detectedEntities = entities
                                             isExtractingEntities = false
+                                            // Discard results if the canvas image changed mid-scan.
+                                            if (scanGeneration == entityScanGeneration) {
+                                                detectedEntities = entities
+                                            }
                                         }
                                     }
                                 }
@@ -1803,7 +1908,10 @@ fun CircleToSearchScreen(
                             // Fullscreen
                             BottomBarButton(stringResource(R.string.label_fullscreen), { Icon(Icons.Default.Fullscreen, null) }) {
                                 if (screenshot != null) {
-                                    selectionRect = Rect(0, 0, screenshot.width, screenshot.height)
+                                    // Full-image selection in screen space (view size, not bitmap size).
+                                    val viewW = if (canvasSizePx.width > 0) canvasSizePx.width else screenshot.width
+                                    val viewH = if (canvasSizePx.height > 0) canvasSizePx.height else screenshot.height
+                                    selectionRect = Rect(0, 0, viewW, viewH)
                                     currentPathPoints.clear()
                                     scope.launch { 
                                         selectionAnim.snapTo(0f)
@@ -1812,6 +1920,13 @@ fun CircleToSearchScreen(
                                         isSearching = true 
                                     }
                                 }
+                            }
+
+                            // Upload — pick a gallery image and run Circle to Search on it
+                            BottomBarButton(stringResource(R.string.label_upload), { Icon(Icons.Default.Upload, null) }) {
+                                pickImageLauncher.launch(
+                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                )
                             }
                         }
                     }
@@ -2000,12 +2115,14 @@ fun CircleToSearchScreen(
                 val screenHeight = maxHeight
                 val bitmapWidth = screenshot.width.toFloat()
                 val bitmapHeight = screenshot.height.toFloat()
+                // ContentScale.Fit mapping — chips sit over the letterboxed image, in dp.
+                val t = fitMapping(screenWidth.value, screenHeight.value, bitmapWidth, bitmapHeight)
 
                 android.util.Log.d("CircleToSearch", "Rendering QR Chips: count=${detectedQrCodes.size}")
                 detectedQrCodes.forEach { qr ->
                     qr.bounds?.let { bounds ->
-                        val chipX = (bounds.centerX() / bitmapWidth) * screenWidth.value
-                        val chipY = (bounds.centerY() / bitmapHeight) * screenHeight.value
+                        val chipX = t.offsetX + bounds.centerX() * t.scale
+                        val chipY = t.offsetY + bounds.centerY() * t.scale
                         val isUrl = qr.result is QrResult.Url
 
                         // Using a Box with pointerInput to consume taps and prevent circling
@@ -2075,6 +2192,8 @@ fun CircleToSearchScreen(
                 val screenHeight = maxHeight
                 val bitmapWidth = screenshot.width.toFloat()
                 val bitmapHeight = screenshot.height.toFloat()
+                // ContentScale.Fit mapping — chips sit over the letterboxed image, in dp.
+                val t = fitMapping(screenWidth.value, screenHeight.value, bitmapWidth, bitmapHeight)
 
                 if (isExtractingEntities) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -2087,8 +2206,8 @@ fun CircleToSearchScreen(
                 }
 
                 detectedEntities.forEach { entity ->
-                    val chipX = (entity.bounds.centerX() / bitmapWidth) * screenWidth.value
-                    val chipY = (entity.bounds.centerY() / bitmapHeight) * screenHeight.value
+                    val chipX = t.offsetX + entity.bounds.centerX() * t.scale
+                    val chipY = t.offsetY + entity.bounds.centerY() * t.scale
 
                     // Main Chip Icon
                     Box(
