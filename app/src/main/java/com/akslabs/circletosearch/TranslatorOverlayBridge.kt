@@ -53,6 +53,13 @@ class TranslatorOverlayBridge(
   private var forcedTargetLanguage: Language? = null
   private var isAutoSource: Boolean = true
   private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+  private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+  private var capturedChrome: Runnable? = null
+  private var capturedScanning = false
+  private var capturedRegion: Rect? = null
+
+  /** Bumped on [deactivate] so a result finishing after close is dropped, not drawn. */
+  private var overlaySession = 0
 
   private data class TranslatedScreen(
     val original: Bitmap,
@@ -192,20 +199,74 @@ class TranslatorOverlayBridge(
   }
 
   /**
-   * Same activation as the module's floating bubble ([activate]), but translates the
-   * screenshot captured when Circle to Search launched instead of capturing a new one.
-   * [returnToCaller] is invoked when the overlay is deactivated (toolbar close, back
-   * press) so the caller can restore its UI.
+   * Starts OCR + translation of the screenshot captured when Circle to Search launched
+   * immediately, so compute overlaps the caller's UI-hide delay. The translator chrome
+   * (border wave + toolbar, then the scan overlay if still computing) is drawn only
+   * after [uiDelayMs], once the caller's UI has been hidden. [returnToCaller] is invoked
+   * when the overlay is deactivated (toolbar close, back press) so the caller can
+   * restore its UI.
    */
-  fun activateWithScreenshot(screenshot: Bitmap, returnToCaller: (() -> Unit)? = null) {
+  fun startCapturedTranslation(
+    screenshot: Bitmap,
+    uiDelayMs: Long = 0L,
+    returnToCaller: (() -> Unit)? = null,
+  ) {
     this.returnToCaller = returnToCaller
     providedScreenshot = screenshot
+
     if (active) {
       if (selectMode) exitSelectMode()
-    } else {
-      enterActiveState()
+      beginProvidedTranslation(screenshot)
+      showScanIfScanning()
+      return
     }
-    translateProvidedScreen(screenshot)
+
+    // Mark active now (gates bubble restore / receivers) but draw the chrome only after
+    // the caller's hide delay, so Circle to Search disappears first.
+    active = true
+    langStateManager.refreshLanguageAvailability()
+    ui.removeFloatingButton()
+    beginProvidedTranslation(screenshot)
+
+    if (uiDelayMs <= 0L) {
+      showCapturedChrome()
+    } else {
+      val show = Runnable {
+        capturedChrome = null
+        if (providedScreenshot != null) showCapturedChrome()
+      }
+      capturedChrome = show
+      mainHandler.postDelayed(show, uiDelayMs)
+    }
+  }
+
+  private fun showCapturedChrome() {
+    showTranslatorChrome()
+    showScanIfScanning()
+  }
+
+  private fun showScanIfScanning() {
+    if (capturedScanning) capturedRegion?.let { ui.showScanOverlay(surfaceState, it) }
+  }
+
+  private fun cancelCapturedChrome() {
+    capturedChrome?.let { mainHandler.removeCallbacks(it) }
+    capturedChrome = null
+  }
+
+  /**
+   * Fades the overlay windows during the system back gesture ([alpha] 1 = normal,
+   * 0 = hidden) so the predictive back arrow, drawn below accessibility overlays,
+   * stays visible.
+   */
+  fun setGestureAlpha(alpha: Float) {
+    if (!active) return
+    ui.setOverlayAlpha(alpha)
+  }
+
+  private fun showTranslatorChrome() {
+    ui.showBorderWave()
+    ui.showToolbar(forcedSourceLanguage, forcedTargetLanguage, currentReadingOrderFor(forcedSourceLanguage), isAutoSource)
   }
 
   private fun enterActiveState() {
@@ -213,11 +274,12 @@ class TranslatorOverlayBridge(
     langStateManager.refreshLanguageAvailability()
     ui.removeFloatingButton()
     ui.removeTranslationOverlays()
-    ui.showBorderWave()
-    ui.showToolbar(forcedSourceLanguage, forcedTargetLanguage, currentReadingOrderFor(forcedSourceLanguage), isAutoSource)
+    showTranslatorChrome()
   }
 
   override fun deactivate() {
+    cancelCapturedChrome()
+    overlaySession++
     active = false
     selectMode = false
     ui.removeSelectSurface()
@@ -372,8 +434,9 @@ class TranslatorOverlayBridge(
   private fun fullCaptureRegion(): Rect =
     dev.davidv.translator.overlayChrome.OverlayInsets.contentBounds(windowManager)
 
-  /** OCR + translate an already-captured screenshot, skipping the accessibility capture. */
-  private fun translateProvidedScreen(screenshot: Bitmap) {
+  /** Crops the provided capture and starts OCR/translate immediately — no UI here;
+   *  the caller draws the scan overlay and chrome separately (they may be delayed). */
+  private fun beginProvidedTranslation(screenshot: Bitmap) {
     ui.removeTranslationOverlays()
 
     val sourceLang = ocrSourceLanguage()
@@ -387,9 +450,14 @@ class TranslatorOverlayBridge(
 
     val cropped = cropToRegion(screenshot, region) ?: return
     surfaceState.regions.value = null
-    ui.showScanOverlay(surfaceState, region)
+    capturedRegion = region
+    capturedScanning = true
     serviceScope.launch {
-      translateRegionBitmap(cropped, region)
+      try {
+        translateRegionBitmap(cropped, region)
+      } finally {
+        capturedScanning = false
+      }
     }
   }
 
@@ -447,6 +515,7 @@ class TranslatorOverlayBridge(
     bitmap: Bitmap,
     region: Rect,
   ) {
+    val session = overlaySession
     val coordinator = translationCoordinator ?: return
     val sourceLang = ocrSourceLanguage()
     val targetLang = forcedTargetLanguage ?: langStateManager.languageByCode(settingsManager.settings.value.defaultTargetLanguageCode) ?: return
@@ -468,6 +537,8 @@ class TranslatorOverlayBridge(
           },
         )
       }
+
+    if (session != overlaySession || !active) return
 
     ui.removeTranslationOverlays()
     if (result == null) {

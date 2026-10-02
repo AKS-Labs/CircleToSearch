@@ -59,6 +59,8 @@ class OverlayUI(
   private var selectDialog: Dialog? = null
   private var selectHost: WindowComposeHost? = null
   private var scanHost: WindowComposeHost? = null
+  private var messageView: TextView? = null
+  private val menuChildren = mutableListOf<View>()
 
   private val menuManager =
     OverlayMenuManager(
@@ -76,6 +78,7 @@ class OverlayUI(
             )
           params.windowAnimations = 0
           windowManager.addView(view, params)
+          menuChildren.add(view)
         }
 
         override fun addMenuView(view: View) {
@@ -92,6 +95,7 @@ class OverlayUI(
           params.y = dpToPx(48)
           params.windowAnimations = 0
           windowManager.addView(view, params)
+          menuChildren.add(view)
         }
 
         override fun addPickerView(view: View) {
@@ -106,9 +110,11 @@ class OverlayUI(
           params.gravity = Gravity.CENTER
           params.windowAnimations = 0
           windowManager.addView(view, params)
+          menuChildren.add(view)
         }
 
         override fun removeMenuChild(view: View) {
+          menuChildren.remove(view)
           windowManager.removeView(view)
         }
       },
@@ -464,12 +470,30 @@ class OverlayUI(
     params.y = dpToPx(80)
 
     windowManager.addView(textView, params)
+    messageView = textView
     handler.postDelayed({
+      if (messageView === textView) messageView = null
       try {
         windowManager.removeView(textView)
       } catch (_: Exception) {
       }
     }, 3000)
+  }
+
+  /**
+   * Sets the alpha of every window this UI owns ([1f] = normal). The system's
+   * back-gesture arrow is drawn *below* accessibility overlays, so during a predictive
+   * back gesture they must become transparent to keep the arrow visible.
+   */
+  fun setOverlayAlpha(alpha: Float) {
+    toolbarView?.alpha = alpha
+    borderView?.alpha = alpha
+    touchWatcher?.alpha = alpha
+    scanHost?.view?.alpha = alpha
+    selectDialog?.window?.decorView?.alpha = alpha
+    messageView?.alpha = alpha
+    translationOverlays.forEach { it.alpha = alpha }
+    menuChildren.forEach { it.alpha = alpha }
   }
 
   fun hasToolbar(): Boolean = toolbarView != null

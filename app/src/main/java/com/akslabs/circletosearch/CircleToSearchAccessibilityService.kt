@@ -1181,19 +1181,27 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
 
     /**
      * Translates the screenshot captured when Circle to Search launched using the
-     * translator module's overlay (same path as its floating bubble).
-     * [onClosed] is invoked when the overlay is dismissed (toolbar close / back press)
-     * so the caller can restore its UI. Returns false if the overlay bridge is not running.
+     * translator module's overlay (same path as its floating bubble). OCR and
+     * translation start immediately; the overlay chrome is drawn after [uiDelayMs],
+     * once the caller's UI has been hidden. [onClosed] is invoked when the overlay is
+     * dismissed (toolbar close / back press) so the caller can restore its UI. Returns
+     * false if the overlay bridge is not running.
      */
-    fun translateCapturedScreen(screenshot: Bitmap, onClosed: (() -> Unit)? = null): Boolean {
+    fun translateCapturedScreen(screenshot: Bitmap, uiDelayMs: Long = 0L, onClosed: (() -> Unit)? = null): Boolean {
         val bridge = translatorBridge ?: return false
-        bridge.activateWithScreenshot(screenshot, onClosed)
+        bridge.startCapturedTranslation(screenshot, uiDelayMs, onClosed)
         return true
     }
 
     /** Dismisses the translator overlay if active, notifying its return callback. */
     fun closeTranslateOverlay() {
         translatorBridge?.deactivate()
+    }
+
+    /** Fades translator overlay windows during the system back gesture so the
+     *  predictive back arrow (drawn below accessibility overlays) stays visible. */
+    fun setTranslatorGestureAlpha(alpha: Float) {
+        translatorBridge?.setGestureAlpha(alpha)
     }
 
     companion object {

@@ -30,6 +30,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
@@ -574,6 +575,24 @@ fun CircleToSearchScreen(
              scope.launch { scaffoldState.bottomSheetState.hide() }
         } else {
             onClose()
+        }
+    }
+
+    // Predictive back arrow: the system animates the back gesture (edge arrow + progress)
+    // only when a prioritized callback receives it. In translator mode back is consumed
+    // with no window transition, so a predictive handler keeps the arrow visible — and
+    // the overlay windows (drawn above the arrow) fade out while the gesture runs.
+    PredictiveBackHandler(enabled = isTranslatorMode) { progress ->
+        val service = CircleToSearchAccessibilityService.instance
+        try {
+            progress.collect { event ->
+                val fade = (1f - event.progress * 6f).coerceIn(0f, 1f)
+                service?.setTranslatorGestureAlpha(fade)
+            }
+            service?.closeTranslateOverlay()
+        } catch (_: java.util.concurrent.CancellationException) {
+            // Gesture cancelled — restore the overlay windows.
+            service?.setTranslatorGestureAlpha(1f)
         }
     }
 
@@ -1520,13 +1539,14 @@ fun CircleToSearchScreen(
                                                 currentPathPoints.clear()
                                                 scope.launch { selectionAnim.snapTo(0f) }
                                                 isTranslatorMode = true
-                                                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                                                    if (isTranslatorMode) {
-                                                        translatorService.translateCapturedScreen(bmp) {
-                                                            isTranslatorMode = false
-                                                        }
-                                                    }
-                                                }, TRANSLATE_HIDE_DELAY_MS)
+                                                // OCR starts now; only the overlay chrome waits for the hide delay.
+                                                val started = translatorService.translateCapturedScreen(bmp, TRANSLATE_HIDE_DELAY_MS) {
+                                                    isTranslatorMode = false
+                                                }
+                                                if (!started) {
+                                                    isTranslatorMode = false
+                                                    android.widget.Toast.makeText(context, context.getString(R.string.toast_translate_unavailable), android.widget.Toast.LENGTH_SHORT).show()
+                                                }
                                             }
                                         },
                                         onLongClick = {
@@ -1536,10 +1556,8 @@ fun CircleToSearchScreen(
                                             if (bmp == null || translatorService == null) {
                                                 android.widget.Toast.makeText(context, context.getString(R.string.toast_translate_unavailable), android.widget.Toast.LENGTH_SHORT).show()
                                             } else {
+                                                translatorService.translateCapturedScreen(bmp, TRANSLATE_TRIGGER_DELAY_MS)
                                                 onClose()
-                                                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                                                    translatorService.translateCapturedScreen(bmp)
-                                                }, TRANSLATE_TRIGGER_DELAY_MS)
                                             }
                                         }
                                     ),
