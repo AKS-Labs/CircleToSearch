@@ -63,8 +63,6 @@
     <string name="label_set_default_assistant_subtitle">Hold the Home button or edge-swipe up to summon CircleToSearch.</string>
     <string name="section_customization">CUSTOMIZATION</string>
     <string name="info_lens_needs_google">Lens needs Google App Installed. But Degoogled friends can stick with the versatile Multi-Search Engine mode.</string>
-    <string name="label_ocr_settings">OCR Language Settings</string>
-    <string name="label_ocr_settings_subtitle">Import custom Tesseract OCR models</string>
     <string name="label_from_akslabs">From AKS-Labs With \u2764\uFE0F</string>
     <string name="toast_could_not_open_link">Could not open link</string>
     <string name="toast_accessibility_settings_error">Could not open Accessibility Settings</string>
@@ -86,7 +84,6 @@
     <string name="cd_logo">Logo</string>
     <string name="cd_voice_search">Voice Search</string>
     <string name="cd_lens">Lens</string>
-    <string name="cd_assist_copy">Assist Copy</string>
     <string name="cd_translate">Translate</string>
     <string name="cd_github">Github</string>
     <string name="cd_donate">Donate</string>
@@ -96,13 +93,10 @@
     <string name="cd_move_down">Move Down</string>
     <string name="cd_back">Back</string>
     <string name="cd_delete">Delete</string>
-    <string name="cd_exit_copy_mode">Exit Copy Mode</string>
     <string name="cd_search_icon">Search Icon</string>
-    <string name="cd_import_model">Import Model</string>
 
     <!-- Search Screen Labels -->
     <string name="label_smartscan">SmartScan</string>
-    <string name="label_copy_text">Copy Text</string>
     <string name="label_scan_qr">Scan QR</string>
     <string name="label_fullscreen">Fullscreen</string>
     <string name="label_share">Share</string>
@@ -140,10 +134,6 @@
     <string name="toast_auto_rotate">Auto Rotate: %1$s</string>
     <string name="toast_auto_rotate_permission">Permission required for Auto Rotate</string>
     <string name="toast_enable_accessibility_tile">Please enable Circle to Search Accessibility Service</string>
-    <string name="toast_invalid_model_file">File must be a .traineddata Tesseract model.</string>
-    <string name="toast_model_imported">Successfully imported %1$s model!</string>
-    <string name="toast_model_import_failed">Failed to import model</string>
-    <string name="toast_ocr_model_selected">Selected: %1$s. Restarting scan\u2026</string>
     <string name="toast_save_failed">Save failed</string>
 
     <!-- Share -->
@@ -186,15 +176,6 @@
     <string name="title_select_action">Select Action</string>
     <string name="title_select_app">Select App</string>
     <string name="hint_search_apps">Search apps</string>
-
-    <!-- OCR Settings Screen -->
-    <string name="title_ocr_settings">OCR Language Models</string>
-    <string name="btn_import_model">Import Model</string>
-    <string name="title_language_models_guide">Language Models Guide</string>
-    <string name="info_ocr_guide_part1">This app uses language models to detect text. By default, it uses a fast English model which may miss some text. To use high-accuracy models or detect other languages, download them from the </string>
-    <string name="info_ocr_guide_telegram_link">developer\'s Telegram group</string>
-    <string name="info_ocr_guide_part2"> with /model command, e.g. /model english and import them below.</string>
-    <string name="title_installed_models">Installed Models</string>
 
     <!-- QR Code Result Sheet -->
     <string name="label_contact">Contact</string>

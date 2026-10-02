@@ -87,7 +87,6 @@ import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.Refresh
@@ -171,6 +170,11 @@ import com.akslabs.circletosearch.ui.qrResultShortLabel
 import com.akslabs.circletosearch.utils.UIPreferences
 import com.akslabs.circletosearch.ui.components.MoreAppsBottomSheet
 import com.akslabs.circletosearch.ui.components.DonateBottomSheet
+import dev.davidv.translator.TranslatorApplication
+import dev.davidv.translator.ui.components.DetectedRegions
+import dev.davidv.translator.ui.components.ImageWordSelection
+import dev.davidv.translator.ui.components.ScanAnimationOverlay
+import dev.davidv.translator.ui.components.WordSelectionOverlay
 import android.net.Uri
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
@@ -195,15 +199,52 @@ private const val TRANSLATE_TRIGGER_DELAY_MS = 400L
 /** Lets the Circle to Search chrome hide before the translator overlay draws. */
 private const val TRANSLATE_HIDE_DELAY_MS = 150L
 
+/**
+ * Runs the translator module's OCR over [bmp] and returns its recognized source words —
+ * no translation, no overlay bitmap. [onRegions] fires as soon as detection boxes arrive
+ * (for the scan animation). Returns null on failure/missing OCR models (toast shown).
+ */
+private suspend fun runInstantScreenshotOcr(
+    context: android.content.Context,
+    bmp: Bitmap,
+    onRegions: (DetectedRegions) -> Unit,
+): ImageWordSelection? {
+    val app = context.applicationContext as? TranslatorApplication ?: return null
+    val coordinator = runCatching { app.translationCoordinator }.getOrNull() ?: return null
+    val target = CircleToSearchAccessibilityService.instance?.defaultTargetLanguage() ?: return null
+    var ocrMissing = false
+    val result = coordinator.ocrWordsOnly(
+        bitmap = bmp,
+        to = target,
+        onDetectedRegions = { boxes, w, h -> onRegions(DetectedRegions(w, h, boxes)) },
+        onOcrUnavailable = { ocrMissing = true },
+    )
+    if (result == null) {
+        if (ocrMissing) {
+            withContext(Dispatchers.Main) {
+                android.widget.Toast.makeText(
+                    context,
+                    context.getString(dev.davidv.translator.R.string.ocr_models_missing),
+                    android.widget.Toast.LENGTH_SHORT,
+                ).show()
+            }
+        }
+        return null
+    }
+    return ImageWordSelection(
+        imageWidth = result.imageWidth,
+        imageHeight = result.imageHeight,
+        sourceWords = result.sourceWords,
+        translatedWords = result.sourceWords,
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CircleToSearchScreen(
     screenshot: Bitmap?,
     onClose: () -> Unit,
     searchModeOverride: Boolean? = null,
-    copyTextManager: com.akslabs.circletosearch.ui.components.CopyTextOverlayManager? = null,
-    onCopyText: () -> Unit = {},
-    onExitCopyMode: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -265,16 +306,12 @@ fun CircleToSearchScreen(
     }
     val searchEngines = preferredOrder
     
-    // Copy Mode internal state
-    var isCopyMode by remember { mutableStateOf(false) }
-
     // Support Settings Sheet
     var showSettingsScreen by remember { mutableStateOf(false) }
 
     // Friendly Message State
     var friendlyMessage by remember { mutableStateOf("") }
     var isMessageVisible by remember { mutableStateOf(false) }
-    var isCopyTextTriggered by remember { mutableStateOf(false) }
     
     // Resizing state
     var isResizing by remember { mutableStateOf(false) }
@@ -425,10 +462,14 @@ fun CircleToSearchScreen(
     // stays visible as the backdrop under the module's scan/result overlays.
     var isTranslatorMode by remember { mutableStateOf(false) }
 
+    // Instant OCR over the screenshot: scan animation boxes while recognizing, then the
+    // recognized source words — tap a word to select and copy (original text, no translation).
+    var instantWords by remember { mutableStateOf<ImageWordSelection?>(null) }
+    var instantRegions by remember { mutableStateOf<DetectedRegions?>(null) }
+
     // Lifecycle reset: When screenshot changes, reset selection and modes
     LaunchedEffect(screenshot) {
         if (screenshot != null) {
-            isCopyMode = false
             selectionRect = null
             selectedBitmap = null
             isSearching = false
@@ -464,6 +505,15 @@ fun CircleToSearchScreen(
         } else {
             detectedQrCodes = emptyList()
         }
+    }
+
+    // Instant OCR: recognize the screenshot's words as soon as it arrives (module
+    // pipeline, no translation) — shown as tappable words over the frozen capture.
+    LaunchedEffect(screenshot) {
+        instantWords = null
+        instantRegions = null
+        val bmp = screenshot ?: return@LaunchedEffect
+        instantWords = runInstantScreenshotOcr(context, bmp) { instantRegions = it }
     }
 
     // Helper to create and configure WebView
@@ -559,11 +609,6 @@ fun CircleToSearchScreen(
     BackHandler(enabled = true) {
         if (isTranslatorMode) {
             CircleToSearchAccessibilityService.instance?.closeTranslateOverlay()
-            return@BackHandler
-        }
-        if (isCopyMode) {
-            isCopyMode = false
-            onExitCopyMode()
             return@BackHandler
         }
         val currentWebView = webViews[selectedEngine]
@@ -910,7 +955,7 @@ fun CircleToSearchScreen(
             // Close button for Copy Mode (Top Left)
 
             // Friendly Message Overlay (Top Center)
-            if (!isCopyMode && !isTranslatorMode) {
+            if (!isTranslatorMode) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -926,7 +971,7 @@ fun CircleToSearchScreen(
             }
 
             // 1. Screenshot Layer
-            if (screenshot != null && !isCopyMode) {
+            if (screenshot != null) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -984,7 +1029,7 @@ fun CircleToSearchScreen(
             }
 
             // 2. Gradient Border Layer (Overlaying screenshot, clipped to rounded corners)
-            if (showGradientBorder && !isCopyMode && !isTranslatorMode) {
+            if (showGradientBorder && !isTranslatorMode) {
                 androidx.compose.animation.AnimatedVisibility(
                     visible = isUIVisible,
                     enter = androidx.compose.animation.fadeIn(animationSpec = tween(700))
@@ -1005,7 +1050,7 @@ fun CircleToSearchScreen(
             }
 
             // 3. Drawing Canvas (Interactive Layer)
-            if (!isCopyMode && !isTranslatorMode) {                Canvas(
+            if (!isTranslatorMode) {                Canvas(
                     modifier = Modifier
                         .fillMaxSize()
                         .pointerInput(Unit) {
@@ -1208,9 +1253,32 @@ fun CircleToSearchScreen(
 
             }
 
+            // Instant OCR overlays: scan animation while recognizing, then tappable source
+            // words over the frozen screenshot. Sits above the screenshot/drawing layers
+            // (later siblings) and below the chrome — drags still reach the drawing canvas,
+            // so circling a region coexists with word selection.
+            if (screenshot != null && !isTranslatorMode && !isEntityExtractMode) {
+                val words = instantWords
+                if (words != null) {
+                    WordSelectionOverlay(
+                        words = words.sourceWords,
+                        imageWidth = words.imageWidth,
+                        imageHeight = words.imageHeight,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else {
+                    instantRegions?.let { regions ->
+                        ScanAnimationOverlay(
+                            regions = regions,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    }
+                }
+            }
+
             // 4. Header (Top)
             androidx.compose.animation.AnimatedVisibility(
-                visible = isUIVisible && !isCopyMode && !isEntityExtractMode && !isTranslatorMode,
+                visible = isUIVisible && !isEntityExtractMode && !isTranslatorMode,
                 enter = androidx.compose.animation.slideInVertically(
                     initialOffsetY = { -it }, // Commence au-dessus de l'écran (-100%)
                     animationSpec = tween(500, easing = androidx.compose.animation.core.FastOutSlowInEasing)
@@ -1394,11 +1462,8 @@ fun CircleToSearchScreen(
                 }
             }
             // 5. Bottom Bar — Material 3 Expressive two-row card
-            // State for Copy Text mode
-            var isCopyTextTriggered by remember { mutableStateOf(false) }
-
             androidx.compose.animation.AnimatedVisibility(
-                visible = isUIVisible && !isCopyMode && !isEntityExtractMode && !isTranslatorMode,
+                visible = isUIVisible && !isEntityExtractMode && !isTranslatorMode,
                 enter = slideInVertically(
                     initialOffsetY = { it }, // slides up from below
                     animationSpec = tween(300, easing = androidx.compose.animation.core.CubicBezierEasing(0f, 0f, 0.2f, 1f))
@@ -1499,21 +1564,6 @@ fun CircleToSearchScreen(
                                         Icon(painterResource(id = com.akslabs.circletosearch.R.drawable.circletosearch), contentDescription = stringResource(R.string.cd_lens), tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(26.dp))
                                     }
                                 }
-                            }
-
-                            // Circular Button: Assist Copy (Music Icon)
-                            IconButton(
-                                onClick = {
-                                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                                    copyTextManager?.setOcrOnlyMode()
-                                    isCopyMode = true
-                                    isCopyTextTriggered = true
-                                },
-                                modifier = Modifier
-                                    .size(60.dp)
-                                    .background(MaterialTheme.colorScheme.surfaceContainer, CircleShape),
-                            ) {
-                                Icon(Icons.Default.MusicNote, contentDescription = stringResource(R.string.cd_assist_copy), tint = MaterialTheme.colorScheme.onSurface)
                             }
 
                             // Circular Button: Translate
@@ -1637,23 +1687,43 @@ fun CircleToSearchScreen(
 //                                }
 //                            }
 
-                            // Smart Entity Extractor
+                            // Smart Entity Extractor — instant OCR over the screenshot using
+                            // the translator module's recognition (no Tesseract, no re-OCR).
                             BottomBarButton(stringResource(R.string.label_smartscan), { Icon(Icons.Default.Search, null, modifier = Modifier.size(22.dp)) }) {
                                 isEntityExtractMode = true
                                 if (detectedEntities.isEmpty() && !isExtractingEntities) {
                                     isExtractingEntities = true
+                                    val cachedWords = instantWords?.sourceWords
                                     scope.launch(kotlinx.coroutines.Dispatchers.IO) {
                                         val bmp = screenshot ?: return@launch
-                                        val textNodes = com.akslabs.circletosearch.ocr.TesseractEngine.extractText(context, bmp)
+                                        val sourceWords = cachedWords ?: runInstantScreenshotOcr(context, bmp) { }?.sourceWords
+                                        if (sourceWords == null) {
+                                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                                isExtractingEntities = false
+                                            }
+                                            return@launch
+                                        }
                                         val entities = mutableListOf<SmartEntity>()
-                                        
+
                                         val urlRegex = android.util.Patterns.WEB_URL.toRegex()
                                         val emailRegex = android.util.Patterns.EMAIL_ADDRESS.toRegex()
                                         val phoneRegexLine = Regex("""(\+?[\d\s\-\(\).]{9,20})""")
                                         val upiRegex = Regex("""[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z]{2,64}""")
 
-                                        textNodes.forEach { node ->
-                                            val lineText = node.fullText
+                                        // Group recognized words into lines; phone matches map into
+                                        // the line's union bounds by character ratio, like before.
+                                        sourceWords.groupBy { it.lineIndex }.forEach { (_, lineWords) ->
+                                            val lineText = lineWords.joinToString(" ") { it.text }
+                                            var left = Float.MAX_VALUE
+                                            var top = Float.MAX_VALUE
+                                            var right = -Float.MAX_VALUE
+                                            var bottom = -Float.MAX_VALUE
+                                            lineWords.forEach { w ->
+                                                left = min(left, w.bounds.cx - w.bounds.width / 2f)
+                                                top = min(top, w.bounds.cy - w.bounds.height / 2f)
+                                                right = max(right, w.bounds.cx + w.bounds.width / 2f)
+                                                bottom = max(bottom, w.bounds.cy + w.bounds.height / 2f)
+                                            }
                                             phoneRegexLine.findAll(lineText).forEach { match ->
                                                 val phoneCandidate = match.value.trim()
                                                 if (phoneCandidate.count { it.isDigit() } >= 10) {
@@ -1662,20 +1732,26 @@ fun CircleToSearchScreen(
                                                     val ratioStart = startIdx.toFloat() / lineText.length.coerceAtLeast(1)
                                                     val ratioEnd = endIdx.toFloat() / lineText.length.coerceAtLeast(1)
                                                     val entityBounds = android.graphics.RectF(
-                                                        node.bounds.left.toFloat() + (ratioStart * node.bounds.width().toFloat()),
-                                                        node.bounds.top.toFloat(),
-                                                        node.bounds.left.toFloat() + (ratioEnd * node.bounds.width().toFloat()),
-                                                        node.bounds.bottom.toFloat()
+                                                        left + (ratioStart * (right - left)),
+                                                        top,
+                                                        left + (ratioEnd * (right - left)),
+                                                        bottom
                                                     )
                                                     entities.add(SmartEntity.Phone(phoneCandidate, entityBounds, context.getString(R.string.entity_type_phone)))
                                                 }
                                             }
-                                            node.words.forEach { word ->
-                                                val txt = word.text.trim()
-                                                if (emailRegex.matches(txt)) entities.add(SmartEntity.Email(txt, word.bounds, context.getString(R.string.entity_type_email)))
-                                                else if (upiRegex.matches(txt)) entities.add(SmartEntity.Upi(txt, word.bounds, context.getString(R.string.entity_type_upi)))
-                                                else if (urlRegex.matches(txt)) entities.add(SmartEntity.Url(txt, word.bounds, context.getString(R.string.entity_type_link)))
-                                            }
+                                        }
+                                        sourceWords.forEach { word ->
+                                            val txt = word.text.trim()
+                                            val wordBounds = android.graphics.RectF(
+                                                word.bounds.cx - word.bounds.width / 2f,
+                                                word.bounds.cy - word.bounds.height / 2f,
+                                                word.bounds.cx + word.bounds.width / 2f,
+                                                word.bounds.cy + word.bounds.height / 2f
+                                            )
+                                            if (emailRegex.matches(txt)) entities.add(SmartEntity.Email(txt, wordBounds, context.getString(R.string.entity_type_email)))
+                                            else if (upiRegex.matches(txt)) entities.add(SmartEntity.Upi(txt, wordBounds, context.getString(R.string.entity_type_upi)))
+                                            else if (urlRegex.matches(txt)) entities.add(SmartEntity.Url(txt, wordBounds, context.getString(R.string.entity_type_link)))
                                         }
                                         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                                             detectedEntities = entities
@@ -1689,13 +1765,6 @@ fun CircleToSearchScreen(
 //                            BottomBarButton("Donate", { Icon(painterResource(id = com.akslabs.circletosearch.R.drawable.donation), null, modifier = Modifier.size(22.dp)) }) {
 //                                showDonateSheet = true
 //                            }
-
-                            // Copy Text
-                            BottomBarButton(stringResource(R.string.label_copy_text), { Icon(painterResource(id = com.akslabs.circletosearch.R.drawable.ocr), null, modifier = Modifier.size(20.dp)) }) {
-                                copyTextManager?.setOcrOnlyMode()
-                                isCopyMode = true
-                                isCopyTextTriggered = true
-                            }
 
                             // QR Scan
                             BottomBarButton(stringResource(R.string.label_scan_qr), { Icon(Icons.Default.QrCode, null) }) {
@@ -1735,23 +1804,8 @@ fun CircleToSearchScreen(
                 )
             }
 
-            // Copy Text overlay integration (Activity-based)
-            if (isCopyMode && copyTextManager != null) {
-                AndroidView(
-                    factory = { ctx ->
-                        copyTextManager.getOverlayView(onDismiss = {
-                            isCopyMode = false
-                            onExitCopyMode()
-                        })
-                    },
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .zIndex(150f)
-                )
-            }
-
             // 4. Selection Actions (Share) — Positioned at the very end for absolute top-layer rendering
-            if (selectionRect != null && selectionAnim.value == 1f && !isCopyMode && !isTranslatorMode) {
+            if (selectionRect != null && selectionAnim.value == 1f && !isTranslatorMode) {
                 val rect = selectionRect!!
                 val density = androidx.compose.ui.platform.LocalDensity.current
                 val leftPx = rect.left.toFloat()
@@ -1912,7 +1966,7 @@ fun CircleToSearchScreen(
             }
 
         // --- NEW: QR Overlay Chips (High Layer) ---
-        if (screenshot != null && !isCopyMode && !isTranslatorMode) {
+        if (screenshot != null && !isTranslatorMode) {
             BoxWithConstraints(modifier = Modifier.fillMaxSize().zIndex(2500f)) {
                 val screenWidth = maxWidth
                 val screenHeight = maxHeight
@@ -1987,7 +2041,7 @@ fun CircleToSearchScreen(
         }
 
         // --- Phase 44: Smart Entity Extractor Overlay Chips ---
-        if (isEntityExtractMode && screenshot != null && !isCopyMode) {
+        if (isEntityExtractMode && screenshot != null) {
             BoxWithConstraints(modifier = Modifier.fillMaxSize().zIndex(2600f)) {
                 val screenWidth = maxWidth
                 val screenHeight = maxHeight

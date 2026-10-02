@@ -539,6 +539,17 @@ class TranslatorOverlayBridge(
       langStateManager.languageByCode(it)
     }
 
+  /**
+   * The default target language. OCR-only flows (instant text selection over a screenshot)
+   * still need a target because the module's plan runs through the translation pipeline.
+   */
+  fun defaultTargetLanguage(): Language? =
+    if (::langStateManager.isInitialized) {
+      langStateManager.languageByCode(settingsManager.settings.value.defaultTargetLanguageCode)
+    } else {
+      null
+    }
+
   private fun currentReadingOrderFor(language: Language?): ReadingOrder? =
     if (language?.code == "ja") {
       ocrReadingOrder

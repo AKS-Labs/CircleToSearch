@@ -61,7 +61,6 @@ import com.akslabs.circletosearch.data.BitmapRepository
 import com.akslabs.circletosearch.data.GestureType
 import com.akslabs.circletosearch.data.OverlayConfigurationManager
 import com.akslabs.circletosearch.data.OverlaySegment
-import com.akslabs.circletosearch.ui.components.CopyTextOverlayManager
 import com.akslabs.circletosearch.utils.ImageUtils
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
@@ -72,9 +71,6 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
     private val overlayViews = mutableListOf<View>() // Track all added segment views
     private val executor: Executor = Executors.newSingleThreadExecutor()
     private lateinit var configManager: OverlayConfigurationManager
-    
-    /** Kept by companion so scroll events can re-scan copy-text nodes. */
-    internal var copyTextManager: CopyTextOverlayManager? = null
 
     private var translatorBridge: TranslatorOverlayBridge? = null
     
@@ -1169,11 +1165,6 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        // Forward scroll events to the Copy Text overlay for live re-scan
-        // Only if it's a scroll event and the copy manager is active
-        if (event?.eventType == AccessibilityEvent.TYPE_VIEW_SCROLLED) {
-            copyTextManager?.rescanNodes()
-        }
         translatorBridge?.onHostAccessibilityEvent(event)
     }
 
@@ -1204,16 +1195,16 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         translatorBridge?.setGestureAlpha(alpha)
     }
 
+    /** The default target language for OCR-only plans (no translation rendered). */
+    fun defaultTargetLanguage(): dev.davidv.translator.Language? =
+        translatorBridge?.defaultTargetLanguage()
+
     companion object {
         var instance: CircleToSearchAccessibilityService? = null
             private set
             
         private var isFlashlightOn = false // Simple static state tracking
         
-        fun setCopyTextManager(manager: CopyTextOverlayManager?) {
-            instance?.copyTextManager = manager
-        }
-
         fun triggerCapture() {
             android.util.Log.d("CircleToSearch", "triggerCapture static called. instance=${instance != null}")
             instance?.performCapture(null)

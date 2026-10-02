@@ -31,13 +31,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.akslabs.circletosearch.data.BitmapRepository
 import com.akslabs.circletosearch.ui.CircleToSearchScreen
-import com.akslabs.circletosearch.ui.components.CopyTextOverlayManager
 import com.akslabs.circletosearch.ui.theme.CircleToSearchTheme
 
 class OverlayActivity : ComponentActivity() {
     
     private val screenshotBitmap = androidx.compose.runtime.mutableStateOf<android.graphics.Bitmap?>(null)
-    private val copyTextManager = androidx.compose.runtime.mutableStateOf<CopyTextOverlayManager?>(null)
     private val searchModeOverride = androidx.compose.runtime.mutableStateOf<Boolean?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -53,13 +51,6 @@ class OverlayActivity : ComponentActivity() {
         loadScreenshot()
         updateOverride(intent)
 
-        // Initialize manager for Activity-based layout
-        copyTextManager.value = CopyTextOverlayManager(
-            context = this,
-            screenshotBitmap = screenshotBitmap.value
-        )
-        CircleToSearchAccessibilityService.setCopyTextManager(copyTextManager.value)
-
         setContent {
             CircleToSearchTheme {
                 Surface(
@@ -73,10 +64,6 @@ class OverlayActivity : ComponentActivity() {
                         onClose = { 
                             BitmapRepository.clear()
                             finish() 
-                        },
-                        copyTextManager = copyTextManager.value,
-                        onExitCopyMode = { 
-                            // Copy Mode exited
                         }
                     )
                 }
@@ -92,19 +79,10 @@ class OverlayActivity : ComponentActivity() {
         
         // IMMEDIATE NULLING to prevent flash of previous screen
         screenshotBitmap.value = null
-        copyTextManager.value?.dismiss()
-        copyTextManager.value = null
         searchModeOverride.value = null
         
         loadScreenshot()
         updateOverride(intent)
-        
-        // Recreate manager with new screenshot
-        copyTextManager.value = CopyTextOverlayManager(
-            context = this,
-            screenshotBitmap = screenshotBitmap.value
-        )
-        CircleToSearchAccessibilityService.setCopyTextManager(copyTextManager.value)
     }
 
     private fun updateOverride(intent: android.content.Intent) {
@@ -127,8 +105,6 @@ class OverlayActivity : ComponentActivity() {
     
     override fun onDestroy() {
         super.onDestroy()
-        copyTextManager.value?.dismiss()
-        copyTextManager.value = null
         if (isFinishing) {
              com.akslabs.circletosearch.data.BitmapRepository.clear()
              com.akslabs.circletosearch.utils.StorageUtils.clearAppCache(this)

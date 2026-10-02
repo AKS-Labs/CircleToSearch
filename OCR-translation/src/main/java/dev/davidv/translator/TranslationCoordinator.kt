@@ -291,6 +291,96 @@ class TranslationCoordinator(
       }
     }
 
+  /**
+   * OCR a bitmap and return the recognized source words without rendering a translation
+   * overlay — for surfaces that show the original image with tappable text (e.g. Circle to
+   * Search's screenshot). The plan still takes a target language ([to]) because recognition
+   * runs through the translation pipeline; the translation result is discarded.
+   *
+   * [onDetectedRegions] fires as soon as boxes are detected, before recognition finishes
+   * (for scan animations). Returns null when OCR failed; [onOcrUnavailable] flags a missing
+   * OCR model chain so the caller can prompt for a repair/download.
+   */
+  suspend fun ocrWordsOnly(
+    bitmap: Bitmap,
+    to: Language,
+    sourceSelection: OcrSourceSelection = OcrSourceSelection.Auto,
+    readingOrder: ReadingOrder? = null,
+    onDetectedRegions: (List<uniffi.translator_core.OrientedRect>, Int, Int) -> Unit = { _, _, _ -> },
+    onOcrUnavailable: () -> Unit = {},
+  ): OcrWordsResult? =
+    withContext(Dispatchers.IO) {
+      _isOcrInProgress.value = true
+      try {
+        val catalog = imageProcessor.loadCatalog() ?: return@withContext null
+        val minConfidence = settingsManager.settings.value.minConfidence
+        val backgroundMode = settingsManager.settings.value.backgroundMode
+        val maxImageSize = settingsManager.settings.value.maxImageSize
+        val ocrStart = System.currentTimeMillis()
+        val srcAddr = NativeBitmap.lockPixels(bitmap)
+        if (srcAddr == 0L) {
+          Log.e("TranslationCoordinator", "lockPixels(source) failed")
+          return@withContext null
+        }
+        val ocrImage =
+          uniffi.bindings.OcrImage.fromPixels(
+            srcAddr.toULong(),
+            bitmap.width.toUInt(),
+            bitmap.height.toUInt(),
+          )
+        NativeBitmap.unlockPixels(bitmap)
+
+        val detection =
+          try {
+            catalog.ocrImageDetect(ocrImage, maxImageSize)
+          } catch (e: uniffi.bindings.CatalogException) {
+            Log.d("OCR", "detect failed: ${e.message}")
+            null
+          }
+        detection?.let { boxes ->
+          onDetectedRegions(boxes.map { it.orientedBox }, bitmap.width, bitmap.height)
+        }
+
+        val plan =
+          try {
+            catalog.ocrImagePlan(
+              ocrImage,
+              maxImageSize,
+              sourceSelection,
+              to,
+              minConfidence,
+              readingOrder,
+              backgroundMode,
+              detection,
+            )
+          } catch (e: uniffi.bindings.CatalogException.MissingAsset) {
+            Log.d("OCR", "ocr plan failed: ${e.message}")
+            onOcrUnavailable()
+            ocrImage.close()
+            return@withContext null
+          } catch (e: uniffi.bindings.CatalogException) {
+            Log.d("OCR", "ocr plan failed: ${e.message}")
+            ocrImage.close()
+            return@withContext null
+          }
+        Log.i("TranslationCoordinator", "ocrWordsOnly: ${System.currentTimeMillis() - ocrStart}ms")
+        val result =
+          OcrWordsResult(
+            sourceWords = plan.sourceWords,
+            extractedText = plan.extractedText,
+            imageWidth = bitmap.width,
+            imageHeight = bitmap.height,
+          )
+        ocrImage.close()
+        result
+      } catch (e: Exception) {
+        Log.e("TranslationCoordinator", "Exception ${e.stackTrace}")
+        null
+      } finally {
+        _isOcrInProgress.value = false
+      }
+    }
+
   suspend fun retranslateImageWithOverlay(
     cachedPlan: PreparedImageOverlay,
     from: Language,
@@ -435,4 +525,12 @@ data class ProcessedImageResult(
   val translatedWords: List<uniffi.translator_core.PositionedWord>,
   // Rust-side owner of the source pixels; reused for a language switch without re-OCR/copy.
   val ocrImage: uniffi.bindings.OcrImage? = null,
+)
+
+/** Recognized source words from an OCR-only pass ([TranslationCoordinator.ocrWordsOnly]). */
+data class OcrWordsResult(
+  val sourceWords: List<uniffi.translator_core.PositionedWord>,
+  val extractedText: String,
+  val imageWidth: Int,
+  val imageHeight: Int,
 )
