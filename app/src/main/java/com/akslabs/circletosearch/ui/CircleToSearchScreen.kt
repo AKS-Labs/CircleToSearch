@@ -553,6 +553,9 @@ fun CircleToSearchScreen(
     // A word selection in the instant-OCR overlay hides the bottom bar; tapping outside the
     // text clears the selection and the bar comes back.
     var wordSelected by remember { mutableStateOf(false) }
+    // Bumped to force the word overlay to drop its selection — text selection and a drawn
+    // circle are mutually exclusive, so completing a circle clears any active selection.
+    var wordSelectionClearSignal by remember { mutableStateOf(0) }
 
     // Circle-draw gesture handlers, shared by the drag-detector wrapper above the drawing
     // layer (see "Circle-draw gestures" below). Plain drags draw; handle grabs and taps are
@@ -582,6 +585,10 @@ fun CircleToSearchScreen(
         currentPathPoints.add(offset)
         selectionRect = null
         scope.launch { selectionAnim.snapTo(0f) }
+        // Text selection and drawing are exclusive from the first moment of the gesture:
+        // drop any active selection as soon as the user starts drawing, not when the
+        // circle completes.
+        if (wordSelected) wordSelectionClearSignal++
     }
 
     fun moveCircleDrag(change: PointerInputChange) {
@@ -1179,10 +1186,6 @@ fun CircleToSearchScreen(
                         .background(Color.Black)
                         // View size for the image-fit mapping (crop-to-search, chips).
                         .onSizeChanged { canvasSizePx = it }
-                        .graphicsLayer {
-                            // Required for BlendMode.Clear to work in child Canvas
-                            compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen
-                        }
                 ) {
                     Image(
                         bitmap = screenshot.asImageBitmap(),
@@ -1193,9 +1196,15 @@ fun CircleToSearchScreen(
 
 
                     // Tint Overlay (Punch-out style) — dimmed during normal CTS use,
-                    // hidden in translator mode so the frozen backdrop stays undimmed
+                    // hidden in translator mode so the frozen backdrop stays undimmed.
+                    // The Canvas renders to its OWN offscreen buffer: BlendMode.Clear then
+                    // erases only the tint (the hole), while the image underneath — drawn in
+                    // the parent, a separate buffer — stays intact and shows through the hole.
+                    // (Offscreen on the parent Box would share one buffer: Clear would erase
+                    // the image too and the hole would punch through to the black window.)
                     Canvas(modifier = Modifier.fillMaxSize().graphicsLayer {
                         alpha = if (isTranslatorMode) 0f else 1f
+                        compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen
                     }) {
                         val strokeWidth = 0f
                         val dimAlpha = 0.15f
@@ -1391,7 +1400,16 @@ fun CircleToSearchScreen(
                                 imageWidth = words.imageWidth,
                                 imageHeight = words.imageHeight,
                                 modifier = Modifier.fillMaxSize(),
-                                onSelectionChanged = { wordSelected = it },
+                                onSelectionChanged = { selected ->
+                                    wordSelected = selected
+                                    // Mutually exclusive with the drawn circle: selecting
+                                    // text drops the frame (and its crop) so only one stays.
+                                    if (selected && selectionRect != null) {
+                                        selectionRect = null
+                                        selectedBitmap = null
+                                    }
+                                },
+                                clearSelectionSignal = wordSelectionClearSignal,
                             )
                         } else if (!instantOcrDone) {
                             instantRegions?.let { regions ->

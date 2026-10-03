@@ -181,6 +181,7 @@ fun WordSelectionOverlay(
   scale: Float = 1f,
   modifier: Modifier = Modifier,
   onSelectionChanged: (Boolean) -> Unit = {},
+  clearSelectionSignal: Int = 0,
 ) {
   val context = LocalContext.current
   val view = LocalView.current
@@ -206,6 +207,15 @@ fun WordSelectionOverlay(
   // bottom bar while text is selected. Keyed on `words` too: they reset the selection.
   LaunchedEffect(hasSelection, words) {
     onSelectionChanged(hasSelection)
+  }
+  // Host force-clear: each new signal value wipes an active selection (Circle to Search
+  // bumps it when a drawn circle must replace the selection — the two are exclusive).
+  // 0 is the initial "no clear requested" value.
+  LaunchedEffect(clearSelectionSignal) {
+    if (clearSelectionSignal != 0) {
+      selStart = null
+      selEnd = null
+    }
   }
   // Pills, handles, bounds and copy text all come from translator-rs in one call, so this overlay
   // and the Qt one cannot disagree about what a drag selected.
