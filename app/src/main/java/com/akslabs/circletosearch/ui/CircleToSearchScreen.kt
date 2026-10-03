@@ -478,7 +478,7 @@ fun CircleToSearchScreen(
              val newUserAgent = if (isDesktop) {
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
             } else {
-                "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+                WebSettings.getDefaultUserAgent(wv.context)
             }
             
             if (wv.settings.userAgentString != newUserAgent) {
@@ -761,7 +761,9 @@ fun CircleToSearchScreen(
                 userAgentString = if (isDesktop(engine)) {
                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
                 } else {
-                    "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+                    // Use the real, always-current WebView UA. A hardcoded stale UA
+                    // makes Google serve degraded variants (app-promo/homepage pages).
+                    WebSettings.getDefaultUserAgent(ctx)
                 }
                 
                 // Dark Mode - Use CSS injection for universal compatibility
@@ -774,7 +776,16 @@ fun CircleToSearchScreen(
             isHorizontalScrollBarEnabled = false
 
             // Enable Third-Party Cookies
-            android.webkit.CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
+            val cookieManager = android.webkit.CookieManager.getInstance()
+            cookieManager.setAcceptThirdPartyCookies(this, true)
+            // Pre-seed Google's consent cookie (only if the user has no choice yet) so
+            // region consent walls don't redirect image searches to a homepage/promo page.
+            val googleConsentUrl = "https://www.google.com"
+            if (cookieManager.getCookie(googleConsentUrl)?.contains("SOCS=") != true) {
+                cookieManager.setCookie(googleConsentUrl, "SOCS=CAESHAgBEhIaAB")
+                cookieManager.setCookie("https://lens.google.com", "SOCS=CAESHAgBEhIaAB")
+                cookieManager.flush()
+            }
 
             webViewClient = object : WebViewClient() {
                 

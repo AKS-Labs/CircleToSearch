@@ -186,7 +186,10 @@ object ImageSearchUploader {
 
     fun getGoogleLensUrl(imageUrl: String): String {
         val encodedUrl = URLEncoder.encode(imageUrl, "UTF-8")
-        return "https://lens.google.com/uploadbyurl?url=$encodedUrl"
+        // Pin the results locale to the device language so Google serves a stable,
+        // region-consistent experience instead of redirecting to a localized homepage.
+        val hl = URLEncoder.encode(java.util.Locale.getDefault().toLanguageTag(), "UTF-8")
+        return "https://lens.google.com/uploadbyurl?url=$encodedUrl&hl=$hl"
     }
     
     fun getGoogleImagesUrl(imageUrl: String): String {
