@@ -1422,7 +1422,7 @@ fun CircleToSearchScreen(
                                 color = Color.Transparent,
                                 topLeft = holeRect.topLeft,
                                 size = holeRect.size,
-                                cornerRadius = CornerRadius(48f),
+                                cornerRadius = CornerRadius(min(48f, min(holeRect.width, holeRect.height) / 2f)),
                                 blendMode = androidx.compose.ui.graphics.BlendMode.Clear
                             )
                         }
@@ -1490,8 +1490,12 @@ fun CircleToSearchScreen(
                         
                         val width = right - left
                         val height = bottom - top
-                        val cornerRadius = 48f // Slightly smaller radius
-                        val armLength = min(width, height) * 0.15f // Slightly shorter arms
+                        // Constant corner look for every frame size: fixed radius and fixed
+                        // arm length (what a small square frame used to draw), clamped only
+                        // so frames smaller than the radius/arm still render correctly.
+                        val maxRadius = min(width, height) / 2f
+                        val cornerRadius = min(48f, maxRadius)
+                        val armLength = max(cornerRadius, min(64f, maxRadius))
 
                         // Top Left
                         val tlPath = Path().apply {
@@ -1555,7 +1559,7 @@ fun CircleToSearchScreen(
                             color = Color.White,
                             topLeft = Offset(left, top),
                             size = Size(width, height),
-                            cornerRadius = CornerRadius(48f),
+                            cornerRadius = CornerRadius(cornerRadius),
                             style = Stroke(width = 4f),
                             alpha = (1f - progress) * 0.5f
                          )
@@ -2154,7 +2158,9 @@ fun CircleToSearchScreen(
                 )
             }
 
-            // 4. Selection Actions (Share) — Positioned at the very end for absolute top-layer rendering
+            // 4. Selection Actions (Share/Save/Pin) - in-window toolbar styled like the
+            // system text-selection toolbar. Drawn inside the scaffold content so the
+            // bottom sheet always covers it (lower z than the sheet).
             if (selectionRect != null && selectionAnim.value == 1f && !isTranslatorMode) {
                 val rect = selectionRect!!
                 val density = androidx.compose.ui.platform.LocalDensity.current
@@ -2162,17 +2168,16 @@ fun CircleToSearchScreen(
                 val topPx = rect.top.toFloat()
                 val rightPx = rect.right.toFloat()
                 val bottomPx = rect.bottom.toFloat()
-                
+
                 val leftDp = with(density) { leftPx.toDp() }
                 val topDp = with(density) { topPx.toDp() }
                 val rightDp = with(density) { rightPx.toDp() }
                 val bottomDp = with(density) { bottomPx.toDp() }
-                val widthDp = rightDp - leftDp
-                
+
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .zIndex(2000f) // Highest Z-index
+                        .zIndex(2000f)
                 ) {
                     val screenWidth = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp.dp
                     val screenHeight = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp
@@ -2186,7 +2191,6 @@ fun CircleToSearchScreen(
                             .width(320.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        // Wrapped in Surface to match Bottom Bar tonal environment
                         androidx.compose.material3.Surface(
                             color = MaterialTheme.colorScheme.surfaceContainerHigh,
                             shape = CircleShape,
@@ -2194,7 +2198,7 @@ fun CircleToSearchScreen(
                             shadowElevation = 8.dp
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                // 1. SHARE BUTTON
+                                // SHARE
                                 androidx.compose.material3.FilledTonalButton(
                                     onClick = {
                                         if (selectedBitmap != null) {
@@ -2204,15 +2208,15 @@ fun CircleToSearchScreen(
                                                     val path = ImageUtils.saveBitmap(context, selectedBitmap!!, fileName)
                                                     val file = java.io.File(path)
                                                     val uri = androidx.core.content.FileProvider.getUriForFile(context, "com.akslabs.circletosearch.fileprovider", file)
-                                                    val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply { 
+                                                    val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
                                                         type = "image/png"
                                                         putExtra(android.content.Intent.EXTRA_STREAM, uri)
                                                         clipData = android.content.ClipData.newRawUri("Selection", uri)
                                                         addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                                         addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
                                                     }
-                                                    context.startActivity(android.content.Intent.createChooser(shareIntent, context.getString(R.string.share_chooser_title)).apply { 
-                                                        addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK) 
+                                                    context.startActivity(android.content.Intent.createChooser(shareIntent, context.getString(R.string.share_chooser_title)).apply {
+                                                        addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
                                                     })
                                                 } catch (e: Exception) {
                                                     android.util.Log.e("CircleToSearch", "Failed to share selection", e)
@@ -2223,29 +2227,21 @@ fun CircleToSearchScreen(
                                     modifier = Modifier.height(48.dp),
                                     shape = CircleShape,
                                     colors = androidx.compose.material3.ButtonDefaults.filledTonalButtonColors(
-                                        containerColor = Color.Transparent, // Parent surface handles color
+                                        containerColor = Color.Transparent,
                                         contentColor = MaterialTheme.colorScheme.onSurface
                                     ),
                                     elevation = null,
-                                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp)
+                                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp)
                                 ) {
                                     Text(
-                                        stringResource(R.string.label_share), 
+                                        stringResource(R.string.label_share),
                                         style = MaterialTheme.typography.labelLarge.copy(
                                             fontWeight = androidx.compose.ui.text.font.FontWeight.Normal
                                         )
                                     )
                                 }
 
-
-
-                                // Separator
-                                androidx.compose.material3.VerticalDivider(
-                                    modifier = Modifier.height(24.dp).padding(horizontal = 2.dp),
-                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                                )
-
-                                // 2. SAVE BUTTON
+                                // SAVE
                                 androidx.compose.material3.FilledTonalButton(
                                     onClick = {
                                         if (selectedBitmap != null) {
@@ -2265,23 +2261,17 @@ fun CircleToSearchScreen(
                                         contentColor = MaterialTheme.colorScheme.onSurface
                                     ),
                                     elevation = null,
-                                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp)
+                                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp)
                                 ) {
                                     Text(
-                                        stringResource(R.string.save), 
+                                        stringResource(R.string.save),
                                         style = MaterialTheme.typography.labelLarge.copy(
                                             fontWeight = androidx.compose.ui.text.font.FontWeight.Normal
                                         )
                                     )
                                 }
 
-                                // Separator
-                                androidx.compose.material3.VerticalDivider(
-                                    modifier = Modifier.height(24.dp).padding(horizontal = 2.dp),
-                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                                )
-
-                                // 3. PIN BUTTON
+                                // PIN
                                 androidx.compose.material3.FilledTonalButton(
                                     onClick = {
                                         if (selectedBitmap != null && selectionRect != null) {
@@ -2300,7 +2290,7 @@ fun CircleToSearchScreen(
                                         contentColor = MaterialTheme.colorScheme.onSurface
                                     ),
                                     elevation = null,
-                                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp)
+                                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp)
                                 ) {
                                     Text(
                                         stringResource(R.string.pin),
