@@ -44,6 +44,24 @@ class OverlayActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         android.util.Log.d("CircleToSearch", "OverlayActivity onCreate")
         
+        // Allow chrome://inspect attachment for diagnosing engine tabs (debug builds only)
+        if (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0) {
+            android.webkit.WebView.setWebContentsDebuggingEnabled(true)
+        }
+
+        // Fresh cookie jar each session (Incognito-equivalent): Google cookies
+        // accumulated across challenged/failed sessions may be trust-flagged,
+        // which breaks Lens ("image not associated with your account") while a
+        // clean Incognito profile loads the same URL fine.
+        try {
+            val cm = android.webkit.CookieManager.getInstance()
+            cm.removeAllCookies { cm.flush() }
+            cm.flush()
+            android.util.Log.d("LensDiag", "COOKIES_CLEARED")
+        } catch (e: Exception) {
+            android.util.Log.e("LensDiag", "cookie clear failed: $e")
+        }
+        
         // Ensure the activity can receive touches and focus properly
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL)
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN)

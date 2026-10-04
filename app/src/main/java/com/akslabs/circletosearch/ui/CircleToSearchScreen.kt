@@ -189,6 +189,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import androidx.webkit.WebViewFeature
+import androidx.webkit.UserAgentMetadata
 import com.akslabs.circletosearch.data.isDirectUpload
 import kotlin.math.max
 import kotlin.math.min
@@ -478,9 +479,9 @@ fun CircleToSearchScreen(
              val newUserAgent = if (isDesktop) {
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
             } else {
-                WebSettings.getDefaultUserAgent(wv.context)
+                "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
             }
-            
+
             if (wv.settings.userAgentString != newUserAgent) {
                 wv.settings.userAgentString = newUserAgent
                 wv.reload()
@@ -499,7 +500,7 @@ fun CircleToSearchScreen(
                         override fun onPageFinished(view: android.webkit.WebView?, url: String?) {
                             super.onPageFinished(view, url)
                             val darkModeCSS = """
-                                javascript:(function() {
+                                (function() {
                                     var style = document.createElement('style');
                                     style.innerHTML = `
                                         html { filter: invert(1) hue-rotate(180deg) !important; background: #000 !important; }
@@ -508,7 +509,7 @@ fun CircleToSearchScreen(
                                     document.head.appendChild(style);
                                 })()
                             """.trimIndent()
-                            view?.loadUrl(darkModeCSS)
+                            view?.evaluateJavascript(darkModeCSS, null)
                         }
                     }
                 } else {
@@ -761,40 +762,180 @@ fun CircleToSearchScreen(
                 userAgentString = if (isDesktop(engine)) {
                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
                 } else {
-                    // Use the real, always-current WebView UA. A hardcoded stale UA
-                    // makes Google serve degraded variants (app-promo/homepage pages).
-                    WebSettings.getDefaultUserAgent(ctx)
+                    "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
                 }
-                
+
                 // Dark Mode - Use CSS injection for universal compatibility
                 // Algorithmic darkening alone doesn't work on many websites
                 android.util.Log.d("CircleToSearch", "Dark mode enabled: $isDarkMode")
             }
-            
+
             // UI Tweaks
             isVerticalScrollBarEnabled = false
             isHorizontalScrollBarEnabled = false
 
             // Enable Third-Party Cookies
-            val cookieManager = android.webkit.CookieManager.getInstance()
-            cookieManager.setAcceptThirdPartyCookies(this, true)
-            // Pre-seed Google's consent cookie (only if the user has no choice yet) so
-            // region consent walls don't redirect image searches to a homepage/promo page.
-            val googleConsentUrl = "https://www.google.com"
-            if (cookieManager.getCookie(googleConsentUrl)?.contains("SOCS=") != true) {
-                cookieManager.setCookie(googleConsentUrl, "SOCS=CAESHAgBEhIaAB")
-                cookieManager.setCookie("https://lens.google.com", "SOCS=CAESHAgBEhIaAB")
-                cookieManager.flush()
-            }
+            android.webkit.CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
 
+            // Instrument fetch/XHR so the Lens results RPC (and its status) is
+            // visible even when it fails silently. Injected at page start AND
+            // finish (start can race the document commit); per-document guard.
+            fun installNetDiag(view: WebView) {
+                val netJs = """
+                    (function() {
+                        if (window.__netDiag) return 'already';
+                        window.__netDiag = 1;
+                        try {
+                            var of = window.fetch;
+                            window.fetch = function(u, init) {
+                                var m = (init && init.method) || 'GET';
+                                var url = (typeof u === 'string') ? u : ((u && u.url) || '');
+                                console.warn('NET fetch ' + m + ' ' + url.slice(0, 200));
+                                return of.apply(this, arguments).then(function(r) {
+                                    console.warn('NET fetchdone ' + r.status + ' ' + m + ' ' + url.slice(0, 200));
+                                    if (/Validate|qfmetadata|sgasync|httpservice|batchexecute|folsrch|bgasy|\/search\?/.test(url)) {
+                                        try {
+                                            console.warn('NETBODY_CLONE ' + url.split('?')[0].slice(-70));
+                                            r.clone().text().then(function(t) {
+                                                var i = t.search(/not associated with your account|No image at the URL|Image not found|Something went wrong/);
+                                                if (i >= 0) {
+                                                    console.warn('NETBODY_HIT @' + i + '/' + t.length + ' >> ' + t.slice(Math.max(0, i - 150), i + 250));
+                                                } else {
+                                                    console.warn('NETBODY ' + url.split('?')[0].slice(-70) + ' len=' + t.length + ' head=' + t.slice(0, 200));
+                                                }
+                                            }).catch(function(e) { console.warn('NETBODY_ERR ' + e); });
+                                        } catch (e) { console.warn('NETBODY_ERR ' + e); }
+                                    }
+                                    return r;
+                                }, function(e) {
+                                    console.warn('NET fetcherr ' + m + ' ' + url.slice(0, 200) + ' ' + e);
+                                    throw e;
+                                });
+                            };
+                            var ox = XMLHttpRequest.prototype.open;
+                            var os = XMLHttpRequest.prototype.send;
+                            XMLHttpRequest.prototype.open = function(m, u) { this.__dm = m; this.__du = u; return ox.apply(this, arguments); };
+                            XMLHttpRequest.prototype.send = function() {
+                                var s = this, m = this.__dm, u = this.__du;
+                                console.warn('NET xhr ' + m + ' ' + String(u).slice(0, 200));
+                                s.addEventListener('loadend', function() {
+                                    console.warn('NET xhrdone ' + s.status + ' ' + m + ' ' + String(u).slice(0, 200));
+                                    try {
+                                        if (/Validate|qfmetadata|sgasync|httpservice|batchexecute|folsrch|bgasy/.test(String(u)) && s.responseText) {
+                                            console.warn('NETBODY_XHR ' + String(u).split('?')[0].slice(-70) + ' >> ' + String(s.responseText).slice(0, 400));
+                                        }
+                                    } catch (e) {}
+                                });
+                                return os.apply(this, arguments);
+                            };
+                            return 'installed';
+                        } catch (e) { return 'NETDIAG_ERR ' + e; }
+                    })()
+                """.trimIndent()
+                view.evaluateJavascript(netJs) { r ->
+                    if (r != null && r != "\"already\"") {
+                        android.util.Log.d("LensDiag", "NETDIAG $r")
+                    }
+                }
+            }
+            
             webViewClient = object : WebViewClient() {
+                
+                override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
+                    super.onPageStarted(view, url, favicon)
+                    if (url != null && url.contains("google.") && view != null) {
+                        android.util.Log.d("LensDiag", "NAV $url")
+                        installNetDiag(view)
+                    }
+                }
+                
+                override fun onReceivedHttpError(
+                    view: WebView?,
+                    request: android.webkit.WebResourceRequest?,
+                    response: android.webkit.WebResourceResponse?
+                ) {
+                    val host = request?.url?.host ?: ""
+                    if (response != null && response.statusCode in 400..599 &&
+                        (host.contains("google") || host.contains("imgdb") || host.contains("catbox"))
+                    ) {
+                        android.util.Log.e("LensDiag", "HTTP ${response.statusCode} ${response.reasonPhrase} ${request?.url}")
+                    }
+                }
                 
                 override fun onPageFinished(view: WebView?, url: String?) {
                     super.onPageFinished(view, url)
+                    // Lens loads its result tabs via async RPCs after page finish.
+                    // Snapshot the network + DOM state so silent failures are visible.
+                    if (url != null && url.contains("google.") && view != null) {
+                        val v = view
+                        installNetDiag(v)
+                        v.postDelayed({
+                            try {
+                                val resJs = """
+                                    (function() {
+                                        try {
+                                            var noise = ['xjs', '/log', 'gen_204', 'client_204', 'folsrch', 'sprites', '.css', '.woff', '.ttf'];
+                                            var r = performance.getEntriesByType('resource')
+                                                .filter(function(e) {
+                                                    var n = e.name;
+                                                    var host = n.indexOf('google') >= 0 || n.indexOf('gstatic') >= 0;
+                                                    var bad = noise.some(function(s) { return n.indexOf(s) >= 0; });
+                                                    return host && !bad;
+                                                })
+                                                .slice(-40)
+                                                .map(function(e) { return (e.responseStatus || '?') + ' ' + e.name.split('?')[0].slice(0, 110); })
+                                                .join(String.fromCharCode(10));
+                                            return r || 'NO_GOOGLE_RESOURCES';
+                                        } catch (err) { return 'SNAP_ERR ' + err; }
+                                    })()
+                                """.trimIndent()
+                                v.evaluateJavascript(resJs) { r ->
+                                    android.util.Log.d("LensDiag", "GOOGLE_RES $r")
+                                }
+                                val envJs = """
+                                    (function() {
+                                        try {
+                                            var d = {
+                                                ua: (navigator.userAgent || '').slice(0, 110),
+                                                brands: navigator.userAgentData ? navigator.userAgentData.brands : 'NO_UADATA',
+                                                mobile: navigator.userAgentData ? navigator.userAgentData.mobile : '?',
+                                                platform: navigator.userAgentData ? navigator.userAgentData.platform : '?',
+                                                chrome: typeof window.chrome === 'undefined' ? 'UNDEFINED' : Object.keys(window.chrome).join(','),
+                                                webdriver: navigator.webdriver,
+                                                cookies: (document.cookie || '').slice(0, 300)
+                                            };
+                                            return JSON.stringify(d);
+                                        } catch (err) { return 'ENV_ERR ' + err; }
+                                    })()
+                                """.trimIndent()
+                                v.evaluateJavascript(envJs) { r ->
+                                    android.util.Log.d("LensDiag", "GOOGLE_ENV $r")
+                                }
+                                val bodyJs = """
+                                    (function() {
+                                        try {
+                                            var txt = (document.body.innerText || '').replace(/\s+/g, ' ').slice(0, 450);
+                                            return location.href.slice(0, 250) + ' >> ' + document.title + ' >> ' + txt;
+                                        } catch (err) { return 'SNAP_ERR ' + err; }
+                                    })()
+                                """.trimIndent()
+                                v.postDelayed({
+                                    try {
+                                        v.evaluateJavascript(bodyJs) { r ->
+                                            android.util.Log.d("LensDiag", "GOOGLE_BODY $r")
+                                        }
+                                        android.util.Log.d("LensDiag", "GOOGLE_COOKIES ${android.webkit.CookieManager.getInstance().getCookie("https://lens.google.com")}")
+                                    } catch (e: Exception) { android.util.Log.e("LensDiag", "snap failed", e) }
+                                }, 3000)
+                            } catch (e: Exception) {
+                                android.util.Log.e("LensDiag", "snapshot failed", e)
+                            }
+                        }, 4000)
+                    }
                     // Inject dark mode CSS if enabled
                     if (isDarkMode) {
                         val darkModeCSS = """
-                            javascript:(function() {
+                            (function() {
                                 var style = document.createElement('style');
                                 style.innerHTML = `
                                     html { filter: invert(1) hue-rotate(180deg) !important; background: #000 !important; }
@@ -803,9 +944,23 @@ fun CircleToSearchScreen(
                                 document.head.appendChild(style);
                             })()
                         """.trimIndent()
-                        view?.loadUrl(darkModeCSS)
+                        view?.evaluateJavascript(darkModeCSS, null)
                         android.util.Log.d("CircleToSearch", "Dark mode CSS injected for: $url")
                     }
+                }
+            }
+            webChromeClient = object : android.webkit.WebChromeClient() {
+                override fun onConsoleMessage(consoleMessage: android.webkit.ConsoleMessage?): Boolean {
+                    val msg = consoleMessage?.message() ?: return super.onConsoleMessage(consoleMessage)
+                    val isNet = msg.contains("NET ") || msg.contains("NETBODY")
+                    val isGoogleSrc = consoleMessage.sourceId()?.contains("google") == true
+                    when {
+                        consoleMessage.messageLevel() == android.webkit.ConsoleMessage.MessageLevel.ERROR ->
+                            android.util.Log.e("LensDiag", "JS $msg @${consoleMessage.sourceId()}:${consoleMessage.lineNumber()}")
+                        consoleMessage.messageLevel() == android.webkit.ConsoleMessage.MessageLevel.WARNING && (isNet || isGoogleSrc) ->
+                            android.util.Log.w("LensDiag", "JSW $msg")
+                    }
+                    return super.onConsoleMessage(consoleMessage)
                 }
             }
             isNestedScrollingEnabled = true
