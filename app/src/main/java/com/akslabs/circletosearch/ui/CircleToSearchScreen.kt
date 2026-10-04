@@ -425,6 +425,7 @@ fun CircleToSearchScreen(
     var selectedEngine by remember(searchEngines) { mutableStateOf<SearchEngine>(searchEngines.first()) }
     var searchUrl by remember { mutableStateOf<String?>(null) }
     var hostedImageUrl by remember { mutableStateOf<String?>(null) }
+    var pageBackgroundColor by remember { mutableStateOf(Color.White) }
     var isLoading by remember { mutableStateOf(false) }
     
     // Desktop Mode - Per Tab
@@ -444,6 +445,34 @@ fun CircleToSearchScreen(
 
     // Track initialized engines for Smart Loading
     val initializedEngines = remember { mutableStateListOf<SearchEngine>() }
+
+    // Keep the tab strip background equal to the webpage's own background so
+    // the sheet never shows a Material color that clashes with the page.
+    fun samplePageBackgroundColor(view: WebView?) {
+        if (view == null) return
+        val js = "(function(){var b=getComputedStyle(document.body).backgroundColor;" +
+            "if(b==='rgba(0, 0, 0, 0)'||b==='transparent'){b=getComputedStyle(document.documentElement).backgroundColor;}" +
+            "return b;})()"
+        val parse: (String) -> Unit = { raw ->
+            val m = Regex("""rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([\d.]+))?\s*\)""").find(raw.trim('"'))
+            if (m != null) {
+                val a = m.groupValues[4].toFloatOrNull() ?: 1f
+                if (a > 0f) {
+                    pageBackgroundColor = Color(
+                        red = m.groupValues[1].toInt() / 255f,
+                        green = m.groupValues[2].toInt() / 255f,
+                        blue = m.groupValues[3].toInt() / 255f
+                    )
+                }
+            }
+        }
+        try {
+            view.evaluateJavascript(js) { raw -> parse(raw ?: "") }
+            view.postDelayed({
+                try { view.evaluateJavascript(js) { raw -> parse(raw ?: "") } } catch (_: Exception) {}
+            }, 800L)
+        } catch (_: Exception) {}
+    }
     
     // Save global preference if user toggles it for the MAIN engine (Google) - Optional choice, 
     // or we just keep it per session. Let's keep it simple: no auto-save of per-tab state to verify complex persistence yet.
@@ -499,6 +528,7 @@ fun CircleToSearchScreen(
                     wv.webViewClient = object : android.webkit.WebViewClient() {
                         override fun onPageFinished(view: android.webkit.WebView?, url: String?) {
                             super.onPageFinished(view, url)
+                            samplePageBackgroundColor(view)
                             val darkModeCSS = """
                                 (function() {
                                     var style = document.createElement('style');
@@ -513,7 +543,12 @@ fun CircleToSearchScreen(
                         }
                     }
                 } else {
-                    wv.webViewClient = android.webkit.WebViewClient()
+                    wv.webViewClient = object : android.webkit.WebViewClient() {
+                        override fun onPageFinished(view: android.webkit.WebView?, url: String?) {
+                            super.onPageFinished(view, url)
+                            samplePageBackgroundColor(view)
+                        }
+                    }
                 }
                 wv.reload()
                 android.util.Log.d("CircleToSearch", "Dark mode changed to: $isDarkMode - Reloaded WebViews")
@@ -864,6 +899,7 @@ fun CircleToSearchScreen(
                 
                 override fun onPageFinished(view: WebView?, url: String?) {
                     super.onPageFinished(view, url)
+                    samplePageBackgroundColor(view)
                     // Lens loads its result tabs via async RPCs after page finish.
                     // Snapshot the network + DOM state so silent failures are visible.
                     if (url != null && url.contains("google.") && view != null) {
@@ -1028,14 +1064,16 @@ fun CircleToSearchScreen(
             sheetSwipeEnabled = true,
             sheetContent = {
                 // Bottom Sheet Content (Results)
+                // Background tracks the loaded page's own background color so the
+                // tab strip matches the webpage instead of Material surface colors.
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(800.dp)
-                        .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
+                        .background(pageBackgroundColor, RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
                 ) {
                 Spacer(modifier = Modifier.height(16.dp))
-                
+
                 // Tabs - Polished UI
                 ScrollableTabRow(
                     selectedTabIndex = searchEngines.indexOf(selectedEngine),
@@ -1067,12 +1105,12 @@ fun CircleToSearchScreen(
                                     ),
                                     modifier = Modifier
                                         .background(
-                                            if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha=0.5f),
+                                            pageBackgroundColor,
                                             RoundedCornerShape(16.dp)
                                         )
                                         .border(
                                              width = 1.dp,
-                                             color = if(selected) MaterialTheme.colorScheme.primary.copy(alpha=0.5f) else Color.Transparent,
+                                             color = if(selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) else Color.Transparent,
                                              shape = RoundedCornerShape(16.dp)
                                         )
                                         .padding(horizontal = 16.dp, vertical = 8.dp),
