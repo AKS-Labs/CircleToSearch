@@ -267,9 +267,9 @@
     <string name="chooser_google_lens">Search with Google Lens</string>
 
     <!-- Accessibility Service -->
-    <string name="pinned_btn_share">SHARE</string>
-    <string name="pinned_btn_delete">DELETE</string>
-    <string name="pinned_btn_save">SAVE</string>
+    <string name="pinned_btn_share">Share</string>
+    <string name="pinned_btn_delete">Delete</string>
+    <string name="pinned_btn_save">Save</string>
 
     <!-- Tile Service -->
     <string name="tile_label">Circle to Search</string>

@@ -761,7 +761,7 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
         private val rect = RectF()
         private val matrix = Matrix()
-        private val radius = 12f * context.resources.displayMetrics.density
+        private val radius = 16f * context.resources.displayMetrics.density
 
         override fun onDraw(canvas: android.graphics.Canvas) {
             val drawable = drawable ?: return
@@ -1027,29 +1027,24 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
 
     private fun showPinnedActions(anchorView: View, bitmap: Bitmap, anchorParams: WindowManager.LayoutParams, onMenuCreated: (View) -> Unit) {
         val displayMetrics = resources.displayMetrics
-        val iconSize = (44 * displayMetrics.density).toInt()
-        val btnPadding = (8 * displayMetrics.density).toInt()
         val menuPadding = (10 * displayMetrics.density).toInt()
         val cornerRadius = 32f * displayMetrics.density
 
-        // --- Phase 40: CopyText-style Text Toolbar ---
+        // --- Matches the Share/Save/Pin selection toolbar: pill surface + plain text buttons ---
         val isNight = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
-        
-        // Match exactly CopyTextOverlayManager's palette mapping
-        val toolbarBgColor = try { getColor(android.R.color.system_surface_container_light) } catch(e: Exception) { if (isNight) Color.parseColor("#FF1C1C1C") else Color.parseColor("#FFF3EDF7") }
-        val primaryColor = try { getColor(android.R.color.system_accent1_600) } catch(e: Exception) { if (isNight) Color.parseColor("#FFD0BCFF") else Color.parseColor("#FF6750A4") }
-        val contentColor = Color.WHITE
-        val borderColor = if (isNight) Color.parseColor("#33FFFFFF") else Color.parseColor("#22000000")
+
+        val toolbarBgColor = try { getColor(if (isNight) android.R.color.system_surface_container_dark else android.R.color.system_surface_container_light) } catch(e: Exception) { if (isNight) Color.parseColor("#FF1C1C1C") else Color.parseColor("#FFF3EDF7") }
+        val contentColor = if (isNight) Color.parseColor("#FFE6E0E9") else Color.parseColor("#FF1C1B1F")
+        val rippleColor = android.content.res.ColorStateList.valueOf(if (isNight) 0x2FFFFFFF else 0x1F000000)
 
         val menuLayout = android.widget.LinearLayout(this).apply {
             orientation = android.widget.LinearLayout.HORIZONTAL
-            setPadding(menuPadding, menuPadding, menuPadding, menuPadding)
+            setPadding(0, 0, 0, 0)
             elevation = 24f
             
             val background = GradientDrawable().apply {
                 setColor(toolbarBgColor)
                 setCornerRadius(cornerRadius)
-                setStroke((1 * displayMetrics.density).toInt(), borderColor)
             }
             setBackground(background)
             
@@ -1063,22 +1058,26 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
 
         fun createTextActionButton(label: String, onClick: () -> Unit) = android.widget.Button(this).apply {
             text = label
+            transformationMethod = null
             setTextColor(contentColor)
-            setTypeface(Typeface.DEFAULT, Typeface.BOLD)
-            textSize = 12f // Roughly 30f in Paint logic
-            
-            // Professional pill background (Solid Primary)
-            val btnDrawable = GradientDrawable().apply {
-                setColor(primaryColor)
-                setCornerRadius(20 * displayMetrics.density)
-            }
-            background = btnDrawable
-            
+            setTypeface(Typeface.DEFAULT, Typeface.NORMAL)
+            textSize = 14f
+            gravity = Gravity.CENTER
+
+            // Transparent background with a shaped ripple, like the selection toolbar buttons
+            background = android.graphics.drawable.RippleDrawable(
+                rippleColor,
+                null,
+                GradientDrawable().apply { setCornerRadius(24f * displayMetrics.density) }
+            )
+            stateListAnimator = null
+            elevation = 0f
+
             setPadding((16 * displayMetrics.density).toInt(), 0, (16 * displayMetrics.density).toInt(), 0)
-            
+
             layoutParams = android.widget.LinearLayout.LayoutParams(
                 android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
-                (36 * displayMetrics.density).toInt()
+                (48 * displayMetrics.density).toInt()
             )
             setOnClickListener { onClick() }
         }
@@ -1102,27 +1101,20 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
             try { windowManager?.removeView(menuLayout) } catch (e: Exception) {}
         })
 
-        // --- Action: Delete ---
+        // --- Action: Save ---
+        menuLayout.addView(createTextActionButton(getString(R.string.pinned_btn_save)) {
+            val success = ImageUtils.saveToGallery(this@CircleToSearchAccessibilityService, bitmap)
+            android.widget.Toast.makeText(this@CircleToSearchAccessibilityService, if (success) getString(R.string.toast_saved_to_gallery) else getString(R.string.toast_save_failed), android.widget.Toast.LENGTH_SHORT).show()
+            try { windowManager?.removeView(menuLayout) } catch (e: Exception) {}
+        })
+
+        // --- Action: Delete (destructive, last) ---
         menuLayout.addView(createTextActionButton(getString(R.string.pinned_btn_delete)) {
             try {
                 windowManager?.removeView(anchorView)
                 windowManager?.removeView(menuLayout)
             } catch (e: Exception) {}
         })
-
-        // --- Action: Save ---
-        val saveBtn = createTextActionButton(getString(R.string.pinned_btn_save)) {
-            val success = ImageUtils.saveToGallery(this@CircleToSearchAccessibilityService, bitmap)
-            android.widget.Toast.makeText(this@CircleToSearchAccessibilityService, if (success) getString(R.string.toast_saved_to_gallery) else getString(R.string.toast_save_failed), android.widget.Toast.LENGTH_SHORT).show()
-            try { windowManager?.removeView(menuLayout) } catch (e: Exception) {}
-        }
-        // Add spacing only if needed (not on the last item)
-        menuLayout.addView(saveBtn)
-        
-        // Ensure buttons have proper spacing between them but not after the last one
-        for (i in 0 until menuLayout.childCount - 1) {
-            (menuLayout.getChildAt(i).layoutParams as android.widget.LinearLayout.LayoutParams).marginEnd = (8 * displayMetrics.density).toInt()
-        }
 
         // Measure properly and clamp to screen bounds to avoid cutoff
         menuLayout.measure(View.MeasureSpec.makeMeasureSpec(displayMetrics.widthPixels, View.MeasureSpec.AT_MOST), View.MeasureSpec.UNSPECIFIED)
