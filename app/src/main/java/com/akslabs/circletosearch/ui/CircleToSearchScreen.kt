@@ -104,7 +104,6 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Email
-import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalIconButton
@@ -161,7 +160,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
-import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.webkit.WebSettingsCompat
 import com.akslabs.circletosearch.data.SearchEngine
 import com.akslabs.circletosearch.ui.components.FriendlyMessageBubble
@@ -426,6 +425,7 @@ fun CircleToSearchScreen(
     var searchUrl by remember { mutableStateOf<String?>(null) }
     var hostedImageUrl by remember { mutableStateOf<String?>(null) }
     var pageBackgroundColor by remember { mutableStateOf(Color.White) }
+    var refreshingEngine by remember { mutableStateOf<SearchEngine?>(null) }
     var isLoading by remember { mutableStateOf(false) }
     
     // Desktop Mode - Per Tab
@@ -498,6 +498,12 @@ fun CircleToSearchScreen(
     
     // WebView Cache
     val webViews = remember { mutableMapOf<SearchEngine, WebView>() }
+
+    // Clears the pull-to-refresh spinner once the refreshed tab finishes loading.
+    fun clearRefreshIfDone(view: WebView?) {
+        val re = refreshingEngine
+        if (view != null && re != null && view === webViews[re]) refreshingEngine = null
+    }
     
     // Update User Agent dynamically when desktop mode changes for a specific engine
     // This is now handled in the AndroidView update block or individual engine effects
@@ -529,6 +535,7 @@ fun CircleToSearchScreen(
                         override fun onPageFinished(view: android.webkit.WebView?, url: String?) {
                             super.onPageFinished(view, url)
                             samplePageBackgroundColor(view)
+                            clearRefreshIfDone(view)
                             val darkModeCSS = """
                                 (function() {
                                     var style = document.createElement('style');
@@ -547,6 +554,7 @@ fun CircleToSearchScreen(
                         override fun onPageFinished(view: android.webkit.WebView?, url: String?) {
                             super.onPageFinished(view, url)
                             samplePageBackgroundColor(view)
+                            clearRefreshIfDone(view)
                         }
                     }
                 }
@@ -900,6 +908,7 @@ fun CircleToSearchScreen(
                 override fun onPageFinished(view: WebView?, url: String?) {
                     super.onPageFinished(view, url)
                     samplePageBackgroundColor(view)
+                    clearRefreshIfDone(view)
                     // Lens loads its result tabs via async RPCs after page finish.
                     // Snapshot the network + DOM state so silent failures are visible.
                     if (url != null && url.contains("google.") && view != null) {
@@ -1060,7 +1069,7 @@ fun CircleToSearchScreen(
             containerColor = Color.Transparent,
             sheetContainerColor = Color.Transparent,
             sheetContentColor = MaterialTheme.colorScheme.onSurface,
-            sheetDragHandle = { BottomSheetDefaults.DragHandle() },
+            sheetDragHandle = null,
             sheetSwipeEnabled = true,
             sheetContent = {
                 // Bottom Sheet Content (Results)
@@ -1124,6 +1133,7 @@ fun CircleToSearchScreen(
                 // Reset everything when bitmap changes (new area selected)
                 LaunchedEffect(selectedBitmap) {
                     hostedImageUrl = null
+                    refreshingEngine = null
                     searchUrl = null
                     preloadedUrls.clear()
                     initializedEngines.clear() // Reset smart loading
@@ -1243,7 +1253,17 @@ fun CircleToSearchScreen(
                 }
                 */
 
-                Box(modifier = Modifier.fillMaxSize()) {
+                PullToRefreshBox(
+                    isRefreshing = refreshingEngine != null,
+                    onRefresh = {
+                        val wv = webViews[selectedEngine]
+                        if (wv != null) {
+                            refreshingEngine = selectedEngine
+                            wv.reload()
+                        }
+                    },
+                    modifier = Modifier.fillMaxSize()
+                ) {
                     // Show loading only if the SELECTED engine isn't ready or just starting
                     if (isLoading || (preloadedUrls.containsKey(selectedEngine) && !webViews.containsKey(selectedEngine))) {
                          // We delay showing the loader slightly to avoid flicker if WebView attaches instantly
@@ -1290,26 +1310,8 @@ fun CircleToSearchScreen(
                                             // Should not happen with key(), but safety check
                                             val v = webViews[engine]!!
                                             (v.parent as? ViewGroup)?.removeView(v)
-                                            
-                                            val swipeRefresh = SwipeRefreshLayout(ctx).apply {
-                                                layoutParams = ViewGroup.LayoutParams(
-                                                    ViewGroup.LayoutParams.MATCH_PARENT,
-                                                    ViewGroup.LayoutParams.MATCH_PARENT
-                                                )
-                                            }
-                                            swipeRefresh.addView(v)
-                                            swipeRefresh.setOnRefreshListener {
-                                                v.reload()
-                                                swipeRefresh.isRefreshing = false
-                                            }
-                                            swipeRefresh
+                                            v
                                         } else {
-                                            val swipeRefresh = SwipeRefreshLayout(ctx).apply {
-                                                layoutParams = ViewGroup.LayoutParams(
-                                                    ViewGroup.LayoutParams.MATCH_PARENT,
-                                                    ViewGroup.LayoutParams.MATCH_PARENT
-                                                )
-                                            }
                                             val webView = createWebView(ctx, engine)
                                             // Apply current settings
                                              if (isDesktop(engine)) {
@@ -1318,29 +1320,12 @@ fun CircleToSearchScreen(
                                             
                                             webViews[engine] = webView
                                             webView.loadUrl(url)
-                                            
-                                            swipeRefresh.addView(webView)
-                                            swipeRefresh.setOnRefreshListener {
-                                                webView.reload()
-                                                swipeRefresh.isRefreshing = false
-                                            }
-                                            swipeRefresh
+                                            webView
                                         }
                                     },
-                                    update = { swipeRefresh ->
-                                        var webView: WebView? = null
-                                        for (i in 0 until swipeRefresh.childCount) {
-                                            val child = swipeRefresh.getChildAt(i)
-                                            if (child is WebView) {
-                                                webView = child
-                                                break
-                                            }
-                                        }
-                                        
-                                        if (webView != null) {
-                                            if (webView.url != url && url != webView.originalUrl) {
-                                                webView.loadUrl(url)
-                                            }
+                                    update = { webView ->
+                                        if (webView.url != url && url != webView.originalUrl) {
+                                            webView.loadUrl(url)
                                         }
                                     },
                                     modifier = Modifier
