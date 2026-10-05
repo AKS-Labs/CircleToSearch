@@ -64,6 +64,26 @@ import com.akslabs.circletosearch.data.OverlaySegment
 import com.akslabs.circletosearch.utils.ImageUtils
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
+import androidx.compose.animation.core.animate
+import androidx.compose.animation.core.spring
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.MotionScheme
+import androidx.compose.runtime.MonotonicFrameClock
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlin.coroutines.resume
+import kotlin.coroutines.suspendCoroutine
+
+/**
+ * Corner radius for pinned stickers: never smaller than 16dp, and proportional
+ * to the sticker size (12.7% of the short side) so enlarged stickers keep a
+ * visually equivalent roundness instead of reading as square.
+ */
+private fun stickerCornerRadius(width: Int, height: Int, density: Float): Float =
+    maxOf(16f * density, minOf(width, height) * 0.127f)
 
 class CircleToSearchAccessibilityService : AccessibilityService() {
 
@@ -755,35 +775,130 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         startActivity(intent)
     }
 
-    // Custom ImageView that clips to rounded corners on the Canvas level
-    // This is much more robust than OutlineProvider for rapid movements and scaling.
+    // Custom ImageView that clips to rounded corners on the Canvas level.
+    // Draws the sticker into a content rect inset from the view bounds: the window
+    // carries headroom margin during transforms (hold/drag/pinch/entrance springs)
+    // so the fixed window surface never square-crops the rounded corners; at rest
+    // the content rect equals the full window.
     private class RoundedImageView(context: android.content.Context) : android.widget.ImageView(context) {
         private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
         private val rect = RectF()
         private val matrix = Matrix()
-        private val radius = 16f * context.resources.displayMetrics.density
+
+        var contentLeft = 0
+        var contentTop = 0
+        var contentWidth = -1
+        var contentHeight = -1
+
+        fun updateContent(left: Int, top: Int, w: Int, h: Int) {
+            contentLeft = left
+            contentTop = top
+            contentWidth = w
+            contentHeight = h
+            invalidateOutline()
+            invalidate()
+        }
 
         override fun onDraw(canvas: android.graphics.Canvas) {
             val drawable = drawable ?: return
-            val bitmap = try { 
-                drawable.toBitmap() 
-            } catch (e: Exception) { 
-                return 
+            if (contentWidth <= 0 || contentHeight <= 0) return
+            val bitmap = try {
+                drawable.toBitmap()
+            } catch (e: Exception) {
+                return
             }
-            
+
             val shader = BitmapShader(bitmap, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP)
-            
-            // Adjust shader to current view bounds
+
             matrix.reset()
-            matrix.setScale(width.toFloat() / bitmap.width, height.toFloat() / bitmap.height)
+            matrix.setScale(contentWidth.toFloat() / bitmap.width, contentHeight.toFloat() / bitmap.height)
+            matrix.postTranslate(contentLeft.toFloat(), contentTop.toFloat())
             shader.setLocalMatrix(matrix)
-            
+
             paint.shader = shader
-            rect.set(0f, 0f, width.toFloat(), height.toFloat())
-            
-            // This never "looses roundness" because it's rendering at the pixel level on each frame
+            rect.set(
+                contentLeft.toFloat(),
+                contentTop.toFloat(),
+                (contentLeft + contentWidth).toFloat(),
+                (contentTop + contentHeight).toFloat()
+            )
+
+            val radius = stickerCornerRadius(contentWidth, contentHeight, context.resources.displayMetrics.density)
             canvas.drawRoundRect(rect, radius, radius, paint)
         }
+    }
+
+    private val stickerAnimScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+
+    private val stickerFrameClock = object : MonotonicFrameClock {
+        override suspend fun <R> withFrameNanos(onFrame: (Long) -> R): R =
+            suspendCoroutine { cont ->
+                android.view.Choreographer.getInstance().postFrameCallback { frameTimeNanos ->
+                    cont.resume(onFrame(frameTimeNanos))
+                }
+            }
+    }
+
+    /**
+     * Drives Compose animation springs on plain Views (no Composition needed): the
+     * Choreographer-backed frame clock lets [animate] run against WindowManager views.
+     * [expressive] uses the M3 MotionScheme.expressive() spatial spring spec.
+     */
+    @OptIn(ExperimentalMaterial3ExpressiveApi::class)
+    private fun springAnim(
+        from: Float,
+        to: Float,
+        dampingRatio: Float,
+        stiffness: Float,
+        expressive: Boolean = false,
+        onEnd: (() -> Unit)? = null,
+        onFrame: (Float) -> Unit
+    ): Job =
+        stickerAnimScope.launch(stickerFrameClock) {
+            val spec: androidx.compose.animation.core.AnimationSpec<Float> =
+                if (expressive) MotionScheme.expressive().defaultSpatialSpec()
+                else spring(dampingRatio = dampingRatio, stiffness = stiffness)
+            animate(from, to, animationSpec = spec) { value, _ -> onFrame(value) }
+            onEnd?.invoke()
+        }
+
+    /**
+     * Bakes rounded corners into the sticker bitmap itself so the crop survives
+     * any expansion (grab/pinch springs) or renderer-side clipping: the corners
+     * are transparent pixels, not a per-frame drawing decision.
+     */
+    private fun cropBitmapToRoundedCorners(src: Bitmap, radiusPx: Float): Bitmap {
+        if (radiusPx <= 0f) return src
+        return try {
+            val out = Bitmap.createBitmap(src.width, src.height, Bitmap.Config.ARGB_8888)
+            val canvas = android.graphics.Canvas(out)
+            val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+            paint.shader = BitmapShader(src, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP)
+            canvas.drawRoundRect(
+                RectF(0f, 0f, src.width.toFloat(), src.height.toFloat()),
+                radiusPx, radiusPx, paint
+            )
+            out
+        } catch (e: Exception) {
+            src
+        }
+    }
+
+    /**
+     * Headroom (px) to add around the sticker content so scale/rotation transforms
+     * (grab spring, drag tilt, entrance/pinch overshoot) stay fully inside the window
+     * surface instead of being square-cropped at its fixed bounds.
+     */
+    private fun stickerMargins(cw: Int, ch: Int, sMax: Float, thetaDeg: Float): Pair<Int, Int> {
+        if (sMax <= 0f) return 0 to 0
+        val th = Math.toRadians(thetaDeg.toDouble())
+        val ct = Math.abs(Math.cos(th)).toFloat()
+        val st = Math.abs(Math.sin(th)).toFloat()
+        val ex = sMax * (cw / 2f * ct + ch / 2f * st)
+        val ey = sMax * (cw / 2f * st + ch / 2f * ct)
+        val mx = (ex - cw / 2f).toInt() + 8
+        val my = (ey - ch / 2f).toInt() + 8
+        return mx.coerceAtLeast(0) to my.coerceAtLeast(0)
     }
 
     private fun showPinnedArea(bitmap: Bitmap, rect: android.graphics.Rect) {
@@ -814,10 +929,69 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         params.x = centerX - width / 2
         params.y = centerY - height / 2
 
-        val pinnedView = RoundedImageView(this).apply {
-            setImageBitmap(bitmap)
+        var entranceScaleXJob: Job? = null
+        var entranceScaleYJob: Job? = null
+        var scaleJob: Job? = null
+        var rotJob: Job? = null
+        var alphaJob: Job? = null
+        var lastTiltRawX = 0f
+        var lastTiltTime = 0L
+        var contentW = width
+        var contentH = height
+        var marginX = 0
+        var marginY = 0
+        var isDown = false
+        var boundsJob: Job? = null
+
+        // The window surface clips at its fixed bounds, so any transform beyond them
+        // (grab scale, drag tilt, entrance/pinch springs) squares off the rounded
+        // corners. Grow the window with headroom while transforming and shrink back
+        // to an exact fit at rest so no invisible touch ring remains around it.
+        val headroomScale = 1.35f
+        val headroomTilt = 15f
+
+        lateinit var pinnedView: RoundedImageView
+
+        fun computeWindowBounds(sMax: Float, thetaDeg: Float) {
+            val (mx, my) = stickerMargins(contentW, contentH, sMax, thetaDeg)
+            val ccx = params.x + params.width / 2
+            val ccy = params.y + params.height / 2
+            params.width = contentW + 2 * mx
+            params.height = contentH + 2 * my
+            params.x = ccx - params.width / 2
+            params.y = ccy - params.height / 2
+            marginX = mx
+            marginY = my
+            pinnedView.updateContent(mx, my, contentW, contentH)
+        }
+
+        fun applyWindowBounds(sMax: Float, thetaDeg: Float) {
+            computeWindowBounds(sMax, thetaDeg)
+            if (pinnedView.isAttachedToWindow) {
+                try { windowManager?.updateViewLayout(pinnedView, params) } catch (e: Exception) {}
+            }
+        }
+
+        // Crop corners into the bitmap (view is 1:1 with bitmap, so radius maps directly)
+        val stickerRadiusPx = stickerCornerRadius(bitmap.width, bitmap.height, displayMetrics.density)
+        val stickerBitmap = cropBitmapToRoundedCorners(bitmap, stickerRadiusPx)
+
+        pinnedView = RoundedImageView(this).apply {
+            setImageBitmap(stickerBitmap)
             scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
             elevation = 0f
+            // Round-rect clip on the content rect (not the window): with headroom
+            // margin the clip transforms with the view, so no expansion can square it.
+            outlineProvider = object : android.view.ViewOutlineProvider() {
+                override fun getOutline(v: View, o: android.graphics.Outline) {
+                    if (contentWidth <= 0 || contentHeight <= 0) return
+                    o.setRoundRect(
+                        contentLeft, contentTop,
+                        contentLeft + contentWidth, contentTop + contentHeight,
+                        stickerCornerRadius(contentWidth, contentHeight, resources.displayMetrics.density)
+                    )
+                }
+            }
             clipToOutline = true
             
             var initialX = 0
@@ -837,29 +1011,49 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
                 flingAnimator = null
             }
 
+            // Shrink back to the exact content window once the settle springs (and any
+            // fling) finish, so a resting sticker never keeps an invisible touch ring.
+            fun requestRestWindow() {
+                boundsJob?.cancel()
+                boundsJob = stickerAnimScope.launch {
+                    scaleJob?.join()
+                    rotJob?.join()
+                    if (!isDown && flingAnimator == null) applyWindowBounds(0f, 0f)
+                }
+            }
+
             // --- Phase 33: ScaleGestureDetector for pinch zoom ---
             val scaleDetector = ScaleGestureDetector(context, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
                 override fun onScale(detector: ScaleGestureDetector): Boolean {
                     isScaling = true
                     val scaleFactor = detector.scaleFactor
-                    
-                    val newWidth = (params.width * scaleFactor).toInt()
-                    val newHeight = (params.height * scaleFactor).toInt()
-                    
+
+                    val newContentW = (contentW * scaleFactor).toInt()
+                    val newContentH = (contentH * scaleFactor).toInt()
+
                     // Constraints: 15% to 95% of screen
                     val minDim = (screenWidth * 0.15f).toInt()
                     val maxDim = (screenWidth * 0.95f).toInt()
-                    
-                    if (newWidth in minDim..maxDim && newHeight in minDim..maxDim) {
+
+                    if (newContentW in minDim..maxDim && newContentH in minDim..maxDim) {
                         // Adjust position to scale from center of pinch
                         val focusX = detector.focusX
                         val focusY = detector.focusY
-                        
+
+                        val (nmx, nmy) = stickerMargins(newContentW, newContentH, headroomScale, headroomTilt)
+                        val newWidth = newContentW + 2 * nmx
+                        val newHeight = newContentH + 2 * nmy
+
                         params.x -= ((newWidth - params.width) * (focusX / this@apply.width)).toInt()
                         params.y -= ((newHeight - params.height) * (focusY / this@apply.height)).toInt()
-                        
+
+                        contentW = newContentW
+                        contentH = newContentH
+                        marginX = nmx
+                        marginY = nmy
                         params.width = newWidth
                         params.height = newHeight
+                        pinnedView.updateContent(nmx, nmy, newContentW, newContentH)
                         windowManager?.updateViewLayout(this@apply, params)
                     }
                     return true
@@ -872,7 +1066,7 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
                     if (!isDragging) {
                         // Show actions
                         if (currentMenu == null) {
-                            showPinnedActions(this@apply, bitmap, params) { menu ->
+                            showPinnedActions(this@apply, bitmap, params, params.y + marginY, contentH) { menu ->
                                 currentMenu = menu
                             }
                         }
@@ -888,13 +1082,31 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
                 
                 when (event.actionMasked) {
                     MotionEvent.ACTION_DOWN -> {
+                        isDown = true
+                        boundsJob?.cancel()
+                        // Grow the window to transform headroom before offsets are
+                        // captured, so grab/tilt springs never get square-cropped.
+                        applyWindowBounds(headroomScale, headroomTilt)
                         initialX = params.x
                         initialY = params.y
                         initialTouchX = event.rawX
                         initialTouchY = event.rawY
+                        lastTiltRawX = event.rawX
+                        lastTiltTime = event.eventTime
                         isDragging = false
                         isScaling = false
                         stopFling()
+                        // Grab feedback: spring the sticker up slightly
+                        entranceScaleXJob?.cancel()
+                        entranceScaleYJob?.cancel()
+                        scaleJob?.cancel()
+                        rotJob?.cancel()
+                        alphaJob?.cancel()
+                        this@apply.alpha = 1f
+                        scaleJob = springAnim(this@apply.scaleX, 1.05f, 0.6f, 420f) {
+                            this@apply.scaleX = it
+                            this@apply.scaleY = it
+                        }
                         velocityTracker?.recycle()
                         velocityTracker = android.view.VelocityTracker.obtain()
                         velocityTracker?.addMovement(event)
@@ -920,57 +1132,84 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
                         params.y = initialY + dy
                         windowManager?.updateViewLayout(v, params)
                         velocityTracker?.addMovement(event)
+                        if (isDragging) {
+                            // Velocity-based tilt while dragging for a playful lean
+                            val tiltDt = (event.eventTime - lastTiltTime).coerceAtLeast(1L)
+                            val tiltVx = (event.rawX - lastTiltRawX) / tiltDt * 1000f
+                            lastTiltRawX = event.rawX
+                            lastTiltTime = event.eventTime
+                            v.rotation = (tiltVx * 0.006f).coerceIn(-8f, 8f)
+                        }
                         true
                     }
                     MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                        isDown = false
                         isScaling = false
+                        // Settle: bouncy springs back to rest (scale + tilt)
+                        scaleJob?.cancel()
+                        rotJob?.cancel()
+                        scaleJob = springAnim(v.scaleX, 1f, 0.5f, 300f) {
+                            v.scaleX = it
+                            v.scaleY = it
+                        }
+                        rotJob = springAnim(v.rotation, 0f, 0.4f, 260f) { v.rotation = it }
                         if (isDragging) {
                             velocityTracker?.computeCurrentVelocity(1000)
                             val vx = velocityTracker?.xVelocity ?: 0f
                             val vy = velocityTracker?.yVelocity ?: 0f
                             
-                            if (Math.abs(vx) > 300 || Math.abs(vy) > 300) {
-                                // Start physics fling
+                            if (Math.abs(vx) > 150 || Math.abs(vy) > 150) {
+                                // Physics fling: real-time friction + bouncy edge restitution
                                 flingAnimator = android.animation.ValueAnimator.ofFloat(0f, 1f).apply {
-                                    duration = 2000
+                                    duration = 4000
                                     interpolator = android.view.animation.LinearInterpolator()
-                                    var lastTime = 0f
-                                    var currVx = vx * 2.2f
-                                    var currVy = vy * 2.2f
-                                    
+                                    var lastPlayMs = 0L
+                                    var posXf = (params.x + marginX).toFloat()
+                                    var posYf = (params.y + marginY).toFloat()
+                                    var currVx = vx * 1.5f
+                                    var currVy = vy * 1.5f
+                                    val display = resources.displayMetrics
+
                                     addUpdateListener { anim ->
-                                        val faction = anim.animatedFraction
-                                        val dt = faction - lastTime
-                                        lastTime = faction
-                                        
-                                        params.x += (currVx * dt * 0.95f).toInt()
-                                        params.y += (currVy * dt * 0.95f).toInt()
-                                        
-                                        // Bounce off edges (Bouncy!)
-                                        val display = resources.displayMetrics
-                                        if (params.x < 0 || params.x + params.width > display.widthPixels) {
-                                            currVx = -currVx * 0.9f 
-                                            params.x = params.x.coerceIn(0, display.widthPixels - params.width)
+                                        val nowMs = anim.currentPlayTime
+                                        val dt = ((nowMs - lastPlayMs).coerceIn(0L, 50L)) / 1000f
+                                        lastPlayMs = nowMs
+
+                                        posXf += currVx * dt
+                                        posYf += currVy * dt
+
+                                        // Bounce off screen edges (restitution), but not forever
+                                        if (posXf < 0f) {
+                                            posXf = -posXf
+                                            currVx = if (Math.abs(currVx) < 180f) 0f else -currVx * 0.8f
+                                        } else if (posXf + contentW > display.widthPixels) {
+                                            posXf = 2f * (display.widthPixels - contentW) - posXf
+                                            currVx = if (Math.abs(currVx) < 180f) 0f else -currVx * 0.8f
                                         }
-                                        if (params.y < 0 || params.y + params.height > display.heightPixels) {
-                                            currVy = -currVy * 0.9f
-                                            params.y = params.y.coerceIn(0, display.heightPixels - params.height)
+                                        if (posYf < 0f) {
+                                            posYf = -posYf
+                                            currVy = if (Math.abs(currVy) < 180f) 0f else -currVy * 0.8f
+                                        } else if (posYf + contentH > display.heightPixels) {
+                                            posYf = 2f * (display.heightPixels - contentH) - posYf
+                                            currVy = if (Math.abs(currVy) < 180f) 0f else -currVy * 0.8f
                                         }
-                                        
-                                        try { 
+
+                                        // Air friction (frame-rate independent)
+                                        val decay = Math.exp(-1.1 * dt).toFloat()
+                                        currVx *= decay
+                                        currVy *= decay
+
+                                        params.x = (posXf - marginX).toInt()
+                                        params.y = (posYf - marginY).toInt()
+
+                                        try {
                                             windowManager?.updateViewLayout(v, params)
-                                            // v.invalidateOutline() // No longer needed with canvas clipping
-                                        } catch(e: Exception) { 
+                                        } catch (e: Exception) {
                                             anim.cancel()
                                             flingAnimator = null
                                         }
-                                        
-                                        // Lower friction for fun play
-                                        currVx *= 0.992f
-                                        currVy *= 0.992f
-                                        
-                                        // Safety check: if velocity is zero or view is gone, stop
-                                        if (Math.abs(currVx) < 10 && Math.abs(currVy) < 10) {
+
+                                        if (Math.hypot(currVx.toDouble(), currVy.toDouble()) < 50.0) {
                                             anim.cancel()
                                             flingAnimator = null
                                         }
@@ -978,9 +1217,11 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
                                     addListener(object : android.animation.AnimatorListenerAdapter() {
                                         override fun onAnimationEnd(animation: android.animation.Animator) {
                                             flingAnimator = null
+                                            requestRestWindow()
                                         }
                                         override fun onAnimationCancel(animation: android.animation.Animator) {
                                             flingAnimator = null
+                                            requestRestWindow()
                                         }
                                     })
                                     start()
@@ -989,6 +1230,7 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
                         }
                         velocityTracker?.recycle()
                         velocityTracker = null
+                        requestRestWindow()
                         true
                     }
                     else -> false
@@ -997,35 +1239,35 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         }
 
         try {
+            // Start with headroom so the entrance springs (overshoot + -15° rotation)
+            // are never square-cropped by the window surface.
+            computeWindowBounds(headroomScale, headroomTilt)
             windowManager?.addView(pinnedView, params)
-            
-            // --- Beautiful Pin Animation ---
+
+            // --- Beautiful Pin Animation: expressive springs (jelly squash & stretch) ---
             pinnedView.scaleX = 0f
             pinnedView.scaleY = 0f
             pinnedView.rotation = -15f
             pinnedView.alpha = 0f
-            pinnedView.animate()
-                .scaleX(1.1f)
-                .scaleY(1.1f)
-                .rotation(0f)
-                .alpha(1f)
-                .setDuration(450)
-                .setInterpolator(android.view.animation.OvershootInterpolator(1.4f))
-                .withEndAction {
-                    pinnedView.animate()
-                        .scaleX(1f)
-                        .scaleY(1f)
-                        .setDuration(150)
-                        .start()
-                }
-                .start()
-                
+            entranceScaleXJob = springAnim(0f, 1f, 0.55f, 240f, expressive = true) { pinnedView.scaleX = it }
+            entranceScaleYJob = springAnim(0f, 1f, 0.5f, 430f, expressive = true) { pinnedView.scaleY = it }
+            rotJob = springAnim(0f, 1f, 0.5f, 300f, expressive = true) { pinnedView.rotation = -15f + 15f * it }
+            alphaJob = springAnim(0f, 1f, 1f, 1200f) { pinnedView.alpha = it.coerceIn(0f, 1f) }
+            // Once the entrance settles, drop the headroom so the resting sticker
+            // occupies exactly its content bounds again (no invisible touch ring).
+            boundsJob = stickerAnimScope.launch {
+                entranceScaleXJob?.join()
+                entranceScaleYJob?.join()
+                rotJob?.join()
+                if (!isDown) applyWindowBounds(0f, 0f)
+            }
+
         } catch (e: Exception) {
             android.util.Log.e("CircleToSearch", "Failed to add pinned view", e)
         }
     }
 
-    private fun showPinnedActions(anchorView: View, bitmap: Bitmap, anchorParams: WindowManager.LayoutParams, onMenuCreated: (View) -> Unit) {
+    private fun showPinnedActions(anchorView: View, bitmap: Bitmap, anchorParams: WindowManager.LayoutParams, contentTop: Int, contentHeight: Int, onMenuCreated: (View) -> Unit) {
         val displayMetrics = resources.displayMetrics
         val menuPadding = (10 * displayMetrics.density).toInt()
         val cornerRadius = 32f * displayMetrics.density
@@ -1039,7 +1281,9 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
 
         val menuLayout = android.widget.LinearLayout(this).apply {
             orientation = android.widget.LinearLayout.HORIZONTAL
-            setPadding(0, 0, 0, 0)
+            // Breathing room at start/end so labels aren't flush with the pill edge
+            val edgePad = (8 * displayMetrics.density).toInt()
+            setPadding(edgePad, 0, edgePad, 0)
             elevation = 24f
             
             val background = GradientDrawable().apply {
@@ -1063,6 +1307,12 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
             setTypeface(Typeface.DEFAULT, Typeface.NORMAL)
             textSize = 14f
             gravity = Gravity.CENTER
+            // Platform Button style enforces ~64dp minWidth/minHeight which stretches
+            // WRAP_CONTENT buttons and blows up the gaps between labels.
+            minWidth = 0
+            minHeight = 0
+            minimumWidth = 0
+            minimumHeight = 0
 
             // Transparent background with a shaped ripple, like the selection toolbar buttons
             background = android.graphics.drawable.RippleDrawable(
@@ -1073,7 +1323,7 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
             stateListAnimator = null
             elevation = 0f
 
-            setPadding((16 * displayMetrics.density).toInt(), 0, (16 * displayMetrics.density).toInt(), 0)
+            setPadding((8 * displayMetrics.density).toInt(), 0, (8 * displayMetrics.density).toInt(), 0)
 
             layoutParams = android.widget.LinearLayout.LayoutParams(
                 android.widget.LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -1110,16 +1360,28 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
 
         // --- Action: Delete (destructive, last) ---
         menuLayout.addView(createTextActionButton(getString(R.string.pinned_btn_delete)) {
-            try {
-                windowManager?.removeView(anchorView)
-                windowManager?.removeView(menuLayout)
-            } catch (e: Exception) {}
+            try { windowManager?.removeView(menuLayout) } catch (e: Exception) {}
+            // Playful shrink-spin-out before the sticker is removed
+            springAnim(1f, 0f, 1f, 900f,
+                onEnd = {
+                    try { windowManager?.removeView(anchorView) } catch (e: Exception) {}
+                }
+            ) { p ->
+                anchorView.scaleX = 0.15f + 0.85f * p
+                anchorView.scaleY = 0.15f + 0.85f * p
+                anchorView.rotation = 35f * (1f - p)
+                anchorView.alpha = (p * 1.5f).coerceAtMost(1f)
+            }
         })
 
         // Measure properly and clamp to screen bounds to avoid cutoff
         menuLayout.measure(View.MeasureSpec.makeMeasureSpec(displayMetrics.widthPixels, View.MeasureSpec.AT_MOST), View.MeasureSpec.UNSPECIFIED)
         val measuredMenuWidth = menuLayout.measuredWidth
         val measuredMenuHeight = menuLayout.measuredHeight
+        android.util.Log.d("PinnedMenu", "pill=$measuredMenuWidth buttons=" + (0 until menuLayout.childCount).joinToString { i ->
+            val c = menuLayout.getChildAt(i)
+            "${c}:w=${c.measuredWidth},minW=${(c as? android.widget.Button)?.minimumWidth},pad=${c.paddingLeft}/${c.paddingRight}"
+        })
 
         val menuParams = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
@@ -1142,14 +1404,25 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         menuParams.x = targetX.toInt()
         
         val yPadding = (12 * displayMetrics.density).toInt()
-        menuParams.y = if (anchorParams.y > measuredMenuHeight + yPadding) {
-            anchorParams.y - measuredMenuHeight - yPadding
+        menuParams.y = if (contentTop > measuredMenuHeight + yPadding) {
+            contentTop - measuredMenuHeight - yPadding
         } else {
-            anchorParams.y + anchorParams.height + yPadding
+            contentTop + contentHeight + yPadding
         }
 
         try {
             windowManager?.addView(menuLayout, menuParams)
+            // Pop in with a playful overshoot
+            menuLayout.alpha = 0f
+            menuLayout.scaleX = 0.85f
+            menuLayout.scaleY = 0.85f
+            menuLayout.animate()
+                .alpha(1f)
+                .scaleX(1f)
+                .scaleY(1f)
+                .setDuration(190)
+                .setInterpolator(android.view.animation.OvershootInterpolator(1.4f))
+                .start()
             onMenuCreated(menuLayout)
         } catch (e: Exception) {
             android.util.Log.e("CircleToSearch", "Failed to add menu view", e)
