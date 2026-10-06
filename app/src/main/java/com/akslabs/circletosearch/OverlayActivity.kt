@@ -129,6 +129,7 @@ class OverlayActivity : ComponentActivity() {
         super.onDestroy()
         copyTextManager.value?.dismiss()
         copyTextManager.value = null
+        CircleToSearchAccessibilityService.setCopyTextManager(null)
         if (isFinishing) {
              com.akslabs.circletosearch.data.BitmapRepository.clear()
              com.akslabs.circletosearch.utils.StorageUtils.clearAppCache(this)

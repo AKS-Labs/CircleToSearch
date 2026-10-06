@@ -105,7 +105,6 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         val info = serviceInfo
         info.flags = info.flags or 
             android.accessibilityservice.AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS or
-            android.accessibilityservice.AccessibilityServiceInfo.FLAG_REQUEST_ENHANCED_WEB_ACCESSIBILITY or
             android.accessibilityservice.AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS
         serviceInfo = info
         
@@ -665,14 +664,8 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
     private fun toggleFlashlight() {
          try {
             val cameraManager = getSystemService(Context.CAMERA_SERVICE) as CameraManager
+            if (cameraManager.cameraIdList.isEmpty()) return
             val cameraId = cameraManager.cameraIdList[0]
-            // This is tricky because we don't know current state easily without callback.
-            // For now, let's assume valid flash.
-            // A robust implementation needs a callback to track state.
-            // We'll just try to turn it on for a second for testing or we need a tracked state.
-            // Let's implement a simple tracking using static var or prefs?
-            // Or just ignore toggle for now and just turn ON? No, user expects toggle.
-            // Let's use a static state?
             if (isFlashlightOn) {
                 cameraManager.setTorchMode(cameraId, false)
                 isFlashlightOn = false
@@ -751,16 +744,31 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         private val rect = RectF()
         private val matrix = Matrix()
         private val radius = 12f * context.resources.displayMetrics.density
+        
+        private var cachedBitmap: Bitmap? = null
+        private var cachedShader: BitmapShader? = null
+        
+        override fun setImageDrawable(drawable: android.graphics.drawable.Drawable?) {
+            super.setImageDrawable(drawable)
+            cachedBitmap = null
+            cachedShader = null
+        }
 
         override fun onDraw(canvas: android.graphics.Canvas) {
-            val drawable = drawable ?: return
-            val bitmap = try { 
-                drawable.toBitmap() 
-            } catch (e: Exception) { 
-                return 
+            if (cachedBitmap == null) {
+                val drawable = drawable ?: return
+                cachedBitmap = try { 
+                    drawable.toBitmap() 
+                } catch (e: Exception) { 
+                    return 
+                }
+                cachedBitmap?.let {
+                    cachedShader = BitmapShader(it, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP)
+                }
             }
             
-            val shader = BitmapShader(bitmap, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP)
+            val bitmap = cachedBitmap ?: return
+            val shader = cachedShader ?: return
             
             // Adjust shader to current view bounds
             matrix.reset()
@@ -1196,6 +1204,7 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
     override fun onDestroy() {
         super.onDestroy()
         instance = null
+        copyTextManager = null
         prefs.unregisterOnSharedPreferenceChangeListener(prefsListener)
         overlayPrefs.unregisterOnSharedPreferenceChangeListener(overlayPrefsListener)
         
@@ -1206,6 +1215,7 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
                 e.printStackTrace()
             }
         }
+        overlayViews.clear()
         hideBubble()
     }
 }

@@ -19,6 +19,7 @@ import com.akslabs.circletosearch.R
 
 class CircleToSearchTileService : TileService() {
 
+    @android.annotation.SuppressLint("StartActivityAndCollapseDeprecated")
     override fun onClick() {
         super.onClick()
         
