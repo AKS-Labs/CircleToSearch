@@ -17,9 +17,13 @@
  *
  */
 
+package com.akslabs.circletosearch
+
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.content.Intent
 import android.graphics.Bitmap
+import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.webkit.WebChromeClient
@@ -32,11 +36,12 @@ import android.webkit.WebViewClient
 class WebViewActivity : Activity() {
 
     private val TAG = "WebViewActivity"
+    private var webView: WebView? = null
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val webView = WebView(this)
+        webView = WebView(this)
         setContentView(webView)
 
         val url = intent.getStringExtra("url")
@@ -46,28 +51,41 @@ class WebViewActivity : Activity() {
             return
         }
 
-        with(webView.settings) {
+        with(webView!!.settings) {
             javaScriptEnabled = true
-            domStorageEnabled = true // Enable DOM storage
-            databaseEnabled = true   // Enable database storage
-            // Other potentially useful settings for modern web pages
-            allowContentAccess = true
-            allowFileAccess = true
-            javaScriptCanOpenWindowsAutomatically = true
-            setSupportMultipleWindows(true)
+            domStorageEnabled = true
+            databaseEnabled = true
+            allowContentAccess = false
+            allowFileAccess = false
+            javaScriptCanOpenWindowsAutomatically = false
+            setSupportMultipleWindows(false)
             builtInZoomControls = true
             displayZoomControls = false
             loadWithOverviewMode = true
             useWideViewPort = true
-            userAgentString = "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36" // Mobile user agent
+            mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
+            userAgentString = "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
         }
 
-        webView.webViewClient = object : WebViewClient() {
+        webView!!.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
-                val newUrl = request?.url.toString()
-                Log.d(TAG, "shouldOverrideUrlLoading: $newUrl")
-                view?.loadUrl(newUrl)
-                return true // Return true to indicate that the host application handles the URL
+                val requestUrl = request?.url ?: return false
+                val scheme = requestUrl.scheme ?: return false
+
+                // Only handle http/https in-app; route everything else to system
+                return if (scheme.equals("http", ignoreCase = true) || scheme.equals("https", ignoreCase = true)) {
+                    false // Let the WebView handle it normally
+                } else {
+                    // tel:, mailto:, intent://, market:// etc. → system handler
+                    try {
+                        val externalIntent = Intent(Intent.ACTION_VIEW, requestUrl)
+                        externalIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        startActivity(externalIntent)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "No handler for scheme: $scheme", e)
+                    }
+                    true
+                }
             }
 
             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
@@ -84,11 +102,10 @@ class WebViewActivity : Activity() {
                 super.onReceivedError(view, request, error)
                 val errorMessage = "Error: ${error?.errorCode} - ${error?.description} for ${request?.url}"
                 Log.e(TAG, "onReceivedError: $errorMessage")
-                // You could display an error message to the user here
             }
         }
 
-        webView.webChromeClient = object : WebChromeClient() {
+        webView!!.webChromeClient = object : WebChromeClient() {
             override fun onProgressChanged(view: WebView?, newProgress: Int) {
                 super.onProgressChanged(view, newProgress)
                 Log.d(TAG, "Loading progress: $newProgress%")
@@ -97,11 +114,18 @@ class WebViewActivity : Activity() {
             override fun onConsoleMessage(consoleMessage: android.webkit.ConsoleMessage?): Boolean {
                 super.onConsoleMessage(consoleMessage)
                 Log.d(TAG, "WebView Console: ${consoleMessage?.message()} -- From ${consoleMessage?.sourceId()}:${consoleMessage?.lineNumber()}")
-                return true // Indicate that the message has been handled
+                return true
             }
         }
         
         Log.d(TAG, "Loading URL: $url")
-        webView.loadUrl(url)
+        webView!!.loadUrl(url)
+    }
+
+    override fun onDestroy() {
+        webView?.stopLoading()
+        webView?.destroy()
+        webView = null
+        super.onDestroy()
     }
 }

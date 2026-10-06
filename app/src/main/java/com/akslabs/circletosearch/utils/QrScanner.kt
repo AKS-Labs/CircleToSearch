@@ -167,7 +167,7 @@ object QrScanner {
     fun parseResult(text: String): QrResult {
         return when {
             text.startsWith("http://", ignoreCase = true) || text.startsWith("https://", ignoreCase = true) -> {
-                val display = text.removePrefix("http://").removePrefix("https://").trimEnd('/')
+                val display = text.replace(Regex("^(?i)https?://"), "").trimEnd('/')
                 QrResult.Url(text, display)
             }
             text.startsWith("WIFI:", ignoreCase = true) -> parseWifi(text)

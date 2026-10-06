@@ -12,13 +12,13 @@ object StorageUtils {
     private const val TAG = "StorageUtils"
 
     /**
-     * Recursively clears the application's cache directory.
+     * Clears the contents of the application's cache directory (preserving the directory itself).
      */
     fun clearAppCache(context: Context) {
         try {
             val cacheDir = context.cacheDir
             if (cacheDir != null && cacheDir.isDirectory) {
-                deleteDir(cacheDir)
+                deleteDirContents(cacheDir)
                 Log.d(TAG, "Application cache cleared successfully")
             }
         } catch (e: Exception) {
@@ -27,28 +27,17 @@ object StorageUtils {
     }
 
     /**
-     * Helper to recursively delete a directory and its contents.
-     * Note: We don't delete the root cacheDir itself, just its children.
+     * Helper to recursively delete a directory's contents.
+     * Deletes files and subdirectories but preserves the given root directory.
      */
-    private fun deleteDir(dir: File?): Boolean {
-        if (dir != null && dir.isDirectory) {
-            val children = dir.list()
-            if (children != null) {
-                for (i in children.indices) {
-                    val success = deleteDir(File(dir, children[i]))
-                    if (!success) {
-                        return false
-                    }
-                }
+    private fun deleteDirContents(dir: File) {
+        val children = dir.listFiles() ?: return
+        for (child in children) {
+            if (child.isDirectory) {
+                deleteDirContents(child)
             }
-            // If it's the root cacheDir, don't delete it, just its children
-            // We can check this by comparing path or just letting it fail if it's the root
-            // but actually standard behavior for "clear cache" is to leave the dir empty.
-            return dir.delete()
-        } else if (dir != null && dir.isFile) {
-            return dir.delete()
+            child.delete()
         }
-        return false
     }
     
     /**

@@ -23,12 +23,16 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.BIND_ACCESSIBILITY_SERVICE" />
     <uses-permission android:name="android.permission.VIBRATE" />
-    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+        </intent>
+    </queries>
 
     <application
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
@@ -37,7 +41,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.CircleToSearch"
         android:enableOnBackInvokedCallback="true"
-        android:extractNativeLibs="true"
+        android:extractNativeLibs="false"
         tools:targetApi="31">
         <activity
             android:name=".MainActivity"

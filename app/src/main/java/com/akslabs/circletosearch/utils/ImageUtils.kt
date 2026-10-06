@@ -27,6 +27,7 @@ import java.io.File
 import java.io.FileOutputStream
 
 object ImageUtils {
+    private const val TAG = "ImageUtils"
     private const val SCREENSHOT_FILENAME = "screenshot.png"
 
     fun saveBitmap(context: Context, bitmap: Bitmap, fileName: String = SCREENSHOT_FILENAME): String {
@@ -56,19 +57,22 @@ object ImageUtils {
     }
 
     fun resizeBitmap(source: Bitmap, maxLength: Int): Bitmap {
-        try {
-            if (source.width <= maxLength && source.height <= maxLength) return source
-            val aspectRatio = source.width.toDouble() / source.height.toDouble()
-            val targetWidth = if (aspectRatio >= 1) maxLength else (maxLength * aspectRatio).toInt()
-            val targetHeight = if (aspectRatio < 1) maxLength else (maxLength / aspectRatio).toInt()
-            return Bitmap.createScaledBitmap(source, targetWidth, targetHeight, true)
-        } catch (e: Exception) {
-            return source
-        }
+        if (source.width <= maxLength && source.height <= maxLength) return source
+        val aspectRatio = source.width.toDouble() / source.height.toDouble()
+        val targetWidth = if (aspectRatio >= 1) maxLength else (maxLength * aspectRatio).toInt()
+        val targetHeight = if (aspectRatio < 1) maxLength else (maxLength / aspectRatio).toInt()
+        return Bitmap.createScaledBitmap(source, targetWidth, targetHeight, true)
     }
 
     fun saveToGallery(context: Context, bitmap: Bitmap): Boolean {
         try {
+            if (android.os.Build.VERSION.SDK_INT <= android.os.Build.VERSION_CODES.P) {
+                if (androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.WRITE_EXTERNAL_STORAGE) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                    android.util.Log.e(TAG, "WRITE_EXTERNAL_STORAGE permission not granted")
+                    return false
+                }
+            }
+
             val filename = "CircleSelection_${System.currentTimeMillis()}.png"
             val contentValues = android.content.ContentValues().apply {
                 put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, filename)
@@ -98,7 +102,7 @@ object ImageUtils {
             
             return true
         } catch (e: Exception) {
-            android.util.Log.e("ImageUtils", "Failed to save to gallery", e)
+            android.util.Log.e(TAG, "Failed to save to gallery", e)
             return false
         }
     }

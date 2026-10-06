@@ -305,7 +305,7 @@ fun SetupScreen(onSettingsClick: () -> Unit, onOcrSettingsClick: () -> Unit) {
                 Card(
                     onClick = {
                         val intent = Intent(Settings.ACTION_VOICE_INPUT_SETTINGS)
-                        context.startActivity(intent)
+                        try { context.startActivity(intent) } catch (e: Exception) { android.util.Log.e("MainActivity", "Failed to start activity", e) }
                     },
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.primaryContainer
@@ -416,7 +416,7 @@ fun SetupScreen(onSettingsClick: () -> Unit, onOcrSettingsClick: () -> Unit) {
                     .clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
                     .clickable {
                         val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/aks-labs"))
-                        context.startActivity(intent)
+                        try { context.startActivity(intent) } catch (e: Exception) { android.util.Log.e("MainActivity", "Failed to start activity", e) }
                     }
                     .padding(8.dp),
                 contentAlignment = Alignment.Center
@@ -460,7 +460,7 @@ fun SetupScreen(onSettingsClick: () -> Unit, onOcrSettingsClick: () -> Unit) {
             onDonateOptionSelected = { url ->
                 try {
                     val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                    context.startActivity(intent)
+                    try { context.startActivity(intent) } catch (e: Exception) { android.util.Log.e("MainActivity", "Failed to start activity", e) }
                 } catch (e: Exception) {
                     android.widget.Toast.makeText(context, context.getString(R.string.toast_could_not_open_link), android.widget.Toast.LENGTH_SHORT).show()
                 }
@@ -475,7 +475,7 @@ fun SetupScreen(onSettingsClick: () -> Unit, onOcrSettingsClick: () -> Unit) {
                 showAccessibilityDisclosure = false
                 try {
                     val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
-                    context.startActivity(intent)
+                    try { context.startActivity(intent) } catch (e: Exception) { android.util.Log.e("MainActivity", "Failed to start activity", e) }
                 } catch (e: Exception) {
                     android.widget.Toast.makeText(context, context.getString(R.string.toast_accessibility_settings_error), android.widget.Toast.LENGTH_LONG).show()
                 }
@@ -536,7 +536,7 @@ fun SocialLinksRow(
         IconButton(
             onClick = {
                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/aks-labs"))
-                context.startActivity(intent)
+                try { context.startActivity(intent) } catch (e: Exception) { android.util.Log.e("MainActivity", "Failed to start activity", e) }
             }, 
             colors = IconButtonDefaults.filledTonalIconButtonColors(),
             modifier = Modifier.padding(horizontal = 8.dp)
@@ -565,7 +565,7 @@ fun SocialLinksRow(
         IconButton(
             onClick = {
                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/akslabs"))
-                context.startActivity(intent)
+                try { context.startActivity(intent) } catch (e: Exception) { android.util.Log.e("MainActivity", "Failed to start activity", e) }
             }, 
             colors = IconButtonDefaults.filledTonalIconButtonColors(),
             modifier = Modifier.padding(horizontal = 8.dp)
@@ -785,4 +785,5 @@ fun BubbleSwitch(context: android.content.Context) {
         )
     )
 }
+
 
