@@ -85,6 +85,20 @@ import kotlin.coroutines.suspendCoroutine
 private fun stickerCornerRadius(width: Int, height: Int, density: Float): Float =
     maxOf(16f * density, minOf(width, height) * 0.127f)
 
+// --- Hardware button trigger prefs (all in app_prefs, default off) ---
+private const val KEY_TRIGGER_DOUBLE_VOL_UP = "trigger_double_vol_up"
+private const val KEY_TRIGGER_DOUBLE_VOL_DOWN = "trigger_double_vol_down"
+private const val KEY_TRIGGER_DOUBLE_POWER = "trigger_double_power"
+private const val KEY_TRIGGER_POWER_VOL_UP = "trigger_power_vol_up"
+private const val KEY_TRIGGER_POWER_VOL_DOWN = "trigger_power_vol_down"
+private const val KEY_TRIGGER_VOL_UP_DOWN = "trigger_vol_up_down"
+
+// Two presses of a single button within this window count as a double-tap
+private const val KEY_DOUBLE_TAP_MS = 350L
+// After a trigger fires, ignore presses for this long so one gesture can't
+// fire twice (e.g. the second tap of a double-tap counting again later)
+private const val KEY_TRIGGER_COOLDOWN_MS = 900L
+
 class CircleToSearchAccessibilityService : AccessibilityService() {
 
     private var windowManager: WindowManager? = null
@@ -124,7 +138,9 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         info.flags = info.flags or 
             android.accessibilityservice.AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS or
             android.accessibilityservice.AccessibilityServiceInfo.FLAG_REQUEST_ENHANCED_WEB_ACCESSIBILITY or
-            android.accessibilityservice.AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS
+            android.accessibilityservice.AccessibilityServiceInfo.FLAG_INCLUDE_NOT_IMPORTANT_VIEWS or
+            // Route volume/power keys through onKeyEvent so hardware triggers work
+            android.accessibilityservice.AccessibilityServiceInfo.FLAG_REQUEST_FILTER_KEY_EVENTS
         serviceInfo = info
         
         prefs.registerOnSharedPreferenceChangeListener(prefsListener)
@@ -1482,6 +1498,90 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
     }
 
     override fun onInterrupt() {}
+
+    // --- Hardware button triggers ---
+    // With FLAG_REQUEST_FILTER_KEY_EVENTS every volume/power press flows through
+    // onKeyEvent. We NEVER consume (always return false), so volume still adjusts
+    // and power still sleeps — presses are only observed to launch the overlay.
+    private var lastVolUpDown = 0L
+    private var lastVolDownDown = 0L
+    private var lastPowerDown = 0L
+    private var lastTriggerFiredAt = 0L
+    private val keysCurrentlyDown = mutableSetOf<Int>()
+
+    override fun onKeyEvent(event: android.view.KeyEvent): Boolean {
+        val code = event.keyCode
+        when (event.action) {
+            android.view.KeyEvent.ACTION_DOWN -> {
+                // Long-press repeats must not count as new presses
+                if (event.repeatCount != 0) return false
+                if (code != android.view.KeyEvent.KEYCODE_VOLUME_UP &&
+                    code != android.view.KeyEvent.KEYCODE_VOLUME_DOWN &&
+                    code != android.view.KeyEvent.KEYCODE_POWER
+                ) return false
+
+                val now = android.os.SystemClock.uptimeMillis()
+                keysCurrentlyDown.add(code)
+                if (now - lastTriggerFiredAt < KEY_TRIGGER_COOLDOWN_MS) return false
+
+                var fire = false
+                when (code) {
+                    android.view.KeyEvent.KEYCODE_VOLUME_UP -> {
+                        if (prefs.getBoolean(KEY_TRIGGER_DOUBLE_VOL_UP, false) &&
+                            now - lastVolUpDown <= KEY_DOUBLE_TAP_MS
+                        ) fire = true
+                        lastVolUpDown = now
+                        if (!fire && prefs.getBoolean(KEY_TRIGGER_POWER_VOL_UP, false) &&
+                            android.view.KeyEvent.KEYCODE_POWER in keysCurrentlyDown
+                        ) fire = true
+                        if (!fire && prefs.getBoolean(KEY_TRIGGER_VOL_UP_DOWN, false) &&
+                            android.view.KeyEvent.KEYCODE_VOLUME_DOWN in keysCurrentlyDown
+                        ) fire = true
+                    }
+                    android.view.KeyEvent.KEYCODE_VOLUME_DOWN -> {
+                        if (prefs.getBoolean(KEY_TRIGGER_DOUBLE_VOL_DOWN, false) &&
+                            now - lastVolDownDown <= KEY_DOUBLE_TAP_MS
+                        ) fire = true
+                        lastVolDownDown = now
+                        if (!fire && prefs.getBoolean(KEY_TRIGGER_POWER_VOL_DOWN, false) &&
+                            android.view.KeyEvent.KEYCODE_POWER in keysCurrentlyDown
+                        ) fire = true
+                        if (!fire && prefs.getBoolean(KEY_TRIGGER_VOL_UP_DOWN, false) &&
+                            android.view.KeyEvent.KEYCODE_VOLUME_UP in keysCurrentlyDown
+                        ) fire = true
+                    }
+                    android.view.KeyEvent.KEYCODE_POWER -> {
+                        if (prefs.getBoolean(KEY_TRIGGER_DOUBLE_POWER, false) &&
+                            now - lastPowerDown <= KEY_DOUBLE_TAP_MS
+                        ) fire = true
+                        lastPowerDown = now
+                        if (!fire && prefs.getBoolean(KEY_TRIGGER_POWER_VOL_UP, false) &&
+                            android.view.KeyEvent.KEYCODE_VOLUME_UP in keysCurrentlyDown
+                        ) fire = true
+                        if (!fire && prefs.getBoolean(KEY_TRIGGER_POWER_VOL_DOWN, false) &&
+                            android.view.KeyEvent.KEYCODE_VOLUME_DOWN in keysCurrentlyDown
+                        ) fire = true
+                    }
+                }
+                if (fire) fireHardwareTrigger()
+            }
+            android.view.KeyEvent.ACTION_UP -> {
+                keysCurrentlyDown.remove(code)
+            }
+        }
+        // Never consume: system keeps full normal button behavior
+        return false
+    }
+
+    private fun fireHardwareTrigger() {
+        lastTriggerFiredAt = android.os.SystemClock.uptimeMillis()
+        // Reset double-tap state so this gesture can't fire a second time
+        lastVolUpDown = 0L
+        lastVolDownDown = 0L
+        lastPowerDown = 0L
+        android.util.Log.d("CircleToSearch", "Hardware button trigger fired")
+        performCapture(null)
+    }
 
     /**
      * Translates the screenshot captured when Circle to Search launched using the

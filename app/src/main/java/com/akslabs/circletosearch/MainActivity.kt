@@ -43,6 +43,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -123,13 +124,40 @@ fun SetupScreen(onSettingsClick: () -> Unit) {
     var isAccessibilityEnabled by remember { mutableStateOf(isAccessibilityServiceEnabled(context)) }
     var isDefaultAssistant by remember { mutableStateOf(isDefaultAssistant(context)) }
     var showAccessibilityDisclosure by remember { mutableStateOf(false) }
-    
+
+    // Summary of enabled triggers for the home card (refreshed on resume)
+    var triggerSummary by remember { mutableStateOf("") }
+    fun refreshTriggerSummary() {
+        val names = mutableListOf<String>()
+        val overlayConfig = runCatching {
+            com.akslabs.circletosearch.data.OverlayConfigurationManager(context).getConfig()
+        }.getOrNull()
+        if (overlayConfig?.isEnabled == true) names.add(context.getString(R.string.trigger_name_statusbar))
+        if (prefs.getBoolean("bubble_enabled", false)) names.add(context.getString(R.string.trigger_name_bubble))
+        if (prefs.getBoolean("trigger_double_vol_up", false)) names.add(context.getString(R.string.trigger_double_vol_up_title))
+        if (prefs.getBoolean("trigger_double_vol_down", false)) names.add(context.getString(R.string.trigger_double_vol_down_title))
+        if (prefs.getBoolean("trigger_double_power", false)) names.add(context.getString(R.string.trigger_double_power_title))
+        if (prefs.getBoolean("trigger_power_vol_up", false)) names.add(context.getString(R.string.trigger_power_vol_up_title))
+        if (prefs.getBoolean("trigger_power_vol_down", false)) names.add(context.getString(R.string.trigger_power_vol_down_title))
+        if (prefs.getBoolean("trigger_vol_up_down", false)) names.add(context.getString(R.string.trigger_vol_up_down_title))
+        if (isDefaultAssistant(context)) names.add(context.getString(R.string.trigger_name_assistant))
+        val shown = names.take(3)
+        val hidden = names.size - shown.size
+        triggerSummary = when {
+            names.isEmpty() -> context.getString(R.string.triggers_card_subtitle_none)
+            hidden > 0 -> shown.joinToString(" \u00B7 ") + " \u00B7 " + context.getString(R.string.triggers_more, hidden)
+            else -> shown.joinToString(" \u00B7 ")
+        }
+    }
+    LaunchedEffect(Unit) { refreshTriggerSummary() }
+
     // Check permissions on Resume
     DisposableEffect(lifecycleOwner) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
             if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
                 isAccessibilityEnabled = isAccessibilityServiceEnabled(context)
                 isDefaultAssistant = isDefaultAssistant(context)
+                refreshTriggerSummary()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -163,7 +191,56 @@ fun SetupScreen(onSettingsClick: () -> Unit) {
     }
 
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.background
+        containerColor = MaterialTheme.colorScheme.background,
+        topBar = {
+            // App icon + title on the left, settings gear on the right
+            TopAppBar(
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        val launcherIcon = remember {
+                            val drawable = context.getDrawable(R.mipmap.ic_launcher)
+                            requireNotNull(drawable) { "ic_launcher drawable missing" }
+                            val w = drawable.intrinsicWidth.coerceAtLeast(1)
+                            val h = drawable.intrinsicHeight.coerceAtLeast(1)
+                            val bitmap = android.graphics.Bitmap.createBitmap(
+                                w, h, android.graphics.Bitmap.Config.ARGB_8888
+                            )
+                            drawable.setBounds(0, 0, w, h)
+                            drawable.draw(android.graphics.Canvas(bitmap))
+                            bitmap.asImageBitmap()
+                        }
+                        Icon(
+                            bitmap = launcherIcon,
+                            contentDescription = stringResource(R.string.cd_app_icon),
+                            tint = Color.Unspecified,
+                            modifier = Modifier
+                                .size(34.dp)
+                                .clip(androidx.compose.foundation.shape.RoundedCornerShape(9.dp))
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = stringResource(R.string.header_title),
+                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                    }
+                },
+                actions = {
+                    IconButton(onClick = onSettingsClick) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = stringResource(R.string.cd_overlay_settings),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background,
+                    titleContentColor = MaterialTheme.colorScheme.onBackground,
+                    actionIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            )
+        }
     ) { padding ->
         Column(
             modifier = Modifier
@@ -173,58 +250,9 @@ fun SetupScreen(onSettingsClick: () -> Unit) {
                 .padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(14.dp)
-            ) {
-                Surface(
-                    shape = M3ExpressiveShapes.Clover4,
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    modifier = Modifier.size(56.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                            modifier = Modifier.size(28.dp)
-                        )
-                    }
-                }
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = stringResource(R.string.header_title),
-                        style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                    Text(
-                        text = stringResource(R.string.subtitle_main),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Surface(
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f),
-                    modifier = Modifier
-                        .size(48.dp)
-                        .m3ExpressivePress(onClick = onSettingsClick)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            Icons.Default.Settings,
-                            contentDescription = stringResource(R.string.cd_overlay_settings),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(22.dp)
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(28.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             Surface(
                 shape = M3ExpressiveShapes.SlantedPill,
@@ -436,70 +464,24 @@ fun SetupScreen(onSettingsClick: () -> Unit) {
                 modifier = Modifier.align(Alignment.Start)
             ) {
                 Text(
-                    text = stringResource(R.string.section_customization),
+                    text = stringResource(R.string.label_triggers),
                     style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
                     color = MaterialTheme.colorScheme.secondary,
                     modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
                 )
             }
             Spacer(modifier = Modifier.height(10.dp))
-            BubbleSwitch(context)
 
-            val uiPreferences = remember { com.akslabs.circletosearch.utils.UIPreferences(context) }
-
+            // Quick glance at what's configured — tap to manage all triggers
             Card(
+                onClick = onSettingsClick,
                 shape = M3ExpressiveShapes.AsymmetricCard,
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
                 ),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 16.dp)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                UnifiedSearchMethodSelector(
-                    uiPreferences = uiPreferences
-                )
-                
-                Spacer(modifier = Modifier.height(12.dp))
-                
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = androidx.compose.material.icons.Icons.Default.Info,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.secondary,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = stringResource(R.string.info_lens_needs_google),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Card(
-                onClick = {
-                    try {
-                        context.startActivity(Intent(context, TranslatorMainActivity::class.java))
-                    } catch (e: Exception) {
-                        android.widget.Toast.makeText(context, "Could not launch translator: ${e.message}", android.widget.Toast.LENGTH_LONG).show()
-                    }
-                },
-                shape = M3ExpressiveShapes.AsymmetricCard,
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.6f)
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
                     .m3ExpressivePress()
-                    .testTag("test_translator_button")
             ) {
                 Row(
                     modifier = Modifier.padding(16.dp),
@@ -507,14 +489,14 @@ fun SetupScreen(onSettingsClick: () -> Unit) {
                 ) {
                     Surface(
                         shape = M3ExpressiveShapes.Clover4,
-                        color = MaterialTheme.colorScheme.tertiary,
+                        color = MaterialTheme.colorScheme.tertiaryContainer,
                         modifier = Modifier.size(48.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
-                                Icons.Default.Translate,
+                                imageVector = Icons.Default.SettingsSuggest,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onTertiary,
+                                tint = MaterialTheme.colorScheme.onTertiaryContainer,
                                 modifier = Modifier.size(24.dp)
                             )
                         }
@@ -522,16 +504,23 @@ fun SetupScreen(onSettingsClick: () -> Unit) {
                     Spacer(modifier = Modifier.width(16.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "Offline Translator (Test)",
+                            text = stringResource(R.string.triggers_card_title),
                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "Open the translator home screen",
+                            text = triggerSummary,
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f)
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 2,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                         )
                     }
+                    Icon(
+                        Icons.Default.KeyboardArrowRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
 //            Spacer(modifier = Modifier.height(25.dp))
