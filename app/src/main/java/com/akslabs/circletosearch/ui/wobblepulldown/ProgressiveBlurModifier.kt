@@ -1,4 +1,4 @@
-package com.sameerasw.essentials.wobblepulldown
+package com.akslabs.circletosearch.ui.wobblepulldown
 
 import android.graphics.RenderEffect
 import android.graphics.RuntimeShader

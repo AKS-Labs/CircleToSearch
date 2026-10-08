@@ -1,6 +1,6 @@
-package com.sameerasw.essentials.wobblepulldown
+package com.akslabs.circletosearch.ui.wobblepulldown
 
-import com.sameerasw.essentials.R
+import com.akslabs.circletosearch.R
 
 object WobbleDeviceImageMapper {
     fun getAndroidLogo(deviceInfo: WobbleDeviceInfo): Int {

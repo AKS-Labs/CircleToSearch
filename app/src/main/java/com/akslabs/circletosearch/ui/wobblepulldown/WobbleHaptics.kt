@@ -1,4 +1,4 @@
-package com.sameerasw.essentials.wobblepulldown
+package com.akslabs.circletosearch.ui.wobblepulldown
 
 import android.os.Build
 import android.view.HapticFeedbackConstants

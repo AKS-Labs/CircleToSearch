@@ -1,12 +1,12 @@
-package com.sameerasw.essentials.wobblepulldown
+package com.akslabs.circletosearch.ui.wobblepulldown
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import com.sameerasw.essentials.R
-import com.sameerasw.essentials.ui.theme.EssentialsTheme
+import com.akslabs.circletosearch.R
+import com.akslabs.circletosearch.ui.theme.CircleToSearchTheme
 
 class WobbleDeviceInfoActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -22,7 +22,7 @@ class WobbleDeviceInfoActivity : ComponentActivity() {
         })
 
         setContent {
-            EssentialsTheme {
+            CircleToSearchTheme {
                 WobbleDeviceInfoScreen(
                     onBackClick = {
                         finish()

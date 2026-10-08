@@ -388,6 +388,8 @@
     <string name="about_source_code">Source code</string>
     <string name="about_source_subtitle">github.com/aks-labs</string>
     <string name="about_donate_subtitle">Support ongoing development</string>
+    <string name="settings_wobble_preview">Wobble home (preview)</string>
+    <string name="settings_wobble_preview_subtitle">Test the pull-down wobble gesture</string>
     <string name="trigger_name_statusbar">Status bar</string>
     <string name="trigger_name_bubble">Bubble</string>
     <string name="trigger_name_assistant">Home button</string>

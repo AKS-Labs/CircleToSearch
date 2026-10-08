@@ -52,6 +52,18 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".ui.wobblepulldown.WobbleHomeDemoActivity"
+            android:exported="false"
+            android:label="Wobble Home"
+            android:theme="@style/Theme.CircleToSearch" />
+
+        <activity
+            android:name=".ui.wobblepulldown.WobbleDeviceInfoActivity"
+            android:exported="false"
+            android:label="Device Info"
+            android:theme="@style/Theme.CircleToSearch" />
+
         <service
             android:name=".CircleToSearchAccessibilityService"
             android:exported="true"

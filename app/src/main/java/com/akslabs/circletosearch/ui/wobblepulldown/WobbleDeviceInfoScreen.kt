@@ -1,4 +1,4 @@
-package com.sameerasw.essentials.wobblepulldown
+package com.akslabs.circletosearch.ui.wobblepulldown
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.EaseOut
@@ -60,13 +60,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.sameerasw.essentials.R
+import com.akslabs.circletosearch.R
 import kotlinx.coroutines.launch
 
 @Composable
@@ -296,6 +297,7 @@ fun WobbleDeviceInfoScreen(
     }
 }
 
+@OptIn(ExperimentalTextApi::class)
 @Composable
 private fun WobbleDeviceHeroCard(
     deviceInfo: WobbleDeviceInfo,
