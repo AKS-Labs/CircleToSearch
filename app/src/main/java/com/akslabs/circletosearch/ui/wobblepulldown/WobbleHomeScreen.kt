@@ -8,13 +8,13 @@ import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -26,19 +26,17 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
-import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -53,20 +51,28 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.akslabs.circletosearch.R
+import com.akslabs.circletosearch.isAccessibilityServiceEnabled
+import com.akslabs.circletosearch.isDefaultAssistant
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalTextApi::class)
 @Composable
 fun WobbleHomeScreen(
     onOpenDeviceInfo: () -> Unit,
     modifier: Modifier = Modifier,
+    wobbleEvent: Int = 0,
     contentPadding: PaddingValues = PaddingValues(0.dp),
 ) {
     val context = LocalContext.current
@@ -106,6 +112,32 @@ fun WobbleHomeScreen(
         }
     }
 
+    var permissionGranted by remember {
+        mutableStateOf(isAccessibilityServiceEnabled(context) || isDefaultAssistant(context))
+    }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                permissionGranted = isAccessibilityServiceEnabled(context) ||
+                    isDefaultAssistant(context)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    LaunchedEffect(wobbleEvent) {
+        if (wobbleEvent > 0) {
+            WobbleHaptics.performUIHaptic(view)
+            rippleTrigger++
+        }
+    }
+
+    val density = LocalDensity.current
+    val topBlurHeightPx = with(density) { contentPadding.calculateTopPadding().toPx() * 1.5f }
+    val bottomBlurHeightPx = with(density) { 120.dp.toPx() }
+
     PullToRefreshBox(
         isRefreshing = isRefreshing,
         onRefresh = { isRefreshing = true },
@@ -113,6 +145,12 @@ fun WobbleHomeScreen(
         indicator = { },
         modifier = modifier
             .fillMaxSize()
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .progressiveBlur(
+                blurRadius = 40f,
+                height = topBlurHeightPx,
+                direction = BlurDirection.TOP,
+            )
             .liquidRipple(
                 trigger = rippleTrigger,
                 origin = textCenterOffset,
@@ -198,11 +236,20 @@ fun WobbleHomeScreen(
             }
         }
 
-        var searchQuery by remember { mutableStateOf("") }
-
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = contentPadding.calculateBottomPadding() + 64.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .progressiveBlur(
+                    blurRadius = 40f,
+                    height = bottomBlurHeightPx,
+                    direction = BlurDirection.BOTTOM,
+                ),
+            contentPadding = PaddingValues(
+                start = 16.dp,
+                end = 16.dp,
+                bottom = contentPadding.calculateBottomPadding() + 120.dp,
+            ),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             item {
                 OutlinedCard(
@@ -212,7 +259,6 @@ fun WobbleHomeScreen(
                     },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp)
                         .height(64.dp + statusBarPadding + cardExpansion),
                     shape = RoundedCornerShape(
                         topStart = 0.dp,
@@ -253,7 +299,11 @@ fun WobbleHomeScreen(
                                     }
                                 }
                                 Text(
-                                    text = deviceInfo.deviceName,
+                                    text = if (permissionGranted) {
+                                        stringResource(R.string.home_running)
+                                    } else {
+                                        deviceInfo.deviceName
+                                    },
                                     style = MaterialTheme.typography.titleMedium.copy(
                                         fontFamily = fontFamily,
                                     ),
@@ -278,34 +328,6 @@ fun WobbleHomeScreen(
                 }
             }
 
-            item {
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
-                    placeholder = { Text("Search settings & features...") },
-                    maxLines = 1,
-                    textStyle = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 16.dp)
-                        .defaultMinSize(minHeight = 56.dp),
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Rounded.Search,
-                            contentDescription = "Search",
-                            modifier = Modifier.padding(start = 12.dp),
-                        )
-                    },
-                    shape = RoundedCornerShape(28.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                        focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                    ),
-                )
-            }
-
             val categories = listOf(
                 "Display & Ambient",
                 "Sound & Vibration",
@@ -317,28 +339,28 @@ fun WobbleHomeScreen(
             items(categories.size) { index ->
                 val category = categories[index]
                 Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Text(
                         text = category,
-                        style = MaterialTheme.typography.titleSmall,
+                        style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(start = 8.dp, bottom = 8.dp),
                     )
                     Surface(
-                        shape = RoundedCornerShape(20.dp),
+                        shape = RoundedCornerShape(24.dp),
                         color = MaterialTheme.colorScheme.surfaceContainerLow,
-                        tonalElevation = 1.dp,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Column {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
                             repeat(3) { itemIdx ->
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                                        .padding(vertical = 4.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                 ) {

@@ -1,6 +1,6 @@
 # Wobble Pull-Down & Device Info Animation Package
 
-This package contains all necessary files and composables to implement the full-screen wobble liquid ripple pull-down gesture on a home screen and transition seamlessly into a Device Info screen with elastic overscroll scaling.
+This package contains all necessary files and composables to implement the full-screen wobble liquid ripple pull-down gesture on a home screen and transition seamlessly into an App Info screen with elastic overscroll scaling.
 
 ## 📦 Package Contents
 
@@ -10,8 +10,8 @@ This package contains all necessary files and composables to implement the full-
 4. **`WobbleDeviceInfo.kt`**: `WobbleDeviceInfo` data model & `WobbleDeviceUtils` helper to fetch hardware (RAM, Storage) and system info (Android Version, SDK, Security Patch, Model, etc.).
 5. **`WobbleDeviceImageMapper.kt`**: Utility mapping Android OS versions/codenames to Android logo drawables.
 6. **`WobbleHomeScreen.kt`**: Home screen UI containing the expandable device hero card, search bar placeholder, settings list, and `PullToRefreshBox` with `liquidRipple` wobble animation.
-7. **`WobbleDeviceInfoScreen.kt`**: Device Info screen UI featuring elastic overscroll logo scaling, hardware spec cards, and progressive blur.
-8. **`WobbleDeviceInfoActivity.kt`**: Activity hosting `WobbleDeviceInfoScreen` with slide-in/slide-out activity transition animations.
+7. **`WobbleAppInfoScreen.kt`**: Circle to Search app info screen — app icon/hero card, permission status rows (grant/revoke state), active launch-trigger statuses, package/build details, with elastic overscroll scaling and progressive blur.
+8. **`WobbleDeviceInfoActivity.kt`**: Activity hosting `WobbleAppInfoScreen` (and `WobbleSetupWizard` in setup mode) with slide-in/slide-out activity transition animations.
 
 ---
 

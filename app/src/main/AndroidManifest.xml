@@ -61,8 +61,8 @@
         <activity
             android:name=".ui.wobblepulldown.WobbleDeviceInfoActivity"
             android:exported="false"
-            android:label="Device Info"
-            android:theme="@style/Theme.CircleToSearch" />
+            android:label="App Info"
+            android:theme="@style/Theme.CircleToSearch.Transparent" />
 
         <service
             android:name=".CircleToSearchAccessibilityService"
