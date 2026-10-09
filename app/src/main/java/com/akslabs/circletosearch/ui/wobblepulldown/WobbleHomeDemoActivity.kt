@@ -20,8 +20,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.app.ActivityOptionsCompat
 import com.akslabs.circletosearch.R
-import com.akslabs.circletosearch.isAccessibilityServiceEnabled
-import com.akslabs.circletosearch.isDefaultAssistant
 import com.akslabs.circletosearch.ui.theme.CircleToSearchTheme
 
 class WobbleHomeDemoActivity : ComponentActivity() {
@@ -52,7 +50,7 @@ private fun WobbleDemoContent(onExit: () -> Unit) {
     }
 
     LaunchedEffect(Unit) {
-        val granted = isAccessibilityServiceEnabled(context) || isDefaultAssistant(context)
+        val granted = isA11yGranted(context) || isAssistantGranted(context)
         if (!granted) {
             val intent = Intent(context, WobbleDeviceInfoActivity::class.java)
                 .putExtra(WobbleDeviceInfoActivity.EXTRA_SETUP_WIZARD, true)

@@ -97,12 +97,13 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.akslabs.circletosearch.R
 import com.akslabs.circletosearch.data.OverlayConfigurationManager
-import com.akslabs.circletosearch.isAccessibilityServiceEnabled
-import com.akslabs.circletosearch.isDefaultAssistant
 import com.akslabs.circletosearch.ui.components.AccessibilityDisclosureDialog
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 private const val GITHUB_URL = "https://github.com/aks-labs"
+private const val MAX_PULL_PX = 160f
+private const val PULL_HAPTIC_PX = 120f
 
 private enum class TriggerStatus { ACTIVE, NEEDS_A11Y, OFF }
 
@@ -140,12 +141,12 @@ private fun loadAppInfo(context: Context): AppInfoData {
 }
 
 private fun loadLaunchMethods(context: Context): List<LaunchMethod> {
-    val a11y = isAccessibilityServiceEnabled(context)
+    val a11y = isA11yGranted(context)
     val overlayOn = OverlayConfigurationManager(context).getConfig().isEnabled
     val appPrefs = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
     val bubbleOn = appPrefs.getBoolean("bubble_enabled", false)
     val hwCount = HW_TRIGGER_KEYS.count { appPrefs.getBoolean(it, false) }
-    val assistant = isDefaultAssistant(context)
+    val assistant = isAssistantGranted(context)
 
     fun status(configured: Boolean): TriggerStatus = when {
         !configured -> TriggerStatus.OFF
@@ -191,22 +192,33 @@ fun WobbleAppInfoScreen(
     val scrollState = rememberScrollState()
     val overscrollOffset = remember { Animatable(0f) }
 
-    var a11yGranted by remember { mutableStateOf(isAccessibilityServiceEnabled(context)) }
-    var assistantGranted by remember { mutableStateOf(isDefaultAssistant(context)) }
+    var a11yGranted by remember { mutableStateOf(isA11yGranted(context)) }
+    var assistantGranted by remember { mutableStateOf(isAssistantGranted(context)) }
     var launchMethods by remember { mutableStateOf(loadLaunchMethods(context)) }
     var showDisclosure by remember { mutableStateOf(false) }
+
+    val refreshPermissions = {
+        a11yGranted = isA11yGranted(context)
+        assistantGranted = isAssistantGranted(context)
+        launchMethods = loadLaunchMethods(context)
+    }
 
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                a11yGranted = isAccessibilityServiceEnabled(context)
-                assistantGranted = isDefaultAssistant(context)
-                launchMethods = loadLaunchMethods(context)
+                refreshPermissions()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            refreshPermissions()
+            delay(500)
+        }
     }
 
     if (showDisclosure) {
@@ -244,12 +256,12 @@ fun WobbleAppInfoScreen(
             override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
                 if (available.y > 0 && scrollState.value == 0) {
                     val prevValue = overscrollOffset.value
-                    if (prevValue >= 350f) return Offset.Zero
+                    if (prevValue >= MAX_PULL_PX) return Offset.Zero
 
-                    val newValue = (prevValue + available.y * 0.5f).coerceAtMost(350f)
+                    val newValue = (prevValue + available.y * 0.5f).coerceAtMost(MAX_PULL_PX)
                     scope.launch { overscrollOffset.snapTo(newValue) }
 
-                    if (prevValue < 300f && newValue >= 300f) {
+                    if (prevValue < PULL_HAPTIC_PX && newValue >= PULL_HAPTIC_PX) {
                         WobbleHaptics.performUIHaptic(view)
                     }
 
@@ -343,6 +355,7 @@ fun WobbleAppInfoScreen(
         val naturalIconY = with(density) { (heroTop + 12.dp).toPx() }
         val naturalNameX = (maxWpx - nameSize.width) / 2f
         val naturalNameY = with(density) { (heroTop + 12.dp + iconExpanded + 24.dp).toPx() }
+        val iconExpandedPx = with(density) { iconExpanded.toPx() }
         val iconCollapsedPx = with(density) { iconCollapsed.toPx() }
         val collapsedNameX = slotPos.value.x + iconCollapsedPx + with(density) { nameGap.toPx() }
         val iconScale = (with(density) { iconCollapsed.toPx() }) / (with(density) { iconExpanded.toPx() })
@@ -581,8 +594,10 @@ fun WobbleAppInfoScreen(
                         transformOrigin = TransformOrigin(0f, 0f)
                         scaleX = s * pullScale
                         scaleY = s * pullScale
-                        translationX = (slotPos.value.x - naturalIconX) * p
-                        translationY = (slotPos.value.y - naturalIconY) * p + contentOffsetState.toPx()
+                        translationX = (slotPos.value.x - naturalIconX) * p -
+                            iconExpandedPx * (pullScale - 1f) / 2f
+                        translationY = (slotPos.value.y - naturalIconY) * p + contentOffsetState.toPx() -
+                            iconExpandedPx * (pullScale - 1f) / 2f
                         alpha = contentAlphaState
                     }
 
@@ -624,8 +639,10 @@ fun WobbleAppInfoScreen(
                         transformOrigin = TransformOrigin(0f, 0f)
                         scaleX = s * pullScale
                         scaleY = s * pullScale
-                        translationX = (collapsedNameX - naturalNameX) * p
-                        translationY = (collapsedNameY - naturalNameY) * p + contentOffsetState.toPx()
+                        translationX = (collapsedNameX - naturalNameX) * p -
+                            nameSize.width * (pullScale - 1f) / 2f
+                        translationY = (collapsedNameY - naturalNameY) * p + contentOffsetState.toPx() -
+                            nameSize.height * (pullScale - 1f) / 2f
                         alpha = contentAlphaState
                     },
                 )

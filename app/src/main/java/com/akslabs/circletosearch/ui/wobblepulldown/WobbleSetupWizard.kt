@@ -28,6 +28,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,28 +45,38 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.akslabs.circletosearch.R
-import com.akslabs.circletosearch.isAccessibilityServiceEnabled
-import com.akslabs.circletosearch.isDefaultAssistant
 import com.akslabs.circletosearch.ui.components.AccessibilityDisclosureDialog
+import kotlinx.coroutines.delay
 
 @Composable
 fun WobbleSetupWizard(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val view = LocalView.current
-    var a11yGranted by remember { mutableStateOf(isAccessibilityServiceEnabled(context)) }
-    var assistantGranted by remember { mutableStateOf(isDefaultAssistant(context)) }
+    var a11yGranted by remember { mutableStateOf(isA11yGranted(context)) }
+    var assistantGranted by remember { mutableStateOf(isAssistantGranted(context)) }
     var showDisclosure by remember { mutableStateOf(false) }
+
+    val refreshPermissions = {
+        a11yGranted = isA11yGranted(context)
+        assistantGranted = isAssistantGranted(context)
+    }
 
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                a11yGranted = isAccessibilityServiceEnabled(context)
-                assistantGranted = isDefaultAssistant(context)
+                refreshPermissions()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            refreshPermissions()
+            delay(500)
+        }
     }
 
     if (showDisclosure) {

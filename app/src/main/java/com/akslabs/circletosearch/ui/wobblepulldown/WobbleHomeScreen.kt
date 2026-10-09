@@ -64,8 +64,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.akslabs.circletosearch.R
-import com.akslabs.circletosearch.isAccessibilityServiceEnabled
-import com.akslabs.circletosearch.isDefaultAssistant
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalTextApi::class)
 @Composable
@@ -113,18 +112,24 @@ fun WobbleHomeScreen(
     }
 
     var permissionGranted by remember {
-        mutableStateOf(isAccessibilityServiceEnabled(context) || isDefaultAssistant(context))
+        mutableStateOf(isA11yGranted(context) || isAssistantGranted(context))
     }
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                permissionGranted = isAccessibilityServiceEnabled(context) ||
-                    isDefaultAssistant(context)
+                permissionGranted = isA11yGranted(context) || isAssistantGranted(context)
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            permissionGranted = isA11yGranted(context) || isAssistantGranted(context)
+            delay(500)
+        }
     }
 
     LaunchedEffect(wobbleEvent) {
@@ -174,19 +179,31 @@ fun WobbleHomeScreen(
         )
 
         val containerColor by animateColorAsState(
-            targetValue = if (thresholdPassed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerLow,
+            targetValue = when {
+                thresholdPassed -> MaterialTheme.colorScheme.primary
+                permissionGranted -> MaterialTheme.colorScheme.primaryContainer
+                else -> MaterialTheme.colorScheme.surfaceContainerLow
+            },
             animationSpec = tween(durationMillis = 300),
             label = "containerColor",
         )
 
         val contentColor by animateColorAsState(
-            targetValue = if (thresholdPassed) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary,
+            targetValue = when {
+                thresholdPassed -> MaterialTheme.colorScheme.onPrimary
+                permissionGranted -> MaterialTheme.colorScheme.onPrimaryContainer
+                else -> MaterialTheme.colorScheme.primary
+            },
             animationSpec = tween(durationMillis = 300),
             label = "contentColor",
         )
 
         val borderColor by animateColorAsState(
-            targetValue = if (thresholdPassed) Color.Transparent else MaterialTheme.colorScheme.outlineVariant,
+            targetValue = if (thresholdPassed || permissionGranted) {
+                Color.Transparent
+            } else {
+                MaterialTheme.colorScheme.outlineVariant
+            },
             animationSpec = tween(durationMillis = 300),
             label = "borderColor",
         )
@@ -236,6 +253,17 @@ fun WobbleHomeScreen(
             }
         }
 
+        val heroStyle = MaterialTheme.typography.titleMedium.copy(fontFamily = fontFamily)
+        val heroColor by animateColorAsState(
+            targetValue = when {
+                thresholdPassed -> MaterialTheme.colorScheme.onPrimary
+                permissionGranted -> MaterialTheme.colorScheme.onPrimaryContainer
+                else -> MaterialTheme.colorScheme.onSurface
+            },
+            animationSpec = tween(durationMillis = 300),
+            label = "heroColor",
+        )
+
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -268,7 +296,7 @@ fun WobbleHomeScreen(
                     ),
                     colors = CardDefaults.outlinedCardColors(
                         containerColor = containerColor,
-                        contentColor = if (thresholdPassed) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                        contentColor = heroColor,
                     ),
                     border = BorderStroke(1.dp, borderColor),
                 ) {
@@ -298,15 +326,8 @@ fun WobbleHomeScreen(
                                         Spacer(modifier = Modifier.width(8.dp))
                                     }
                                 }
-                                Text(
-                                    text = if (permissionGranted) {
-                                        stringResource(R.string.home_running)
-                                    } else {
-                                        deviceInfo.deviceName
-                                    },
-                                    style = MaterialTheme.typography.titleMedium.copy(
-                                        fontFamily = fontFamily,
-                                    ),
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
                                     modifier = Modifier
                                         .onGloballyPositioned { coords ->
                                             val pos = coords.positionInRoot()
@@ -320,8 +341,26 @@ fun WobbleHomeScreen(
                                             scaleX = textScale
                                             scaleY = textScale
                                         },
-                                    color = if (thresholdPassed) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
-                                )
+                                ) {
+                                    if (permissionGranted) {
+                                        Text(
+                                            text = stringResource(R.string.home_running_title),
+                                            style = heroStyle,
+                                            color = heroColor,
+                                        )
+                                        Text(
+                                            text = stringResource(R.string.home_running_state),
+                                            style = heroStyle,
+                                            color = heroColor,
+                                        )
+                                    } else {
+                                        Text(
+                                            text = deviceInfo.deviceName,
+                                            style = heroStyle,
+                                            color = heroColor,
+                                        )
+                                    }
+                                }
                             }
                         }
                     }

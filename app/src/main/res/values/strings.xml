@@ -396,7 +396,8 @@
     <string name="wizard_assistant_title">Assistant</string>
     <string name="wizard_grant">Grant</string>
     <string name="wizard_granted">Granted</string>
-    <string name="home_running">Circle to search running</string>
+    <string name="home_running_title">Circle to search</string>
+    <string name="home_running_state">running</string>
     <string name="info_screen_title">App Info</string>
     <string name="section_permissions">PERMISSIONS</string>
     <string name="info_section_about">ABOUT</string>

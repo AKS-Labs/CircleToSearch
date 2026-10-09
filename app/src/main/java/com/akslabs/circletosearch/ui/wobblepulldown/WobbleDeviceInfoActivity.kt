@@ -7,10 +7,11 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.lifecycleScope
 import com.akslabs.circletosearch.R
-import com.akslabs.circletosearch.isAccessibilityServiceEnabled
-import com.akslabs.circletosearch.isDefaultAssistant
 import com.akslabs.circletosearch.ui.theme.CircleToSearchTheme
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 class WobbleDeviceInfoActivity : ComponentActivity() {
 
@@ -37,17 +38,18 @@ class WobbleDeviceInfoActivity : ComponentActivity() {
 
         lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onResume(owner: LifecycleOwner) {
-                if (wizardMode &&
-                    (isAccessibilityServiceEnabled(applicationContext) ||
-                            isDefaultAssistant(applicationContext))
-                ) {
-                    setResult(RESULT_OK)
-                    finish()
-                    @Suppress("DEPRECATION")
-                    overridePendingTransition(R.anim.anim_stay, R.anim.anim_slide_out_top)
-                }
+                maybeAutoDismiss()
             }
         })
+
+        if (wizardMode) {
+            lifecycleScope.launch {
+                while (true) {
+                    delay(500)
+                    maybeAutoDismiss()
+                }
+            }
+        }
 
         setContent {
             CircleToSearchTheme {
@@ -63,6 +65,22 @@ class WobbleDeviceInfoActivity : ComponentActivity() {
                     )
                 }
             }
+        }
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) maybeAutoDismiss()
+    }
+
+    private fun maybeAutoDismiss() {
+        if (wizardMode &&
+            (isA11yGranted(applicationContext) || isAssistantGranted(applicationContext))
+        ) {
+            setResult(RESULT_OK)
+            finish()
+            @Suppress("DEPRECATION")
+            overridePendingTransition(R.anim.anim_stay, R.anim.anim_slide_out_top)
         }
     }
 
