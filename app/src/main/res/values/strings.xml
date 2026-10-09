@@ -398,6 +398,16 @@
     <string name="wizard_granted">Granted</string>
     <string name="home_running_title">Circle to search</string>
     <string name="home_running_state">running</string>
+    <string name="home_section_more">More</string>
+    <string name="home_bottom_edge_title">Bottom edge long-press</string>
+    <string name="home_bottom_edge_subtitle">Press and hold near the bottom edge of any screen</string>
+    <string name="home_assistant_setup_subtitle">Set as default assistant to use the home button and swipes</string>
+    <string name="home_assistant_ready_subtitle">Home button and bottom-edge gestures work automatically</string>
+    <string name="home_ready">Ready</string>
+    <string name="home_set_up">Set up</string>
+    <string name="home_hw_title">Hardware buttons</string>
+    <string name="home_hw_count">%1$d on</string>
+    <string name="home_hw_none">None on</string>
     <string name="info_screen_title">App Info</string>
     <string name="section_permissions">PERMISSIONS</string>
     <string name="info_section_about">ABOUT</string>

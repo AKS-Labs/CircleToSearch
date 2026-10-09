@@ -71,6 +71,15 @@ private fun SettingsPage.order(): Int = when (this) {
     SettingsPage.About -> 5
 }
 
+private fun settingsPageFromName(name: String?): SettingsPage? = when (name) {
+    "triggers" -> SettingsPage.Triggers
+    "zones" -> SettingsPage.Zones
+    "search" -> SettingsPage.Search
+    "general" -> SettingsPage.General
+    "about" -> SettingsPage.About
+    else -> null
+}
+
 @Stable
 private class OverlaySettingsState(context: Context) {
     private val configManager = OverlayConfigurationManager(context)
@@ -116,11 +125,19 @@ private class OverlaySettingsState(context: Context) {
 
 @Composable
 fun OverlaySettingsScreen(
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    initialPage: String? = null
 ) {
     val context = LocalContext.current
     val state = remember { OverlaySettingsState(context) }
-    val backStack = remember { mutableStateListOf<SettingsPage>(SettingsPage.Root) }
+    val backStack = remember {
+        val startPage = settingsPageFromName(initialPage)
+        if (startPage != null) {
+            mutableStateListOf<SettingsPage>(SettingsPage.Root, startPage)
+        } else {
+            mutableStateListOf<SettingsPage>(SettingsPage.Root)
+        }
+    }
     val pop: () -> Unit = { backStack.removeAt(backStack.lastIndex) }
 
     androidx.activity.compose.BackHandler {

@@ -2,6 +2,8 @@ package com.akslabs.circletosearch.ui.wobblepulldown
 
 import android.content.Intent
 import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -41,7 +43,6 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.akslabs.circletosearch.R
@@ -61,12 +62,16 @@ fun WobbleSetupWizard(modifier: Modifier = Modifier) {
         assistantGranted = isAssistantGranted(context)
     }
 
+    val settingsLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) {
+        refreshPermissions()
+    }
+
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                refreshPermissions()
-            }
+        val observer = LifecycleEventObserver { _, _ ->
+            refreshPermissions()
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
@@ -84,7 +89,7 @@ fun WobbleSetupWizard(modifier: Modifier = Modifier) {
             onAccept = {
                 showDisclosure = false
                 runCatching {
-                    context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                    settingsLauncher.launch(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
                 }
             },
             onDismiss = { showDisclosure = false },
@@ -140,7 +145,7 @@ fun WobbleSetupWizard(modifier: Modifier = Modifier) {
                     onClick = {
                         WobbleHaptics.performUIHaptic(view)
                         runCatching {
-                            context.startActivity(Intent(Settings.ACTION_VOICE_INPUT_SETTINGS))
+                            settingsLauncher.launch(Intent(Settings.ACTION_VOICE_INPUT_SETTINGS))
                         }
                     },
                 )

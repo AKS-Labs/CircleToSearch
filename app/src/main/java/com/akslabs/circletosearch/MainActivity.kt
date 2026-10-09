@@ -69,8 +69,13 @@ import com.akslabs.circletosearch.ui.components.UnifiedSearchMethodSelector
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
+
+    private var pendingSettingsPage by mutableStateOf<String?>(null)
+    private var navTick by mutableStateOf(0)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        pendingSettingsPage = intent.getStringExtra(EXTRA_SETTINGS_PAGE)
         Toast.makeText(this, getString(R.string.toast_getting_started), Toast.LENGTH_LONG).show()
         setContent {
             CircleToSearchTheme {
@@ -93,12 +98,30 @@ class MainActivity : ComponentActivity() {
                             }
                         )
                     } else {
-                        var currentScreen by remember { mutableStateOf("home") }
+                        var currentScreen by remember {
+                            mutableStateOf(if (pendingSettingsPage != null) "settings" else "home")
+                        }
+                        LaunchedEffect(navTick) {
+                            if (navTick > 0 && pendingSettingsPage != null) {
+                                currentScreen = "settings"
+                            }
+                        }
                         androidx.compose.animation.Crossfade(targetState = currentScreen) { screen ->
                             when (screen) {
-                                "settings" -> com.akslabs.circletosearch.ui.OverlaySettingsScreen(onBack = { currentScreen = "home" })
+                                "settings" -> key(navTick) {
+                                    com.akslabs.circletosearch.ui.OverlaySettingsScreen(
+                                        onBack = {
+                                            pendingSettingsPage = null
+                                            currentScreen = "home"
+                                        },
+                                        initialPage = pendingSettingsPage,
+                                    )
+                                }
                                 else -> SetupScreen(
-                                    onSettingsClick = { currentScreen = "settings" }
+                                    onSettingsClick = {
+                                        pendingSettingsPage = null
+                                        currentScreen = "settings"
+                                    }
                                 )
                             }
                         }
@@ -106,6 +129,17 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        pendingSettingsPage = intent.getStringExtra(EXTRA_SETTINGS_PAGE)
+        navTick = navTick + 1
+    }
+
+    companion object {
+        const val EXTRA_SETTINGS_PAGE = "settings_page"
     }
 }
 

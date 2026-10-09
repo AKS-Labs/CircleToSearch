@@ -6,6 +6,8 @@ import android.content.pm.ApplicationInfo
 import android.net.Uri
 import android.provider.Settings
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.EaseOut
@@ -203,12 +205,16 @@ fun WobbleAppInfoScreen(
         launchMethods = loadLaunchMethods(context)
     }
 
+    val settingsLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) {
+        refreshPermissions()
+    }
+
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                refreshPermissions()
-            }
+        val observer = LifecycleEventObserver { _, _ ->
+            refreshPermissions()
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
@@ -226,7 +232,7 @@ fun WobbleAppInfoScreen(
             onAccept = {
                 showDisclosure = false
                 runCatching {
-                    context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                    settingsLauncher.launch(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
                 }.onFailure {
                     Toast.makeText(
                         context,
@@ -426,7 +432,7 @@ fun WobbleAppInfoScreen(
                 onClick = {
                     WobbleHaptics.performUIHaptic(view)
                     runCatching {
-                        context.startActivity(Intent(Settings.ACTION_VOICE_INPUT_SETTINGS))
+                        settingsLauncher.launch(Intent(Settings.ACTION_VOICE_INPUT_SETTINGS))
                     }
                 },
             )
