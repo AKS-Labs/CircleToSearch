@@ -28,11 +28,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.VolumeDown
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Assistant
-import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.TouchApp
@@ -49,6 +49,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
@@ -90,7 +91,6 @@ import com.akslabs.circletosearch.data.GestureType
 import com.akslabs.circletosearch.data.OverlayConfigurationManager
 import com.akslabs.circletosearch.data.OverlaySegment
 import com.akslabs.circletosearch.ui.SettingsSectionHeader
-import com.akslabs.circletosearch.ui.SettingsToggleItem
 import com.akslabs.circletosearch.ui.components.UnifiedSearchMethodSelector
 import com.akslabs.circletosearch.utils.UIPreferences
 import dev.davidv.translator.MainActivity as TranslatorMainActivity
@@ -521,27 +521,30 @@ fun WobbleHomeScreen(
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Column {
-                            SettingsToggleItem(
+                            HomeToggleItem(
                                 title = stringResource(R.string.trigger_statusbar_title),
                                 subtitle = stringResource(R.string.trigger_statusbar_subtitle),
                                 icon = Icons.Default.Layers,
                                 checked = overlayEnabled,
+                                enabled = a11yGranted,
                                 onCheckedChange = { setOverlayEnabled(it) },
                             )
                             HomeRowDivider()
-                            SettingsToggleItem(
+                            HomeToggleItem(
                                 title = stringResource(R.string.label_floating_bubble),
                                 subtitle = stringResource(R.string.trigger_bubble_subtitle),
                                 icon = Icons.Default.TouchApp,
                                 checked = bubbleEnabled,
+                                enabled = a11yGranted,
                                 onCheckedChange = { setBubbleEnabled(it) },
                             )
                             HomeRowDivider()
-                            SettingsToggleItem(
+                            HomeToggleItem(
                                 title = stringResource(R.string.home_bottom_edge_title),
                                 subtitle = stringResource(R.string.home_bottom_edge_subtitle),
                                 icon = Icons.Rounded.KeyboardArrowDown,
                                 checked = bottomEdgeOn,
+                                enabled = a11yGranted,
                                 onCheckedChange = { setBottomEdge(it) },
                             )
                             HomeRowDivider()
@@ -562,6 +565,7 @@ fun WobbleHomeScreen(
                                     if (hwEnabledCount > 0) R.string.home_hw_count else R.string.home_hw_none,
                                     hwEnabledCount,
                                 ),
+                                enabled = a11yGranted,
                                 onClick = { showHwSheet = true },
                             )
                             HomeRowDivider()
@@ -569,6 +573,7 @@ fun WobbleHomeScreen(
                                 icon = Icons.Default.Widgets,
                                 title = stringResource(R.string.trigger_qs_title),
                                 subtitle = stringResource(R.string.trigger_qs_subtitle),
+                                enabled = a11yGranted,
                             )
                         }
                     }
@@ -644,17 +649,19 @@ private fun HomeRowDivider() {
 }
 
 @Composable
-private fun HomeLinkRow(
-    icon: ImageVector,
+private fun HomeToggleItem(
     title: String,
-    subtitle: String?,
-    modifier: Modifier = Modifier,
-    onClick: (() -> Unit)? = null,
+    subtitle: String,
+    icon: ImageVector,
+    checked: Boolean,
+    enabled: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
 ) {
+    val alpha = if (enabled) 1f else 0.38f
     Row(
-        modifier = modifier
+        modifier = Modifier
             .fillMaxWidth()
-            .let { if (onClick != null) it.clickable { onClick() } else it }
+            .clickable(enabled = enabled) { onCheckedChange(!checked) }
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -662,24 +669,73 @@ private fun HomeLinkRow(
             imageVector = icon,
             contentDescription = null,
             modifier = Modifier.size(24.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha),
         )
         Spacer(modifier = Modifier.width(16.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(text = title, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha),
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha),
+            )
+        }
+        Spacer(modifier = Modifier.width(8.dp))
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            enabled = enabled,
+        )
+    }
+}
+
+@Composable
+private fun HomeLinkRow(
+    icon: ImageVector,
+    title: String,
+    subtitle: String?,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    onClick: (() -> Unit)? = null,
+) {
+    val alpha = if (enabled) 1f else 0.38f
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .let { if (onClick != null && enabled) it.clickable { onClick() } else it }
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            modifier = Modifier.size(24.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha),
+        )
+        Spacer(modifier = Modifier.width(16.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha),
+            )
             if (subtitle != null) {
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
         }
-        if (onClick != null) {
+        if (onClick != null && enabled) {
             Icon(
-                imageVector = Icons.Default.KeyboardArrowRight,
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
             )
@@ -768,11 +824,12 @@ private fun HomeHwSheet(
             }
             HW_TRIGGER_KEYS.forEachIndexed { index, key ->
                 if (index > 0) HomeRowDivider()
-                SettingsToggleItem(
+                HomeToggleItem(
                     title = stringResource(HW_TRIGGER_TITLES[index]),
                     subtitle = stringResource(R.string.trigger_hw_subtitle),
                     icon = HW_TRIGGER_ICONS[index],
                     checked = hwTriggers[key] ?: false,
+                    enabled = a11yGranted,
                     onCheckedChange = { onToggle(key, it) },
                 )
             }
