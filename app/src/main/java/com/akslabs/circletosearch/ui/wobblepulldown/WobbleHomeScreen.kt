@@ -3,13 +3,22 @@ package com.akslabs.circletosearch.ui.wobblepulldown
 import android.content.Context
 import android.content.Intent
 import android.provider.Settings
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateIntAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -25,6 +34,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -40,17 +50,25 @@ import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material3.ButtonGroup
+import androidx.compose.material3.ButtonGroupDefaults
+import androidx.compose.material3.ButtonShapes
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedCard
+import androidx.compose.material3.ShapeDefaults
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.ToggleButton
+import androidx.compose.material3.ToggleButtonDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
@@ -64,12 +82,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
@@ -79,15 +104,19 @@ import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.Canvas
 import androidx.core.app.ActivityOptionsCompat
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.akslabs.circletosearch.MainActivity
 import com.akslabs.circletosearch.R
 import com.akslabs.circletosearch.data.ActionType
+import com.akslabs.circletosearch.data.BottomEdgeConfig
 import com.akslabs.circletosearch.data.GestureType
+import com.akslabs.circletosearch.data.OverlayConfig
 import com.akslabs.circletosearch.data.OverlayConfigurationManager
 import com.akslabs.circletosearch.data.OverlaySegment
 import com.akslabs.circletosearch.ui.SettingsSectionHeader
@@ -180,29 +209,26 @@ fun WobbleHomeScreen(
     var a11yGranted by remember { mutableStateOf(isA11yGranted(context)) }
     var assistantGranted by remember { mutableStateOf(isAssistantGranted(context)) }
     var overlayEnabled by remember { mutableStateOf(configManager.getConfig().isEnabled) }
+    var overlayConfig by remember { mutableStateOf(configManager.getConfig()) }
     var bubbleEnabled by remember { mutableStateOf(appPrefs.getBoolean("bubble_enabled", false)) }
     var hwTriggers by remember {
         mutableStateOf(HW_TRIGGER_KEYS.associateWith { appPrefs.getBoolean(it, false) })
     }
     var showHwSheet by remember { mutableStateOf(false) }
-    var bottomEdgeOn by remember {
-        mutableStateOf(
-            configManager.getConfig().segments
-                .any { it.gestureData[GestureType.LONG_PRESS] == BOTTOM_EDGE_MARKER },
-        )
-    }
+    var bottomEdge by remember { mutableStateOf(configManager.getBottomEdgeConfig()) }
+    val bottomEdgeActive = bottomEdge.leftEnabled || bottomEdge.rightEnabled || bottomEdge.midEnabled
     val hwEnabledCount = hwTriggers.values.count { it }
     val running = assistantGranted ||
-        (a11yGranted && (overlayEnabled || bubbleEnabled || bottomEdgeOn || hwEnabledCount > 0))
+        (a11yGranted && (overlayEnabled || bubbleEnabled || bottomEdgeActive || hwEnabledCount > 0))
 
     val refreshHomeState = {
         a11yGranted = isA11yGranted(context)
         assistantGranted = isAssistantGranted(context)
         overlayEnabled = configManager.getConfig().isEnabled
+        overlayConfig = configManager.getConfig()
         bubbleEnabled = appPrefs.getBoolean("bubble_enabled", false)
         hwTriggers = HW_TRIGGER_KEYS.associateWith { appPrefs.getBoolean(it, false) }
-        bottomEdgeOn = configManager.getConfig().segments
-            .any { it.gestureData[GestureType.LONG_PRESS] == BOTTOM_EDGE_MARKER }
+        bottomEdge = configManager.getBottomEdgeConfig()
     }
 
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -230,9 +256,10 @@ fun WobbleHomeScreen(
         context.startActivity(intent, options.toBundle())
     }
 
-    val setOverlayEnabled: (Boolean) -> Unit = { on ->
-        configManager.saveConfig(configManager.getConfig().copy(isEnabled = on))
-        overlayEnabled = on
+    val saveOverlayConfig: (OverlayConfig) -> Unit = { cfg ->
+        configManager.saveConfig(cfg)
+        overlayConfig = cfg
+        overlayEnabled = cfg.isEnabled
     }
 
     val setBubbleEnabled: (Boolean) -> Unit = { on ->
@@ -245,29 +272,29 @@ fun WobbleHomeScreen(
         hwTriggers = hwTriggers + (key to checked)
     }
 
-    val setBottomEdge: (Boolean) -> Unit = { on ->
+    val saveBottomEdge: (BottomEdgeConfig) -> Unit = { cfg ->
+        bottomEdge = cfg
+        configManager.saveBottomEdgeConfig(cfg)
+    }
+
+    // Strip any legacy full-width bottom strip that older builds stored as a segment.
+    LaunchedEffect(Unit) {
         val cfg = configManager.getConfig()
-        val segments = cfg.segments.toMutableList()
-        if (on) {
-            if (segments.none { it.gestureData[GestureType.LONG_PRESS] == BOTTOM_EDGE_MARKER }) {
-                val dm = context.resources.displayMetrics
-                val stripPx = with(density) { 48.dp.roundToPx() }
-                segments.add(
-                    OverlaySegment(
-                        width = dm.widthPixels,
-                        height = stripPx,
-                        xOffset = 0,
-                        yOffset = (dm.heightPixels - stripPx).coerceAtLeast(0),
-                        gestures = mutableMapOf(GestureType.LONG_PRESS to ActionType.CTS_AUTO),
-                        gestureData = mutableMapOf(GestureType.LONG_PRESS to BOTTOM_EDGE_MARKER),
-                    ),
-                )
-            }
-        } else {
-            segments.removeAll { it.gestureData[GestureType.LONG_PRESS] == BOTTOM_EDGE_MARKER }
+        if (cfg.segments.any { it.gestureData[GestureType.LONG_PRESS] == BOTTOM_EDGE_MARKER }) {
+            configManager.saveConfig(
+                cfg.copy(segments = cfg.segments.filterNot {
+                    it.gestureData[GestureType.LONG_PRESS] == BOTTOM_EDGE_MARKER
+                }),
+            )
         }
-        configManager.saveConfig(cfg.copy(segments = segments))
-        bottomEdgeOn = on
+    }
+
+    // Clear preview when leaving the screen so overlays don't stay visible.
+    DisposableEffect(Unit) {
+        onDispose {
+            val cur = configManager.getBottomEdgeConfig()
+            if (cur.previewVisible) configManager.saveBottomEdgeConfig(cur.copy(previewVisible = false))
+        }
     }
 
     LaunchedEffect(wobbleEvent) {
@@ -521,13 +548,10 @@ fun WobbleHomeScreen(
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Column {
-                            HomeToggleItem(
-                                title = stringResource(R.string.trigger_statusbar_title),
-                                subtitle = stringResource(R.string.trigger_statusbar_subtitle),
-                                icon = Icons.Default.Layers,
-                                checked = overlayEnabled,
-                                enabled = a11yGranted,
-                                onCheckedChange = { setOverlayEnabled(it) },
+                            HomeStatusBarSection(
+                                config = overlayConfig,
+                                a11yGranted = a11yGranted,
+                                onChange = saveOverlayConfig,
                             )
                             HomeRowDivider()
                             HomeToggleItem(
@@ -539,13 +563,10 @@ fun WobbleHomeScreen(
                                 onCheckedChange = { setBubbleEnabled(it) },
                             )
                             HomeRowDivider()
-                            HomeToggleItem(
-                                title = stringResource(R.string.home_bottom_edge_title),
-                                subtitle = stringResource(R.string.home_bottom_edge_subtitle),
-                                icon = Icons.Rounded.KeyboardArrowDown,
-                                checked = bottomEdgeOn,
-                                enabled = a11yGranted,
-                                onCheckedChange = { setBottomEdge(it) },
+                            HomeBottomEdgeSection(
+                                config = bottomEdge,
+                                a11yGranted = a11yGranted,
+                                onChange = saveBottomEdge,
                             )
                             HomeRowDivider()
                             HomeAssistantRow(
@@ -833,6 +854,531 @@ private fun HomeHwSheet(
                     onCheckedChange = { onToggle(key, it) },
                 )
             }
+        }
+    }
+}
+
+/**
+ * Expandable block for the status-bar overlay, mirroring [HomeBottomEdgeSection]:
+ * a header row with a master switch, and a dropdown with an animated strip preview
+ * plus width / height / vertical-position sliders for the top trigger strip.
+ */
+@Composable
+private fun HomeStatusBarSection(
+    config: OverlayConfig,
+    a11yGranted: Boolean,
+    onChange: (OverlayConfig) -> Unit,
+) {
+    val masterOn = config.isEnabled
+    var expanded by remember { mutableStateOf(false) }
+    val density = LocalDensity.current
+    val expandProgress by animateFloatAsState(
+        targetValue = if (expanded) 1f else 0f,
+        animationSpec = tween(durationMillis = 240),
+        label = "statusBarExpand",
+    )
+
+    val segment = config.segments.firstOrNull() ?: OverlaySegment()
+    fun saveSegment(newSegment: OverlaySegment) {
+        val segments = config.segments.toMutableList()
+        if (segments.isEmpty()) segments.add(newSegment) else segments[0] = newSegment
+        onChange(config.copy(segments = segments))
+    }
+
+    val screenWidthDp = LocalConfiguration.current.screenWidthDp.toFloat()
+    val screenWidthPx = screenWidthDp * density.density
+    val widthDp = segment.width / density.density
+    val heightDp = segment.height / density.density
+    val yDp = segment.yOffset / density.density
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(enabled = a11yGranted) { expanded = !expanded }
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            val rowAlpha = if (a11yGranted) 1f else 0.38f
+            Icon(
+                imageVector = Icons.Rounded.KeyboardArrowDown,
+                contentDescription = null,
+                modifier = Modifier
+                    .size(24.dp)
+                    .graphicsLayer {
+                        alpha = rowAlpha
+                        rotationZ = expandProgress * 180f
+                    },
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.trigger_statusbar_title),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = rowAlpha),
+                )
+                Text(
+                    text = stringResource(R.string.trigger_statusbar_subtitle),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = rowAlpha),
+                )
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Switch(
+                checked = masterOn,
+                enabled = a11yGranted,
+                onCheckedChange = { on ->
+                    onChange(config.copy(isEnabled = on))
+                    if (on) expanded = true
+                },
+            )
+        }
+
+        AnimatedVisibility(
+            visible = expanded && a11yGranted,
+            enter = expandVertically(tween(240)) + fadeIn(tween(240)),
+            exit = shrinkVertically(tween(200)) + fadeOut(tween(160)),
+        ) {
+            Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp)) {
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        // Animated preview of the trigger strip on a mini phone canvas.
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(72.dp)
+                                .graphicsLayer { alpha = expandProgress },
+                            contentAlignment = Alignment.TopCenter,
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(horizontal = 48.dp)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                                contentAlignment = Alignment.TopCenter,
+                            ) {
+                                val stripWidthFraction =
+                                    (segment.width / screenWidthPx).coerceIn(0.08f, 1f)
+                                Box(
+                                    modifier = Modifier
+                                        .padding(top = yDp.dp)
+                                        .fillMaxWidth(stripWidthFraction)
+                                        .height(heightDp.coerceAtMost(56f).dp)
+                                        .background(
+                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
+                                        ),
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        LabelledSlider(
+                            label = stringResource(R.string.home_statusbar_width),
+                            value = widthDp,
+                            valueRange = 60f..(screenWidthDp - 40f).coerceAtLeast(120f),
+                            valueText = "${widthDp.toInt()}dp",
+                            onValueChange = {
+                                saveSegment(segment.copy(width = (it * density.density).toInt()))
+                            },
+                        )
+                        LabelledSlider(
+                            label = stringResource(R.string.home_statusbar_height),
+                            value = heightDp,
+                            valueRange = 24f..140f,
+                            valueText = "${heightDp.toInt()}dp",
+                            onValueChange = {
+                                saveSegment(segment.copy(height = (it * density.density).toInt()))
+                            },
+                        )
+                        LabelledSlider(
+                            label = stringResource(R.string.home_statusbar_ypos),
+                            value = yDp,
+                            valueRange = 0f..160f,
+                            valueText = "${yDp.toInt()}dp",
+                            onValueChange = {
+                                saveSegment(segment.copy(yOffset = (it * density.density).toInt()))
+                            },
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Compact, expandable block for the bottom-edge long-press triggers.
+ * Master switch enables/disables; expanding it reveals an animated illustration plus
+ * per-corner toggles, a corner-size slider, and a separate bottom-mid switch + slider.
+ * While expanded, [BottomEdgeConfig.previewVisible] is forced true so the real overlays
+ * appear on screen for live sizing; collapsing (or leaving) hides them again.
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun HomeBottomEdgeSection(
+    config: BottomEdgeConfig,
+    a11yGranted: Boolean,
+    onChange: (BottomEdgeConfig) -> Unit,
+) {
+    val masterOn = config.leftEnabled || config.rightEnabled || config.midEnabled
+    var expanded by remember { mutableStateOf(false) }
+
+    // Keep preview in sync with expansion state.
+    LaunchedEffect(expanded) {
+        if (config.previewVisible != expanded) {
+            onChange(config.copy(previewVisible = expanded))
+        }
+    }
+
+    val cornerSize by animateDpAsState(
+        targetValue = config.cornerSizeDp.dp,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label = "cornerSize",
+    )
+    val midSize by animateDpAsState(
+        targetValue = config.midSizeDp.dp,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label = "midSize",
+    )
+    val expandProgress by animateFloatAsState(
+        targetValue = if (expanded) 1f else 0f,
+        animationSpec = tween(durationMillis = 240),
+        label = "expandProgress",
+    )
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        // Header row: icon + label + master switch + expand chevron.
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(enabled = a11yGranted) { expanded = !expanded }
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            val rowAlpha = if (a11yGranted) 1f else 0.38f
+            Icon(
+                imageVector = Icons.Rounded.KeyboardArrowDown,
+                contentDescription = null,
+                modifier = Modifier
+                    .size(24.dp)
+                    .graphicsLayer {
+                        alpha = rowAlpha
+                        rotationZ = expandProgress * 180f
+                    },
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.home_bottom_edge_title),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = rowAlpha),
+                )
+                Text(
+                    text = stringResource(R.string.home_bottom_edge_subtitle),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = rowAlpha),
+                )
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Switch(
+                checked = masterOn,
+                enabled = a11yGranted,
+                onCheckedChange = { on ->
+                    onChange(
+                        config.copy(
+                            leftEnabled = on,
+                            rightEnabled = on,
+                            // keep mid as-is unless turning everything on for the first time
+                            midEnabled = if (on) config.midEnabled else false,
+                        ),
+                    )
+                    if (on) expanded = true
+                },
+            )
+        }
+
+        AnimatedVisibility(
+            visible = expanded && a11yGranted,
+            enter = expandVertically(tween(240)) + fadeIn(tween(240)),
+            exit = shrinkVertically(tween(200)) + fadeOut(tween(160)),
+        ) {
+            Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp)) {
+                // Compact container grouping the illustration, toggles and sliders so
+                // they share one consistent width and read as a single control block.
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        // Animated illustration of the phone bottom edge.
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(96.dp)
+                                .graphicsLayer { alpha = expandProgress },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            BottomEdgeIllustration(
+                                leftEnabled = config.leftEnabled,
+                                rightEnabled = config.rightEnabled,
+                                midEnabled = config.midEnabled,
+                                cornerSizeDp = config.cornerSizeDp,
+                                midSizeDp = config.midSizeDp,
+                                expandProgress = expandProgress,
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // Per-shape toggles as a small M3 expressive connected button
+                        // group: Left / Mid / Right. Unchecked buttons get a chip-like
+                        // outline so they stay clearly visible.
+                        val groupBorder = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+                        ButtonGroup(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement =
+                                Arrangement.spacedBy(ButtonGroupDefaults.connectedSpaceBetween),
+                            animateFraction = 0f,
+                        ) {
+                            val startShapes = ButtonShapes(
+                                shape = ButtonGroupDefaults.connectedLeadingButtonShape,
+                                pressedShape = ButtonGroupDefaults.connectedLeadingButtonPressShape,
+                                checkedShape = ToggleButtonDefaults.checkedShape,
+                            )
+                            val middleShapes = ButtonShapes(
+                                shape = ShapeDefaults.Small,
+                                pressedShape = ToggleButtonDefaults.pressedShape,
+                                checkedShape = ToggleButtonDefaults.checkedShape,
+                            )
+                            val endShapes = ButtonShapes(
+                                shape = ButtonGroupDefaults.connectedTrailingButtonShape,
+                                pressedShape = ButtonGroupDefaults.connectedTrailingButtonPressShape,
+                                checkedShape = ToggleButtonDefaults.checkedShape,
+                            )
+                            ToggleButton(
+                                checked = config.leftEnabled,
+                                onCheckedChange = { on ->
+                                    onChange(config.copy(leftEnabled = on))
+                                },
+                                shapes = startShapes,
+                                border = groupBorder,
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.home_corner_left),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                            ToggleButton(
+                                checked = config.midEnabled,
+                                onCheckedChange = { on ->
+                                    onChange(config.copy(midEnabled = on))
+                                },
+                                shapes = middleShapes,
+                                border = groupBorder,
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.home_bottom_mid_title),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                            ToggleButton(
+                                checked = config.rightEnabled,
+                                onCheckedChange = { on ->
+                                    onChange(config.copy(rightEnabled = on))
+                                },
+                                shapes = endShapes,
+                                border = groupBorder,
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.home_corner_right),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // Corner size slider.
+                        LabelledSlider(
+                            label = stringResource(R.string.home_corner_size),
+                            value = config.cornerSizeDp.toFloat(),
+                            valueRange = 48f..140f,
+                            valueText = "${config.cornerSizeDp}dp",
+                            onValueChange = { onChange(config.copy(cornerSizeDp = it.toInt())) },
+                        )
+
+                        // Mid size slider (only meaningful when mid enabled).
+                        AnimatedVisibility(visible = config.midEnabled) {
+                            LabelledSlider(
+                                label = stringResource(R.string.home_mid_size),
+                                value = config.midSizeDp.toFloat(),
+                                valueRange = 48f..200f,
+                                valueText = "${config.midSizeDp}dp",
+                                onValueChange = { onChange(config.copy(midSizeDp = it.toInt())) },
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LabelledSlider(
+    label: String,
+    value: Float,
+    valueRange: ClosedFloatingPointRange<Float>,
+    valueText: String,
+    onValueChange: (Float) -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = valueText,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+        Slider(
+            value = value,
+            onValueChange = onValueChange,
+            valueRange = valueRange,
+        )
+    }
+}
+
+/**
+ * A lightweight animated illustration of a phone's bottom edge showing the two corner arcs
+ * and the bottom-mid semicircle, so the user can visualise what they are enabling/sizing.
+ */
+@Composable
+private fun BottomEdgeIllustration(
+    leftEnabled: Boolean,
+    rightEnabled: Boolean,
+    midEnabled: Boolean,
+    cornerSizeDp: Int,
+    midSizeDp: Int,
+    expandProgress: Float,
+) {
+    val primary = MaterialTheme.colorScheme.primary
+    val outline = MaterialTheme.colorScheme.outlineVariant
+
+    // Subtle idle pulse so the enabled shapes feel alive.
+    val infiniteTransition = rememberInfiniteTransition(label = "edgePulse")
+    val pulse by infiniteTransition.animateFloat(
+        initialValue = 0.85f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(1100), RepeatMode.Reverse),
+        label = "pulse",
+    )
+
+    Canvas(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(96.dp),
+    ) {
+        val w = size.width
+        val h = size.height
+        // Phone outline: rounded rect occupying the lower portion (wide so the
+        // shapes have room and read as small against it).
+        val phoneTop = h * 0.14f
+        val phoneBottom = h * 0.92f
+        val phoneLeft = w * 0.06f
+        val phoneRight = w * 0.94f
+        val cornerRadius = 18.dp.toPx()
+
+        drawRoundRect(
+            color = outline.copy(alpha = 0.35f * expandProgress),
+            topLeft = Offset(phoneLeft, phoneTop),
+            size = Size(phoneRight - phoneLeft, phoneBottom - phoneTop),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(cornerRadius, cornerRadius),
+        )
+
+        // Scale dp sizes to fit the illustration box, kept tiny and clamped so a
+        // shape can never grow outside the phone outline. Fractions of the slider
+        // ranges keep the illustration device-independent.
+        val phoneW = phoneRight - phoneLeft
+        val phoneH = phoneBottom - phoneTop
+        val maxCorridor = phoneW / 2f
+        val maxRadius = minOf(maxCorridor * 0.45f, phoneH * 0.85f)
+        val cornerFrac = ((cornerSizeDp - 48f) / 92f).coerceIn(0f, 1f)
+        val midFrac = ((midSizeDp - 48f) / 152f).coerceIn(0f, 1f)
+        val cornerScale = (0.35f + 0.65f * cornerFrac) * maxRadius
+        val midScale = (0.35f + 0.65f * midFrac) * maxRadius
+
+        fun drawArcShape(isLeft: Boolean, radius: Float) {
+            val cx = if (isLeft) phoneLeft else phoneRight
+            val cy = phoneBottom
+            val path = Path().apply {
+                moveTo(cx, cy)
+                if (isLeft) {
+                    lineTo(cx, cy - radius)
+                    arcTo(
+                        Rect(cx - radius, cy - radius, cx + radius, cy + radius),
+                        startAngleDegrees = 270f,
+                        sweepAngleDegrees = 90f,
+                        forceMoveTo = false,
+                    )
+                } else {
+                    lineTo(cx, cy - radius)
+                    arcTo(
+                        Rect(cx - radius, cy - radius, cx + radius, cy + radius),
+                        startAngleDegrees = 270f,
+                        sweepAngleDegrees = -90f,
+                        forceMoveTo = false,
+                    )
+                }
+                close()
+            }
+            drawPath(path, color = primary.copy(alpha = 0.35f * pulse * expandProgress))
+            drawPath(path, color = primary.copy(alpha = 0.8f * expandProgress), style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round))
+        }
+
+        if (leftEnabled) drawArcShape(true, cornerScale)
+        if (rightEnabled) drawArcShape(false, cornerScale)
+
+        if (midEnabled) {
+            val cx = (phoneLeft + phoneRight) / 2f
+            val cy = phoneBottom
+            val r = midScale
+            val path = Path().apply {
+                moveTo(cx - r, cy)
+                arcTo(
+                    Rect(cx - r, cy - r, cx + r, cy + r),
+                    startAngleDegrees = 180f,
+                    sweepAngleDegrees = 180f,
+                    forceMoveTo = false,
+                )
+                close()
+            }
+            drawPath(path, color = primary.copy(alpha = 0.35f * pulse * expandProgress))
+            drawPath(path, color = primary.copy(alpha = 0.8f * expandProgress), style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round))
         }
     }
 }

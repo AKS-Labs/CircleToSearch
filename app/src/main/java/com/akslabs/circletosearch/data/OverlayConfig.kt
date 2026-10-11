@@ -27,6 +27,20 @@ data class OverlaySegment(
     @SerializedName("gestureData") val gestureData: MutableMap<GestureType, String> = mutableMapOf() // Stores extra data like package name for OPEN_APP
 )
 
+/**
+ * Dedicated config for the bottom-edge long-press triggers (two corner arcs + one
+ * bottom-centre semicircle). Stored separately from [OverlayConfig.segments] so that
+ * toggling the status-bar overlay ([OverlayConfig.isEnabled]) can never add/remove them.
+ */
+data class BottomEdgeConfig(
+    @SerializedName("leftEnabled") val leftEnabled: Boolean = true,
+    @SerializedName("rightEnabled") val rightEnabled: Boolean = true,
+    @SerializedName("midEnabled") val midEnabled: Boolean = false,
+    @SerializedName("cornerSizeDp") val cornerSizeDp: Int = 72, // arc radius-ish size
+    @SerializedName("midSizeDp") val midSizeDp: Int = 48, // semicircle size (actual overlay)
+    @SerializedName("previewVisible") val previewVisible: Boolean = false, // true only while settings dropdown open
+)
+
 enum class GestureType {
     DOUBLE_TAP,
     LONG_PRESS,
@@ -100,7 +114,9 @@ class OverlayConfigurationManager(context: Context) {
     private val gson = Gson()
     
     companion object {
-        private const val KEY_CONFIG = "overlay_config"
+private const val KEY_CONFIG = "overlay_config"
+private const val KEY_BOTTOM_EDGE = "bottom_edge_config"
+private const val KEY_BOTTOM_EDGE_MID_MIGRATED = "bottom_edge_mid_migrated_v1"
     }
 
     fun getConfig(): OverlayConfig {
@@ -130,5 +146,29 @@ class OverlayConfigurationManager(context: Context) {
     
     fun resetConfig() {
         prefs.edit().remove(KEY_CONFIG).apply()
+    }
+
+    fun getBottomEdgeConfig(): BottomEdgeConfig {
+        val json = prefs.getString(KEY_BOTTOM_EDGE, null) ?: return BottomEdgeConfig()
+        val cfg = try {
+            gson.fromJson(json, BottomEdgeConfig::class.java) ?: BottomEdgeConfig()
+        } catch (e: Exception) {
+            return BottomEdgeConfig()
+        }
+        // One-time migration: the old mid-overlay defaults (96dp, later 64dp) were too
+        // large for the actual on-screen semicircle — shrink them to the new 48dp default.
+        if (!prefs.getBoolean(KEY_BOTTOM_EDGE_MID_MIGRATED, false) && cfg.midSizeDp >= 64) {
+            val migrated = cfg.copy(midSizeDp = 48)
+            prefs.edit()
+                .putString(KEY_BOTTOM_EDGE, gson.toJson(migrated))
+                .putBoolean(KEY_BOTTOM_EDGE_MID_MIGRATED, true)
+                .apply()
+            return migrated
+        }
+        return cfg
+    }
+
+    fun saveBottomEdgeConfig(config: BottomEdgeConfig) {
+        prefs.edit().putString(KEY_BOTTOM_EDGE, gson.toJson(config)).apply()
     }
 }

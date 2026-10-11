@@ -198,6 +198,7 @@ fun WobbleAppInfoScreen(
     var assistantGranted by remember { mutableStateOf(isAssistantGranted(context)) }
     var launchMethods by remember { mutableStateOf(loadLaunchMethods(context)) }
     var showDisclosure by remember { mutableStateOf(false) }
+    var showAssistantSheet by remember { mutableStateOf(false) }
 
     val refreshPermissions = {
         a11yGranted = isA11yGranted(context)
@@ -242,6 +243,13 @@ fun WobbleAppInfoScreen(
                 }
             },
             onDismiss = { showDisclosure = false },
+        )
+    }
+
+    if (showAssistantSheet) {
+        AssistantSetupSheet(
+            onLaunch = { intent -> settingsLauncher.launch(intent) },
+            onDismiss = { showAssistantSheet = false },
         )
     }
 
@@ -420,7 +428,13 @@ fun WobbleAppInfoScreen(
                 granted = a11yGranted,
                 onClick = {
                     WobbleHaptics.performUIHaptic(view)
-                    showDisclosure = true
+                    if (a11yGranted) {
+                        runCatching {
+                            settingsLauncher.launch(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                        }
+                    } else {
+                        showDisclosure = true
+                    }
                 },
             )
 
@@ -431,9 +445,7 @@ fun WobbleAppInfoScreen(
                 granted = assistantGranted,
                 onClick = {
                     WobbleHaptics.performUIHaptic(view)
-                    runCatching {
-                        settingsLauncher.launch(Intent(Settings.ACTION_VOICE_INPUT_SETTINGS))
-                    }
+                    showAssistantSheet = true
                 },
             )
 

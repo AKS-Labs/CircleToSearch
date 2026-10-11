@@ -1,12 +1,14 @@
 package com.akslabs.circletosearch.ui.wobblepulldown
 
 import android.content.Intent
+import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -23,11 +25,15 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Accessibility
 import androidx.compose.material.icons.rounded.Assistant
 import androidx.compose.material.icons.rounded.Verified
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -56,6 +62,7 @@ fun WobbleSetupWizard(modifier: Modifier = Modifier) {
     var a11yGranted by remember { mutableStateOf(isA11yGranted(context)) }
     var assistantGranted by remember { mutableStateOf(isAssistantGranted(context)) }
     var showDisclosure by remember { mutableStateOf(false) }
+    var showAssistantSheet by remember { mutableStateOf(false) }
 
     val refreshPermissions = {
         a11yGranted = isA11yGranted(context)
@@ -93,6 +100,13 @@ fun WobbleSetupWizard(modifier: Modifier = Modifier) {
                 }
             },
             onDismiss = { showDisclosure = false },
+        )
+    }
+
+    if (showAssistantSheet) {
+        AssistantSetupSheet(
+            onLaunch = { intent -> settingsLauncher.launch(intent) },
+            onDismiss = { showAssistantSheet = false },
         )
     }
 
@@ -134,7 +148,13 @@ fun WobbleSetupWizard(modifier: Modifier = Modifier) {
                     granted = a11yGranted,
                     onClick = {
                         WobbleHaptics.performUIHaptic(view)
-                        showDisclosure = true
+                        if (a11yGranted) {
+                            runCatching {
+                                settingsLauncher.launch(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                            }
+                        } else {
+                            showDisclosure = true
+                        }
                     },
                 )
                 WizardPermissionRow(
@@ -144,9 +164,7 @@ fun WobbleSetupWizard(modifier: Modifier = Modifier) {
                     granted = assistantGranted,
                     onClick = {
                         WobbleHaptics.performUIHaptic(view)
-                        runCatching {
-                            settingsLauncher.launch(Intent(Settings.ACTION_VOICE_INPUT_SETTINGS))
-                        }
+                        showAssistantSheet = true
                     },
                 )
             }
@@ -154,6 +172,7 @@ fun WobbleSetupWizard(modifier: Modifier = Modifier) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WizardPermissionRow(
     icon: ImageVector,
@@ -162,7 +181,11 @@ fun WizardPermissionRow(
     granted: Boolean,
     onClick: () -> Unit,
 ) {
+    // The WHOLE row is the click target (ripple over everything), in both states:
+    // un-granted opens the permission flow, granted still opens the system screen so
+    // the user can review or revoke the permission.
     Surface(
+        onClick = onClick,
         shape = RoundedCornerShape(24.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         modifier = Modifier.fillMaxWidth(),
@@ -204,6 +227,98 @@ fun WizardPermissionRow(
                 FilledTonalButton(onClick = onClick) {
                     Text(stringResource(R.string.wizard_grant))
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Bottom sheet for assistant setup: explains that CircleToSearch can act as the device
+ * assistant (so the normal assistant trigger — long-press Home, gesture handle, etc. —
+ * opens this app) and offers the picker that makes that happen.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AssistantSetupSheet(
+    onLaunch: (Intent) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val context = LocalContext.current
+
+    // Try the canonical assistant-role picker first, then generic fallbacks that exist
+    // on different OEM builds.
+    fun launchFirst(vararg intents: Intent?): Boolean {
+        for (intent in intents) {
+            if (intent == null) continue
+            val ok = runCatching { onLaunch(intent); true }.getOrDefault(false)
+            if (ok) return true
+        }
+        return false
+    }
+
+    val roleManager = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        runCatching { context.getSystemService(android.app.role.RoleManager::class.java) }.getOrNull()
+    } else {
+        null
+    }
+    // If we already hold the assistant role the request intent is a no-op (launches
+    // nothing visible), so skip it and go straight to the settings screen instead.
+    val alreadyAssistant = roleManager?.isRoleHeld(android.app.role.RoleManager.ROLE_ASSISTANT) == true
+    val roleIntent: Intent? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !alreadyAssistant) {
+        runCatching {
+            roleManager?.createRequestRoleIntent(android.app.role.RoleManager.ROLE_ASSISTANT)
+        }.getOrNull()
+    } else {
+        null
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 24.dp, end = 24.dp, bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.assistant_sheet_title),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                text = stringResource(R.string.assistant_sheet_body),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            Button(
+                onClick = {
+                    if (launchFirst(
+                            // Same screen the permission row's grant action used to open.
+                            Intent(Settings.ACTION_VOICE_INPUT_SETTINGS),
+                            roleIntent,
+                            Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS),
+                            Intent(Settings.ACTION_SETTINGS),
+                        )
+                    ) {
+                        onDismiss()
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 14.dp),
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Assistant,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    text = stringResource(R.string.assistant_opt_set_title),
+                    fontWeight = FontWeight.Bold,
+                )
             }
         }
     }

@@ -99,10 +99,14 @@ private const val KEY_DOUBLE_TAP_MS = 350L
 // fire twice (e.g. the second tap of a double-tap counting again later)
 private const val KEY_TRIGGER_COOLDOWN_MS = 900L
 
+// Shape variants for the bottom-edge long-press overlays.
+private enum class BottomEdgeShape { ARC_LEFT, ARC_RIGHT, SEMICIRCLE }
+
 class CircleToSearchAccessibilityService : AccessibilityService() {
 
     private var windowManager: WindowManager? = null
     private val overlayViews = mutableListOf<View>() // Track all added segment views
+    private val bottomEdgeViews = mutableListOf<BottomEdgeOverlayView>() // Track bottom-edge corner/mid overlays
     private val executor: Executor = Executors.newSingleThreadExecutor()
     private lateinit var configManager: OverlayConfigurationManager
 
@@ -125,6 +129,7 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
     private val overlayPrefsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
         // On any overlay config change, rebuild the overlay
         updateOverlay()
+        updateBottomEdgeOverlays()
     }
 
     override fun onServiceConnected() {
@@ -161,11 +166,13 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
 
         updateBubbleState()
         updateOverlay()
+        updateBottomEdgeOverlays()
     }
     
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
         updateOverlay()
+        updateBottomEdgeOverlays()
     }
 
     private fun updateBubbleState() {
@@ -310,7 +317,10 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
                 if (params.width != segment.width) { params.width = segment.width; changed = true }
                 if (params.height != segment.height) { params.height = segment.height; changed = true }
                 if (params.x != segment.xOffset) { params.x = segment.xOffset; changed = true }
-                if (params.y != segment.yOffset) { params.y = segment.yOffset; changed = true }
+                // Keep strips that sit at the very top (status-bar trigger) 3dp below the edge.
+                val targetY = segment.yOffset +
+                        if (segment.yOffset == 0) (3 * resources.displayMetrics.density).toInt() else 0
+                if (params.y != targetY) { params.y = targetY; changed = true }
                 
                 if (changed) {
                     try {
@@ -368,7 +378,9 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
                 
                 params.gravity = Gravity.TOP or Gravity.START
                 params.x = segment.xOffset
-                params.y = segment.yOffset
+                // Keep strips that sit at the very top (status-bar trigger) 3dp below the edge.
+                params.y = segment.yOffset +
+                        if (segment.yOffset == 0) (3 * resources.displayMetrics.density).toInt() else 0
                 
                  if (config.isVisible) {
                     val color = themePalette[index % themePalette.size]
@@ -398,9 +410,93 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
             }
         }
     }
+
+    /**
+     * Bottom-edge long-press triggers (two corner arcs + optional bottom-centre semicircle).
+     * Deliberately kept in their own list and NOT gated by [OverlayConfig.isEnabled], so
+     * toggling the status-bar overlay can never add/remove them (previously they shared the
+     * segment list and got wiped together).
+     */
+    private fun updateBottomEdgeOverlays() {
+        val wm = windowManager ?: return
+        val cfg = configManager.getBottomEdgeConfig()
+
+        // Drop everything and rebuild: simplest correct approach for max 3 views.
+        bottomEdgeViews.forEach { view ->
+            try { wm.removeView(view) } catch (_: Exception) {}
+        }
+        bottomEdgeViews.clear()
+
+        val dm = resources.displayMetrics
+        val density = dm.density
+        // Full display bounds (displayMetrics can exclude bars, which made the overlays
+        // float or sit off-screen, clipping the right corner's border).
+        val bounds = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            wm.maximumWindowMetrics.bounds
+        } else {
+            null
+        }
+        val screenW = bounds?.width() ?: dm.widthPixels
+        val screenH = bounds?.height() ?: dm.heightPixels
+
+        val accent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            getColor(android.R.color.system_accent1_400)
+        } else {
+            Color.parseColor("#FF6200EE")
+        }
+
+        fun addView(view: BottomEdgeOverlayView, w: Int, h: Int, x: Int, y: Int) {
+            val params = WindowManager.LayoutParams(
+                w, h,
+                WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                        WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                        WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                        WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                PixelFormat.TRANSLUCENT
+            )
+            params.gravity = Gravity.TOP or Gravity.START
+            params.x = x
+            params.y = y
+            try {
+                wm.addView(view, params)
+                bottomEdgeViews.add(view)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+
+        val cornerSizePx = (cfg.cornerSizeDp * density).toInt().coerceAtLeast(48)
+        val midSizePx = (cfg.midSizeDp * density).toInt().coerceAtLeast(48)
+        // Flush with the very bottom of the screen (no nav-bar inset).
+        val bottomBase = screenH
+
+        if (cfg.leftEnabled) {
+            addView(
+                BottomEdgeOverlayView(this, BottomEdgeShape.ARC_LEFT, cfg.previewVisible, accent),
+                cornerSizePx, cornerSizePx, 0, bottomBase - cornerSizePx,
+            )
+        }
+        if (cfg.rightEnabled) {
+            addView(
+                BottomEdgeOverlayView(this, BottomEdgeShape.ARC_RIGHT, cfg.previewVisible, accent),
+                cornerSizePx, cornerSizePx, screenW - cornerSizePx, bottomBase - cornerSizePx,
+            )
+        }
+        if (cfg.midEnabled) {
+            addView(
+                BottomEdgeOverlayView(this, BottomEdgeShape.SEMICIRCLE, cfg.previewVisible, accent),
+                midSizePx * 2, midSizePx, (screenW - midSizePx * 2) / 2, bottomBase - midSizePx,
+            )
+        }
+    }
     
     @SuppressLint("ClickableViewAccessibility")
     private fun attachTouchListener(view: View, segment: OverlaySegment, segmentIndex: Int) {
+        // Slow drags and taps on an overlay must still reach the system UI below
+        // (notification shade / quick settings on the status bar, the app under a strip).
+        var lastScrollForwardAt = 0L
+        var scrollForwardedThisGesture = false
         val gestureDetector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
             override fun onDoubleTap(e: MotionEvent): Boolean {
                 val action = segment.gestures[GestureType.DOUBLE_TAP] ?: ActionType.NONE
@@ -413,6 +509,39 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
                 if (action != ActionType.NONE) performAction(action, segment)
             }
 
+            override fun onScroll(e1: MotionEvent?, e2: MotionEvent, distanceX: Float, distanceY: Float): Boolean {
+                if (e1 == null) return false
+                val dx = e2.rawX - e1.rawX
+                val dy = e2.rawY - e1.rawY
+                // Only treat this as a real drag once the finger has clearly moved — tiny
+                // jitter during a tap/double-tap must NOT be forwarded (forwarding briefly
+                // makes the window untouchable and swallows the second tap).
+                val minForwardDist = 40 * resources.displayMetrics.density
+                if (Math.abs(dx) < minForwardDist && Math.abs(dy) < minForwardDist) return false
+                val mostlyVertical = Math.abs(dy) > Math.abs(dx)
+                val direction = when {
+                    mostlyVertical && dy > 0 -> GestureType.SWIPE_DOWN
+                    mostlyVertical && dy < 0 -> GestureType.SWIPE_UP
+                    dx > 0 -> GestureType.SWIPE_RIGHT
+                    else -> GestureType.SWIPE_LEFT
+                }
+                // A configured custom action wins: don't forward, let the fling handler trigger it.
+                val custom = segment.gestures[direction]
+                if (custom != null && custom != ActionType.NONE) return false
+                // Otherwise forward the drag so the system below still tracks it
+                // (e.g. pulling down the notification shade / quick settings on the status bar).
+                val now = android.os.SystemClock.uptimeMillis()
+                if (now - lastScrollForwardAt < 180L) return true
+                lastScrollForwardAt = now
+                scrollForwardedThisGesture = true
+                val path = android.graphics.Path().apply {
+                    moveTo(e1.rawX, e1.rawY)
+                    lineTo(e2.rawX, e2.rawY)
+                }
+                forwardPassthroughGesture(view, path, 140)
+                return true
+            }
+
             override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
                  // User wants "buttons behind to be clickable" 
                  // We temporarily disable touch on our window and dispatch the click through.
@@ -422,6 +551,9 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
             
             override fun onFling(e1: MotionEvent?, e2: MotionEvent, velocityX: Float, velocityY: Float): Boolean {
                 if (e1 == null) return false
+                // This drag was already forwarded to the system below; don't also fire
+                // a global action (would open the shade a second time).
+                if (scrollForwardedThisGesture) return true
                 val diffY = e2.y - e1.y
                 val diffX = e2.x - e1.x
                 
@@ -485,7 +617,11 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
             }
         }).apply {
              setOnDoubleTapListener(object : GestureDetector.OnDoubleTapListener {
-                override fun onSingleTapConfirmed(e: MotionEvent): Boolean = false
+                override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
+                    // Forward single taps so status-bar taps still reach the system UI below.
+                    propagateSingleTap(view, e.rawX, e.rawY)
+                    return false
+                }
                 override fun onDoubleTap(e: MotionEvent): Boolean {
                     val action = segment.gestures[GestureType.DOUBLE_TAP] ?: ActionType.NONE
                     if (action != ActionType.NONE) { performAction(action, segment); return true }
@@ -500,6 +636,7 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         
         view.setOnTouchListener { _, event ->
              if (event.action == MotionEvent.ACTION_DOWN) {
+                scrollForwardedThisGesture = false
                 val currentTime = System.currentTimeMillis()
                 if (currentTime - lastTapTime < 400) {
                     tapCount++
@@ -668,45 +805,12 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
     }
     
     // Pass-through Logic for Single Tap
-    // We must temporarily make the window UNTOUCHABLE so the injected gesture falls through to the app below.
-    // Otherwise, the injected tap hits our own overlay (loop/blocked).
+    // Temporarily makes the window untouchable, injects the tap, and (via
+    // forwardPassthroughGesture) guarantees the window is restored even if the
+    // dispatch fails — a missing restore would leave the overlay dead.
     private fun propagateSingleTap(view: View, x: Float, y: Float) {
-        val params = view.layoutParams as WindowManager.LayoutParams
-        val originalFlags = params.flags
-        
-        // Make untouchable
-        params.flags = params.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-        windowManager?.updateViewLayout(view, params)
-        
         val path = android.graphics.Path().apply { moveTo(x, y) }
-        val stroke = android.accessibilityservice.GestureDescription.StrokeDescription(path, 0, 50) // 50ms tap duration (more standard)
-        val gesture = android.accessibilityservice.GestureDescription.Builder().addStroke(stroke).build()
-        
-        // Wait for WindowManager to update input focus before dispatching
-        val handler = android.os.Handler(android.os.Looper.getMainLooper())
-        handler.postDelayed({
-            dispatchGesture(gesture, object : android.accessibilityservice.AccessibilityService.GestureResultCallback() {
-                override fun onCompleted(gestureDescription: android.accessibilityservice.GestureDescription?) {
-                    restoreFlags()
-                }
-    
-                override fun onCancelled(gestureDescription: android.accessibilityservice.GestureDescription?) {
-                    restoreFlags()
-                }
-                
-                fun restoreFlags() {
-                    // Restore original flags (Touchable) using main thread to be safe with UI
-                    handler.post {
-                        params.flags = originalFlags
-                        try {
-                            windowManager?.updateViewLayout(view, params)
-                        } catch (e: Exception) {
-                            // View might be removed
-                        }
-                    }
-                }
-            }, null)
-        }, 100) // 100ms Delay to ensure 'untouchable' takes effect solidly
+        forwardPassthroughGesture(view, path, 50)
     }
     
     private fun toggleFlashlight() {
@@ -1653,7 +1757,282 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
                 e.printStackTrace()
             }
         }
+        bottomEdgeViews.forEach { view ->
+            try { windowManager?.removeView(view) } catch (_: Exception) {}
+        }
+        bottomEdgeViews.clear()
         hideBubble()
+    }
+
+    /**
+     * Forwards a synthetic gesture (tap or swipe) to whatever is underneath an overlay window.
+     * The overlay is temporarily made FLAG_NOT_TOUCHABLE so the dispatched stroke reaches the app
+     * below instead of being swallowed by our own window.
+     */
+    private fun forwardPassthroughGesture(
+        view: View,
+        path: android.graphics.Path,
+        durationMs: Long,
+    ) {
+        val params = view.layoutParams as WindowManager.LayoutParams
+        val originalFlags = params.flags
+        params.flags = params.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+        try { windowManager?.updateViewLayout(view, params) } catch (_: Exception) {}
+
+        val stroke = android.accessibilityservice.GestureDescription.StrokeDescription(path, 0, durationMs)
+        val gesture = android.accessibilityservice.GestureDescription.Builder().addStroke(stroke).build()
+        val handler = android.os.Handler(android.os.Looper.getMainLooper())
+
+        // The window MUST become touchable again no matter what: if it stayed
+        // FLAG_NOT_TOUCHABLE the overlay would silently stop receiving touches and
+        // long-press would appear dead until the service rebuilt the views.
+        var restored = false
+        fun restore() {
+            if (restored) return
+            restored = true
+            handler.post {
+                params.flags = originalFlags
+                try { windowManager?.updateViewLayout(view, params) } catch (_: Exception) {}
+            }
+        }
+
+        handler.postDelayed({
+            val dispatched = try {
+                dispatchGesture(
+                    gesture,
+                    object : android.accessibilityservice.AccessibilityService.GestureResultCallback() {
+                        override fun onCompleted(g: android.accessibilityservice.GestureDescription?) { restore() }
+                        override fun onCancelled(g: android.accessibilityservice.GestureDescription?) { restore() }
+                    },
+                    null,
+                )
+            } catch (e: Exception) {
+                false
+            }
+            // dispatchGesture returns false when a gesture is already running (or the
+            // service can't dispatch): restore immediately instead of waiting forever.
+            if (!dispatched) restore()
+            // Safety net: never leave the window untouchable for more than a moment.
+            handler.postDelayed({ restore() }, durationMs + 1000L)
+        }, 100)
+    }
+
+    /**
+     * A transparent, click-through overlay that sits at a bottom corner (arc) or bottom-centre
+     * (semicircle). It only reacts to a LONG-PRESS (which triggers Circle to Search); taps and
+     * swipes are forwarded to the app underneath so it never blocks normal interaction.
+     * When [isPreview] is true it draws a translucent filled shape so the user can see/size it.
+     */
+    private inner class BottomEdgeOverlayView(
+        context: android.content.Context,
+        private val shape: BottomEdgeShape,
+        private var isPreview: Boolean,
+        private val accent: Int,
+    ) : android.view.View(context) {
+
+        private val fillPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            style = android.graphics.Paint.Style.FILL
+        }
+        private val strokePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            style = android.graphics.Paint.Style.STROKE
+            strokeWidth = 3f * resources.displayMetrics.density
+        }
+
+        private val handler = android.os.Handler(android.os.Looper.getMainLooper())
+        private val touchSlop = android.view.ViewConfiguration.get(context).scaledTouchSlop
+        // Long-press stays alive while the finger drifts a little (more tolerant than
+        // the system tap slop) so slight jitter doesn't kill the gesture.
+        private val longPressSlop = touchSlop * 1.5f
+        private val longPressTimeoutMs = 400L
+        // Minimum gap between forwarded scroll segments (each one briefly makes the
+        // window untouchable and dispatches a synthetic gesture).
+        private val scrollForwardIntervalMs = 180L
+
+        private var downX = 0f
+        private var downY = 0f
+        private var lastScrollRawX = 0f
+        private var lastScrollRawY = 0f
+        private var lastScrollForwardAt = 0L
+        private var longPressConsumed = false
+        private var scrollForwarded = false
+
+        private val longPressRunnable = Runnable {
+            if (longPressConsumed || scrollForwarded) return@Runnable
+            longPressConsumed = true
+            hapticClick()
+            performCapture(null)
+        }
+
+        private fun hapticClick() {
+            val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as android.os.Vibrator
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                vibrator.vibrate(android.os.VibrationEffect.createPredefined(android.os.VibrationEffect.EFFECT_CLICK))
+            } else {
+                @Suppress("DEPRECATION") vibrator.vibrate(20)
+            }
+        }
+
+        private fun forwardPath(path: android.graphics.Path, durationMs: Long) {
+            forwardPassthroughGesture(this@BottomEdgeOverlayView, path, durationMs)
+        }
+
+        override fun onDetachedFromWindow() {
+            handler.removeCallbacksAndMessages(null)
+            super.onDetachedFromWindow()
+        }
+
+        /** Hit test: only the shaped region consumes touches; the bounding-box corners pass through. */
+        private fun hitTest(x: Float, y: Float): Boolean {
+            val w = width.toFloat()
+            val h = height.toFloat()
+            return when (shape) {
+                BottomEdgeShape.ARC_LEFT -> {
+                    // Quarter disc centred at bottom-left corner (0, h), radius = w.
+                    val dx = x; val dy = h - y
+                    dx * dx + dy * dy <= w * w
+                }
+                BottomEdgeShape.ARC_RIGHT -> {
+                    val dx = w - x; val dy = h - y
+                    dx * dx + dy * dy <= w * w
+                }
+                BottomEdgeShape.SEMICIRCLE -> {
+                    // Half disc centred at (w/2, h), radius = h, upper half only.
+                    val dx = x - w / 2f; val dy = h - y
+                    dy >= 0f && dx * dx + dy * dy <= h * h
+                }
+            }
+        }
+
+        override fun onDraw(canvas: android.graphics.Canvas) {
+            super.onDraw(canvas)
+            if (!isPreview) return
+            val w = width.toFloat()
+            val h = height.toFloat()
+
+            fun buildPath(inset: Float): android.graphics.Path {
+                val path = android.graphics.Path()
+                when (shape) {
+                    BottomEdgeShape.ARC_LEFT -> {
+                        // Quarter disc centred on the bottom-left corner of the view.
+                        val r = minOf(w, h) - inset
+                        path.moveTo(inset, h - inset)
+                        path.lineTo(inset, h - inset - r)
+                        path.arcTo(
+                            android.graphics.RectF(inset - r, h - inset - r, inset + r, h - inset + r),
+                            270f, 90f,
+                        )
+                        path.close()
+                    }
+                    BottomEdgeShape.ARC_RIGHT -> {
+                        // Quarter disc centred on the bottom-right corner of the view.
+                        val r = minOf(w, h) - inset
+                        path.moveTo(w - inset, h - inset)
+                        path.lineTo(w - inset, h - inset - r)
+                        path.arcTo(
+                            android.graphics.RectF(w - inset - r, h - inset - r, w - inset + r, h - inset + r),
+                            270f, -90f,
+                        )
+                        path.close()
+                    }
+                    BottomEdgeShape.SEMICIRCLE -> {
+                        // Upper half disc centred on the bottom-centre of the view.
+                        val r = minOf(w / 2f, h) - inset
+                        path.moveTo(w / 2f - r, h - inset)
+                        path.arcTo(
+                            android.graphics.RectF(w / 2f - r, h - inset - r, w / 2f + r, h - inset + r),
+                            180f, 180f,
+                        )
+                        path.close()
+                    }
+                }
+                return path
+            }
+
+            val a = (0.28f * 255).toInt()
+            fillPaint.color = android.graphics.Color.argb(
+                a, android.graphics.Color.red(accent), android.graphics.Color.green(accent), android.graphics.Color.blue(accent),
+            )
+            strokePaint.color = android.graphics.Color.argb(
+                (0.6f * 255).toInt(), android.graphics.Color.red(accent), android.graphics.Color.green(accent), android.graphics.Color.blue(accent),
+            )
+            // Even border, guaranteed: the fill sits half a stroke width from the view
+            // (screen) edge, and the stroke is placed so its OUTER edge lands exactly on
+            // the fill boundary. The stroke therefore lies entirely on top of the fill
+            // (one uniform tone along the whole border), is never clipped by the view
+            // bounds, and leaves no fill rim outside the border.
+            val sw = strokePaint.strokeWidth
+            canvas.drawPath(buildPath(sw / 2f), fillPaint)
+            canvas.drawPath(buildPath(sw), strokePaint)
+        }
+
+        @SuppressLint("ClickableViewAccessibility")
+        override fun onTouchEvent(event: MotionEvent): Boolean {
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    // Only the shaped region consumes touches; the bounding-box
+                    // corners pass straight through to the app underneath.
+                    if (!hitTest(event.x, event.y)) return false
+                    downX = event.x
+                    downY = event.y
+                    lastScrollRawX = event.rawX
+                    lastScrollRawY = event.rawY
+                    lastScrollForwardAt = 0L
+                    longPressConsumed = false
+                    scrollForwarded = false
+                    handler.removeCallbacks(longPressRunnable)
+                    handler.postDelayed(longPressRunnable, longPressTimeoutMs)
+                    return true
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    if (longPressConsumed) return true
+                    val dx = event.x - downX
+                    val dy = event.y - downY
+                    val dist = Math.sqrt((dx * dx + dy * dy).toDouble()).toFloat()
+                    if (dist > longPressSlop) {
+                        // Moved like a swipe: cancel the pending long-press and keep
+                        // forwarding the drag so the app underneath still scrolls.
+                        if (!scrollForwarded) {
+                            scrollForwarded = true
+                            handler.removeCallbacks(longPressRunnable)
+                        }
+                        val now = android.os.SystemClock.uptimeMillis()
+                        if (now - lastScrollForwardAt >= scrollForwardIntervalMs) {
+                            lastScrollForwardAt = now
+                            val path = android.graphics.Path().apply {
+                                moveTo(lastScrollRawX, lastScrollRawY)
+                                lineTo(event.rawX, event.rawY)
+                            }
+                            lastScrollRawX = event.rawX
+                            lastScrollRawY = event.rawY
+                            forwardPath(path, 120)
+                        }
+                    }
+                    // Small drift keeps the long-press timer running (jitter tolerant).
+                    return true
+                }
+                MotionEvent.ACTION_UP -> {
+                    handler.removeCallbacks(longPressRunnable)
+                    if (!longPressConsumed && !scrollForwarded) {
+                        // Stationary release = tap: forward immediately so taps behave
+                        // exactly like they do without the overlay.
+                        forwardPath(android.graphics.Path().apply { moveTo(event.rawX, event.rawY) }, 50)
+                    }
+                    return true
+                }
+                MotionEvent.ACTION_CANCEL -> {
+                    handler.removeCallbacks(longPressRunnable)
+                    return true
+                }
+                else -> return true
+            }
+        }
+
+        fun setPreview(value: Boolean) {
+            if (isPreview != value) {
+                isPreview = value
+                invalidate()
+            }
+        }
     }
 }
 
