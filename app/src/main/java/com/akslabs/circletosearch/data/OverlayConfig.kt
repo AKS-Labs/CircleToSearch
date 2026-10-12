@@ -6,6 +6,7 @@ package com.akslabs.circletosearch.data
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.provider.Settings
 import com.akslabs.circletosearch.R
 import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
@@ -110,7 +111,33 @@ fun GestureType.getFriendlyName(context: Context): String = when (this) {
     GestureType.SWIPE_RIGHT -> context.getString(R.string.gesture_swipe_right)
 }
 
+/**
+ * True when the device uses full-screen gesture navigation.
+ * `Settings.Secure.NAVIGATION_MODE` (raw key "navigation_mode", hidden from the SDK):
+ * 0 = 3-button, 1 = 2-button, 2 = gesture. Pre-Q devices have no gesture navigation,
+ * and the key is simply absent there → defaults to button nav.
+ */
+fun isGestureNavigation(context: Context): Boolean = try {
+    Settings.Secure.getInt(context.contentResolver, "navigation_mode", 0) == 2
+} catch (_: Exception) {
+    false
+}
+
+/**
+ * Fresh (never-saved) bottom-edge config. On devices with a button navigation bar
+ * the bottom edge of the screen belongs to the system nav bar, so the long-press
+ * triggers there default to OFF to avoid fighting it (gesture nav keeps the
+ * original left/right defaults).
+ */
+fun defaultBottomEdgeConfig(context: Context): BottomEdgeConfig =
+    if (isGestureNavigation(context)) {
+        BottomEdgeConfig()
+    } else {
+        BottomEdgeConfig(leftEnabled = false, rightEnabled = false, midEnabled = false)
+    }
+
 class OverlayConfigurationManager(context: Context) {
+    private val appContext: Context = context.applicationContext
     private val prefs: SharedPreferences = context.getSharedPreferences("overlay_prefs", Context.MODE_PRIVATE)
     private val gson = Gson()
     
@@ -150,11 +177,13 @@ private const val KEY_BOTTOM_EDGE_MID_MIGRATED = "bottom_edge_mid_migrated_v1"
     }
 
     fun getBottomEdgeConfig(): BottomEdgeConfig {
-        val json = prefs.getString(KEY_BOTTOM_EDGE, null) ?: return BottomEdgeConfig()
+        val json = prefs.getString(KEY_BOTTOM_EDGE, null)
+            ?: return defaultBottomEdgeConfig(appContext)
         val cfg = try {
-            gson.fromJson(json, BottomEdgeConfig::class.java) ?: BottomEdgeConfig()
+            gson.fromJson(json, BottomEdgeConfig::class.java)
+                ?: defaultBottomEdgeConfig(appContext)
         } catch (e: Exception) {
-            return BottomEdgeConfig()
+            return defaultBottomEdgeConfig(appContext)
         }
         // One-time migration: the old mid-overlay defaults (96dp, later 64dp) were too
         // large for the actual on-screen semicircle — shrink them to the new 48dp default.

@@ -22,6 +22,7 @@ package com.akslabs.circletosearch
 import android.accessibilityservice.AccessibilityService
 import android.annotation.SuppressLint
 import android.content.Context
+import android.animation.ValueAnimator
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.ActivityInfo
@@ -55,6 +56,7 @@ import android.view.ViewOutlineProvider
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import android.view.animation.DecelerateInterpolator
 import com.akslabs.circletosearch.R
 import com.akslabs.circletosearch.data.ActionType
 import com.akslabs.circletosearch.data.BitmapRepository
@@ -87,6 +89,9 @@ private fun stickerCornerRadius(width: Int, height: Int, density: Float): Float 
 
 // --- Hardware button trigger prefs (all in app_prefs, default off) ---
 private const val KEY_TRIGGER_DOUBLE_VOL_UP = "trigger_double_vol_up"
+
+/** Opacity of the floating bubble while it is docked (half hidden behind a screen edge). */
+private const val DOCKED_BUBBLE_ALPHA = 0.45f
 private const val KEY_TRIGGER_DOUBLE_VOL_DOWN = "trigger_double_vol_down"
 private const val KEY_TRIGGER_DOUBLE_POWER = "trigger_double_power"
 private const val KEY_TRIGGER_POWER_VOL_UP = "trigger_power_vol_up"
@@ -194,38 +199,105 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
             PixelFormat.TRANSLUCENT
         )
         params.gravity = Gravity.TOP or Gravity.START
-        params.x = 0
+        // Start docked at the left edge: half the bubble hidden, dimmed — it only
+        // takes half its footprint of visible screen space while at rest.
+        params.x = -(params.width / 2)
         params.y = 200
 
         bubbleView = View(this).apply {
             setBackgroundResource(R.mipmap.ic_launcher)
             elevation = 10f
-            
+            alpha = DOCKED_BUBBLE_ALPHA
+
             var initialX = 0
             var initialY = 0
             var initialTouchX = 0f
             var initialTouchY = 0f
-            
+            var dragged = false
+            var screenW = 0
+            var screenH = 0
+            var dockAnimator: ValueAnimator? = null
+
+            fun screenBounds(): Pair<Int, Int> {
+                val dm = resources.displayMetrics
+                val bounds = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    windowManager?.maximumWindowMetrics?.bounds
+                } else {
+                    null
+                }
+                return (bounds?.width() ?: dm.widthPixels) to (bounds?.height() ?: dm.heightPixels)
+            }
+
+            fun updateLayout() {
+                runCatching { windowManager?.updateViewLayout(this, params) }
+            }
+
+            // Slide to the nearest side edge, half hidden behind it, dimmed.
+            fun dockToNearestEdge(animate: Boolean) {
+                if (screenW <= 0) {
+                    val (w, h) = screenBounds()
+                    screenW = w
+                    screenH = h
+                }
+                val half = params.width / 2
+                val targetX = if (params.x + params.width / 2 < screenW / 2) -half else screenW - half
+                val targetY = params.y.coerceIn(0, (screenH - params.height).coerceAtLeast(0))
+                alpha = DOCKED_BUBBLE_ALPHA
+                dockAnimator?.cancel()
+                if (!animate || (params.x == targetX && params.y == targetY)) {
+                    params.x = targetX
+                    params.y = targetY
+                    updateLayout()
+                    return
+                }
+                val startX = params.x
+                val startY = params.y
+                dockAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
+                    duration = 180
+                    interpolator = DecelerateInterpolator()
+                    addUpdateListener {
+                        params.x = (startX + (targetX - startX) * it.animatedFraction).toInt()
+                        params.y = (startY + (targetY - startY) * it.animatedFraction).toInt()
+                        updateLayout()
+                    }
+                    start()
+                }
+            }
+
             @SuppressLint("ClickableViewAccessibility")
             setOnTouchListener { _, event ->
                 when (event.action) {
                     MotionEvent.ACTION_DOWN -> {
+                        dockAnimator?.cancel()
                         initialX = params.x
                         initialY = params.y
                         initialTouchX = event.rawX
                         initialTouchY = event.rawY
+                        dragged = false
+                        val (w, h) = screenBounds()
+                        screenW = w
+                        screenH = h
+                        alpha = 1f
                         true
                     }
                     MotionEvent.ACTION_MOVE -> {
-                        params.x = initialX + (event.rawX - initialTouchX).toInt()
-                        params.y = initialY + (event.rawY - initialTouchY).toInt()
-                        windowManager?.updateViewLayout(this, params)
+                        val dx = event.rawX - initialTouchX
+                        val dy = event.rawY - initialTouchY
+                        if (!dragged && (Math.abs(dx) >= 10 || Math.abs(dy) >= 10)) dragged = true
+                        val half = params.width / 2
+                        params.x = (initialX + dx.toInt()).coerceIn(-half, screenW - half)
+                        params.y = (initialY + dy.toInt())
+                            .coerceIn(0, (screenH - params.height).coerceAtLeast(0))
+                        updateLayout()
                         true
                     }
                     MotionEvent.ACTION_UP -> {
-                        if (Math.abs(event.rawX - initialTouchX) < 10 && Math.abs(event.rawY - initialTouchY) < 10) {
+                        if (!dragged) {
                             performCapture()
                         }
+                        // Never leave it floating mid-screen: after every release it
+                        // ends up docked at the nearest side edge (half hidden, dimmed).
+                        dockToNearestEdge(animate = true)
                         true
                     }
                     else -> false
