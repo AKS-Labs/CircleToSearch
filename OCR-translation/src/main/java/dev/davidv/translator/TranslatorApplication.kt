@@ -97,7 +97,11 @@ class TranslatorApplication : Application() {
       return
     }
 
-    languageCatalog = filePathManager.loadCatalog()
+    // Copy the bundled text-recognition models into filesDir in the background so a
+    // fresh install can detect text offline right away (OCR flows await the seed).
+    filePathManager.seedBundledOcrAssetsAsync()
+
+    languageCatalog = filePathManager.loadCatalog(awaitOcrSeed = false)
     languagesFlow.value = languageCatalog?.languageList ?: emptyList()
     languageMetadataManager = LanguageMetadataManager(this, languagesFlow)
     imageProcessor = ImageProcessor(this, filePathManager)
