@@ -58,6 +58,34 @@
             android:label="Wobble Home"
             android:theme="@style/Theme.CircleToSearch" />
 
+        <!-- Assist entry point: lets assist intents (long-press home on builds that
+             route assist through an activity, the ASSIST key, voice-assist
+             entrypoints) resolve to this app directly instead of the system
+             disambiguation dialog. Triggers capture and finishes immediately. -->
+        <activity
+            android:name=".AssistEntryActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTask"
+            android:theme="@style/Theme.CircleToSearch.Transparent">
+            <intent-filter>
+                <action android:name="android.intent.action.ASSIST" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.ASSIST" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VOICE_ASSIST" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <!-- Launcher home-button long-press runs contextual search ("omni"),
+             dispatched via LAUNCH_CONTEXTUAL_SEARCH; paired with the
+             secure contextual_search_package setting pointing at this app. -->
+            <intent-filter>
+                <action android:name="android.app.contextualsearch.action.LAUNCH_CONTEXTUAL_SEARCH" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
         <activity
             android:name=".ui.wobblepulldown.WobbleDeviceInfoActivity"
             android:exported="false"

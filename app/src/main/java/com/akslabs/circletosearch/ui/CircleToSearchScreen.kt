@@ -220,7 +220,16 @@ private suspend fun runInstantScreenshotOcr(
 ): ImageWordSelection? {
     val app = context.applicationContext as? TranslatorApplication ?: return null
     val coordinator = runCatching { app.translationCoordinator }.getOrNull() ?: return null
-    val target = CircleToSearchAccessibilityService.instance?.defaultTargetLanguage() ?: return null
+    // The accessibility service exposes the configured target language when it is
+    // running, but the assistant launch path must also work with accessibility
+    // disabled — resolve the same setting from the translator application directly.
+    val target = CircleToSearchAccessibilityService.instance?.defaultTargetLanguage()
+        ?: runCatching {
+            app.languageCatalog?.languageByCode(
+                app.settingsManager.settings.value.defaultTargetLanguageCode
+            )
+        }.getOrNull()
+        ?: return null
     var ocrMissing = false
     var sourceDetectFailed = false
     val result = coordinator.ocrWordsOnly(

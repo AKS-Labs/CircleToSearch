@@ -1681,13 +1681,26 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
 
     // --- Hardware button triggers ---
     // With FLAG_REQUEST_FILTER_KEY_EVENTS every volume/power press flows through
-    // onKeyEvent. We NEVER consume (always return false), so volume still adjusts
-    // and power still sleeps — presses are only observed to launch the overlay.
+    // onKeyEvent. Volume/power are NEVER consumed (always return false), so volume
+    // still adjusts and power still sleeps — presses are only observed to launch the
+    // overlay. HOME is the one exception: a long-press is claimed by us (the release
+    // is consumed) because this ROM routes long-press-home into the launcher's
+    // contextual search, which fails silently, instead of dispatching assist — so
+    // we detect the hold ourselves and a consumed UP prevents the stray "go home".
     private var lastVolUpDown = 0L
     private var lastVolDownDown = 0L
     private var lastPowerDown = 0L
     private var lastTriggerFiredAt = 0L
     private val keysCurrentlyDown = mutableSetOf<Int>()
+    private val homeKeyHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private var homeDownEventTime = 0L
+    private var homeLongPressTriggered = false
+    private val homeLongPressRunnable = Runnable {
+        if (homeDownEventTime == 0L) return@Runnable
+        homeLongPressTriggered = true
+        android.util.Log.d("CircleToSearch", "Home long-press fired (threshold while held)")
+        fireHardwareTrigger()
+    }
 
     override fun onKeyEvent(event: android.view.KeyEvent): Boolean {
         val code = event.keyCode
@@ -1695,6 +1708,17 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
             android.view.KeyEvent.ACTION_DOWN -> {
                 // Long-press repeats must not count as new presses
                 if (event.repeatCount != 0) return false
+                if (code == android.view.KeyEvent.KEYCODE_HOME) {
+                    homeDownEventTime = event.eventTime
+                    homeLongPressTriggered = false
+                    homeKeyHandler.removeCallbacks(homeLongPressRunnable)
+                    homeKeyHandler.postDelayed(
+                        homeLongPressRunnable,
+                        android.view.ViewConfiguration.getLongPressTimeout().toLong(),
+                    )
+                    android.util.Log.d("CircleToSearch", "HOME down observed by a11y filter")
+                    return false // short tap must still behave like the Home button
+                }
                 if (code != android.view.KeyEvent.KEYCODE_VOLUME_UP &&
                     code != android.view.KeyEvent.KEYCODE_VOLUME_DOWN &&
                     code != android.view.KeyEvent.KEYCODE_POWER
@@ -1746,6 +1770,23 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
                 if (fire) fireHardwareTrigger()
             }
             android.view.KeyEvent.ACTION_UP -> {
+                if (code == android.view.KeyEvent.KEYCODE_HOME) {
+                    homeKeyHandler.removeCallbacks(homeLongPressRunnable)
+                    val sawDown = homeDownEventTime != 0L
+                    val held = if (sawDown) event.eventTime - homeDownEventTime else 0L
+                    val wasLongPress = sawDown &&
+                        (homeLongPressTriggered ||
+                            held >= android.view.ViewConfiguration.getLongPressTimeout())
+                    homeDownEventTime = 0L
+                    if (wasLongPress) {
+                        if (!homeLongPressTriggered) fireHardwareTrigger()
+                        // Consume the release: we handled this press, so the system
+                        // must not also run its "go home" on key-up.
+                        android.util.Log.d("CircleToSearch", "HOME long-press release consumed")
+                        return true
+                    }
+                    return false // normal short tap → Home behaves as usual
+                }
                 keysCurrentlyDown.remove(code)
             }
         }

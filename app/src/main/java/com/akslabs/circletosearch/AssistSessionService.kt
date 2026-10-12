@@ -33,6 +33,11 @@ import com.akslabs.circletosearch.data.BitmapRepository
 
 class AssistSessionService : VoiceInteractionSessionService() {
 
+    companion object {
+        /** Screenshot handed from AssistEntryActivity (captured by the system's assist pipeline). */
+        const val EXTRA_SCREENSHOT_BITMAP = "com.akslabs.circletosearch.extra.SCREENSHOT_BITMAP"
+    }
+
     override fun onCreate() {
         super.onCreate()
         android.util.Log.d("AssistSessionService", "Service onCreate")
@@ -45,6 +50,9 @@ class AssistSessionService : VoiceInteractionSessionService() {
 
     inner class CircleToSearchSession(context: Context) : VoiceInteractionSession(context) {
 
+        private var captureLaunched = false
+        private val sessionHandler = android.os.Handler(android.os.Looper.getMainLooper())
+
         override fun onShow(args: Bundle?, showFlags: Int) {
             super.onShow(args, showFlags)
             android.util.Log.d("AssistSessionService", "onShow called with flags: $showFlags")
@@ -52,7 +60,7 @@ class AssistSessionService : VoiceInteractionSessionService() {
             // Ensure our session window doesn't intercept target app touches
             window?.window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE)
             window?.window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE)
-            
+
             // Haptic feedback to acknowledge the trigger
             val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -61,6 +69,48 @@ class AssistSessionService : VoiceInteractionSessionService() {
                 @Suppress("DEPRECATION")
                 vibrator.vibrate(50)
             }
+
+            // Screenshot captured by the system's assist pipeline (assistant privileges)
+            // and passed through the entry activity. Using it means the whole flow works
+            // without the accessibility service.
+            val systemScreenshot: android.graphics.Bitmap? = args?.let {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    it.getParcelable(EXTRA_SCREENSHOT_BITMAP, android.graphics.Bitmap::class.java)
+                } else {
+                    @Suppress("DEPRECATION")
+                    it.getParcelable(EXTRA_SCREENSHOT_BITMAP)
+                }
+            }
+            if (systemScreenshot != null && !systemScreenshot.isRecycled) {
+                android.util.Log.d(
+                    "AssistSessionService",
+                    "Using system-provided screenshot ${systemScreenshot.width}x${systemScreenshot.height}"
+                )
+                BitmapRepository.setScreenshot(systemScreenshot)
+                captureLaunched = true
+                launchOverlayDirectly()
+                return
+            }
+
+            // No screenshot in args (e.g. plain assist invocation). Modern Android versions
+            // may never deliver onHandleScreenshot, so kick off a capture shortly after
+            // showing; whichever source (the fallback or the system screenshot) arrives
+            // first wins. Without the accessibility service wait a little longer for the
+            // system screenshot requested via SHOW_WITH_SCREENSHOT.
+            captureLaunched = false
+            val a11yAvailable = CircleToSearchAccessibilityService.instance != null
+            val fallbackDelayMs = if (a11yAvailable) 250L else 1200L
+            sessionHandler.postDelayed({
+                if (captureLaunched) return@postDelayed
+                captureLaunched = true
+                if (CircleToSearchAccessibilityService.instance != null) {
+                    android.util.Log.d("AssistSessionService", "Using accessibility capture fallback")
+                    CircleToSearchAccessibilityService.triggerCapture()
+                } else {
+                    android.util.Log.d("AssistSessionService", "No capture source available; launching overlay directly")
+                    launchOverlayDirectly()
+                }
+            }, fallbackDelayMs)
         }
 
         override fun onHandleAssist(data: Bundle?, structure: AssistStructure?, content: AssistContent?) {
@@ -71,10 +121,16 @@ class AssistSessionService : VoiceInteractionSessionService() {
         override fun onHandleScreenshot(screenshot: android.graphics.Bitmap?) {
             super.onHandleScreenshot(screenshot)
             android.util.Log.d("AssistSessionService", "onHandleScreenshot received, bitmap null? ${screenshot == null}")
-            
+
+            if (captureLaunched) {
+                android.util.Log.d("AssistSessionService", "Screenshot arrived after fallback already launched; ignoring")
+                return
+            }
+            captureLaunched = true
+
             // 1. Save screenshot to repository
             BitmapRepository.setScreenshot(screenshot)
-            
+
             // 2. Launch the search overlay
             launchOverlayDirectly()
         }
