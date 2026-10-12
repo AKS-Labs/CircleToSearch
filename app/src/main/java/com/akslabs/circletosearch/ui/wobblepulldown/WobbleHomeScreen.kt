@@ -109,6 +109,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.Canvas
 import androidx.core.app.ActivityOptionsCompat
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.akslabs.circletosearch.MainActivity
@@ -216,6 +217,8 @@ fun WobbleHomeScreen(
     }
     var showHwSheet by remember { mutableStateOf(false) }
     var bottomEdge by remember { mutableStateOf(configManager.getBottomEdgeConfig()) }
+    var statusBarExpanded by remember { mutableStateOf(false) }
+    var bottomEdgeExpanded by remember { mutableStateOf(false) }
     val bottomEdgeActive = bottomEdge.leftEnabled || bottomEdge.rightEnabled || bottomEdge.midEnabled
     val hwEnabledCount = hwTriggers.values.count { it }
     val running = assistantGranted ||
@@ -233,7 +236,15 @@ fun WobbleHomeScreen(
 
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, _ -> refreshHomeState() }
+        val observer = LifecycleEventObserver { _, event ->
+            refreshHomeState()
+            if (event == Lifecycle.Event.ON_STOP) {
+                // Switching away from the app closes both settings dropdowns, which
+                // also drops their on-screen overlay previews.
+                statusBarExpanded = false
+                bottomEdgeExpanded = false
+            }
+        }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
@@ -551,6 +562,8 @@ fun WobbleHomeScreen(
                             HomeStatusBarSection(
                                 config = overlayConfig,
                                 a11yGranted = a11yGranted,
+                                expanded = statusBarExpanded,
+                                onExpandedChange = { statusBarExpanded = it },
                                 onChange = saveOverlayConfig,
                             )
                             HomeRowDivider()
@@ -566,6 +579,8 @@ fun WobbleHomeScreen(
                             HomeBottomEdgeSection(
                                 config = bottomEdge,
                                 a11yGranted = a11yGranted,
+                                expanded = bottomEdgeExpanded,
+                                onExpandedChange = { bottomEdgeExpanded = it },
                                 onChange = saveBottomEdge,
                             )
                             HomeRowDivider()
@@ -867,16 +882,25 @@ private fun HomeHwSheet(
 private fun HomeStatusBarSection(
     config: OverlayConfig,
     a11yGranted: Boolean,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
     onChange: (OverlayConfig) -> Unit,
 ) {
     val masterOn = config.isEnabled
-    var expanded by remember { mutableStateOf(false) }
     val density = LocalDensity.current
     val expandProgress by animateFloatAsState(
         targetValue = if (expanded) 1f else 0f,
         animationSpec = tween(durationMillis = 240),
         label = "statusBarExpand",
     )
+
+    // Keep the strip on screen (as a tinted preview) while the dropdown is open so
+    // slider adjustments are visible live; closing the dropdown hides it again.
+    LaunchedEffect(expanded) {
+        if (config.previewVisible != expanded) {
+            onChange(config.copy(previewVisible = expanded))
+        }
+    }
 
     val segment = config.segments.firstOrNull() ?: OverlaySegment()
     fun saveSegment(newSegment: OverlaySegment) {
@@ -895,7 +919,7 @@ private fun HomeStatusBarSection(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable(enabled = a11yGranted) { expanded = !expanded }
+                .clickable(enabled = a11yGranted) { onExpandedChange(!expanded) }
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -930,7 +954,7 @@ private fun HomeStatusBarSection(
                 enabled = a11yGranted,
                 onCheckedChange = { on ->
                     onChange(config.copy(isEnabled = on))
-                    if (on) expanded = true
+                    if (on) onExpandedChange(true)
                 },
             )
         }
@@ -983,7 +1007,7 @@ private fun HomeStatusBarSection(
                         LabelledSlider(
                             label = stringResource(R.string.home_statusbar_width),
                             value = widthDp,
-                            valueRange = 60f..(screenWidthDp - 40f).coerceAtLeast(120f),
+                            valueRange = 60f..maxOf(screenWidthDp, widthDp),
                             valueText = "${widthDp.toInt()}dp",
                             onValueChange = {
                                 saveSegment(segment.copy(width = (it * density.density).toInt()))
@@ -1026,10 +1050,11 @@ private fun HomeStatusBarSection(
 private fun HomeBottomEdgeSection(
     config: BottomEdgeConfig,
     a11yGranted: Boolean,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
     onChange: (BottomEdgeConfig) -> Unit,
 ) {
     val masterOn = config.leftEnabled || config.rightEnabled || config.midEnabled
-    var expanded by remember { mutableStateOf(false) }
 
     // Keep preview in sync with expansion state.
     LaunchedEffect(expanded) {
@@ -1059,7 +1084,7 @@ private fun HomeBottomEdgeSection(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable(enabled = a11yGranted) { expanded = !expanded }
+                .clickable(enabled = a11yGranted) { onExpandedChange(!expanded) }
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -1101,7 +1126,7 @@ private fun HomeBottomEdgeSection(
                             midEnabled = if (on) config.midEnabled else false,
                         ),
                     )
-                    if (on) expanded = true
+                    if (on) onExpandedChange(true)
                 },
             )
         }

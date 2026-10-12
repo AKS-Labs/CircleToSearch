@@ -254,7 +254,11 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
     private fun updateOverlay() {
         val config = configManager.getConfig()
         
-        if (!config.isEnabled) {
+        // Keep strips alive while their settings dropdown is open (preview), even
+        // when the master switch is off, and tint them so slider adjustments are
+        // visible live (normal running strips are fully transparent).
+        val previewing = config.previewVisible
+        if (!config.isEnabled && !config.previewVisible) {
             overlayViews.forEach { 
                 try { windowManager?.removeView(it) } catch(e: Exception) {} 
             }
@@ -330,8 +334,8 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
                     }
                 }
                 
-                // Update Color (Debug)
-                if (config.isVisible) {
+                // Update Color (Debug / dropdown preview)
+                if (config.isVisible || previewing) {
                     val color = themePalette[index % themePalette.size]
                     val drawable = GradientDrawable().apply {
                         setColor(color)
@@ -382,7 +386,7 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
                 params.y = segment.yOffset +
                         if (segment.yOffset == 0) (3 * resources.displayMetrics.density).toInt() else 0
                 
-                 if (config.isVisible) {
+                 if (config.isVisible || previewing) {
                     val color = themePalette[index % themePalette.size]
                     val drawable = GradientDrawable().apply {
                         setColor(color)

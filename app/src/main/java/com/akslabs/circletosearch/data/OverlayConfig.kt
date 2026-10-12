@@ -14,6 +14,7 @@ data class OverlayConfig(
     @SerializedName("isEnabled") val isEnabled: Boolean = true,
     @SerializedName("isEnabledInLandscape") val isEnabledInLandscape: Boolean = false,
     @SerializedName("isVisible") val isVisible: Boolean = false, // Debug visibility (colored)
+    @SerializedName("previewVisible") val previewVisible: Boolean = false, // true only while the settings dropdown is open
     @SerializedName("activeSegmentIndex") val activeSegmentIndex: Int = -1, // Currently being edited in settings
     @SerializedName("segments") val segments: List<OverlaySegment> = listOf(OverlaySegment(width = 1080)) // Default to a common large width
 )
