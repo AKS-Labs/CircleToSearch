@@ -152,6 +152,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -295,6 +296,37 @@ private fun fitCrop(
         t.unmapY(rect.bottom.toFloat()).toInt().coerceIn(0, imageH),
     )
 
+/**
+ * The device's physical screen corner radii in px: upper-left, upper-right,
+ * lower-right, lower-left. `Display.getRoundedCorner` (Android 12+) reports the
+ * real bezel radius per corner and returns null where the screen is rectangular;
+ * older OEM builds usually expose the physical radius as an `android` framework
+ * dimen. Every unresolved path yields 0, so the overlay border follows the true
+ * screen shape on any device.
+ */
+private fun deviceCornerRadiiPx(context: android.content.Context): FloatArray {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        val display = context.display
+            ?: (context as? android.app.Activity)?.windowManager?.let {
+                @Suppress("DEPRECATION")
+                it.defaultDisplay
+            }
+        if (display != null) {
+            fun radiusAt(position: Int): Float =
+                display.getRoundedCorner(position)?.radius?.toFloat() ?: 0f
+            return floatArrayOf(
+                radiusAt(android.view.RoundedCorner.POSITION_TOP_LEFT),
+                radiusAt(android.view.RoundedCorner.POSITION_TOP_RIGHT),
+                radiusAt(android.view.RoundedCorner.POSITION_BOTTOM_RIGHT),
+                radiusAt(android.view.RoundedCorner.POSITION_BOTTOM_LEFT),
+            )
+        }
+    }
+    val id = context.resources.getIdentifier("rounded_corner_radius", "dimen", "android")
+    val r = if (id != 0) context.resources.getDimension(id) else 0f
+    return floatArrayOf(r, r, r, r)
+}
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun CircleToSearchScreen(
@@ -304,6 +336,21 @@ fun CircleToSearchScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+
+    // Border shape follows the physical screen corners (rounded bezel vs.
+    // rectangular) so the overlay outline matches the device on any screen ratio.
+    val density = LocalDensity.current
+    val deviceCornerShape = remember(density, context) {
+        val radii = deviceCornerRadiiPx(context)
+        with(density) {
+            RoundedCornerShape(
+                topStart = radii[0].toDp(),
+                topEnd = radii[1].toDp(),
+                bottomEnd = radii[2].toDp(),
+                bottomStart = radii[3].toDp(),
+            )
+        }
+    }
 
     // Upload flow: the user can swap the canvas for a gallery image and run Circle to
     // Search on it. Keyed on the capture param so a fresh capture supersedes a pick.
@@ -1405,8 +1452,7 @@ fun CircleToSearchScreen(
                         alpha = if (isTranslatorMode) 0f else 1f
                         compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen
                     }) {
-                        val strokeWidth = 0f
-                        val dimAlpha = 0.15f
+                        val dimAlpha = 0.08f
                         
                         // 1. Draw global dim
                         drawRect(Color.Black.copy(alpha = dimAlpha))
@@ -1441,6 +1487,8 @@ fun CircleToSearchScreen(
             }
 
             // 2. Gradient Border Layer (Overlaying screenshot, clipped to rounded corners)
+            // Sibling drawn AFTER the dim/tint layer, so overlay dimness can never
+            // wash the border out — it stays at its own alpha regardless of dimAlpha.
             if (showGradientBorder && !isTranslatorMode) {
                 androidx.compose.animation.AnimatedVisibility(
                     visible = isUIVisible,
@@ -1450,13 +1498,13 @@ fun CircleToSearchScreen(
                         modifier = Modifier
                             .fillMaxSize()
                             .border(
-                                width = 8.dp,
+                                width = 2.dp,
                                 brush = Brush.verticalGradient(
-                                    colors = OverlayGradientColors.map { it.copy(alpha = 0.5f) }
+                                    colors = OverlayGradientColors.map { it.copy(alpha = 0.9f) }
                                 ),
-                                shape = RoundedCornerShape(24.dp) // Rounded corners for device
+                                shape = deviceCornerShape
                             )
-                            .clip(RoundedCornerShape(24.dp))
+                            .clip(deviceCornerShape)
                     )
                 }
             }
