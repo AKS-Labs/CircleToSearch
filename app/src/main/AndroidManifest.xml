@@ -68,10 +68,23 @@
             android:excludeFromRecents="true"
             android:launchMode="singleTask"
             android:theme="@style/Theme.CircleToSearch.Transparent">
+            <!-- Assist entry point: lets assist intents (long-press home on builds that
+                 route assist through an activity, the ASSIST key, voice-assist
+                 entrypoints) resolve to this app directly instead of the system
+                 disambiguation dialog. Triggers capture and finishes immediately.
+
+                 The ASSIST category on ACTION_ASSIST is what makes the system treat this
+                 as *the* assistant entry point: with the assistant role held, assist
+                 intents route here directly instead of offering a "complete action using"
+                 sheet against other assistants (e.g. Google). -->
             <intent-filter>
                 <action android:name="android.intent.action.ASSIST" />
-                <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.ASSIST" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VOICE_COMMAND" />
+                <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.VOICE_ASSIST" />

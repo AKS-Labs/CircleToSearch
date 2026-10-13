@@ -37,6 +37,7 @@ class OverlayActivity : ComponentActivity() {
     
     private val screenshotBitmap = androidx.compose.runtime.mutableStateOf<android.graphics.Bitmap?>(null)
     private val searchModeOverride = androidx.compose.runtime.mutableStateOf<Boolean?>(null)
+    private var translateBridge: AssistantTranslateOverlayBridge? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(0))
@@ -66,6 +67,8 @@ class OverlayActivity : ComponentActivity() {
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL)
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN)
         
+        com.akslabs.circletosearch.AssistSessionService.registerOverlayActivity(this)
+
         loadScreenshot()
         updateOverride(intent)
 
@@ -87,6 +90,15 @@ class OverlayActivity : ComponentActivity() {
                 }
             }
         }
+
+        // Activity-hosted translate overlay: reuses the exact same OverlayUI chrome the
+        // accessibility path uses, hosted in this activity's window (no a11y permission
+        // needed for the OCR/translation — only the window type differed).
+        // NOTE: must be created AFTER setContent — setContent installs the ComposeView
+        // via setContentView, which removes any previously added content views (including
+        // the bridge's container), detaching the translate chrome from the window.
+        translateBridge = AssistantTranslateOverlayBridge(this).also { it.start() }
+        AssistantTranslateOverlay.attach(translateBridge!!)
     }
 
 
@@ -123,6 +135,11 @@ class OverlayActivity : ComponentActivity() {
     
     override fun onDestroy() {
         super.onDestroy()
+        translateBridge?.let {
+            AssistantTranslateOverlay.detach(it)
+            it.destroy()
+        }
+        translateBridge = null
         if (isFinishing) {
              com.akslabs.circletosearch.data.BitmapRepository.clear()
              com.akslabs.circletosearch.utils.StorageUtils.clearAppCache(this)

@@ -40,7 +40,30 @@ class OverlayUI(
   private val serviceContext: Context,
   private val windowManager: WindowManager,
   private val settingsManager: SettingsManager,
+  private val windowTypeOverride: Int? = null,
+  private val container: android.view.ViewGroup? = null,
 ) {
+  private fun windowType(): Int =
+    windowTypeOverride ?: WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
+
+  /** Adds a chrome view: to the in-activity container when hosted by our overlay activity
+   *  (which is already a full-screen window, so no separate overlay window is needed), or
+   *  to the WindowManager when running in the accessibility service. */
+  private fun addChromeView(view: View, lp: android.view.ViewGroup.LayoutParams) {
+    if (container != null) {
+      container.addView(view, lp)
+    } else {
+      windowManager.addView(view, lp as WindowManager.LayoutParams)
+    }
+  }
+
+  private fun removeChromeView(view: View) {
+    if (container != null) {
+      container.removeView(view)
+    } else {
+      windowManager.removeView(view)
+    }
+  }
   private val handler = Handler(Looper.getMainLooper())
   private var launcherBubble: FloatingBubble? = null
   private var toolbarView: View? = null
@@ -58,6 +81,7 @@ class OverlayUI(
   private var borderView: BorderWaveView? = null
   private var selectDialog: Dialog? = null
   private var selectHost: WindowComposeHost? = null
+  private var selectSurfaceView: View? = null
   private var scanHost: WindowComposeHost? = null
   private var messageView: TextView? = null
   private val menuChildren = mutableListOf<View>()
@@ -68,54 +92,76 @@ class OverlayUI(
       ::dpToPx,
       object : OverlayMenuHost {
         override fun addDismissLayer(view: View) {
-          val params =
-            WindowManager.LayoutParams(
-              WindowManager.LayoutParams.MATCH_PARENT,
-              WindowManager.LayoutParams.MATCH_PARENT,
-              WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-              WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-              PixelFormat.TRANSLUCENT,
-            )
-          params.windowAnimations = 0
-          windowManager.addView(view, params)
+          val lp =
+            if (container != null) {
+              android.widget.FrameLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+              )
+            } else {
+              WindowManager.LayoutParams(
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.MATCH_PARENT,
+                windowType(),
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                PixelFormat.TRANSLUCENT,
+              ).apply { windowAnimations = 0 }
+            }
+          addChromeView(view, lp)
           menuChildren.add(view)
         }
 
         override fun addMenuView(view: View) {
-          val params =
-            WindowManager.LayoutParams(
-              dpToPx(180),
-              WindowManager.LayoutParams.WRAP_CONTENT,
-              WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-              WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
-              PixelFormat.TRANSLUCENT,
-            )
-          params.gravity = Gravity.TOP or Gravity.END
-          params.x = dpToPx(8)
-          params.y = dpToPx(48)
-          params.windowAnimations = 0
-          windowManager.addView(view, params)
+          val lp =
+            if (container != null) {
+              android.widget.FrameLayout.LayoutParams(dpToPx(180), android.view.ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                gravity = Gravity.TOP or Gravity.END
+                topMargin = dpToPx(48)
+                marginEnd = dpToPx(8)
+              }
+            } else {
+              WindowManager.LayoutParams(
+                dpToPx(180),
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                windowType(),
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+                PixelFormat.TRANSLUCENT,
+              ).apply {
+                gravity = Gravity.TOP or Gravity.END
+                x = dpToPx(8)
+                y = dpToPx(48)
+                windowAnimations = 0
+              }
+            }
+          addChromeView(view, lp)
           menuChildren.add(view)
         }
 
         override fun addPickerView(view: View) {
-          val params =
-            WindowManager.LayoutParams(
-              dpToPx(250),
-              dpToPx(400),
-              WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-              WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
-              PixelFormat.TRANSLUCENT,
-            )
-          params.gravity = Gravity.CENTER
-          params.windowAnimations = 0
-          windowManager.addView(view, params)
+          val lp =
+            if (container != null) {
+              android.widget.FrameLayout.LayoutParams(dpToPx(250), dpToPx(400)).apply {
+                gravity = Gravity.CENTER
+              }
+            } else {
+              WindowManager.LayoutParams(
+                dpToPx(250),
+                dpToPx(400),
+                windowType(),
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+                PixelFormat.TRANSLUCENT,
+              ).apply {
+                gravity = Gravity.CENTER
+                windowAnimations = 0
+              }
+            }
+          addChromeView(view, lp)
           menuChildren.add(view)
         }
 
         override fun removeMenuChild(view: View) {
           menuChildren.remove(view)
-          windowManager.removeView(view)
+          removeChromeView(view)
         }
       },
     )
@@ -124,7 +170,7 @@ class OverlayUI(
     val bubble = launcherBubble
     if (bubble == null) {
       launcherBubble =
-        FloatingBubble(serviceContext, windowManager, WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY, ::dpToPx) {
+        FloatingBubble(serviceContext, windowManager, windowType(), ::dpToPx) {
           service.activate()
         }.also { it.show() }
     } else {
@@ -179,27 +225,35 @@ class OverlayUI(
     flipIconView = toolbarViews.flipIcon
     flipButtonView?.visibility = View.GONE
 
-    val params =
-      WindowManager.LayoutParams(
-        WindowManager.LayoutParams.MATCH_PARENT,
-        WindowManager.LayoutParams.WRAP_CONTENT,
-        WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-        WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-        PixelFormat.TRANSLUCENT,
-      )
-    params.gravity = Gravity.TOP or Gravity.START
-    params.x = 0
-    params.y = getStatusBarHeight()
-    params.windowAnimations = 0
+    val lp: android.view.ViewGroup.LayoutParams =
+      if (container != null) {
+        android.widget.FrameLayout.LayoutParams(
+          android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+          android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+        ).apply { topMargin = getStatusBarHeight() }
+      } else {
+        WindowManager.LayoutParams(
+          WindowManager.LayoutParams.MATCH_PARENT,
+          WindowManager.LayoutParams.WRAP_CONTENT,
+          windowType(),
+          WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+          PixelFormat.TRANSLUCENT,
+        ).apply {
+          gravity = Gravity.TOP or Gravity.START
+          x = 0
+          y = getStatusBarHeight()
+          windowAnimations = 0
+        }
+      }
 
-    windowManager.addView(toolbar, params)
+    addChromeView(toolbar, lp)
     toolbarView = toolbar
-    toolbarParams = params
+    toolbarParams = lp as? WindowManager.LayoutParams
   }
 
   fun removeToolbar() {
     toolbarView?.let {
-      windowManager.removeView(it)
+      removeChromeView(it)
       toolbarView = null
       toolbarParams = null
       sourceLabelView = null
@@ -283,22 +337,30 @@ class OverlayUI(
 
     // Non-touchable so taps and swipes pass straight through to the app underneath;
     // the overlay clears itself off the next scroll/click via onAccessibilityEvent.
-    val params =
-      WindowManager.LayoutParams(
-        bounds.width(),
-        bounds.height(),
-        WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-        WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-          WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
-          WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-        PixelFormat.TRANSLUCENT,
-      )
-    params.gravity = Gravity.TOP or Gravity.START
-    params.x = bounds.left
-    params.y = bounds.top
-    params.spanFullDisplay()
+    val lp: android.view.ViewGroup.LayoutParams =
+      if (container != null) {
+        android.widget.FrameLayout.LayoutParams(bounds.width(), bounds.height()).apply {
+          leftMargin = bounds.left
+          topMargin = bounds.top
+        }
+      } else {
+        WindowManager.LayoutParams(
+          bounds.width(),
+          bounds.height(),
+          windowType(),
+          WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+            WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+          PixelFormat.TRANSLUCENT,
+        ).apply {
+          gravity = Gravity.TOP or Gravity.START
+          x = bounds.left
+          y = bounds.top
+          spanFullDisplay()
+        }
+      }
 
-    windowManager.addView(imageView, params)
+    addChromeView(imageView, lp)
     translationOverlays.add(imageView)
     raiseToolbar()
     ensureTouchWatcher()
@@ -316,46 +378,66 @@ class OverlayUI(
     region: Rect,
     onDismiss: () -> Unit,
   ) {
-    if (selectDialog != null) return
-    val dialog = Dialog(serviceContext, android.R.style.Theme_Material_NoActionBar)
-    val host = WindowComposeHost(serviceContext)
-    host.setContent { SelectionSurface(state) }
-    dialog.setContentView(host.view)
-    dialog.setCanceledOnTouchOutside(false)
-    dialog.window?.apply {
-      setType(WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY)
-      addFlags(
-        WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
-          WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-      )
-      clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-      setWindowAnimations(0)
-      setGravity(Gravity.TOP or Gravity.START)
-      attributes =
-        attributes.apply {
-          x = region.left
-          y = region.top
-          width = region.width()
-          height = region.height()
-          spanFullDisplay()
-        }
-      decorView.setPadding(0, 0, 0, 0)
-      host.installOn(decorView)
+    if (container != null) {
+      // In-activity hosting: the selection surface is a child view, not a dialog window
+      // (no SYSTEM_ALERT_WINDOW / a11y overlay window type is available to us).
+      val host = WindowComposeHost(serviceContext)
+      host.setContent { SelectionSurface(state) }
+      val lp = android.widget.FrameLayout.LayoutParams(region.width(), region.height()).apply {
+        leftMargin = region.left
+        topMargin = region.top
+      }
+      container.addView(host.view, lp)
+      selectHost = host
+      selectSurfaceView = host.view
+      host.view.setOnClickListener { onDismiss() }
+    } else {
+      val dialog = Dialog(serviceContext, android.R.style.Theme_Material_NoActionBar)
+      val host = WindowComposeHost(serviceContext)
+      host.setContent { SelectionSurface(state) }
+      dialog.setContentView(host.view)
+      dialog.setCanceledOnTouchOutside(false)
+      dialog.window?.apply {
+        setType(windowType())
+        addFlags(
+          WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+        )
+        clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+        setWindowAnimations(0)
+        setGravity(Gravity.TOP or Gravity.START)
+        attributes =
+          attributes.apply {
+            x = region.left
+            y = region.top
+            width = region.width()
+            height = region.height()
+            spanFullDisplay()
+          }
+        decorView.setPadding(0, 0, 0, 0)
+        host.installOn(decorView)
+      }
+      dialog.setOnCancelListener { onDismiss() }
+      dialog.show()
+      selectDialog = dialog
+      selectHost = host
     }
-    dialog.setOnCancelListener { onDismiss() }
-    dialog.show()
-    selectDialog = dialog
-    selectHost = host
     raiseToolbar()
   }
 
   fun removeSelectSurface() {
+    selectSurfaceView?.let {
+      container?.removeView(it)
+      selectSurfaceView = null
+    }
+    selectHost?.let {
+      if (selectSurfaceView == null) it.dispose()
+    }
+    selectHost = null
     val dialog = selectDialog ?: return
     selectDialog = null
     dialog.setOnCancelListener(null)
     dialog.dismiss()
-    selectHost?.dispose()
-    selectHost = null
   }
 
   fun hasSelectSurface(): Boolean = selectDialog != null
@@ -376,27 +458,32 @@ class OverlayUI(
       }
       false
     }
-    val params =
-      WindowManager.LayoutParams(
-        1,
-        1,
-        WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-        WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-          WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
-          WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH or
-          WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-        PixelFormat.TRANSLUCENT,
-      )
-    params.gravity = Gravity.TOP or Gravity.START
-    params.windowAnimations = 0
-    windowManager.addView(watcher, params)
+    val lp: android.view.ViewGroup.LayoutParams =
+      if (container != null) {
+        android.widget.FrameLayout.LayoutParams(1, 1)
+      } else {
+        WindowManager.LayoutParams(
+          1,
+          1,
+          windowType(),
+          WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+            WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+            WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH or
+            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+          PixelFormat.TRANSLUCENT,
+        ).apply {
+          gravity = Gravity.TOP or Gravity.START
+          windowAnimations = 0
+        }
+      }
+    addChromeView(watcher, lp)
     touchWatcher = watcher
   }
 
   private fun removeTouchWatcher() {
     touchWatcher?.let {
       try {
-        windowManager.removeView(it)
+        if (container != null) container.removeView(it) else windowManager.removeView(it)
       } catch (_: Exception) {
       }
     }
@@ -416,29 +503,37 @@ class OverlayUI(
         ScanAnimationOverlay(regions = it, modifier = Modifier.fillMaxSize())
       }
     }
-    val params =
-      WindowManager.LayoutParams(
-        region.width(),
-        region.height(),
-        WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-        WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-          WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
-          WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-        PixelFormat.TRANSLUCENT,
-      )
-    params.gravity = Gravity.TOP or Gravity.START
-    params.x = region.left
-    params.y = region.top
-    params.spanFullDisplay()
-    params.windowAnimations = 0
-    windowManager.addView(host.view, params)
+    if (container != null) {
+      val lp = android.widget.FrameLayout.LayoutParams(region.width(), region.height()).apply {
+        leftMargin = region.left
+        topMargin = region.top
+      }
+      container.addView(host.view, lp)
+    } else {
+      val params =
+        WindowManager.LayoutParams(
+          region.width(),
+          region.height(),
+          windowType(),
+          WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+            WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+          PixelFormat.TRANSLUCENT,
+        )
+      params.gravity = Gravity.TOP or Gravity.START
+      params.x = region.left
+      params.y = region.top
+      params.spanFullDisplay()
+      params.windowAnimations = 0
+      windowManager.addView(host.view, params)
+    }
     scanHost = host
   }
 
   private fun removeScanOverlay() {
     scanHost?.let {
       try {
-        windowManager.removeView(it.view)
+        if (container != null) container.removeView(it.view) else windowManager.removeView(it.view)
       } catch (_: Exception) {
       }
       it.dispose()
@@ -458,23 +553,33 @@ class OverlayUI(
     bg.cornerRadius = dpToPx(8).toFloat()
     textView.background = bg
 
-    val params =
-      WindowManager.LayoutParams(
-        WindowManager.LayoutParams.WRAP_CONTENT,
-        WindowManager.LayoutParams.WRAP_CONTENT,
-        WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-        WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
-        PixelFormat.TRANSLUCENT,
-      )
-    params.gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
-    params.y = dpToPx(80)
-
-    windowManager.addView(textView, params)
+    if (container != null) {
+      val lp = android.widget.FrameLayout.LayoutParams(
+        android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+        android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+      ).apply {
+        gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+        bottomMargin = dpToPx(80)
+      }
+      container.addView(textView, lp)
+    } else {
+      val params =
+        WindowManager.LayoutParams(
+          WindowManager.LayoutParams.WRAP_CONTENT,
+          WindowManager.LayoutParams.WRAP_CONTENT,
+          windowType(),
+          WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
+          PixelFormat.TRANSLUCENT,
+        )
+      params.gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+      params.y = dpToPx(80)
+      windowManager.addView(textView, params)
+    }
     messageView = textView
     handler.postDelayed({
       if (messageView === textView) messageView = null
       try {
-        windowManager.removeView(textView)
+        if (container != null) container.removeView(textView) else windowManager.removeView(textView)
       } catch (_: Exception) {
       }
     }, 3000)
@@ -502,17 +607,24 @@ class OverlayUI(
    *  select surface) — windows stack in insertion order. */
   private fun raiseToolbar() {
     val tv = toolbarView ?: return
-    val tp = toolbarParams ?: return
     runCatching {
-      windowManager.removeView(tv)
-      windowManager.addView(tv, tp)
+      if (container != null) {
+        container.removeView(tv)
+        container.addView(tv, tv.layoutParams)
+      } else {
+        // Container mode stores FrameLayout.LayoutParams, so toolbarParams is null there;
+        // the window path needs the original WindowManager.LayoutParams to re-add.
+        val tp = toolbarParams ?: return
+        windowManager.removeView(tv)
+        windowManager.addView(tv, tp)
+      }
     }
   }
 
   fun removeTranslationOverlays() {
     for (view in translationOverlays) {
       try {
-        windowManager.removeView(view)
+        if (container != null) container.removeView(view) else windowManager.removeView(view)
       } catch (_: Exception) {
       }
     }
@@ -526,18 +638,28 @@ class OverlayUI(
   fun showBorderWave() {
     if (borderView != null) return
     val view = BorderWaveView.create(serviceContext)
-    val params =
-      WindowManager.LayoutParams(
-        WindowManager.LayoutParams.MATCH_PARENT,
-        WindowManager.LayoutParams.MATCH_PARENT,
-        WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-        WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-          WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
-          WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
-        PixelFormat.TRANSLUCENT,
+    if (container != null) {
+      container.addView(
+        view,
+        android.widget.FrameLayout.LayoutParams(
+          android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+          android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+        ),
       )
-    params.spanFullDisplay()
-    windowManager.addView(view, params)
+    } else {
+      val params =
+        WindowManager.LayoutParams(
+          WindowManager.LayoutParams.MATCH_PARENT,
+          WindowManager.LayoutParams.MATCH_PARENT,
+          windowType(),
+          WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+            WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+          PixelFormat.TRANSLUCENT,
+        )
+      params.spanFullDisplay()
+      windowManager.addView(view, params)
+    }
     borderView = view
     view.startAnimation()
   }
@@ -546,7 +668,7 @@ class OverlayUI(
     borderView?.stopAnimation()
     borderView?.let {
       try {
-        windowManager.removeView(it)
+        if (container != null) container.removeView(it) else windowManager.removeView(it)
       } catch (_: Exception) {
       }
     }

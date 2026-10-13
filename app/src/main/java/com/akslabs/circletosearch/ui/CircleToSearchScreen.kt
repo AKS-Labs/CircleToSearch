@@ -21,6 +21,7 @@ package com.akslabs.circletosearch.ui
 
 import android.graphics.Bitmap
 import android.graphics.Rect
+import com.akslabs.circletosearch.AssistSessionService
 import com.akslabs.circletosearch.CircleToSearchAccessibilityService
 import android.util.Base64
 import android.view.Display
@@ -67,6 +68,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -74,15 +76,20 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BorderOuter
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.automirrored.filled.FormatTextdirectionRToL
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.DesktopWindows
 import androidx.compose.material.icons.filled.Favorite
@@ -108,6 +115,7 @@ import androidx.compose.material.icons.filled.Email
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -116,8 +124,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.SheetValue
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -156,6 +166,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.window.Dialog
 import com.akslabs.circletosearch.R
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -173,6 +184,7 @@ import com.akslabs.circletosearch.utils.ImageSearchUploader
 import com.akslabs.circletosearch.utils.ImageUtils
 import com.akslabs.circletosearch.utils.QrResult
 import com.akslabs.circletosearch.utils.QrResultWithBounds
+import dev.davidv.translator.localizedName
 import com.akslabs.circletosearch.utils.QrScanner
 import com.akslabs.circletosearch.ui.qrResultShortLabel
 import com.akslabs.circletosearch.utils.UIPreferences
@@ -775,7 +787,9 @@ fun CircleToSearchScreen(
             isExtractingEntities = false
             entityScanGeneration = entityScanGeneration + 1
             if (isTranslatorMode) {
-                CircleToSearchAccessibilityService.instance?.closeTranslateOverlay()
+                val a11y = CircleToSearchAccessibilityService.instance
+                if (a11y != null) a11y.closeTranslateOverlay()
+                else com.akslabs.circletosearch.AssistantTranslateOverlay.close()
             }
         }
     }
@@ -1083,7 +1097,12 @@ fun CircleToSearchScreen(
     // Back Handler Logic
     BackHandler(enabled = true) {
         if (isTranslatorMode) {
-            CircleToSearchAccessibilityService.instance?.closeTranslateOverlay()
+            val service = CircleToSearchAccessibilityService.instance
+            if (service != null) {
+                service.closeTranslateOverlay()
+            } else {
+                com.akslabs.circletosearch.AssistantTranslateOverlay.close()
+            }
             return@BackHandler
         }
         val currentWebView = webViews[selectedEngine]
@@ -1102,7 +1121,9 @@ fun CircleToSearchScreen(
     // only when a prioritized callback receives it. In translator mode back is consumed
     // with no window transition, so a predictive handler keeps the arrow visible — and
     // the overlay windows (drawn above the arrow) fade out while the gesture runs.
-    PredictiveBackHandler(enabled = isTranslatorMode) { progress ->
+    // Only the accessibility path draws its chrome in separate windows it can fade, so
+    // assistant mode (activity-hosted chrome) falls back to the plain BackHandler above.
+    PredictiveBackHandler(enabled = isTranslatorMode && CircleToSearchAccessibilityService.instance != null) { progress ->
         val service = CircleToSearchAccessibilityService.instance
         try {
             progress.collect { event ->
@@ -1977,35 +1998,67 @@ fun CircleToSearchScreen(
                                         onClick = {
                                             haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
                                             val bmp = screenshot
-                                            val translatorService = CircleToSearchAccessibilityService.instance
-                                            if (bmp == null || translatorService == null) {
+                                            if (bmp == null) {
                                                 android.widget.Toast.makeText(context, context.getString(R.string.toast_translate_unavailable), android.widget.Toast.LENGTH_SHORT).show()
-                                            } else {
-                                                selectionRect = null
-                                                selectedBitmap = null
-                                                isSearching = false
-                                                currentPathPoints.clear()
-                                                scope.launch { selectionAnim.snapTo(0f) }
+                                                return@combinedClickable
+                                            }
+                                            selectionRect = null
+                                            selectedBitmap = null
+                                            isSearching = false
+                                            currentPathPoints.clear()
+                                            scope.launch { selectionAnim.snapTo(0f) }
+
+                                            val translatorService = CircleToSearchAccessibilityService.instance
+                                            if (translatorService != null) {
                                                 isTranslatorMode = true
                                                 // OCR starts now; only the overlay chrome waits for the hide delay.
                                                 val started = translatorService.translateCapturedScreen(bmp, TRANSLATE_HIDE_DELAY_MS) {
                                                     isTranslatorMode = false
                                                 }
-                                                if (!started) {
-                                                    isTranslatorMode = false
-                                                    android.widget.Toast.makeText(context, context.getString(R.string.toast_translate_unavailable), android.widget.Toast.LENGTH_SHORT).show()
-                                                }
+                                                if (started) return@combinedClickable
+                                                isTranslatorMode = false
+                                            }
+                                            // No accessibility service (or its bridge failed):
+                                            // show the module's translate overlay hosted in our
+                                            // own activity — same OverlayUI chrome as the a11y path.
+                                            isTranslatorMode = true
+                                            val startedTranslate = com.akslabs.circletosearch.AssistantTranslateOverlay.start(bmp, TRANSLATE_HIDE_DELAY_MS) {
+                                                isTranslatorMode = false
+                                            }
+                                            if (!startedTranslate) {
+                                                isTranslatorMode = false
+                                                android.widget.Toast.makeText(context, context.getString(R.string.toast_translate_unavailable), android.widget.Toast.LENGTH_SHORT).show()
                                             }
                                         },
                                         onLongClick = {
                                             haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
                                             val bmp = screenshot
-                                            val translatorService = CircleToSearchAccessibilityService.instance
-                                            if (bmp == null || translatorService == null) {
+                                            if (bmp == null) {
                                                 android.widget.Toast.makeText(context, context.getString(R.string.toast_translate_unavailable), android.widget.Toast.LENGTH_SHORT).show()
-                                            } else {
+                                                return@combinedClickable
+                                            }
+                                            selectionRect = null
+                                            selectedBitmap = null
+                                            isSearching = false
+                                            currentPathPoints.clear()
+                                            scope.launch { selectionAnim.snapTo(0f) }
+
+                                            val translatorService = CircleToSearchAccessibilityService.instance
+                                            if (translatorService != null) {
                                                 translatorService.translateCapturedScreen(bmp, TRANSLATE_TRIGGER_DELAY_MS)
                                                 onClose()
+                                            } else {
+                                                // No accessibility service: long-press behaves like a
+                                                // short press — show the module's translate overlay
+                                                // hosted in our own activity.
+                                                isTranslatorMode = true
+                                                val startedTranslate = com.akslabs.circletosearch.AssistantTranslateOverlay.start(bmp, TRANSLATE_TRIGGER_DELAY_MS) {
+                                                    isTranslatorMode = false
+                                                }
+                                                if (!startedTranslate) {
+                                                    isTranslatorMode = false
+                                                    android.widget.Toast.makeText(context, context.getString(R.string.toast_translate_unavailable), android.widget.Toast.LENGTH_SHORT).show()
+                                                }
                                             }
                                         }
                                     ),

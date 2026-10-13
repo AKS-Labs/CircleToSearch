@@ -39,6 +39,17 @@ import com.akslabs.circletosearch.data.BitmapRepository
  * a fallback for invocations where no screenshot was delivered.
  */
 class AssistEntryActivity : Activity() {
+
+    companion object {
+        /** Cold-start race window: starting this activity may spawn the process before
+         *  the system has bound [CircleToSearchVoiceService]; retry briefly for it. */
+        private const val VOICE_SERVICE_RETRY_MS = 100L
+        private const val VOICE_SERVICE_RETRIES = 10
+    }
+
+    private val retryHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private var screenshot: Bitmap? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -51,19 +62,23 @@ class AssistEntryActivity : Activity() {
         }
 
         android.util.Log.d("CircleToSearchAssist", "Assist intent received: ${intent?.action}")
-        val screenshot = extractScreenshot(intent)
+        screenshot = extractScreenshot(intent)
+        attemptHandoff(0)
+    }
 
+    private fun attemptHandoff(attempt: Int) {
+        val shot = screenshot
         val voiceService = CircleToSearchVoiceService.instance
         if (voiceService != null) {
             try {
                 val args = Bundle()
-                if (screenshot != null) {
-                    args.putParcelable(AssistSessionService.EXTRA_SCREENSHOT_BITMAP, screenshot)
+                if (shot != null) {
+                    args.putParcelable(AssistSessionService.EXTRA_SCREENSHOT_BITMAP, shot)
                 }
                 // No screenshot attached? Ask the system for one through the
                 // assistant pipeline instead; the session falls back if it
                 // never arrives.
-                val flags = if (screenshot == null) {
+                val flags = if (shot == null) {
                     VoiceInteractionSession.SHOW_WITH_SCREENSHOT
                 } else {
                     0
@@ -71,7 +86,7 @@ class AssistEntryActivity : Activity() {
                 voiceService.showSession(args, flags)
                 android.util.Log.d(
                     "CircleToSearchAssist",
-                    "Handed trigger to voice interaction session (screenshot=${screenshot != null})"
+                    "Handed trigger to voice interaction session (screenshot=${shot != null}, attempt=$attempt)"
                 )
                 finish()
                 return
@@ -80,10 +95,17 @@ class AssistEntryActivity : Activity() {
             }
         }
 
+        // The gesture app may have started this process fresh: the system binds the
+        // voice interaction service slightly later, so retry before giving up.
+        if (attempt < VOICE_SERVICE_RETRIES) {
+            retryHandler.postDelayed({ attemptHandoff(attempt + 1) }, VOICE_SERVICE_RETRY_MS)
+            return
+        }
+
         // Assistant session unavailable: still launch without accessibility when
         // the system handed us its own screenshot.
-        if (screenshot != null) {
-            BitmapRepository.setScreenshot(screenshot)
+        if (shot != null) {
+            BitmapRepository.setScreenshot(shot)
             try {
                 startActivity(Intent(this, OverlayActivity::class.java).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -97,6 +119,11 @@ class AssistEntryActivity : Activity() {
             CircleToSearchAccessibilityService.triggerCapture()
         }
         finish()
+    }
+
+    override fun onDestroy() {
+        retryHandler.removeCallbacksAndMessages(null)
+        super.onDestroy()
     }
 
     private fun extractScreenshot(intent: Intent?): Bitmap? {

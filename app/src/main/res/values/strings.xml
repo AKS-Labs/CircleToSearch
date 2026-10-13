@@ -121,6 +121,7 @@
 
     <!-- Toast Messages -->
     <string name="toast_translate_unavailable">Translation unavailable. Check accessibility service.</string>
+    <string name="label_translating">Translating…</string>
     <string name="toast_saved_to_gallery">Saved to Gallery</string>
     <string name="toast_failed_to_save">Failed to save</string>
     <string name="toast_accessibility_permission_needed">Allow accessibility permission to use this feature</string>
