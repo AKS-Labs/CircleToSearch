@@ -227,19 +227,21 @@
     <!-- Privacy Dialog -->
     <string name="title_privacy">Privacy &amp; Data Usage Transparency</string>
     <string name="privacy_q_upload">Does this app upload my searched images anywhere other than search engines?</string>
-    <string name="privacy_a_upload">Yes! \u2705\nYour images are uploaded to LitterBox and Catbox third-party services to generate image url.\n\n\u2022 Litterbox \u2192 Auto-delete image after 1 hour\n\u2022 Catbox \u2192 Used only when Litterbox fails (stores image forever)\n\nImportant: Litterbox is actually part of Catbox.\nThey belong to the same service family and may use similar infrastructure.</string>
+    <string name="privacy_a_upload">Yes.\n\nYour image is uploaded to a temporary host to create a usable link:\n\n\u2022 ImageDB (imgdb.io) \u2192 Primary \u2014 the image expires after 1 hour\n\u2022 Litterbox \u2192 Backup when ImageDB is unavailable \u2014 also expires after 1 hour\n\nBy default, uploaded images are automatically deleted after 1 hour.</string>
     <string name="privacy_q_why_upload">Why does this app upload my image at all?</string>
     <string name="privacy_a_why_upload">Search engines don\'t allow apps to directly upload images Programmatically (to prevent misuse &amp; abuse). So the app uploads your image first to create a safe, usable link/url of image.</string>
-    <string name="privacy_q_safe">Are Catbox and Litterbox safe?</string>
-    <string name="privacy_a_safe">They\'re widely trusted for temporary file hosting because:\n\n\u2022 No account &amp; API is required\n\u2022 Anonymous uploads are supported\n\u2022 Simple, fast and reliable\n\nThey are not open-source, so please read their official data and privacy policies to fully understand how your data is handled.</string>
+    <string name="privacy_q_device">Does anything leave my device on its own?</string>
+    <string name="privacy_a_device">No. Nothing leaves your device without an explicit action from you — and even then, only the image you draw a circle around is uploaded. No other screen content, files, or personal data ever leaves your device.</string>
+    <string name="privacy_q_safe">Are ImageDB and Litterbox safe?</string>
+    <string name="privacy_a_safe">The app uses this file hosting because:\n\n\u2022 No account or API key required\n\u2022 Anonymous uploads supported\n\u2022 Fast, simple and reliable\n\u2022 Both delete your image after 1 hour\n\nThis app is not associated with these platforms in any way. The hosting services may change in future releases if better privacy-first options are found.\n\nPlease read their policies before use: ImageDB and Litterbox.</string>
     <string name="privacy_q_personal">Should I search personal or private images?</string>
-    <string name="privacy_a_personal">Please don\'t! &#x1F64F;\n\nAvoid uploading personal photos, private documents, IDs, or anything sensitive. Only search images that are safe and non-personal.</string>
+    <string name="privacy_a_personal">Please don\'t.\n\nAvoid uploading personal photos, private documents, IDs, or anything sensitive. Only search images that are safe and non-personal.</string>
     <string name="privacy_q_store">Does the app store my images or links?</string>
-    <string name="privacy_a_store">Nope! \u2705\n\nYour images and URLs are not stored, tracked, or logged by this app.</string>
+    <string name="privacy_a_store">No.\n\nYour images and URLs are not stored, tracked, or logged by this app.</string>
     <string name="privacy_q_developer">Can the developer see my images or links?</string>
-    <string name="privacy_a_developer">No. Never.\n\nThis App:\n\u2022 Has no server\n\u2022 Does not store images\n\u2022 Does not store image URLs\n\u2022 Does not track what you search\n\u2022 Does not collect data\n\nYour data stays between you \u2192 Catbox/Litterbox \u2192 Search engine.</string>
-    <string name="privacy_reminder_title">&#x1F514; Important Reminder</string>
-    <string name="privacy_reminder_body">Your searched images can remain on search engine servers, Catbox servers, caches, and backups. This is why you should never upload private or personal images.</string>
+    <string name="privacy_a_developer">No. Never.\n\nThis app:\n\u2022 Has no server\n\u2022 Does not store images\n\u2022 Does not store image URLs\n\u2022 Does not track what you search\n\u2022 Does not collect data\n\nYour data stays between you \u2192 ImageDB/Litterbox \u2192 the search engine.</string>
+    <string name="privacy_reminder_title">Important reminder</string>
+    <string name="privacy_reminder_body">Your searched images can remain on search engine servers, image host servers, caches, and backups. This is why you should never upload private or personal images.</string>
     <string name="btn_privacy_accept">I Understand &amp; Accept</string>
 
     <!-- Accessibility Disclosure Dialog -->

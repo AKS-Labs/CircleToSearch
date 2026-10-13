@@ -13,21 +13,19 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -39,9 +37,10 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Gesture
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -56,26 +55,27 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
-import androidx.compose.ui.input.nestedscroll.NestedScrollSource
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.ExperimentalTextApi
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withLink
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.akslabs.circletosearch.R
 import com.akslabs.circletosearch.ui.components.BackgroundPreset
 import com.akslabs.circletosearch.ui.components.ExpressiveOnboardingScaffold
@@ -86,9 +86,11 @@ import com.akslabs.circletosearch.utils.PrivacyPreferences
  * Circle to Search onboarding flow.
  *
  * Two steps, styled after the homescreen preview (WobbleHomeScreen):
- * - Warm welcome with a homescreen-style hero card (variable Google Sans Flex
- *   title that settles from wide/bold, primaryContainer card, gesture pill)
- * - Privacy & data transparency (must accept to finish)
+ * - Warm welcome with the app icon, a variable Google Sans Flex title that
+ *   settles from wide/bold, and the gesture pill — floating directly over the
+ *   animated background (default preset: PixelSetup)
+ * - Privacy & data transparency as a professional grouped list (must accept
+ *   to finish)
  */
 @Composable
 fun PixelCircleSearchOnboardingScreen(
@@ -106,7 +108,7 @@ fun PixelCircleSearchOnboardingScreen(
   // Dev visual tester: cycles the animated onboarding backgrounds one by one.
   val backgroundPresets = remember { BackgroundPreset.entries.toList() }
   var bgPresetIndex by remember {
-    mutableStateOf(backgroundPresets.indexOf(BackgroundPreset.CircleSearch).coerceAtLeast(0))
+    mutableStateOf(backgroundPresets.indexOf(BackgroundPreset.PixelSetup).coerceAtLeast(0))
   }
 
   Box(modifier = modifier) {
@@ -156,35 +158,28 @@ fun PixelCircleSearchOnboardingScreen(
     }
   }
 
-    // Dev-only pill button: tap to switch to the next background animation.
-    Surface(
-      shape = CircleShape,
-      color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.92f),
+    // Invisible dev-only hotspot (top-right): cycles background animations and
+    // toasts the active preset name. No visible UI — only the developer knows.
+    Box(
       modifier = Modifier
-        .align(Alignment.BottomEnd)
-        .navigationBarsPadding()
-        .padding(end = 16.dp, bottom = 96.dp)
-        .clickable { bgPresetIndex = (bgPresetIndex + 1) % backgroundPresets.size }
-        .testTag("bg_preset_cycle_button")
-    ) {
-      Row(
-        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-      ) {
-        Icon(
-          imageVector = Icons.Default.Refresh,
-          contentDescription = "Switch background animation",
-          tint = MaterialTheme.colorScheme.onSurfaceVariant,
-          modifier = Modifier.size(16.dp)
-        )
-        Spacer(modifier = Modifier.width(6.dp))
-        Text(
-          text = backgroundPresets[bgPresetIndex].name,
-          style = MaterialTheme.typography.labelMedium,
-          color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-      }
-    }
+        .align(Alignment.TopEnd)
+        .statusBarsPadding()
+        .padding(top = 8.dp, end = 8.dp)
+        .size(48.dp)
+        .clickable(
+          interactionSource = remember { MutableInteractionSource() },
+          indication = null
+        ) {
+          bgPresetIndex = (bgPresetIndex + 1) % backgroundPresets.size
+          android.widget.Toast
+            .makeText(
+              context,
+              "BG: ${backgroundPresets[bgPresetIndex].name}",
+              android.widget.Toast.LENGTH_SHORT
+            )
+            .show()
+        }
+    )
   }
 }
 
@@ -397,134 +392,124 @@ private fun HomeChip(
 }
 
 /**
- * Step 2: Full privacy & data transparency, restyled in the homescreen's
- * surface language (surfaceContainerLow cards, 28dp corners). Scrollable so
- * nothing is lost. The finish button stays disabled until the accept row is ticked.
+ * Step 2: Full privacy & data transparency as a professional grouped list —
+ * one homescreen-style card with hairline dividers, neutral rows, and a
+ * restrained accent palette. Scrollable so nothing is lost. The finish button
+ * stays disabled until the accept row is ticked.
  */
 @Composable
 private fun CircleSearchPrivacyStep(
   accepted: Boolean,
   onAcceptChange: (Boolean) -> Unit
 ) {
-  BoxWithConstraints(
+  // Full-height list: everything is visible immediately from the top; it only
+  // scrolls when the content genuinely overflows the available area.
+  Column(
     modifier = Modifier
       .fillMaxSize()
-      .padding(bottom = 16.dp),
-    contentAlignment = Alignment.BottomStart
+      .verticalScroll(rememberScrollState())
+      .padding(bottom = 16.dp)
+      .testTag("circle_search_privacy_card"),
+    verticalArrangement = Arrangement.spacedBy(12.dp)
   ) {
-    val density = LocalDensity.current
-    val collapsedMaxPx = with(density) { (maxHeight * 0.52f).toPx() }
-    val fullMaxPx = with(density) { maxHeight.toPx() }
-    var expandPx by remember { mutableFloatStateOf(0f) }
-    val privacyScroll = rememberScrollState()
-    val expandConnection = remember(collapsedMaxPx, fullMaxPx) {
-      object : NestedScrollConnection {
-        override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-          val dy = available.y
-          val maxExpand = fullMaxPx - collapsedMaxPx
-          if (dy < 0f && expandPx < maxExpand) {
-            val take = minOf(-dy, maxExpand - expandPx)
-            expandPx += take
-            return Offset(0f, -take)
-          }
-          if (dy > 0f && expandPx > 0f && privacyScroll.value == 0) {
-            val take = minOf(dy, expandPx)
-            expandPx -= take
-            return Offset(0f, take)
-          }
-          return Offset.Zero
-        }
-      }
-    }
-    Column(
-      modifier = Modifier
-        .fillMaxWidth()
-        .heightIn(max = with(density) { (collapsedMaxPx + expandPx).toDp() })
-        .clip(RoundedCornerShape(28.dp))
-        .background(MaterialTheme.colorScheme.surfaceContainerLow)
-        .nestedScroll(expandConnection)
-        .verticalScroll(privacyScroll)
-        .padding(16.dp)
-        .testTag("circle_search_privacy_card"),
-      verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
     Row(
       verticalAlignment = Alignment.CenterVertically,
       horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
       Surface(
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(14.dp),
         color = MaterialTheme.colorScheme.secondaryContainer,
-        modifier = Modifier.size(48.dp)
+        modifier = Modifier.size(44.dp)
       ) {
         Box(contentAlignment = Alignment.Center) {
           Icon(
             imageVector = Icons.Default.Shield,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSecondaryContainer,
-            modifier = Modifier.size(24.dp)
+            modifier = Modifier.size(22.dp)
           )
         }
       }
-      Text(
-        text = stringResource(R.string.title_privacy),
-        style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.SemiBold),
-        color = MaterialTheme.colorScheme.onSurface
-      )
+      Column {
+        Text(
+          text = stringResource(R.string.title_privacy),
+          style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+          color = MaterialTheme.colorScheme.onSurface
+        )
+        Text(
+          text = "How your searches are handled",
+          style = MaterialTheme.typography.bodySmall,
+          color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+      }
     }
 
-    PrivacyBullet(
-      icon = Icons.Default.CloudUpload,
-      title = stringResource(R.string.privacy_q_upload),
-      body = stringResource(R.string.privacy_a_upload)
-    )
-    PrivacyBullet(
-      icon = Icons.Default.Info,
-      title = stringResource(R.string.privacy_q_why_upload),
-      body = stringResource(R.string.privacy_a_why_upload)
-    )
-    PrivacyBullet(
-      icon = Icons.Default.Info,
-      title = stringResource(R.string.privacy_q_safe),
-      body = stringResource(R.string.privacy_a_safe),
-      isWarning = true
-    )
-    PrivacyBullet(
-      icon = Icons.Default.Warning,
-      title = stringResource(R.string.privacy_q_personal),
-      body = stringResource(R.string.privacy_a_personal),
-      isWarning = true
-    )
-    PrivacyBullet(
-      icon = Icons.Default.CheckCircle,
-      title = stringResource(R.string.privacy_q_store),
-      body = stringResource(R.string.privacy_a_store),
-      isPositive = true
-    )
-    PrivacyBullet(
-      icon = Icons.Default.CheckCircle,
-      title = stringResource(R.string.privacy_q_developer),
-      body = stringResource(R.string.privacy_a_developer),
-      isPositive = true
-    )
-
+    // One grouped card, homescreen-style: rows separated by hairline dividers.
     Surface(
-      shape = RoundedCornerShape(16.dp),
-      color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f),
+      shape = RoundedCornerShape(28.dp),
+      color = MaterialTheme.colorScheme.surfaceContainerLow,
       modifier = Modifier.fillMaxWidth()
     ) {
-      Column(modifier = Modifier.padding(12.dp)) {
-        Text(
-          text = stringResource(R.string.privacy_reminder_title),
-          style = MaterialTheme.typography.titleSmall,
-          fontWeight = FontWeight.Bold,
-          color = MaterialTheme.colorScheme.error
+      Column {
+        PrivacyRow(
+          icon = Icons.Default.Lock,
+          title = stringResource(R.string.privacy_q_device),
+          body = stringResource(R.string.privacy_a_device),
+          tone = PrivacyRowTone.Positive
         )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-          text = stringResource(R.string.privacy_reminder_body),
-          style = MaterialTheme.typography.bodySmall,
-          color = MaterialTheme.colorScheme.onSurface
+        PrivacyDivider()
+        PrivacyRow(
+          icon = Icons.Default.CloudUpload,
+          title = stringResource(R.string.privacy_q_upload),
+          body = stringResource(R.string.privacy_a_upload),
+          links = mapOf(
+            "ImageDB" to "https://imgdb.io/privacy",
+            "Litterbox" to "https://catbox.moe/legal.php"
+          )
+        )
+        PrivacyDivider()
+        PrivacyRow(
+          icon = Icons.Default.Info,
+          title = stringResource(R.string.privacy_q_why_upload),
+          body = stringResource(R.string.privacy_a_why_upload)
+        )
+        PrivacyDivider()
+        PrivacyRow(
+          icon = Icons.Default.Info,
+          title = stringResource(R.string.privacy_q_safe),
+          body = stringResource(R.string.privacy_a_safe),
+          links = mapOf(
+            "ImageDB" to "https://imgdb.io/privacy",
+            "Litterbox" to "https://catbox.moe/legal.php"
+          )
+        )
+        PrivacyDivider()
+        PrivacyRow(
+          icon = Icons.Default.Warning,
+          title = stringResource(R.string.privacy_q_personal),
+          body = stringResource(R.string.privacy_a_personal),
+          tone = PrivacyRowTone.Warning
+        )
+        PrivacyDivider()
+        PrivacyRow(
+          icon = Icons.Default.CheckCircle,
+          title = stringResource(R.string.privacy_q_store),
+          body = stringResource(R.string.privacy_a_store),
+          tone = PrivacyRowTone.Positive
+        )
+        PrivacyDivider()
+        PrivacyRow(
+          icon = Icons.Default.CheckCircle,
+          title = stringResource(R.string.privacy_q_developer),
+          body = stringResource(R.string.privacy_a_developer),
+          tone = PrivacyRowTone.Positive
+        )
+        PrivacyDivider()
+        PrivacyRow(
+          icon = Icons.Default.Warning,
+          title = stringResource(R.string.privacy_reminder_title),
+          body = stringResource(R.string.privacy_reminder_body),
+          tone = PrivacyRowTone.Warning
         )
       }
     }
@@ -568,55 +553,96 @@ private fun CircleSearchPrivacyStep(
         )
       }
     }
+  }
+}
+
+private enum class PrivacyRowTone { Neutral, Warning, Positive }
+
+@Composable
+private fun PrivacyRow(
+  icon: ImageVector,
+  title: String,
+  body: String,
+  tone: PrivacyRowTone = PrivacyRowTone.Neutral,
+  links: Map<String, String> = emptyMap()
+) {
+  val linkColor = MaterialTheme.colorScheme.primary
+  // Wraps every occurrence of a link name (e.g. "ImageDB", "Litterbox") in a
+  // clickable URL span that opens the service's privacy policy page.
+  val bodyText = remember(body, links, linkColor) {
+    buildAnnotatedString {
+      if (links.isEmpty()) {
+        append(body)
+      } else {
+        var i = 0
+        while (i <= body.length) {
+          val next = links.entries
+            .mapNotNull { (name, url) ->
+              val idx = body.indexOf(name, i)
+              if (idx >= 0) Triple(idx, name, url) else null
+            }
+            .minByOrNull { it.first }
+          if (next == null) {
+            if (i < body.length) append(body.substring(i))
+            break
+          }
+          val (idx, name, url) = next
+          append(body.substring(i, idx))
+          withLink(LinkAnnotation.Url(url)) {
+            withStyle(
+              SpanStyle(
+                color = linkColor,
+                fontWeight = FontWeight.Medium,
+                textDecoration = TextDecoration.Underline
+              )
+            ) {
+              append(name)
+            }
+          }
+          i = idx + name.length
+        }
+      }
+    }
+  }
+  Row(
+    modifier = Modifier
+      .fillMaxWidth()
+      .padding(horizontal = 16.dp, vertical = 12.dp),
+    verticalAlignment = Alignment.Top
+  ) {
+    Icon(
+      imageVector = icon,
+      contentDescription = null,
+      tint = when (tone) {
+        PrivacyRowTone.Warning -> MaterialTheme.colorScheme.error
+        PrivacyRowTone.Positive -> MaterialTheme.colorScheme.primary
+        PrivacyRowTone.Neutral -> MaterialTheme.colorScheme.onSurfaceVariant
+      },
+      modifier = Modifier.size(22.dp)
+    )
+    Spacer(modifier = Modifier.width(16.dp))
+    Column {
+      Text(
+        text = title,
+        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+        color = MaterialTheme.colorScheme.onSurface
+      )
+      Spacer(modifier = Modifier.height(4.dp))
+      Text(
+        text = bodyText,
+        style = MaterialTheme.typography.bodySmall,
+        lineHeight = 18.sp,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+      )
     }
   }
 }
 
 @Composable
-private fun PrivacyBullet(
-  icon: ImageVector,
-  title: String,
-  body: String,
-  isWarning: Boolean = false,
-  isPositive: Boolean = false
-) {
-  Surface(
-    shape = RoundedCornerShape(16.dp),
-    color = when {
-      isWarning -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.25f)
-      isPositive -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
-      else -> MaterialTheme.colorScheme.surfaceContainer
-    },
-    modifier = Modifier.fillMaxWidth()
-  ) {
-    Row(
-      modifier = Modifier.padding(12.dp),
-      verticalAlignment = Alignment.Top
-    ) {
-      Icon(
-        imageVector = icon,
-        contentDescription = null,
-        tint = when {
-          isWarning -> MaterialTheme.colorScheme.error
-          isPositive -> MaterialTheme.colorScheme.primary
-          else -> MaterialTheme.colorScheme.onSurfaceVariant
-        },
-        modifier = Modifier.size(20.dp)
-      )
-      Spacer(modifier = Modifier.width(10.dp))
-      Column {
-        Text(
-          text = title,
-          style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-          color = MaterialTheme.colorScheme.onSurface
-        )
-        Spacer(modifier = Modifier.height(2.dp))
-        Text(
-          text = body,
-          style = MaterialTheme.typography.bodySmall,
-          color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-      }
-    }
-  }
+private fun PrivacyDivider() {
+  HorizontalDivider(
+    modifier = Modifier.padding(horizontal = 16.dp),
+    thickness = 0.5.dp,
+    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.1f)
+  )
 }
