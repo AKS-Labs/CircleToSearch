@@ -72,10 +72,12 @@ class MainActivity : ComponentActivity() {
 
     private var pendingSettingsPage by mutableStateOf<String?>(null)
     private var navTick by mutableStateOf(0)
+    private var forceOnboarding by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         pendingSettingsPage = intent.getStringExtra(EXTRA_SETTINGS_PAGE)
+        forceOnboarding = intent.getBooleanExtra(EXTRA_SHOW_ONBOARDING, false)
         Toast.makeText(this, getString(R.string.toast_getting_started), Toast.LENGTH_LONG).show()
         setContent {
             CircleToSearchTheme {
@@ -88,7 +90,9 @@ class MainActivity : ComponentActivity() {
                         context.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
                     }
                     var showOnboarding by remember {
-                        mutableStateOf(!appPrefs.getBoolean("onboarding_completed", false))
+                        mutableStateOf(
+                            forceOnboarding || !appPrefs.getBoolean("onboarding_completed", false)
+                        )
                     }
                     if (showOnboarding) {
                         PixelCircleSearchOnboardingScreen(
@@ -140,6 +144,8 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_SETTINGS_PAGE = "settings_page"
+        /** Dev/testing: re-show the onboarding flow without clearing app data. */
+        const val EXTRA_SHOW_ONBOARDING = "show_onboarding"
     }
 }
 

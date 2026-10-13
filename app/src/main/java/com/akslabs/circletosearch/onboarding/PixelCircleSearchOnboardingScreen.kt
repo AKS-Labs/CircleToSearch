@@ -13,11 +13,8 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -28,6 +25,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -36,19 +34,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Gesture
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.ImageSearch
-import androidx.compose.material.icons.filled.ShoppingBag
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Shield
-import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -56,20 +49,17 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
-import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
@@ -80,24 +70,24 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.ExperimentalTextApi
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.akslabs.circletosearch.R
 import com.akslabs.circletosearch.ui.components.BackgroundPreset
 import com.akslabs.circletosearch.ui.components.ExpressiveOnboardingScaffold
-import com.akslabs.circletosearch.ui.theme.M3ExpressiveShapes
 import com.akslabs.circletosearch.ui.theme.M3ExpressiveSpring
-import com.akslabs.circletosearch.ui.theme.m3ExpressivePress
 import com.akslabs.circletosearch.utils.PrivacyPreferences
 
 /**
  * Circle to Search onboarding flow.
  *
- * Steps:
- * - Warm welcome & introduction
- * - Hold gesture bar to activate
- * - Interactive gesture drawing canvas (finger lasso around search targets)
- * - Instant translation & equation solving
+ * Two steps, styled after the homescreen preview (WobbleHomeScreen):
+ * - Warm welcome with a homescreen-style hero card (variable Google Sans Flex
+ *   title that settles from wide/bold, primaryContainer card, gesture pill)
  * - Privacy & data transparency (must accept to finish)
  */
 @Composable
@@ -107,15 +97,22 @@ fun PixelCircleSearchOnboardingScreen(
   modifier: Modifier = Modifier
 ) {
   var currentStep by remember { mutableStateOf(1) }
-  val totalSteps = 5
+  val totalSteps = 2
   val context = LocalContext.current
   val privacyPreferences = remember { PrivacyPreferences(context) }
   var privacyAccepted by remember { mutableStateOf(privacyPreferences.hasAcceptedPrivacyPolicy()) }
   val isLastStep = currentStep == totalSteps
 
+  // Dev visual tester: cycles the animated onboarding backgrounds one by one.
+  val backgroundPresets = remember { BackgroundPreset.entries.toList() }
+  var bgPresetIndex by remember {
+    mutableStateOf(backgroundPresets.indexOf(BackgroundPreset.CircleSearch).coerceAtLeast(0))
+  }
+
+  Box(modifier = modifier) {
   ExpressiveOnboardingScaffold(
-    modifier = modifier.testTag("circle_search_onboarding_screen"),
-    backgroundPreset = BackgroundPreset.GeminiAura,
+    modifier = Modifier.testTag("circle_search_onboarding_screen"),
+    backgroundPreset = backgroundPresets[bgPresetIndex],
     reducedMotion = reducedMotion,
     totalSteps = totalSteps,
     currentStep = currentStep,
@@ -150,10 +147,7 @@ fun PixelCircleSearchOnboardingScreen(
       label = "CircleSearchStepTransition"
     ) { step ->
       when (step) {
-        1 -> CircleSearchWelcomeStep()
-        2 -> CircleSearchActivateStep(reducedMotion = reducedMotion)
-        3 -> CircleSearchInteractiveLassoStep(reducedMotion = reducedMotion)
-        4 -> CircleSearchTranslateSolveStep(reducedMotion = reducedMotion)
+        1 -> CircleSearchWelcomeStep(reducedMotion = reducedMotion)
         else -> CircleSearchPrivacyStep(
           accepted = privacyAccepted,
           onAcceptChange = { privacyAccepted = it }
@@ -161,59 +155,33 @@ fun PixelCircleSearchOnboardingScreen(
       }
     }
   }
-}
 
-/**
- * Step 1: Warm welcome and introduction.
- */
-@Composable
-private fun CircleSearchWelcomeStep() {
-  Column(
-    modifier = Modifier
-      .fillMaxWidth()
-      .padding(bottom = 16.dp)
-  ) {
-    Text(
-      text = "Welcome to Circle to Search",
-      style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Normal),
-      color = MaterialTheme.colorScheme.onBackground
-    )
-
-    Spacer(modifier = Modifier.height(8.dp))
-
-    Text(
-      text = "Search anything on your screen — text, images, QR codes — without switching apps. Free, open source, and no account needed.",
-      style = MaterialTheme.typography.bodyLarge,
-      color = MaterialTheme.colorScheme.onSurfaceVariant
-    )
-
-    Spacer(modifier = Modifier.height(16.dp))
-
-    Row(
-      horizontalArrangement = Arrangement.spacedBy(10.dp),
-      verticalAlignment = Alignment.CenterVertically
+    // Dev-only pill button: tap to switch to the next background animation.
+    Surface(
+      shape = CircleShape,
+      color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.92f),
+      modifier = Modifier
+        .align(Alignment.BottomEnd)
+        .navigationBarsPadding()
+        .padding(end = 16.dp, bottom = 96.dp)
+        .clickable { bgPresetIndex = (bgPresetIndex + 1) % backgroundPresets.size }
+        .testTag("bg_preset_cycle_button")
     ) {
-      Surface(
-        shape = M3ExpressiveShapes.SlantedPill,
-        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+      Row(
+        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
       ) {
-        Text(
-          text = "Free & Open Source",
-          style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Medium),
-          color = MaterialTheme.colorScheme.primary,
-          modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+        Icon(
+          imageVector = Icons.Default.Refresh,
+          contentDescription = "Switch background animation",
+          tint = MaterialTheme.colorScheme.onSurfaceVariant,
+          modifier = Modifier.size(16.dp)
         )
-      }
-
-      Surface(
-        shape = M3ExpressiveShapes.SlantedPill,
-        color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.12f)
-      ) {
+        Spacer(modifier = Modifier.width(6.dp))
         Text(
-          text = "No Account Needed",
-          style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Medium),
-          color = MaterialTheme.colorScheme.secondary,
-          modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+          text = backgroundPresets[bgPresetIndex].name,
+          style = MaterialTheme.typography.labelMedium,
+          color = MaterialTheme.colorScheme.onSurfaceVariant
         )
       }
     }
@@ -221,104 +189,145 @@ private fun CircleSearchWelcomeStep() {
 }
 
 /**
- * Step 2: Hold gesture bar or home button to activate.
+ * Homescreen-style variable font: Google Sans Flex with the ROND axis, animating
+ * width/weight exactly like the WobbleHomeScreen hero card.
  */
+@OptIn(ExperimentalTextApi::class)
 @Composable
-private fun CircleSearchActivateStep(reducedMotion: Boolean) {
-  val infiniteTransition = rememberInfiniteTransition(label = "NeonPerimeterTransition")
-  val borderPhase by if (reducedMotion) {
-    remember { mutableStateOf(0f) }
-  } else {
-    infiniteTransition.animateFloat(
-      initialValue = 0f,
-      targetValue = 1f,
-      animationSpec = infiniteRepeatable(
-        animation = tween(durationMillis = 3200, easing = LinearEasing),
-        repeatMode = RepeatMode.Restart
-      ),
-      label = "BorderPhase"
-    )
+private fun rememberHomeHeroFontFamily(width: Float, weight: Int): FontFamily =
+  remember(width, weight) {
+    try {
+      FontFamily(
+        Font(
+          R.font.google_sans_flex,
+          variationSettings = FontVariation.Settings(
+            FontVariation.width(width),
+            FontVariation.weight(weight),
+            FontVariation.Setting("ROND", 100f),
+          ),
+        )
+      )
+    } catch (_: Exception) {
+      FontFamily.Default
+    }
   }
 
-  val neonGlow = listOf(
-    Color(0xFF4285F4),
-    Color(0xFF9C27B0),
-    Color(0xFFEA4335),
-    Color(0xFFFBBC05),
-    Color(0xFF34A853),
-    Color(0xFF4285F4)
-  )
+/**
+ * Step 1: Warm welcome built like the homescreen preview — a primaryContainer
+ * hero card with a variable-font title that springs from wide/bold to rest,
+ * the gesture-handle pill, and homescreen-style chips below.
+ */
+@Composable
+private fun CircleSearchWelcomeStep(reducedMotion: Boolean) {
+  val context = LocalContext.current
+  val enterProgress = remember { Animatable(if (reducedMotion) 1f else 0f) }
+  val heroScale = remember { Animatable(if (reducedMotion) 1f else 0.92f) }
+
+  LaunchedEffect(Unit) {
+    if (!reducedMotion) {
+      heroScale.animateTo(1f, animationSpec = M3ExpressiveSpring.Bouncy)
+    }
+    enterProgress.animateTo(1f, animationSpec = M3ExpressiveSpring.Gentle)
+  }
+
+  // Wide/bold settles to the resting face — the pull-to-refresh feel of the home hero.
+  val fontWidth = 130f - 30f * enterProgress.value
+  val fontWeight = (700f - 200f * enterProgress.value).toInt()
+  val heroFontFamily = rememberHomeHeroFontFamily(width = fontWidth, weight = fontWeight)
+
+  // Soft breathing pulse on the gesture pill, like the home chevron affordance.
+  val infiniteTransition = rememberInfiniteTransition(label = "WelcomePulse")
+  val pillAlpha by if (reducedMotion) {
+    remember { mutableFloatStateOf(1f) }
+  } else {
+    infiniteTransition.animateFloat(
+      initialValue = 0.55f,
+      targetValue = 1f,
+      animationSpec = infiniteRepeatable(
+        animation = tween(durationMillis = 1400, easing = LinearEasing),
+        repeatMode = RepeatMode.Reverse
+      ),
+      label = "PillAlpha"
+    )
+  }
 
   Column(
     modifier = Modifier
       .fillMaxWidth()
       .padding(bottom = 16.dp)
   ) {
-    Card(
-      shape = M3ExpressiveShapes.Arch,
-      colors = CardDefaults.cardColors(
-        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
-      ),
+    // Hero content floats directly over the animated background — no card
+    // container, so the preset animation stays fully visible behind it.
+    Box(
       modifier = Modifier
         .fillMaxWidth()
-        .height(280.dp)
-        .border(
-          width = 3.dp,
-          brush = Brush.sweepGradient(neonGlow),
-          shape = M3ExpressiveShapes.Arch
-        )
-        .testTag("circle_search_neon_frame")
-    ) {
-      Box(
-        modifier = Modifier
-          .fillMaxSize()
-          .padding(24.dp),
-        contentAlignment = Alignment.Center
-      ) {
-        Column(
-          horizontalAlignment = Alignment.CenterHorizontally,
-          verticalArrangement = Arrangement.Center
-        ) {
-          Surface(
-            shape = M3ExpressiveShapes.Clover4,
-            color = MaterialTheme.colorScheme.primaryContainer,
-            modifier = Modifier.size(72.dp)
-          ) {
-            Box(contentAlignment = Alignment.Center) {
-              Icon(
-                imageVector = Icons.Default.Gesture,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                modifier = Modifier.size(34.dp)
-              )
-            }
-          }
-
-          Spacer(modifier = Modifier.height(18.dp))
-
-          Text(
-            text = "Long-press the Gesture Bar",
-            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
-            color = MaterialTheme.colorScheme.onSurface
-          )
-
-          Spacer(modifier = Modifier.height(8.dp))
-
-          Surface(
-            shape = RoundedCornerShape(12.dp),
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier
-              .width(96.dp)
-              .height(6.dp)
-          ) {}
+        .padding(bottom = 8.dp)
+        .graphicsLayer {
+          scaleX = heroScale.value
+          scaleY = heroScale.value
         }
+        .testTag("circle_search_hero_card"),
+      contentAlignment = Alignment.Center
+    ) {
+      Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+      ) {
+        val launcherIcon = remember(context) {
+          val drawable = context.getDrawable(R.mipmap.ic_launcher) ?: return@remember null
+          val w = drawable.intrinsicWidth.coerceAtLeast(1)
+          val h = drawable.intrinsicHeight.coerceAtLeast(1)
+          val bitmap = android.graphics.Bitmap.createBitmap(
+            w, h, android.graphics.Bitmap.Config.ARGB_8888
+          )
+          drawable.setBounds(0, 0, w, h)
+          drawable.draw(android.graphics.Canvas(bitmap))
+          bitmap.asImageBitmap()
+        }
+        if (launcherIcon != null) {
+          Icon(
+            bitmap = launcherIcon,
+            contentDescription = stringResource(R.string.cd_app_icon),
+            tint = Color.Unspecified,
+            modifier = Modifier
+              .size(64.dp)
+              .clip(RoundedCornerShape(18.dp))
+          )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text(
+          text = "Circle to Search",
+          style = MaterialTheme.typography.titleLarge.copy(fontFamily = heroFontFamily),
+          color = MaterialTheme.colorScheme.onBackground
+        )
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        Text(
+          text = "Ready on your device",
+          style = MaterialTheme.typography.bodyMedium,
+          color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Spacer(modifier = Modifier.height(18.dp))
+
+        Surface(
+          shape = RoundedCornerShape(50),
+          color = MaterialTheme.colorScheme.primary,
+          modifier = Modifier
+            .width(96.dp)
+            .height(6.dp)
+            .graphicsLayer { alpha = pillAlpha }
+        ) {}
       }
     }
 
     Spacer(modifier = Modifier.height(24.dp))
 
     Text(
-      text = "Start searching in one gesture",
+      text = "Search anything on your screen",
       style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Normal),
       color = MaterialTheme.colorScheme.onBackground
     )
@@ -326,7 +335,7 @@ private fun CircleSearchActivateStep(reducedMotion: Boolean) {
     Spacer(modifier = Modifier.height(8.dp))
 
     Text(
-      text = "Touch and hold the gesture handle or home button from any screen. No need to open or switch apps first.",
+      text = "Circle text, images, and QR codes without switching apps — straight from any screen with one gesture. Free, open source, and no account needed.",
       style = MaterialTheme.typography.bodyLarge,
       color = MaterialTheme.colorScheme.onSurfaceVariant
     )
@@ -337,398 +346,60 @@ private fun CircleSearchActivateStep(reducedMotion: Boolean) {
       horizontalArrangement = Arrangement.spacedBy(10.dp),
       verticalAlignment = Alignment.CenterVertically
     ) {
-      Surface(
-        shape = M3ExpressiveShapes.SlantedPill,
-        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-      ) {
-        Row(
-          modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-          verticalAlignment = Alignment.CenterVertically
-        ) {
-          Icon(
-            imageVector = Icons.Default.Gesture,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(16.dp)
-          )
-          Spacer(modifier = Modifier.width(6.dp))
-          Text(
-            text = "Zero App Switching",
-            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Medium),
-            color = MaterialTheme.colorScheme.primary
-          )
-        }
-      }
-
-      Surface(
-        shape = M3ExpressiveShapes.SlantedPill,
-        color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.12f)
-      ) {
-        Text(
-          text = "Works Everywhere",
-          style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Medium),
-          color = MaterialTheme.colorScheme.secondary,
-          modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-        )
-      }
-    }
-  }
-}
-
-/**
- * Step 3: Interactive gesture lasso canvas where users drag finger to circle target.
- */
-@Composable
-private fun CircleSearchInteractiveLassoStep(reducedMotion: Boolean) {
-  val strokePoints = remember { mutableStateListOf<Offset>() }
-  var hasCircled by remember { mutableStateOf(false) }
-  val resultCardScale = remember { Animatable(0.85f) }
-
-  LaunchedEffect(hasCircled) {
-    if (hasCircled) {
-      resultCardScale.animateTo(
-        targetValue = 1f,
-        animationSpec = M3ExpressiveSpring.Bouncy
+      HomeChip(
+        icon = Icons.Default.Gesture,
+        label = "One-Gesture Search",
+        containerColor = MaterialTheme.colorScheme.primaryContainer,
+        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+      )
+      HomeChip(
+        icon = null,
+        label = "No Account Needed",
+        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
       )
     }
   }
-
-  Column(
-    modifier = Modifier
-      .fillMaxWidth()
-      .padding(bottom = 16.dp)
-  ) {
-    Card(
-      shape = RoundedCornerShape(24.dp),
-      colors = CardDefaults.cardColors(
-        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
-      ),
-      modifier = Modifier
-        .fillMaxWidth()
-        .height(280.dp)
-        .testTag("interactive_lasso_canvas_card")
-    ) {
-      Box(modifier = Modifier.fillMaxSize()) {
-        Column(
-          modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-          horizontalAlignment = Alignment.CenterHorizontally,
-          verticalArrangement = Arrangement.Center
-        ) {
-          Surface(
-            shape = M3ExpressiveShapes.AsymmetricCard,
-            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.8f),
-            modifier = Modifier.size(90.dp)
-          ) {
-            Box(contentAlignment = Alignment.Center) {
-              Icon(
-                imageVector = Icons.Default.ShoppingBag,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                modifier = Modifier.size(42.dp)
-              )
-            }
-          }
-
-          Spacer(modifier = Modifier.height(12.dp))
-
-          Text(
-            text = if (!hasCircled) "Draw a circle around this item" else "Item Identified!",
-            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
-            color = MaterialTheme.colorScheme.onSurface
-          )
-        }
-
-        val strokeColor = MaterialTheme.colorScheme.primary
-        Canvas(
-          modifier = Modifier
-            .fillMaxSize()
-            .pointerInput(Unit) {
-              detectDragGestures(
-                onDragStart = { startOffset ->
-                  strokePoints.clear()
-                  strokePoints.add(startOffset)
-                  hasCircled = false
-                },
-                onDrag = { change, _ ->
-                  change.consume()
-                  strokePoints.add(change.position)
-                  if (strokePoints.size > 25) {
-                    hasCircled = true
-                  }
-                },
-                onDragEnd = {
-                  if (strokePoints.size > 15) {
-                    hasCircled = true
-                  }
-                }
-              )
-            }
-        ) {
-          if (strokePoints.size > 1) {
-            val lassoPath = Path()
-            lassoPath.moveTo(strokePoints.first().x, strokePoints.first().y)
-            for (pt in strokePoints) {
-              lassoPath.lineTo(pt.x, pt.y)
-            }
-            drawPath(
-              path = lassoPath,
-              color = strokeColor,
-              style = Stroke(width = 3.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
-            )
-          }
-        }
-
-        androidx.compose.animation.AnimatedVisibility(
-          visible = hasCircled,
-          enter = fadeIn() + scaleIn(initialScale = 0.8f, animationSpec = M3ExpressiveSpring.Bouncy),
-          modifier = Modifier
-            .align(Alignment.BottomCenter)
-            .padding(12.dp)
-        ) {
-          Surface(
-            shape = RoundedCornerShape(16.dp),
-            color = MaterialTheme.colorScheme.surface,
-            shadowElevation = 6.dp,
-            modifier = Modifier.fillMaxWidth()
-          ) {
-            Row(
-              modifier = Modifier.padding(12.dp),
-              verticalAlignment = Alignment.CenterVertically
-            ) {
-              Surface(
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(36.dp)
-              ) {
-                Icon(
-                  imageVector = Icons.Default.Check,
-                  contentDescription = null,
-                  tint = MaterialTheme.colorScheme.onPrimary,
-                  modifier = Modifier.padding(8.dp)
-                )
-              }
-              Spacer(modifier = Modifier.width(12.dp))
-              Column {
-                Text(
-                  text = "Visual Search Result",
-                  style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-                  color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                  text = "Retro Leather Duffle • Available nearby",
-                  style = MaterialTheme.typography.bodySmall,
-                  color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-              }
-            }
-          }
-        }
-      }
-    }
-
-    Spacer(modifier = Modifier.height(24.dp))
-
-    Text(
-      text = "Circle, scribble, or tap",
-      style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Normal),
-      color = MaterialTheme.colorScheme.onBackground
-    )
-
-    Spacer(modifier = Modifier.height(8.dp))
-
-    Text(
-      text = "Draw a circle with your finger around anything you want to know more about: clothes, shoes, landmarks, or formulas. Try it above!",
-      style = MaterialTheme.typography.bodyLarge,
-      color = MaterialTheme.colorScheme.onSurfaceVariant
-    )
-  }
 }
 
-/**
- * Step 4: Instant text translation & math equation solving.
- */
+/** Homescreen-style pill chip (matches the "Ready" chip on the home hero card). */
 @Composable
-private fun CircleSearchTranslateSolveStep(reducedMotion: Boolean) {
-  var activeMode by remember { mutableStateOf(0) }
-
-  Column(
-    modifier = Modifier
-      .fillMaxWidth()
-      .padding(bottom = 16.dp)
+private fun HomeChip(
+  icon: ImageVector?,
+  label: String,
+  containerColor: Color,
+  contentColor: Color
+) {
+  Surface(
+    shape = CircleShape,
+    color = containerColor
   ) {
-    Card(
-      shape = M3ExpressiveShapes.AsymmetricCard,
-      colors = CardDefaults.cardColors(
-        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
-      ),
-      modifier = Modifier
-        .fillMaxWidth()
-        .height(280.dp)
+    Row(
+      modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+      verticalAlignment = Alignment.CenterVertically
     ) {
-      Column(
-        modifier = Modifier
-          .fillMaxSize()
-          .padding(20.dp),
-        verticalArrangement = Arrangement.SpaceBetween
-      ) {
-        Row(
-          horizontalArrangement = Arrangement.spacedBy(8.dp),
-          modifier = Modifier.fillMaxWidth()
-        ) {
-          Surface(
-            shape = M3ExpressiveShapes.SlantedPill,
-            color = if (activeMode == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
-            modifier = Modifier
-              .weight(1f)
-              .m3ExpressivePress { activeMode = 0 }
-              .testTag("mode_translate_pill")
-          ) {
-            Row(
-              modifier = Modifier.padding(vertical = 8.dp),
-              horizontalArrangement = Arrangement.Center,
-              verticalAlignment = Alignment.CenterVertically
-            ) {
-              Icon(
-                imageVector = Icons.Default.Translate,
-                contentDescription = null,
-                tint = if (activeMode == 0) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.size(16.dp)
-              )
-              Spacer(modifier = Modifier.width(6.dp))
-              Text(
-                text = "Translate",
-                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                color = if (activeMode == 0) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
-              )
-            }
-          }
-
-          Surface(
-            shape = M3ExpressiveShapes.SlantedPill,
-            color = if (activeMode == 1) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
-            modifier = Modifier
-              .weight(1f)
-              .m3ExpressivePress { activeMode = 1 }
-              .testTag("mode_math_pill")
-          ) {
-            Row(
-              modifier = Modifier.padding(vertical = 8.dp),
-              horizontalArrangement = Arrangement.Center,
-              verticalAlignment = Alignment.CenterVertically
-            ) {
-              Icon(
-                imageVector = Icons.Default.Calculate,
-                contentDescription = null,
-                tint = if (activeMode == 1) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.size(16.dp)
-              )
-              Spacer(modifier = Modifier.width(6.dp))
-              Text(
-                text = "Solve Math",
-                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                color = if (activeMode == 1) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
-              )
-            }
-          }
-        }
-
-        AnimatedContent(
-          targetState = activeMode,
-          transitionSpec = {
-            (fadeIn() + scaleIn(initialScale = 0.95f, animationSpec = M3ExpressiveSpring.Snappy)).togetherWith(
-              fadeOut() + scaleOut(targetScale = 0.95f)
-            )
-          },
-          label = "ModeContentTransition"
-        ) { mode ->
-          if (mode == 0) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-              Surface(
-                shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.surface,
-                modifier = Modifier.fillMaxWidth()
-              ) {
-                Column(modifier = Modifier.padding(14.dp)) {
-                  Text(
-                    text = "Original text: Bonjour le monde!",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                  )
-                  Spacer(modifier = Modifier.height(4.dp))
-                  Text(
-                    text = "Translated: Hello world!",
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.primary
-                  )
-                }
-              }
-            }
-          } else {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-              Surface(
-                shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.surface,
-                modifier = Modifier.fillMaxWidth()
-              ) {
-                Column(modifier = Modifier.padding(14.dp)) {
-                  Text(
-                    text = "Equation: ∫ 2x dx",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                  )
-                  Spacer(modifier = Modifier.height(4.dp))
-                  Text(
-                    text = "Step-by-step Solution: x² + C",
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.tertiary
-                  )
-                }
-              }
-            }
-          }
-        }
-
-        Row(verticalAlignment = Alignment.CenterVertically) {
-          Icon(
-            imageVector = Icons.Default.ImageSearch,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(16.dp)
-          )
-          Spacer(modifier = Modifier.width(6.dp))
-          Text(
-            text = "Multi-search: add text to refine image results",
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-          )
-        }
+      if (icon != null) {
+        Icon(
+          imageVector = icon,
+          contentDescription = null,
+          tint = contentColor,
+          modifier = Modifier.size(16.dp)
+        )
+        Spacer(modifier = Modifier.width(6.dp))
       }
+      Text(
+        text = label,
+        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Medium),
+        color = contentColor
+      )
     }
-
-    Spacer(modifier = Modifier.height(24.dp))
-
-    Text(
-      text = "Translate & Solve Instantly",
-      style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Normal),
-      color = MaterialTheme.colorScheme.onBackground
-    )
-
-    Spacer(modifier = Modifier.height(8.dp))
-
-    Text(
-      text = "Circle foreign menus, street signs, or tricky math problems to get live translations and step-by-step explanations.",
-      style = MaterialTheme.typography.bodyLarge,
-      color = MaterialTheme.colorScheme.onSurfaceVariant
-    )
   }
 }
 
 /**
- * Step 5: Full privacy & data transparency from the dialog,
- * restyled in the same expressive language. Scrollable so nothing is lost.
- * The finish button stays disabled until the user ticks the accept row.
+ * Step 2: Full privacy & data transparency, restyled in the homescreen's
+ * surface language (surfaceContainerLow cards, 28dp corners). Scrollable so
+ * nothing is lost. The finish button stays disabled until the accept row is ticked.
  */
 @Composable
 private fun CircleSearchPrivacyStep(
@@ -769,10 +440,8 @@ private fun CircleSearchPrivacyStep(
       modifier = Modifier
         .fillMaxWidth()
         .heightIn(max = with(density) { (collapsedMaxPx + expandPx).toDp() })
-        .background(
-          color = MaterialTheme.colorScheme.background,
-          shape = RoundedCornerShape(24.dp)
-        )
+        .clip(RoundedCornerShape(28.dp))
+        .background(MaterialTheme.colorScheme.surfaceContainerLow)
         .nestedScroll(expandConnection)
         .verticalScroll(privacyScroll)
         .padding(16.dp)
@@ -784,15 +453,15 @@ private fun CircleSearchPrivacyStep(
       horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
       Surface(
-        shape = M3ExpressiveShapes.Clover4,
-        color = MaterialTheme.colorScheme.primaryContainer,
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.secondaryContainer,
         modifier = Modifier.size(48.dp)
       ) {
         Box(contentAlignment = Alignment.Center) {
           Icon(
             imageVector = Icons.Default.Shield,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+            tint = MaterialTheme.colorScheme.onSecondaryContainer,
             modifier = Modifier.size(24.dp)
           )
         }
@@ -800,7 +469,7 @@ private fun CircleSearchPrivacyStep(
       Text(
         text = stringResource(R.string.title_privacy),
         style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.SemiBold),
-        color = MaterialTheme.colorScheme.onBackground
+        color = MaterialTheme.colorScheme.onSurface
       )
     }
 
@@ -861,9 +530,9 @@ private fun CircleSearchPrivacyStep(
     }
 
     Surface(
-      shape = M3ExpressiveShapes.SlantedPill,
+      shape = RoundedCornerShape(28.dp),
       color = if (accepted) MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
-      else MaterialTheme.colorScheme.surfaceVariant,
+      else MaterialTheme.colorScheme.surfaceContainerHighest,
       modifier = Modifier
         .fillMaxWidth()
         .clickable(
@@ -914,9 +583,9 @@ private fun PrivacyBullet(
   Surface(
     shape = RoundedCornerShape(16.dp),
     color = when {
-      isWarning -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f)
-      isPositive -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.2f)
-      else -> MaterialTheme.colorScheme.surface
+      isWarning -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.25f)
+      isPositive -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+      else -> MaterialTheme.colorScheme.surfaceContainer
     },
     modifier = Modifier.fillMaxWidth()
   ) {
