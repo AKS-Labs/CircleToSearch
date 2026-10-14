@@ -360,6 +360,19 @@ class OverlayUI(
         }
       }
 
+    if (container != null) {
+      // Activity-hosted (assistant mode): the translated result is interactive — tap or
+      // long-press switches to the word-selection surface (tap a word → floating
+      // Copy/Share/Search bar), matching the Circle to Search text-selection UX. The
+      // window path keeps its non-touchable pass-through (taps land on the app below
+      // and clear the overlay).
+      imageView.setOnClickListener { service.toggleSelectMode() }
+      imageView.setOnLongClickListener {
+        service.toggleSelectMode()
+        true
+      }
+    }
+
     addChromeView(imageView, lp)
     translationOverlays.add(imageView)
     raiseToolbar()
@@ -440,7 +453,7 @@ class OverlayUI(
     dialog.dismiss()
   }
 
-  fun hasSelectSurface(): Boolean = selectDialog != null
+  fun hasSelectSurface(): Boolean = selectDialog != null || selectSurfaceView != null
 
   /** A 1×1 watcher window: WATCH_OUTSIDE_TOUCH fires ACTION_OUTSIDE on the *down* of
    *  any touch anywhere on screen, and NOT_TOUCH_MODAL lets that same touch reach the
