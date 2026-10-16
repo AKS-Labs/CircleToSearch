@@ -432,7 +432,7 @@ fun CircleToSearchScreen(
     // pixel-for-pixel (the overlay can't read the Compose theme directly).
     androidx.compose.runtime.SideEffect {
         dev.davidv.translator.overlayChrome.OverlayChromeFactory.appBarContainerColor =
-            colorScheme.surfaceContainerHigh.toArgb()
+            colorScheme.surfaceContainerLow.toArgb()
         dev.davidv.translator.overlayChrome.OverlayChromeFactory.appPillColor =
             colorScheme.surfaceContainerLowest.toArgb()
     }

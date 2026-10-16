@@ -263,22 +263,32 @@ class AssistantTranslateOverlayBridge(
   override fun showLanguagePicker(isSource: Boolean) {
     serviceScope.launch {
       langStateManager.refreshLanguageAvailability()
-      val availableLangs = overlayTextTranslationHelper.awaitAvailableLanguages(isSource)
-      ui.showLanguagePicker(isSource, availableLangs) { lang ->
-        if (isSource) {
-          if (lang == null) {
-            isAutoSource = true
+      overlayTextTranslationHelper.awaitPickerRows()
+      ui.showLanguagePicker(
+        isSource,
+        rowsProvider = { overlayTextTranslationHelper.pickerRows() },
+        onPick = { lang ->
+          if (isSource) {
+            if (lang == null) {
+              isAutoSource = true
+            } else {
+              isAutoSource = false
+              forcedSourceLanguage = lang
+            }
+            syncReadingOrderForSource()
           } else {
-            isAutoSource = false
-            forcedSourceLanguage = lang
+            forcedTargetLanguage = lang
           }
-          syncReadingOrderForSource()
-        } else {
-          forcedTargetLanguage = lang
-        }
-        ui.updateToolbarState(forcedSourceLanguage, forcedTargetLanguage, currentReadingOrderFor(forcedSourceLanguage), isAutoSource)
-        if (active) handleFullScreenOcr()
-      }
+          ui.updateToolbarState(forcedSourceLanguage, forcedTargetLanguage, currentReadingOrderFor(forcedSourceLanguage), isAutoSource)
+          if (active) handleFullScreenOcr()
+        },
+        onToggleFavorite = { language, favorite ->
+          overlayTextTranslationHelper.setFavorite(language, favorite)
+        },
+        onDelete = { language ->
+          langStateManager.deleteLanguage(language)
+        },
+      )
     }
   }
 

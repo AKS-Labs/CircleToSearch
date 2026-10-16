@@ -36,6 +36,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -128,6 +129,11 @@ class DownloadService : Service() {
   private val _downloadEvents = MutableSharedFlow<DownloadEvent>()
   val downloadEvents: SharedFlow<DownloadEvent> = _downloadEvents.asSharedFlow()
 
+  private suspend fun emitEvent(event: DownloadEvent) {
+    _downloadEvents.emit(event)
+    _pickerEvents.tryEmit(event)
+  }
+
   private val downloadJobs = mutableMapOf<Language, Job>()
   private val dictionaryDownloadJobs = mutableMapOf<Language, Job>()
   private val ttsDownloadJobs = mutableMapOf<Language, Job>()
@@ -139,6 +145,17 @@ class DownloadService : Service() {
     get() = filePathManager.currentBaseDir().absolutePath
 
   companion object {
+    /**
+     * Process-wide mirrors of the translation download state/events so overlay
+     * surfaces (accessibility toolbar picker, CTS bridges) can observe downloads
+     * started from any host without binding to the service instance.
+     */
+    private val _pickerStates = MutableStateFlow<Map<Language, DownloadState>>(emptyMap())
+    val pickerStates: StateFlow<Map<Language, DownloadState>> = _pickerStates.asStateFlow()
+
+    private val _pickerEvents = MutableSharedFlow<DownloadEvent>(extraBufferCapacity = 16)
+    val pickerEvents: SharedFlow<DownloadEvent> = _pickerEvents.asSharedFlow()
+
     fun startDownload(
       context: Context,
       language: Language,
@@ -457,16 +474,16 @@ class DownloadService : Service() {
             val refreshedCatalog = filePathManager.reloadCatalog() ?: catalog
             onSuccess(catalog, refreshedCatalog)
             Log.i("DownloadService", "${actionLabel.replaceFirstChar(Char::titlecase)} complete: ${language.displayName}")
-            _downloadEvents.emit(DownloadEvent.NewTranslationAvailable(language))
+            emitEvent(DownloadEvent.NewTranslationAvailable(language))
           } else {
-            _downloadEvents.emit(DownloadEvent.DownloadError(getString(failureMessageRes, language.displayName)))
+            emitEvent(DownloadEvent.DownloadError(getString(failureMessageRes, language.displayName)))
           }
         } catch (e: Exception) {
           Log.e("DownloadService", "${actionLabel.replaceFirstChar(Char::titlecase)} failed for ${language.displayName}", e)
           updateDownloadState(language) {
             it.copy(isDownloading = false, error = e.message)
           }
-          _downloadEvents.emit(DownloadEvent.DownloadError(getString(failureMessageRes, language.displayName)))
+          emitEvent(DownloadEvent.DownloadError(getString(failureMessageRes, language.displayName)))
         } finally {
           downloadJobs.remove(language)
         }
@@ -619,10 +636,10 @@ class DownloadService : Service() {
             onSuccess()
             Log.i("DownloadService", "Language batch download complete")
             activeLanguages.forEach { language ->
-              _downloadEvents.emit(DownloadEvent.NewTranslationAvailable(language))
+              emitEvent(DownloadEvent.NewTranslationAvailable(language))
             }
           } else {
-            _downloadEvents.emit(DownloadEvent.DownloadError(getString(failureMessageRes)))
+            emitEvent(DownloadEvent.DownloadError(getString(failureMessageRes)))
           }
         } catch (e: Exception) {
           Log.e("DownloadService", "Language batch download failed", e)
@@ -631,7 +648,7 @@ class DownloadService : Service() {
               it.copy(isDownloading = false, error = e.message)
             }
           }
-          _downloadEvents.emit(DownloadEvent.DownloadError(getString(failureMessageRes)))
+          emitEvent(DownloadEvent.DownloadError(getString(failureMessageRes)))
         } finally {
           activeLanguages.forEach(downloadJobs::remove)
         }
@@ -691,9 +708,9 @@ class DownloadService : Service() {
         if (success) {
           filePathManager.reloadCatalog()
           Log.i("DownloadService", "Dictionary download complete: ${language.displayName}")
-          _downloadEvents.emit(DownloadEvent.NewDictionaryAvailable(language))
+          emitEvent(DownloadEvent.NewDictionaryAvailable(language))
         } else {
-          _downloadEvents.emit(DownloadEvent.DownloadError(getString(R.string.download_failed_dictionary, language.displayName)))
+          emitEvent(DownloadEvent.DownloadError(getString(R.string.download_failed_dictionary, language.displayName)))
           Log.e("DownloadService", "Dictionary download failed for ${language.displayName}")
           updateDictionaryDownloadState(language) {
             it.copy(isDownloading = false, error = "Dictionary download failed for ${language.displayName}")
@@ -781,9 +798,9 @@ class DownloadService : Service() {
             filePathManager.reloadCatalog()
             TranslatorTtsEngine.notifyVoiceDataChanged(this@DownloadService)
             Log.i("DownloadService", "TTS download complete: ${language.displayName}")
-            _downloadEvents.emit(DownloadEvent.NewTtsAvailable(language))
+            emitEvent(DownloadEvent.NewTtsAvailable(language))
           } else {
-            _downloadEvents.emit(DownloadEvent.DownloadError(getString(R.string.download_failed_tts, language.displayName)))
+            emitEvent(DownloadEvent.DownloadError(getString(R.string.download_failed_tts, language.displayName)))
             updateTtsDownloadState(language) {
               it.copy(isDownloading = false, error = "TTS download failed for ${language.displayName}")
             }
@@ -793,7 +810,7 @@ class DownloadService : Service() {
           updateTtsDownloadState(language) {
             it.copy(isDownloading = false, error = e.message)
           }
-          _downloadEvents.emit(DownloadEvent.DownloadError("${language.displayName} TTS download failed"))
+          emitEvent(DownloadEvent.DownloadError("${language.displayName} TTS download failed"))
         } finally {
           ttsDownloadJobs.remove(language)
           _activeTtsPackIds.update { it - language }
@@ -843,7 +860,7 @@ class DownloadService : Service() {
               updateAdblockDownloadState {
                 it.copy(isDownloading = false, error = "Catalog unavailable")
               }
-              _downloadEvents.emit(DownloadEvent.DownloadError(getString(R.string.download_catalog_unavailable)))
+              emitEvent(DownloadEvent.DownloadError(getString(R.string.download_catalog_unavailable)))
               return@launch
             }
           val downloadPlan =
@@ -882,19 +899,19 @@ class DownloadService : Service() {
             filePathManager.reloadCatalog()
             (application as? TranslatorApplication)?.adblockManager?.reload()
             Log.i("DownloadService", "Adblock download complete")
-            _downloadEvents.emit(DownloadEvent.NewSupportAvailable(ADBLOCK_KIND))
+            emitEvent(DownloadEvent.NewSupportAvailable(ADBLOCK_KIND))
           } else {
             updateAdblockDownloadState {
               it.copy(isDownloading = false, error = "Adblock download failed")
             }
-            _downloadEvents.emit(DownloadEvent.DownloadError(getString(R.string.download_failed_adblock)))
+            emitEvent(DownloadEvent.DownloadError(getString(R.string.download_failed_adblock)))
           }
         } catch (e: Exception) {
           Log.e("DownloadService", "Adblock download failed", e)
           updateAdblockDownloadState {
             it.copy(isDownloading = false, error = e.message)
           }
-          _downloadEvents.emit(DownloadEvent.DownloadError(getString(R.string.download_failed_adblock)))
+          emitEvent(DownloadEvent.DownloadError(getString(R.string.download_failed_adblock)))
         } finally {
           adblockDownloadJob = null
         }
@@ -920,7 +937,7 @@ class DownloadService : Service() {
               updateRepairDownloadState {
                 it.copy(isDownloading = false, error = "Catalog unavailable")
               }
-              _downloadEvents.emit(DownloadEvent.DownloadError(getString(R.string.download_catalog_unavailable)))
+              emitEvent(DownloadEvent.DownloadError(getString(R.string.download_catalog_unavailable)))
               return@launch
             }
           val downloadPlan = catalog.planRepair()
@@ -951,16 +968,16 @@ class DownloadService : Service() {
           if (success) {
             filePathManager.reloadCatalog()
             Log.i("DownloadService", "Repair download complete")
-            _downloadEvents.emit(DownloadEvent.NewSupportAvailable(REPAIR_KIND))
+            emitEvent(DownloadEvent.NewSupportAvailable(REPAIR_KIND))
           } else {
-            _downloadEvents.emit(DownloadEvent.DownloadError(getString(R.string.download_failed_repair)))
+            emitEvent(DownloadEvent.DownloadError(getString(R.string.download_failed_repair)))
           }
         } catch (e: Exception) {
           Log.e("DownloadService", "Repair download failed", e)
           updateRepairDownloadState {
             it.copy(isDownloading = false, error = e.message)
           }
-          _downloadEvents.emit(DownloadEvent.DownloadError(getString(R.string.download_failed_repair)))
+          emitEvent(DownloadEvent.DownloadError(getString(R.string.download_failed_repair)))
         } finally {
           repairDownloadJob = null
         }
@@ -1005,6 +1022,7 @@ class DownloadService : Service() {
       )
       currentStates[language] = newState
       _downloadStates.value = currentStates
+      _pickerStates.value = currentStates
     }
   }
 
@@ -1021,6 +1039,7 @@ class DownloadService : Service() {
           downloaded = newDownloaded,
         )
       _downloadStates.value = currentStates
+      _pickerStates.value = currentStates
     }
   }
 
@@ -1359,16 +1378,16 @@ class DownloadService : Service() {
         if (tempFile.renameTo(catalogFile)) {
           Log.i("DownloadService", "Downloaded catalog from $url to $catalogFile")
           filePathManager.reloadCatalog()
-          _downloadEvents.emit(DownloadEvent.CatalogDownloaded)
+          emitEvent(DownloadEvent.CatalogDownloaded)
         } else {
           Log.e("DownloadService", "Failed to move temp catalog file $tempFile to final location $catalogFile")
           tempFile.delete()
-          _downloadEvents.emit(DownloadEvent.DownloadError(getString(R.string.download_catalog_save_failed)))
+          emitEvent(DownloadEvent.DownloadError(getString(R.string.download_catalog_save_failed)))
         }
       } catch (e: Exception) {
         Log.e("DownloadService", "Error downloading catalog", e)
         val detail = e.message ?: getString(R.string.download_unknown_error)
-        _downloadEvents.emit(DownloadEvent.DownloadError(getString(R.string.download_catalog_failed, detail)))
+        emitEvent(DownloadEvent.DownloadError(getString(R.string.download_catalog_failed, detail)))
       }
     }
   }

@@ -153,12 +153,13 @@ class TranslatorVoiceInteractionSession(
           }
 
           override fun addPickerView(view: View) {
+            val (pickerW, pickerH) = OverlayChromeFactory.pickerWindowSize(context)
             rootView.addView(
               view,
               FrameLayout
                 .LayoutParams(
-                  dpToPx(250),
-                  dpToPx(400),
+                  pickerW,
+                  pickerH,
                 ).apply { gravity = Gravity.CENTER },
             )
           }
@@ -681,10 +682,16 @@ class TranslatorVoiceInteractionSession(
   private fun showLanguagePicker(isSource: Boolean) {
     sessionScope.launch {
       langStateManager.refreshLanguageAvailability()
-      val availableLangs = overlayTextTranslationHelper.awaitAvailableLanguages(isSource)
+      overlayTextTranslationHelper.awaitPickerRows()
       menuManager?.showLanguagePicker(
         isSource = isSource,
-        availableLangs = availableLangs,
+        rowsProvider = { overlayTextTranslationHelper.pickerRows() },
+        onToggleFavorite = { language, favorite ->
+          overlayTextTranslationHelper.setFavorite(language, favorite)
+        },
+        onDelete = { language ->
+          langStateManager.deleteLanguage(language)
+        },
       ) { language ->
         if (isSource) {
           if (language == null) {

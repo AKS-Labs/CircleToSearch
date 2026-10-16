@@ -17,6 +17,7 @@ import dev.davidv.translator.Language
 import dev.davidv.translator.R
 import dev.davidv.translator.ReadingOrder
 import dev.davidv.translator.localizedName
+import kotlin.math.roundToInt
 
 data class LanguageToolbarViews(
   val root: View,
@@ -31,13 +32,21 @@ data class LanguageToolbarViews(
   val selectIcon: ImageView? = null,
 )
 
+/** Live handle to a shown language picker: rows can be replaced (install-state
+ *  flips after a download) and download rows refreshed in place on progress. */
+class LanguagePickerHandle(
+  val root: View,
+  internal val setRows: (List<dev.davidv.translator.OverlayLanguagePickerRow>) -> Unit,
+  internal val updateDownloadStates: () -> Unit,
+)
+
 object OverlayChromeFactory {
   val ACTIVE_ICON_TINT: Int = Color.parseColor("#8AB4F8")
 
   /**
-   * Exact CTS bottom-bar colors published by CircleToSearchScreen via SideEffect:
-   * the outer card (`surfaceContainerHigh`) and the search pill (`surfaceContainer`).
-   * When set, the toolbar uses them pixel-for-pixel instead of the locally derived scheme.
+   * Exact CTS bottom-bar color published by CircleToSearchScreen via SideEffect
+   * (`surfaceContainerLow`). When set, the toolbar uses it pixel-for-pixel
+   * instead of the locally derived scheme.
    */
   @Volatile
   var appBarContainerColor: Int? = null
@@ -85,9 +94,9 @@ object OverlayChromeFactory {
     val onSurface = scheme.onSurface.toArgb()
     return ChromePalette(
       onSurface = onSurface,
-      // CTS bottom-bar outer card (surfaceContainerHigh) — prefer the exact value
+      // CTS bottom-bar container (surfaceContainerLow) — prefer the exact value
       // published by the app UI so the bar matches pixel-for-pixel.
-      barColor = opaque(appBarContainerColor ?: scheme.surfaceContainerHigh.toArgb()),
+      barColor = opaque(appBarContainerColor ?: scheme.surfaceContainerLow.toArgb()),
       barStroke = withAlpha(onSurface, if (dark) 0.18f else 0.15f),
       // Button-pill fill (surfaceContainerLowest) — same fill for every button pill.
       chipColor = opaque(appPillColor ?: scheme.surfaceContainerLowest.toArgb()),
@@ -100,6 +109,17 @@ object OverlayChromeFactory {
   }
 
   fun activeIconTint(context: Context): Int = palette(context).activeTint
+
+  /**
+   * Size for the language-picker dialog in pixels: most of the screen so the
+   * full language list is browsable, capped on wide (tablet) screens.
+   */
+  fun pickerWindowSize(context: Context): Pair<Int, Int> {
+    val dm = context.resources.displayMetrics
+    val width = (dm.widthPixels * 0.88f).toInt().coerceAtMost((480 * dm.density).toInt())
+    val height = (dm.heightPixels * 0.78f).toInt().coerceAtMost((760 * dm.density).toInt())
+    return width to height
+  }
 
   fun formatSourceLabel(
     forcedSourceLanguage: Language?,
@@ -295,34 +315,13 @@ object OverlayChromeFactory {
         )
       }
 
-    // Thin divider that visually separates the language picker/swap group from the
-    // action buttons on either side.
-    fun divider(): View =
-      View(context).apply {
-        background =
-          GradientDrawable().apply {
-            setColor(p.barStroke)
-            cornerRadius = dpToPx(1).toFloat()
-          }
-      }
-    bar.addView(
-      divider(),
-      LinearLayout.LayoutParams(dpToPx(1), dpToPx(24)).apply {
-        marginStart = dpToPx(6)
-        marginEnd = dpToPx(4)
-      },
-    )
     // Same pill size as the other toolbar buttons (40dp tall), so the language
     // picker + swap sit in their own pill, clearly off the bar's container color.
     bar.addView(
       langChip,
-      LinearLayout.LayoutParams(0, btnSize, 1f),
-    )
-    bar.addView(
-      divider(),
-      LinearLayout.LayoutParams(dpToPx(1), dpToPx(24)).apply {
-        marginStart = dpToPx(4)
-        marginEnd = dpToPx(6)
+      LinearLayout.LayoutParams(0, btnSize, 1f).apply {
+        marginStart = dpToPx(2)
+        marginEnd = dpToPx(2)
       },
     )
 
@@ -461,34 +460,278 @@ object OverlayChromeFactory {
     context: Context,
     dpToPx: (Int) -> Int,
     isSource: Boolean,
-    availableLangs: List<Language>,
+    rowsProvider: () -> List<dev.davidv.translator.OverlayLanguagePickerRow>,
     allowAuto: Boolean = true,
+    downloadStateFor: (Language) -> dev.davidv.translator.DownloadState?,
     onPick: (Language?) -> Unit,
-  ): ScrollView {
+    onDownload: (dev.davidv.translator.OverlayLanguagePickerRow) -> Unit,
+    onCancelDownload: (Language) -> Unit,
+    onDelete: (dev.davidv.translator.OverlayLanguagePickerRow) -> Unit,
+    onToggleFavorite: (Language, Boolean) -> Unit,
+  ): LanguagePickerHandle {
+    val p = palette(context)
     val scroll = ScrollView(context)
     val list = LinearLayout(context)
     list.orientation = LinearLayout.VERTICAL
-    val bg = GradientDrawable()
-    bg.setColor(palette(context).menuBg)
-    bg.cornerRadius = dpToPx(20).toFloat()
-    list.background = bg
+    // Rounded surface on the ScrollView itself (not the scrolling content), so the
+    // corners stay rounded while scrolling instead of clipping to a square window.
+    val bg =
+      GradientDrawable().apply {
+        setColor(p.menuBg)
+        cornerRadius = dpToPx(20).toFloat()
+        setStroke(dpToPx(1), p.barStroke)
+      }
+    scroll.background = bg
+    scroll.clipToOutline = true
     val listPad = dpToPx(8)
     list.setPadding(listPad, listPad, listPad, listPad)
-
-    if (isSource && allowAuto) {
-      addMenuItem(context, list, dpToPx, "\u2728  Auto-detect") {
-        onPick(null)
-      }
-    }
-
-    for (lang in availableLangs) {
-      addMenuItem(context, list, dpToPx, lang.localizedName()) {
-        onPick(lang)
-      }
-    }
-
     scroll.addView(list)
-    return scroll
+
+    var currentRows = rowsProvider()
+    val stateUpdaters = mutableListOf<() -> Unit>()
+
+    fun formatSize(sizeBytes: Long): String {
+      val sizeMiB = sizeBytes / (1024f * 1024f)
+      return if (sizeMiB < 1f) {
+        "\u003c1 MB"
+      } else {
+        "${sizeMiB.roundToInt()} MB"
+      }
+    }
+
+    fun formatPercent(downloaded: Long, total: Long): String {
+      val pct =
+        if (total > 0) {
+          ((downloaded * 100) / total).toInt().coerceIn(0, 100)
+        } else {
+          0
+        }
+      return "$pct%"
+    }
+
+    fun applyRipple(view: View) {
+      val out = TypedValue()
+      if (context.theme.resolveAttribute(android.R.attr.selectableItemBackground, out, true) && out.resourceId != 0) {
+        view.setBackgroundResource(out.resourceId)
+      }
+    }
+
+    fun render(rowList: List<dev.davidv.translator.OverlayLanguagePickerRow>) {
+      currentRows = rowList
+      list.removeAllViews()
+      stateUpdaters.clear()
+
+      if (isSource && allowAuto) {
+        val autoItem =
+          TextView(context).apply {
+            text = "\u2728  Auto-detect"
+            setTextColor(p.menuText)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+            val pad = dpToPx(12)
+            setPadding(pad, pad, pad, pad)
+            applyRipple(this)
+            setOnClickListener { onPick(null) }
+          }
+        list.addView(autoItem)
+      }
+
+      for (row in rowList) {
+        val language = row.language
+        val state = downloadStateFor(language)
+        val showAsInstalled = row.installed || state?.isCompleted == true
+        val downloadingState = if (!showAsInstalled && state?.isDownloading == true) state else null
+
+        val item = LinearLayout(context)
+        item.orientation = LinearLayout.HORIZONTAL
+        item.gravity = Gravity.CENTER_VERTICAL
+        val itemPad = dpToPx(12)
+        item.setPadding(itemPad, itemPad, itemPad, itemPad)
+        applyRipple(item)
+
+        val name =
+          TextView(context).apply {
+            text = language.localizedName()
+            setTextColor(p.menuText)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+            maxLines = 1
+            ellipsize = TextUtils.TruncateAt.END
+          }
+        item.addView(name, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+
+        // Trailing group: [size % / progress ring] [star] [download button]
+        val trailing =
+          LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+          }
+
+        var sizeText: TextView? = null
+        if (!showAsInstalled || row.installedSizeBytes > 0) {
+          val label =
+            TextView(context).apply {
+              text =
+                when {
+                  downloadingState != null -> formatPercent(downloadingState.downloaded, downloadingState.totalSize)
+                  showAsInstalled -> formatSize(row.installedSizeBytes)
+                  else -> formatSize(row.downloadSizeBytes)
+                }
+              setTextColor(p.menuTextDisabled)
+              setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+              gravity = Gravity.END
+            }
+          sizeText = label
+          trailing.addView(
+            label,
+            LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+              .apply { marginEnd = dpToPx(8) },
+          )
+        }
+
+        val starHolder =
+          FrameLayout(context).apply {
+            val starSize = dpToPx(36)
+            val starPad = dpToPx(9)
+            val star =
+              ImageView(context).apply {
+                setPadding(starPad, starPad, starPad, starPad)
+              }
+            fun applyStar(favorite: Boolean) {
+              star.setImageResource(if (favorite) R.drawable.star_filled else R.drawable.star)
+              star.setColorFilter(if (favorite) p.activeTint else p.menuTextDisabled)
+              star.contentDescription = if (favorite) "Unstar ${language.displayName}" else "Star ${language.displayName}"
+            }
+            applyStar(row.favorite)
+            addView(star, FrameLayout.LayoutParams(starSize, starSize).apply { gravity = Gravity.CENTER })
+            setOnClickListener {
+              val newFavorite = !(currentRows.find { it.language.code == language.code }?.favorite ?: row.favorite)
+              applyStar(newFavorite)
+              onToggleFavorite(language, newFavorite)
+            }
+          }
+        trailing.addView(starHolder)
+
+        if (!showAsInstalled) {
+          val iconHolder = FrameLayout(context)
+          val iconSize = dpToPx(36)
+          fun setDownloadIcon() {
+            iconHolder.removeAllViews()
+            iconHolder.setOnClickListener(null)
+            val pill =
+              GradientDrawable().apply {
+                setColor(p.chipColor)
+                cornerRadius = dpToPx(18).toFloat()
+              }
+            val out = TypedValue()
+            if (context.theme.resolveAttribute(android.R.attr.selectableItemBackground, out, true) && out.resourceId != 0) {
+              iconHolder.background =
+                android.graphics.drawable.LayerDrawable(
+                  arrayOf(
+                    pill,
+                    context.getDrawable(out.resourceId) ?: android.graphics.drawable.ColorDrawable(Color.TRANSPARENT),
+                  ),
+                )
+            } else {
+              iconHolder.background = pill
+            }
+            val iconPad = dpToPx(8)
+            val icon =
+              ImageView(context).apply {
+                setImageResource(R.drawable.download)
+                setColorFilter(p.onSurface)
+                setPadding(iconPad, iconPad, iconPad, iconPad)
+                contentDescription = "Download ${language.displayName}"
+              }
+            iconHolder.addView(icon, FrameLayout.LayoutParams(iconSize, iconSize).apply { gravity = Gravity.CENTER })
+            iconHolder.setOnClickListener { onDownload(row) }
+          }
+          fun setProgressRing(downloaded: Long, total: Long) {
+            iconHolder.removeAllViews()
+            iconHolder.background = null
+            val ring =
+              android.widget.ProgressBar(context, null, android.R.attr.progressBarStyleSmall).apply {
+                isIndeterminate = false
+                max = 100
+                progress =
+                  if (total > 0) {
+                    ((downloaded * 100) / total).toInt().coerceIn(0, 100)
+                  } else {
+                    0
+                  }
+                progressTintList = android.content.res.ColorStateList.valueOf(p.activeTint)
+              }
+            val ringSize = dpToPx(24)
+            iconHolder.addView(ring, FrameLayout.LayoutParams(ringSize, ringSize).apply { gravity = Gravity.CENTER })
+            // Tapping the ring cancels the download, like the language setup screen.
+            iconHolder.setOnClickListener { onCancelDownload(language) }
+          }
+          if (downloadingState != null) {
+            setProgressRing(downloadingState.downloaded, downloadingState.totalSize)
+          } else {
+            setDownloadIcon()
+          }
+          trailing.addView(iconHolder, LinearLayout.LayoutParams(iconSize, iconSize))
+
+          stateUpdaters.add {
+            val currentState = downloadStateFor(language)
+            if (currentState?.isDownloading == true) {
+              setProgressRing(currentState.downloaded, currentState.totalSize)
+              sizeText?.text = formatPercent(currentState.downloaded, currentState.totalSize)
+            } else {
+              setDownloadIcon()
+              sizeText?.text = formatSize(row.downloadSizeBytes)
+            }
+          }
+        } else if (!language.isEnglish) {
+          // Installed rows: delete button (English has no downloadable assets).
+          val deleteHolder =
+            FrameLayout(context).apply {
+              val delSize = dpToPx(36)
+              val pill =
+                GradientDrawable().apply {
+                  setColor(p.chipColor)
+                  cornerRadius = dpToPx(18).toFloat()
+                }
+              val out = TypedValue()
+              if (context.theme.resolveAttribute(android.R.attr.selectableItemBackground, out, true) && out.resourceId != 0) {
+                background =
+                  android.graphics.drawable.LayerDrawable(
+                    arrayOf(
+                      pill,
+                      context.getDrawable(out.resourceId) ?: android.graphics.drawable.ColorDrawable(Color.TRANSPARENT),
+                    ),
+                  )
+              } else {
+                background = pill
+              }
+              val iconPad = dpToPx(8)
+              val icon =
+                ImageView(context).apply {
+                  setImageResource(R.drawable.delete)
+                  setColorFilter(p.onSurface)
+                  setPadding(iconPad, iconPad, iconPad, iconPad)
+                  contentDescription = "Delete ${language.displayName}"
+                }
+              addView(icon, FrameLayout.LayoutParams(delSize, delSize).apply { gravity = Gravity.CENTER })
+              setOnClickListener { onDelete(row) }
+            }
+          trailing.addView(deleteHolder, LinearLayout.LayoutParams(dpToPx(36), dpToPx(36)))
+        }
+
+        item.addView(trailing)
+        if (showAsInstalled) {
+          item.setOnClickListener { onPick(language) }
+        }
+        list.addView(item)
+      }
+      scroll.scrollTo(0, 0)
+    }
+
+    render(currentRows)
+    return LanguagePickerHandle(
+      root = scroll,
+      setRows = { render(it) },
+      updateDownloadStates = { stateUpdaters.forEach { update -> update() } },
+    )
   }
 
   fun createMenuContainer(
@@ -535,6 +778,10 @@ object OverlayChromeFactory {
     item.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
     val pad = dpToPx(12)
     item.setPadding(pad, pad, pad, pad)
+    val out = TypedValue()
+    if (context.theme.resolveAttribute(android.R.attr.selectableItemBackground, out, true) && out.resourceId != 0) {
+      item.setBackgroundResource(out.resourceId)
+    }
     item.setOnClickListener { onClick() }
     parent.addView(item)
   }

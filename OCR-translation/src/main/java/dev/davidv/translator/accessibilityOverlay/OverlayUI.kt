@@ -140,15 +140,16 @@ class OverlayUI(
         }
 
         override fun addPickerView(view: View) {
+          val (pickerW, pickerH) = OverlayChromeFactory.pickerWindowSize(serviceContext)
           val lp =
             if (container != null) {
-              android.widget.FrameLayout.LayoutParams(dpToPx(250), dpToPx(400)).apply {
+              android.widget.FrameLayout.LayoutParams(pickerW, pickerH).apply {
                 gravity = Gravity.CENTER
               }
             } else {
               WindowManager.LayoutParams(
-                dpToPx(250),
-                dpToPx(400),
+                pickerW,
+                pickerH,
                 windowType(),
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
                 PixelFormat.TRANSLUCENT,
@@ -400,12 +401,18 @@ class OverlayUI(
 
   fun showLanguagePicker(
     isSource: Boolean,
-    availableLangs: List<Language>,
+    rowsProvider: () -> List<dev.davidv.translator.OverlayLanguagePickerRow>,
+    onToggleFavorite: (Language, Boolean) -> Unit,
+    onDelete: (Language) -> Unit,
     onPick: (Language?) -> Unit,
   ) {
-    menuManager.showLanguagePicker(isSource, availableLangs) { lang ->
-      onPick(lang)
-    }
+    menuManager.showLanguagePicker(
+      isSource,
+      rowsProvider,
+      onToggleFavorite = onToggleFavorite,
+      onDelete = onDelete,
+      onPick = onPick,
+    )
   }
 
   fun dismissMenu() {

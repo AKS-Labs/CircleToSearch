@@ -44,9 +44,11 @@ import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
 import dev.davidv.translator.Language
+import dev.davidv.translator.LanguageMetadata
 import dev.davidv.translator.LanguageStateManager
 import dev.davidv.translator.R
 import dev.davidv.translator.TranslatorApplication
+import dev.davidv.translator.buildOverlayPickerRows
 import dev.davidv.translator.languageNameComparator
 import dev.davidv.translator.localizedName
 import dev.davidv.translator.overlayChrome.FloatingBubble
@@ -379,10 +381,11 @@ class ScreenTranslateService : Service() {
           }
 
           override fun addPickerView(view: View) {
+            val (pickerW, pickerH) = OverlayChromeFactory.pickerWindowSize(this@ScreenTranslateService)
             val params =
               WindowManager.LayoutParams(
-                dpToPx(250),
-                dpToPx(400),
+                pickerW,
+                pickerH,
                 type,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
                 PixelFormat.TRANSLUCENT,
@@ -516,12 +519,22 @@ class ScreenTranslateService : Service() {
     scope.launch {
       lsm.refreshLanguageAvailability()
       lsm.languageState.first { !it.isChecking }
-      val langs =
-        lsm.languageState.value
-          .translatorLanguages(requireOcr = isSource)
-          .sortedWith(compareBy(languageNameComparator()) { it.localizedName() })
       // Live screen translate never runs in auto-source mode, so no Auto option.
-      mm.showLanguagePicker(isSource, langs, allowAuto = false) { lang ->
+      mm.showLanguagePicker(
+        isSource,
+        rowsProvider = {
+          buildOverlayPickerRows(lsm, (applicationContext as TranslatorApplication).languageMetadataManager.metadata.value)
+        },
+        allowAuto = false,
+        onToggleFavorite = { language, favorite ->
+          val metadataManager = (applicationContext as TranslatorApplication).languageMetadataManager
+          val current = metadataManager.metadata.value[language] ?: LanguageMetadata()
+          metadataManager.updateLanguage(language, current.copy(favorite = favorite))
+        },
+        onDelete = { language ->
+          lsm.deleteLanguage(language)
+        },
+      ) { lang ->
         if (isSource) {
           if (lang != null) currentFrom = lang
         } else if (lang != null) {
