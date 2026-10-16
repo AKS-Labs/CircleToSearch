@@ -1,0 +1,16 @@
+[package]
+name = "translator-raster"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+
+[lib]
+name = "translator_raster"
+path = "src/lib.rs"
+
+[dependencies]
+translator-core = { path = "../translator-core" }
+image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
+fast_image_resize = "5"
+rayon = "1"
+log = "0.4"

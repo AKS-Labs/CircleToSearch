@@ -1,0 +1,26 @@
+# browsermt/mozilla-translations "base-memory" student (matches the app's shipped
+# packs: index URLs read retrain_base-memory_...). slimt runs this arch.
+# Joint 32k SPM (vocab.entl.spm) => shared vocab => tied-embeddings-all: true.
+dec-cell-base-depth: 2
+dec-cell-high-depth: 1
+dec-cell: ssru
+dec-depth: 4
+dim-emb: 384
+enc-cell-depth: 1
+enc-cell: gru
+enc-depth: 6
+enc-type: bidirectional
+transformer-decoder-autoreg: rnn
+transformer-dim-ffn: 1536
+transformer-ffn-activation: relu
+transformer-ffn-depth: 2
+transformer-guided-alignment-layer: last
+transformer-heads: 8
+transformer-no-projection: false
+transformer-postprocess-emb: d
+transformer-postprocess: dan
+transformer-preprocess: ""
+transformer-tied-layers: []
+transformer-train-position-embeddings: false
+type: transformer
+tied-embeddings-all: true

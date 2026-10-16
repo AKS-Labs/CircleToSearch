@@ -1,0 +1,32 @@
+# KD decode box: CT2 int8 NLLB teacher + n-best extract-best selection, one image
+# (DESIGN: image by co-location — selection runs on the KD box right after decode).
+# The CT2 conversion and tokenizer are baked at build time so a rented box makes
+# zero HF pulls; the cuda-cudnn base is the known-good runtime for the CT2 wheel
+# (NOTES pillar 6 vast recipe).
+#
+# NLLB_MODEL selects the teacher (600M distilled vs 1.3B); kd_decode.sh reads the
+# model id and CT2 dir back out of the env, so one script serves every teacher tag.
+#   docker build --build-arg NLLB_MODEL=facebook/nllb-200-1.3B -t nllb-ct2:1.3b .
+FROM nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04
+LABEL org.opencontainers.image.source=https://github.com/DavidVentura/offline-translator
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 python3-pip openssh-server rsync ca-certificates \
+ && apt-get clean && rm -rf /var/lib/apt/lists/*
+# CPU torch: transformers>=4.48 refuses torch.load of NLLB .bin on torch<2.6
+# (CVE-2025-32434) and CT2 does the GPU work itself.
+RUN pip3 install --no-cache-dir ctranslate2==4.8.1 transformers==4.57.6 \
+    sentencepiece sacremoses sacrebleu \
+ && pip3 install --no-cache-dir torch==2.6.0 --index-url https://download.pytorch.org/whl/cpu
+ENV HF_HOME=/opt/hf
+ARG NLLB_MODEL=facebook/nllb-200-distilled-600M
+ENV NLLB_MODEL=${NLLB_MODEL}
+ENV NLLB_CT2_DIR=/opt/nllb-ct2
+# The converter downloads the full original checkpoint into HF_HOME; runtime
+# needs only the CT2 dir + tokenizer files, so drop the weight blobs (~2.4GB for
+# 600M, ~5.5GB for 1.3B) and prove the tokenizer still loads offline (ghcr
+# throttles pulls to ~75Mbps, so image size is rental wall-time — see DESIGN.md).
+RUN ct2-transformers-converter --model "$NLLB_MODEL" \
+      --output_dir "$NLLB_CT2_DIR" --quantization int8 \
+ && find /opt/hf -size +100M -delete \
+ && HF_HUB_OFFLINE=1 python3 -c "import os; from transformers import AutoTokenizer; AutoTokenizer.from_pretrained(os.environ['NLLB_MODEL'])"

@@ -1,0 +1,35 @@
+# Hy-MT2 KD decode box: lean vLLM (pip cu129) serving Tencent's instruction MT
+# model for sharded 1-best ug->en distillation. vLLM (not CT2) because Hy-MT2 is a
+# decoder LLM.
+#
+# Built from the cu129 wheel rather than vllm/vllm-openai:latest (18.7GB, CUDA
+# 13.0.2): this lands at ~14GB AND ships CUDA 12.9, which rents on nearly the whole
+# vast 4090 pool (minor-version compat down to driver ~525) where CUDA 13 needs a
+# recent driver (~580) that is scarce. Validated 2026-07-16 at 124.5 l/s (== the
+# fat image) with correct FP8 output.
+#
+# The model is NOT baked: the FP8 checkpoint (~7.5GB) is pulled from HF at runtime.
+# map_step's per-shard retry + Vast(tries=8) cover a flaky HF pull.
+#
+# openssh-server + rsync: the pipe job protocol ssh's in and rsyncs. gcc/g++/
+# python3-dev: triton JIT-compiles a CUDA driver shim at engine startup and needs a
+# host C compiler (the vllm-openai base had one; python:slim does not).
+FROM python:3.12-slim
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      openssh-server rsync gcc g++ python3-dev libgomp1 libnuma1 ca-certificates \
+ && apt-get clean && rm -rf /var/lib/apt/lists/*
+# Pin the torch/CUDA stack to cu129 (primary index); vLLM cu129 wheel by URL;
+# everything else (transformers, flashinfer, ...) from PyPI.
+RUN pip install --no-cache-dir \
+      --index-url https://download.pytorch.org/whl/cu129 \
+      --extra-index-url https://pypi.org/simple \
+      "https://github.com/vllm-project/vllm/releases/download/v0.25.1/vllm-0.25.1+cu129-cp38-abi3-manylinux_2_28_x86_64.whl"
+COPY vllm_decode.py /opt/vllm_decode.py
+ENV HY_MODEL=tencent/Hy-MT2-7B-FP8
+# Greedy 1-best decode uses the native sampler, not flashinfer's — flashinfer's
+# sampler JIT-compiles with nvcc at runtime, which this lean image has no toolkit
+# for. Zero quality impact at temperature 0.
+ENV VLLM_USE_FLASHINFER_SAMPLER=0
+LABEL org.opencontainers.image.source=https://github.com/DavidVentura/offline-translator
+ENTRYPOINT []

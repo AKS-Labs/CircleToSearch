@@ -1,0 +1,24 @@
+[project]
+name = "pipe"
+version = "0.1.0"
+description = "Resumable runner for the opus-trainer distillation pipeline"
+requires-python = ">=3.12"
+dependencies = [
+    "paramiko>=3.4",
+    "vastai>=0.2",
+]
+
+[project.scripts]
+pipe = "pipe.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["pipe"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]

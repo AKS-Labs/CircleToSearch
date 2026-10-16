@@ -1,0 +1,20 @@
+**/target/*
+samples/*
+espeak-ng-data/*
+.test-assets/
+*.pdf
+*.log
+*.pt
+__pycache__
+viz-out/
+*.png
+*.jpg
+*.json
+*.mp4
+*.bin
+*.map
+*.jsonl
+*.mnn
+
+# MT training corpora — kept out of git, destined for HF datasets
+scripts/opus-trainer/data/

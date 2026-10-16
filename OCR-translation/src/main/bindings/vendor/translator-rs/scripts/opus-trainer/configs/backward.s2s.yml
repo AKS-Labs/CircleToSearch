@@ -1,0 +1,26 @@
+# mozilla/translations backward model: pipeline/train/configs/model/backward.yml
+# + training/backward.train.yml (marian wmt2017-uedin example). Shallow s2s RNN
+# trained on HUMAN bitext only — teacher-independent, so it can judge teacher
+# output for ce-filtering (and later back-translation) without sharing the
+# teacher's blind spots.
+type: s2s
+layer-normalization: true
+tied-embeddings-all: true
+
+beam-size: 12
+cost-type: ce-mean-words
+disp-freq: 1000
+early-stopping: 5
+exponential-smoothing: true
+max-length: 100
+maxi-batch: 1000
+mini-batch-fit: true
+normalize: 1
+# mozilla uses 10000 (they train on the full parallel corpus); our human sets
+# are ~1M pairs so an epoch is only a few thousand updates — validate often
+# enough that early-stopping sees the overfit turn.
+save-freq: 2000
+valid-freq: 2000
+valid-mini-batch: 64
+valid-metrics:
+  - ce-mean-words

@@ -56,6 +56,13 @@ class TranslatorOverlayBridge(
   private var capturedChrome: Runnable? = null
   private var capturedScanning = false
   private var capturedRegion: Rect? = null
+  /** Whether the translated result window consumes taps (word selection / copy).
+   *  False for live-screen modes (long-press translate, bubble) where taps must
+   *  pass through to the app underneath. */
+  private var resultTapToCopy = true
+  /** Flip-button state outside select mode: showing the original capture instead
+   *  of the translated overlay. Reset whenever a new result is drawn. */
+  private var showingOriginal = false
 
   /** Bumped on [deactivate] so a result finishing after close is dropped, not drawn. */
   private var overlaySession = 0
@@ -160,6 +167,9 @@ class TranslatorOverlayBridge(
 
   override fun activate() {
     if (active) return
+    // Bubble / live-screen mode: the app underneath stays interactive, so the
+    // result window must pass taps through (auto-clears on the next click/scroll).
+    resultTapToCopy = false
     enterActiveState()
     android.os.Handler(android.os.Looper.getMainLooper()).post {
       if (active) {
@@ -174,14 +184,18 @@ class TranslatorOverlayBridge(
    * (border wave + toolbar, then the scan overlay if still computing) is drawn only
    * after [uiDelayMs], once the caller's UI has been hidden. [returnToCaller] is invoked
    * when the overlay is deactivated (toolbar close, back press) so the caller can
-   * restore its UI.
+   * restore its UI. [tapToCopy] — false when the live screen stays interactive
+   * underneath (long-press translate closes Circle to Search); the result window
+   * then passes taps through instead of consuming them for word selection.
    */
   fun startCapturedTranslation(
     screenshot: Bitmap,
     uiDelayMs: Long = 0L,
     returnToCaller: (() -> Unit)? = null,
+    tapToCopy: Boolean = true,
   ) {
     this.returnToCaller = returnToCaller
+    this.resultTapToCopy = tapToCopy
     providedScreenshot = screenshot
 
     if (active) {
@@ -235,7 +249,16 @@ class TranslatorOverlayBridge(
 
   private fun showTranslatorChrome() {
     ui.showBorderWave()
-    ui.showToolbar(forcedSourceLanguage, forcedTargetLanguage, currentReadingOrderFor(forcedSourceLanguage), isAutoSource)
+    // Live-screen modes (resultTapToCopy == false: long-press translate, bubble)
+    // need the select-text button — taps pass through the result there, so copy
+    // is only reachable through select mode. Frozen modes get flip instead.
+    ui.showToolbar(
+      forcedSourceLanguage,
+      forcedTargetLanguage,
+      currentReadingOrderFor(forcedSourceLanguage),
+      isAutoSource,
+      showSelectButton = !resultTapToCopy,
+    )
   }
 
   private fun enterActiveState() {
@@ -250,6 +273,8 @@ class TranslatorOverlayBridge(
     overlaySession++
     active = false
     selectMode = false
+    resultTapToCopy = true
+    showingOriginal = false
     ui.removeSelectSurface()
     surfaceState.clear()
     lastResult = null
@@ -283,7 +308,9 @@ class TranslatorOverlayBridge(
 
   private fun exitSelectMode() {
     selectMode = false
-    lastResult?.let { ui.showBitmapOverlay(it.translated, it.region) }
+    showingOriginal = false
+    ui.setFlipActive(false)
+    lastResult?.let { ui.showBitmapOverlay(it.translated, it.region, tapToCopy = resultTapToCopy) }
     ui.removeSelectSurface()
     surfaceState.clear()
     ui.setSelectModeUi(false)
@@ -294,8 +321,21 @@ class TranslatorOverlayBridge(
   }
 
   override fun toggleFlipOriginal() {
-    if (!selectMode) return
-    ui.setFlipActive(surfaceState.toggleShowOriginal())
+    if (selectMode) {
+      ui.setFlipActive(surfaceState.toggleShowOriginal())
+      return
+    }
+    // Outside select mode (no select button in this mode): swap the static result
+    // overlay between the original and translated bitmaps.
+    val res = lastResult ?: return
+    showingOriginal = !showingOriginal
+    ui.setFlipActive(showingOriginal)
+    ui.removeTranslationOverlays()
+    ui.showBitmapOverlay(
+      if (showingOriginal) res.original else res.translated,
+      res.region,
+      tapToCopy = resultTapToCopy,
+    )
   }
 
   override fun swapLanguages() {
@@ -385,14 +425,14 @@ class TranslatorOverlayBridge(
     }, SCREENSHOT_RENDER_DELAY_MS)
   }
 
-  /** The screen area under the toolbar — capture and overlay region. */
+  /** The screen area above the bottom toolbar — capture and overlay region. */
   private fun currentCaptureRegion(): Rect {
     val content = dev.davidv.translator.overlayChrome.OverlayInsets.contentBounds(windowManager)
     return Rect(
       content.left,
-      content.top + ui.dpToPx(48),
+      content.top,
       content.right,
-      content.bottom,
+      content.bottom - ui.dpToPx(80),
     )
   }
 
@@ -438,17 +478,11 @@ class TranslatorOverlayBridge(
   }
 
   private fun captureFullScreen(region: Rect) {
-    // Entered from Circle to Search: toolbar refresh / language change re-translates the
-    // captured screenshot instead of re-capturing the live screen.
-    val provided = providedScreenshot
-    if (provided != null) {
-      val full = fullCaptureRegion()
-      val cropped = cropToRegion(provided, full) ?: return
-      surfaceState.regions.value = null
-      ui.showScanOverlay(surfaceState, full)
-      serviceScope.launch { translateRegionBitmap(cropped, full) }
-      return
-    }
+    // Refresh / language change always re-captures the LIVE screen via a11y
+    // takeScreenshot — the caller already removed the result overlays and waited
+    // SCREENSHOT_RENDER_DELAY_MS so they aren't in the capture (the toolbar sits
+    // above `region`). Re-translating the original provided screenshot here made
+    // refresh a no-op after the underlying screen changed.
     host.takeScreenshot(
       Display.DEFAULT_DISPLAY,
       host.mainExecutor,
@@ -524,13 +558,15 @@ class TranslatorOverlayBridge(
         translatedWords = result.translatedWords,
       )
     lastResult = TranslatedScreen(original = bitmap, translated = result.correctedBitmap, words = words, region = region)
+    showingOriginal = false
+    ui.setFlipActive(false)
     if (selectMode) {
       surfaceState.showResult(result.correctedBitmap, bitmap, words)
       if (!ui.hasSelectSurface()) {
         ui.showSelectSurface(surfaceState, region) { onSelectSurfaceDismissed() }
       }
     } else {
-      ui.showBitmapOverlay(result.correctedBitmap, region)
+      ui.showBitmapOverlay(result.correctedBitmap, region, tapToCopy = resultTapToCopy)
     }
   }
 

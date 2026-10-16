@@ -1,0 +1,18 @@
+[package]
+name = "translator-tts"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+
+[lib]
+name = "translator_tts"
+path = "src/lib.rs"
+
+[dependencies]
+translator-core = { path = "../translator-core" }
+piper-rs = { git = "https://github.com/DavidVentura/piper-rs", features = ["japanese", "fst-normalization", "mnn"] }
+translator-transliterate = { path = "../translator-transliterate", optional = true }
+log = "0.4"
+
+[features]
+transliterate = ["dep:translator-transliterate"]

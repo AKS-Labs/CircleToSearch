@@ -1,0 +1,19 @@
+[package]
+name = "translator-live"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+
+[lib]
+name = "translator_live"
+path = "src/lib.rs"
+
+[dependencies]
+translator-core = { path = "../translator-core" }
+translator-raster = { path = "../translator-raster" }
+translator-render = { path = "../translator-render" }
+translator-ocr = { path = "../translator-ocr" }
+translator-tracker = { path = "../translator-tracker", features = ["image-render"] }
+translator-translate = { path = "../translator-translate" }
+image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
+log = "0.4"

@@ -1,0 +1,232 @@
+[package]
+name = "translator"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+
+[workspace]
+members = ["crates/*"]
+
+[lib]
+name = "translator"
+path = "src/lib.rs"
+
+[[bin]]
+name = "bucket_samples"
+path = "src/bin/bucket_samples.rs"
+required-features = ["tts"]
+
+[[bin]]
+name = "onnx_to_mnn"
+path = "src/bin/onnx_to_mnn.rs"
+required-features = ["model-convert"]
+
+[[bin]]
+name = "bloat_probe"
+path = "src/bin/bloat_probe.rs"
+required-features = ["odt", "tts", "dictionary", "ppocr", "transliterate", "pdf"]
+
+[[bin]]
+name = "translate"
+path = "src/bin/translate.rs"
+required-features = ["translate-cli"]
+
+[[bin]]
+name = "surface_sim"
+path = "src/bin/surface_sim.rs"
+required-features = ["surface-sim"]
+
+[[bin]]
+name = "viz_pipeline"
+path = "src/bin/viz_pipeline.rs"
+required-features = ["viz"]
+
+[[bin]]
+name = "extract_strips"
+path = "src/bin/extract_strips.rs"
+required-features = ["viz"]
+
+[[bin]]
+name = "ppocr_bench"
+path = "src/bin/ppocr_bench.rs"
+required-features = ["ppocr"]
+
+[[bin]]
+name = "ink_bench"
+path = "src/bin/ink_bench.rs"
+required-features = ["ppocr"]
+
+[[bin]]
+name = "dump_det_boxes"
+path = "src/bin/dump_det_boxes.rs"
+required-features = ["ppocr"]
+
+[[bin]]
+name = "golden_eval"
+path = "src/bin/golden_eval.rs"
+required-features = ["ppocr"]
+
+[features]
+default = []
+translate-cli = ["dep:toml"]
+uniffi = ["dep:uniffi", "translator-core/uniffi", "translator-translate/uniffi", "translator-align?/uniffi", "translator-render?/uniffi"]
+dictionary = ["dep:translator-dictionary"]
+mucab = ["dep:translator-mucab", "translator-transliterate?/mucab"]
+tts = ["dep:translator-tts", "dep:piper-rs"]
+transliterate = ["dep:translator-transliterate", "translator-tts?/transliterate"]
+pdf = [
+    "dep:mupdf",
+    "dep:lopdf",
+    "dep:ttf-parser",
+    "dep:subsetter",
+    "dep:rustybuzz",
+    "dep:unicode-bidi",
+    "dep:unicode-script",
+    "translator-core/script-from-unicode",
+    "dep:translator-render",
+    "dep:translator-pdf",
+]
+odt = ["translator-doc/odt"]
+dom-translate = ["translator-translate/dom-translate"]
+html = ["dom-translate", "translator-translate/html"]
+epub = ["translator-doc/epub"]
+http = ["dep:rouille", "dep:rand", "html", "image-render"]
+image-render = [
+    "dep:translator-render",
+    "translator-core/script-from-unicode",
+]
+pdf-image-translate = [
+    "pdf",
+    "image-render",
+    "ppocr",
+    "translator-pdf/image-translate",
+]
+doc-align = ["dep:translator-align", "dep:ndarray"]
+raster = ["dep:translator-raster", "dep:image"]
+ppocr = ["dep:translator-ocr", "raster"]
+model-convert = ["dep:translator-convert"]
+planar-tracker = ["ppocr", "dep:translator-live", "dep:translator-tracker", "translator-tracker/image-render", "image-render", "raster", "dep:image", "dep:imageproc", "dep:rayon"]
+gpu = ["dep:translator-gpu", "planar-tracker"]
+surface-sim = ["planar-tracker", "dep:minifb", "dep:ab_glyph", "dep:env_logger"]
+viz = ["ppocr", "doc-align", "image-render", "dep:ab_glyph", "dep:env_logger", "dep:image", "dep:imageproc"]
+
+[dependencies]
+translator-core = { path = "crates/translator-core" }
+translator-translate = { path = "crates/translator-translate" }
+translator-doc = { path = "crates/translator-doc" }
+translator-render = { path = "crates/translator-render", optional = true }
+translator-pdf = { path = "crates/translator-pdf", optional = true }
+translator-tracker = { path = "crates/translator-tracker", optional = true }
+translator-raster = { path = "crates/translator-raster", optional = true }
+translator-ocr = { path = "crates/translator-ocr", optional = true }
+translator-convert = { path = "crates/translator-convert", optional = true }
+translator-live = { path = "crates/translator-live", optional = true }
+translator-gpu = { path = "crates/translator-gpu", optional = true }
+regex = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = { version = "0.8", optional = true, default-features = false, features = ["parse"] }
+uniffi = { version = "0.31", optional = true, default-features = false }
+translator-dictionary = { path = "crates/translator-dictionary", optional = true }
+translator-mucab = { path = "crates/translator-mucab", optional = true }
+translator-transliterate = { path = "crates/translator-transliterate", optional = true }
+translator-tts = { path = "crates/translator-tts", optional = true }
+piper-rs = { git = "https://github.com/DavidVentura/piper-rs", optional = true, features = ["japanese", "fst-normalization", "mnn"] }
+lopdf = { version = "0.40", optional = true, default-features = false }
+ttf-parser = { version = "0.25", optional = true, default-features = false, features = ["std", "opentype-layout", "variable-fonts"] }
+subsetter = { version = "0.2", optional = true, default-features = false }
+rustybuzz = { version = "0.20", optional = true, default-features = false, features = ["std"] }
+unicode-bidi = { version = "0.3", optional = true, default-features = false, features = ["std", "hardcoded-data"] }
+unicode-script = { version = "0.5", optional = true, default-features = false }
+unicode-linebreak = { version = "0.1", optional = true }
+zeno = { version = "0.3", optional = true, default-features = false, features = ["std", "eval"] }
+image = { version = "0.25", optional = true, default-features = false, features = ["jpeg", "png"] }
+translator-align = { path = "crates/translator-align", optional = true }
+ndarray = { version = "0.16", optional = true }
+imageproc = { version = "0.25", optional = true, default-features = false }
+rayon = { version = "1", optional = true }
+log = "0.4"
+minifb = { version = "0.27", optional = true }
+ab_glyph = { version = "0.2", optional = true }
+env_logger = { version = "0.11", optional = true }
+rouille = { version = "3.6", optional = true, default-features = false }
+rand = { version = "0.8", optional = true }
+
+
+[dev-dependencies]
+image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
+ab_glyph = "0.2"
+env_logger = "0.11"
+khronos-egl = { version = "6", features = ["dynamic"] }
+glow = { version = "0.17", default-features = false }
+
+[target.'cfg(target_os = "android")'.dependencies]
+mupdf = { git = "https://github.com/DavidVentura/mupdf-rs", optional = true, default-features = false, features = [] }
+
+[target.'cfg(not(target_os = "android"))'.dependencies]
+mupdf = { git = "https://github.com/DavidVentura/mupdf-rs", optional = true, default-features = false, features = ["system-fonts"] }
+
+
+[[test]]
+name = "translate_smoke"
+path = "tests/translate_smoke.rs"
+required-features = ["html"]
+
+[[test]]
+name = "http_smoke"
+path = "tests/http_smoke.rs"
+required-features = ["http"]
+
+[[test]]
+name = "pdf_smoke"
+path = "tests/pdf_smoke.rs"
+required-features = ["pdf"]
+
+[[test]]
+name = "pdf_image_smoke"
+path = "tests/pdf_image_smoke.rs"
+required-features = ["pdf-image-translate"]
+
+[[test]]
+name = "odt_smoke"
+path = "tests/odt_smoke.rs"
+required-features = ["odt"]
+
+[[test]]
+name = "doc_align_refine_visual"
+path = "tests/doc_align/refine_visual.rs"
+required-features = ["doc-align"]
+
+[[test]]
+name = "ppocr_tilt_dump"
+path = "tests/ppocr_tilt_dump.rs"
+required-features = ["ppocr"]
+
+[[test]]
+name = "ppocr_color_matting"
+path = "tests/ppocr_color_matting.rs"
+required-features = ["ppocr"]
+
+[[test]]
+name = "planar_tracker_synthetic"
+path = "tests/planar_tracker_synthetic.rs"
+required-features = ["planar-tracker"]
+
+[[test]]
+name = "planar_engine_lifecycle"
+path = "tests/planar_engine_lifecycle.rs"
+required-features = ["planar-tracker"]
+
+# [patch."https://github.com/DavidVentura/mnn-sys"]
+# mnn-sys = { path = "../mnn-sys" }
+
+# [patch."https://github.com/DavidVentura/piper-rs"]
+# piper-rs = { path = "../piper-rs" }
+
+# [patch."https://github.com/DavidVentura/mupdf-rs"]
+# mupdf-rs = { path = "../mupdf-rs" }
+
+[[test]]
+name = "ppocr_textline_orientation"
+path = "tests/ppocr_textline_orientation.rs"
+required-features = ["ppocr", "planar-tracker"]

@@ -60,6 +60,25 @@ object OverlayInsets {
       (24 * resources.displayMetrics.density).toInt()
     }
   }
+
+  /** Bottom offset that clears the navigation bar (and gesture bar), for
+   *  bottom-anchored chrome like the translate toolbar. */
+  fun bottomInset(
+    windowManager: WindowManager,
+    resources: Resources,
+  ): Int {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+      return windowManager.currentWindowMetrics.windowInsets
+        .getInsets(WindowInsets.Type.navigationBars() or WindowInsets.Type.displayCutout())
+        .bottom
+    }
+    val id = resources.getIdentifier("navigation_bar_height", "dimen", "android")
+    return if (id > 0) {
+      resources.getDimensionPixelSize(id)
+    } else {
+      (48 * resources.displayMetrics.density).toInt()
+    }
+  }
 }
 
 fun WindowManager.LayoutParams.spanFullDisplay() {

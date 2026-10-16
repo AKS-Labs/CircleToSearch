@@ -70,6 +70,9 @@ class AssistantTranslateOverlayBridge(
   private var lastResult: TranslatedScreen? = null
   private val surfaceState = SelectionSurfaceState()
   private var ocrReadingOrder: ReadingOrder? = null
+  /** Flip-button state outside select mode: showing the original capture instead
+   *  of the translated overlay. Reset whenever a new result is drawn. */
+  private var showingOriginal = false
 
   private val translationCoordinator
     get() = runCatching { app.translationCoordinator }.getOrNull()
@@ -159,7 +162,13 @@ class AssistantTranslateOverlayBridge(
   }
 
   private fun showTranslatorChrome() {
-    ui.showToolbar(forcedSourceLanguage, forcedTargetLanguage, currentReadingOrderFor(forcedSourceLanguage), isAutoSource)
+    ui.showToolbar(
+      forcedSourceLanguage,
+      forcedTargetLanguage,
+      currentReadingOrderFor(forcedSourceLanguage),
+      isAutoSource,
+      showSelectButton = false,
+    )
   }
 
   override fun activate() {
@@ -180,6 +189,7 @@ class AssistantTranslateOverlayBridge(
     overlaySession++
     active = false
     selectMode = false
+    showingOriginal = false
     ui.removeSelectSurface()
     surfaceState.clear()
     lastResult = null
@@ -212,6 +222,8 @@ class AssistantTranslateOverlayBridge(
 
   private fun exitSelectMode() {
     selectMode = false
+    showingOriginal = false
+    ui.setFlipActive(false)
     lastResult?.let { ui.showBitmapOverlay(it.translated, it.region) }
     ui.removeSelectSurface()
     surfaceState.clear()
@@ -223,8 +235,17 @@ class AssistantTranslateOverlayBridge(
   }
 
   override fun toggleFlipOriginal() {
-    if (!selectMode) return
-    ui.setFlipActive(surfaceState.toggleShowOriginal())
+    if (selectMode) {
+      ui.setFlipActive(surfaceState.toggleShowOriginal())
+      return
+    }
+    // No select button in this mode: flip swaps the static result overlay
+    // between the original and translated bitmaps.
+    val res = lastResult ?: return
+    showingOriginal = !showingOriginal
+    ui.setFlipActive(showingOriginal)
+    ui.removeTranslationOverlays()
+    ui.showBitmapOverlay(if (showingOriginal) res.original else res.translated, res.region)
   }
 
   override fun swapLanguages() {
@@ -389,6 +410,8 @@ class AssistantTranslateOverlayBridge(
         translatedWords = result.translatedWords,
       )
     lastResult = TranslatedScreen(original = bitmap, translated = result.correctedBitmap, words = words, region = region)
+    showingOriginal = false
+    ui.setFlipActive(false)
     if (selectMode) {
       surfaceState.showResult(result.correctedBitmap, bitmap, words)
       if (!ui.hasSelectSurface()) {

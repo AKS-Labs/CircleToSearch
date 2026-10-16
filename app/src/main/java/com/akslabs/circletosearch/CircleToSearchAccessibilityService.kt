@@ -1810,11 +1810,18 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
      * translation start immediately; the overlay chrome is drawn after [uiDelayMs],
      * once the caller's UI has been hidden. [onClosed] is invoked when the overlay is
      * dismissed (toolbar close / back press) so the caller can restore its UI. Returns
-     * false if the overlay bridge is not running.
+     * false if the overlay bridge is not running. [tapToCopy] — false when the live
+     * screen stays interactive underneath (long-press translate); the result overlay
+     * then passes taps through instead of consuming them for word selection.
      */
-    fun translateCapturedScreen(screenshot: Bitmap, uiDelayMs: Long = 0L, onClosed: (() -> Unit)? = null): Boolean {
+    fun translateCapturedScreen(
+        screenshot: Bitmap,
+        uiDelayMs: Long = 0L,
+        onClosed: (() -> Unit)? = null,
+        tapToCopy: Boolean = true,
+    ): Boolean {
         val bridge = translatorBridge ?: return false
-        bridge.startCapturedTranslation(screenshot, uiDelayMs, onClosed)
+        bridge.startCapturedTranslation(screenshot, uiDelayMs, onClosed, tapToCopy)
         return true
     }
 

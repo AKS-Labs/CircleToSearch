@@ -68,6 +68,7 @@ class OverlayUI(
   private var launcherBubble: FloatingBubble? = null
   private var toolbarView: View? = null
   private var toolbarParams: WindowManager.LayoutParams? = null
+  private var hasSelectButton = false
   private var sourceLabelView: TextView? = null
   private var targetLabelView: TextView? = null
   private var readingOrderButtonView: View? = null
@@ -112,11 +113,12 @@ class OverlayUI(
         }
 
         override fun addMenuView(view: View) {
+          val menuBottom = dpToPx(84) + OverlayInsets.bottomInset(windowManager, serviceContext.resources)
           val lp =
             if (container != null) {
               android.widget.FrameLayout.LayoutParams(dpToPx(180), android.view.ViewGroup.LayoutParams.WRAP_CONTENT).apply {
-                gravity = Gravity.TOP or Gravity.END
-                topMargin = dpToPx(48)
+                gravity = Gravity.BOTTOM or Gravity.END
+                bottomMargin = menuBottom
                 marginEnd = dpToPx(8)
               }
             } else {
@@ -127,9 +129,9 @@ class OverlayUI(
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
                 PixelFormat.TRANSLUCENT,
               ).apply {
-                gravity = Gravity.TOP or Gravity.END
+                gravity = Gravity.BOTTOM or Gravity.END
                 x = dpToPx(8)
-                y = dpToPx(48)
+                y = menuBottom
                 windowAnimations = 0
               }
             }
@@ -191,6 +193,7 @@ class OverlayUI(
     forcedTargetLanguage: Language?,
     readingOrder: ReadingOrder?,
     isAutoSource: Boolean,
+    showSelectButton: Boolean = false,
   ) {
     if (toolbarView != null) return
 
@@ -202,7 +205,11 @@ class OverlayUI(
         forcedTargetLanguage = forcedTargetLanguage,
         defaultTargetLanguage = service.langStateManager.languageByCode(settingsManager.settings.value.defaultTargetLanguageCode) ?: return,
         onClose = { service.deactivate() },
-        onSelectModeClick = { service.toggleSelectMode() },
+        onSelectModeClick = if (showSelectButton) {
+          { service.toggleSelectMode() }
+        } else {
+          null
+        },
         onSourceClick = { service.showLanguagePicker(true) },
         onSwap = { service.swapLanguages() },
         onTargetClick = { service.showLanguagePicker(false) },
@@ -211,7 +218,6 @@ class OverlayUI(
         onReadingOrderClick = { service.toggleJapaneseOcrMode() },
         onRefreshClick = { service.handleFullScreenOcr() },
         onFlipOriginal = { service.toggleFlipOriginal() },
-        onMenuClick = { service.showDotsMenu() },
         isAutoSource = isAutoSource,
       )
     val toolbar = toolbarViews.root
@@ -223,25 +229,34 @@ class OverlayUI(
     refreshButtonView = toolbarViews.refreshButton
     flipButtonView = toolbarViews.flipButton
     flipIconView = toolbarViews.flipIcon
-    flipButtonView?.visibility = View.GONE
+    hasSelectButton = showSelectButton
+    // Flip (original/translated) is a permanent control outside select mode when
+    // there's no select button; with select mode it stays hidden until entered.
+    flipButtonView?.visibility = if (showSelectButton) View.GONE else View.VISIBLE
 
+    val bottomInset = OverlayInsets.bottomInset(windowManager, serviceContext.resources)
+    // Extra padding above the nav bar so the bar doesn't sit flush at the screen edge.
+    val bottomOffset = bottomInset + dpToPx(16)
     val lp: android.view.ViewGroup.LayoutParams =
       if (container != null) {
         android.widget.FrameLayout.LayoutParams(
-          android.view.ViewGroup.LayoutParams.MATCH_PARENT,
           android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
-        ).apply { topMargin = getStatusBarHeight() }
+          android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+        ).apply {
+          gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+          bottomMargin = bottomOffset
+        }
       } else {
         WindowManager.LayoutParams(
-          WindowManager.LayoutParams.MATCH_PARENT,
+          WindowManager.LayoutParams.WRAP_CONTENT,
           WindowManager.LayoutParams.WRAP_CONTENT,
           windowType(),
           WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
           PixelFormat.TRANSLUCENT,
         ).apply {
-          gravity = Gravity.TOP or Gravity.START
+          gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
           x = 0
-          y = getStatusBarHeight()
+          y = bottomOffset
           windowAnimations = 0
         }
       }
@@ -249,6 +264,68 @@ class OverlayUI(
     addChromeView(toolbar, lp)
     toolbarView = toolbar
     toolbarParams = lp as? WindowManager.LayoutParams
+    makeToolbarDraggable(toolbar)
+  }
+
+  private var dragStartRawX = 0f
+  private var dragStartRawY = 0f
+  private var dragStartTx = 0f
+  private var dragStartTy = 0f
+  private var dragStartWinX = 0
+  private var dragStartWinY = 0
+
+  /**
+   * Makes the toolbar draggable from anywhere on its bar/grip that isn't a button
+   * (buttons consume their own clicks). Container mode moves via translation;
+   * window mode updates the WindowManager params. Drag is vertical + horizontal,
+   * clamped so the bar stays on screen.
+   */
+  @android.annotation.SuppressLint("ClickableViewAccessibility")
+  private fun makeToolbarDraggable(toolbar: View) {
+    val touchSlop = android.view.ViewConfiguration.get(serviceContext).scaledTouchSlop
+    var dragging = false
+    toolbar.setOnTouchListener { v, event ->
+      when (event.actionMasked) {
+        android.view.MotionEvent.ACTION_DOWN -> {
+          dragStartRawX = event.rawX
+          dragStartRawY = event.rawY
+          dragStartTx = v.translationX
+          dragStartTy = v.translationY
+          dragStartWinX = toolbarParams?.x ?: 0
+          dragStartWinY = toolbarParams?.y ?: 0
+          dragging = false
+          true
+        }
+        android.view.MotionEvent.ACTION_MOVE -> {
+          val dx = event.rawX - dragStartRawX
+          val dy = event.rawY - dragStartRawY
+          if (!dragging && (kotlin.math.abs(dx) > touchSlop || kotlin.math.abs(dy) > touchSlop)) {
+            dragging = true
+          }
+          if (dragging) {
+            val params = toolbarParams
+            if (container != null) {
+              val parent = v.parent as? android.view.View
+              val maxY = (parent?.height ?: 0) - v.height
+              v.translationX = dragStartTx + dx
+              v.translationY = (dragStartTy + dy).coerceIn(-maxY.toFloat(), 0f)
+            } else if (params != null) {
+              val maxY = OverlayInsets.contentBounds(windowManager).bottom - v.height
+              params.x = (dragStartWinX + dx.toInt())
+              params.y = (dragStartWinY - dy.toInt()).coerceIn(dpToPx(8), maxY.coerceAtLeast(dpToPx(8)))
+              runCatching { windowManager.updateViewLayout(v, params) }
+            }
+          }
+          true
+        }
+        android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
+          if (!dragging) v.performClick()
+          dragging = false
+          true
+        }
+        else -> false
+      }
+    }
   }
 
   fun removeToolbar() {
@@ -269,14 +346,22 @@ class OverlayUI(
 
   /** Swap the mode-dependent toolbar slot: refresh drives the live screen, flip the frozen one. */
   fun setSelectModeUi(active: Boolean) {
-    selectIconView?.setColorFilter(if (active) OverlayChromeFactory.ACTIVE_ICON_TINT else Color.WHITE)
+    val onSurface = OverlayChromeFactory.palette(serviceContext).onSurface
+    val activeTint = OverlayChromeFactory.activeIconTint(serviceContext)
+    selectIconView?.setColorFilter(if (active) activeTint else onSurface)
     refreshButtonView?.visibility = if (active) View.GONE else View.VISIBLE
-    flipButtonView?.visibility = if (active) View.VISIBLE else View.GONE
-    if (!active) flipIconView?.setColorFilter(Color.WHITE)
+    // Without a select button, flip is a permanent control — only hide it when
+    // leaving select mode if select mode is what made it visible.
+    flipButtonView?.visibility =
+      if (active) View.VISIBLE else if (hasSelectButton) View.GONE else View.VISIBLE
+    if (!active) flipIconView?.setColorFilter(onSurface)
   }
 
   fun setFlipActive(active: Boolean) {
-    flipIconView?.setColorFilter(if (active) OverlayChromeFactory.ACTIVE_ICON_TINT else Color.WHITE)
+    flipIconView?.setColorFilter(
+      if (active) OverlayChromeFactory.activeIconTint(serviceContext)
+      else OverlayChromeFactory.palette(serviceContext).onSurface,
+    )
   }
 
   fun updateToolbarState(
@@ -330,13 +415,12 @@ class OverlayUI(
   fun showBitmapOverlay(
     bitmap: Bitmap,
     bounds: Rect,
+    tapToCopy: Boolean = true,
   ) {
     val imageView = ImageView(serviceContext)
     imageView.setImageBitmap(bitmap)
     imageView.scaleType = ImageView.ScaleType.FIT_XY
 
-    // Non-touchable so taps and swipes pass straight through to the app underneath;
-    // the overlay clears itself off the next scroll/click via onAccessibilityEvent.
     val lp: android.view.ViewGroup.LayoutParams =
       if (container != null) {
         android.widget.FrameLayout.LayoutParams(bounds.width(), bounds.height()).apply {
@@ -348,8 +432,12 @@ class OverlayUI(
           bounds.width(),
           bounds.height(),
           windowType(),
+          // tapToCopy: the window must consume taps (word selection). Pass-through
+          // mode (live screen under a long-press translate) keeps NOT_TOUCHABLE so
+          // taps/swipes reach the app below and the overlay auto-clears via
+          // onAccessibilityEvent. NOT_FOCUSABLE keeps the app below focused.
           WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-            WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+            (if (tapToCopy) 0 else WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE) or
             WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
           PixelFormat.TRANSLUCENT,
         ).apply {
@@ -360,12 +448,11 @@ class OverlayUI(
         }
       }
 
-    if (container != null) {
-      // Activity-hosted (assistant mode): the translated result is interactive — tap or
-      // long-press switches to the word-selection surface (tap a word → floating
-      // Copy/Share/Search bar), matching the Circle to Search text-selection UX. The
-      // window path keeps its non-touchable pass-through (taps land on the app below
-      // and clear the overlay).
+    if (tapToCopy) {
+      // Tap or long-press the translated result to switch to the word-selection surface
+      // (tap a word → floating Copy/Share/Search bar), matching the Circle to Search
+      // text-selection UX. Only wired when the result should be interactive — the
+      // long-press/live-screen mode needs the taps to reach the app underneath.
       imageView.setOnClickListener { service.toggleSelectMode() }
       imageView.setOnLongClickListener {
         service.toggleSelectMode()
@@ -555,15 +642,17 @@ class OverlayUI(
   }
 
   fun showOverlayMessage(message: String) {
+    val p = OverlayChromeFactory.palette(serviceContext)
     val textView = TextView(serviceContext)
     textView.text = message
-    textView.setTextColor(Color.WHITE)
+    textView.setTextColor(p.onSurface)
     textView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
     val pad = dpToPx(16)
     textView.setPadding(pad, pad, pad, pad)
     val bg = GradientDrawable()
-    bg.setColor(Color.parseColor("#DD333333"))
-    bg.cornerRadius = dpToPx(8).toFloat()
+    bg.setColor(p.barColor)
+    bg.cornerRadius = dpToPx(16).toFloat()
+    bg.setStroke(dpToPx(1), p.barStroke)
     textView.background = bg
 
     if (container != null) {

@@ -49,6 +49,17 @@ git = "https://github.com/DavidVentura/translator-rs.git"
 # path = "/home/david/git/translator-rs"
 features = ["uniffi", "html"]
 
+# Local vendored copy of translator-rs with image-OCR patches for Circle to Search:
+#  - Auto source-detection decline keeps the per-box recognized words (falls back to
+#    source=target identity) instead of erroring, which made the caller re-OCR with
+#    the target language's script and turn non-Latin text into garbage.
+#  - Per-block source detection so mixed-language screens translate each block from
+#    its own detected language.
+#  - Mixed-script routing keeps confident minority scripts (never folds a genuine
+#    second language into the dominant script).
+[patch."https://github.com/DavidVentura/translator-rs.git"]
+translator = { path = "vendor/translator-rs" }
+
 [target.'cfg(target_os = "android")'.dependencies]
 android_logger = { version = "0.14", default-features = false }
 

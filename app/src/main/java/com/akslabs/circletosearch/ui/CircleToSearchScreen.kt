@@ -156,6 +156,7 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.layout.ContentScale
@@ -426,6 +427,15 @@ fun CircleToSearchScreen(
     val barBgColor = if (isDark) Color(0xFF0D0D0D) else colorScheme.surface
     val bubbleColor = if (isDark) Color(0xFF1F1F1F) else colorScheme.secondaryContainer.copy(alpha = 0.9f)
     val contentColor = if (isDark) Color.White else colorScheme.onSecondaryContainer
+
+    // Publish the exact CTS bottom-bar colors so the translate toolbar matches them
+    // pixel-for-pixel (the overlay can't read the Compose theme directly).
+    androidx.compose.runtime.SideEffect {
+        dev.davidv.translator.overlayChrome.OverlayChromeFactory.appBarContainerColor =
+            colorScheme.surfaceContainerHigh.toArgb()
+        dev.davidv.translator.overlayChrome.OverlayChromeFactory.appPillColor =
+            colorScheme.surfaceContainerLowest.toArgb()
+    }
 
     //Haptic feedback
     val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
@@ -2012,9 +2022,9 @@ fun CircleToSearchScreen(
                                             if (translatorService != null) {
                                                 isTranslatorMode = true
                                                 // OCR starts now; only the overlay chrome waits for the hide delay.
-                                                val started = translatorService.translateCapturedScreen(bmp, TRANSLATE_HIDE_DELAY_MS) {
+                                                val started = translatorService.translateCapturedScreen(bmp, TRANSLATE_HIDE_DELAY_MS, onClosed = {
                                                     isTranslatorMode = false
-                                                }
+                                                })
                                                 if (started) return@combinedClickable
                                                 isTranslatorMode = false
                                             }
@@ -2045,7 +2055,10 @@ fun CircleToSearchScreen(
 
                                             val translatorService = CircleToSearchAccessibilityService.instance
                                             if (translatorService != null) {
-                                                translatorService.translateCapturedScreen(bmp, TRANSLATE_TRIGGER_DELAY_MS)
+                                                // Long-press closes Circle to Search: the live screen
+                                                // stays interactive underneath, so the result overlay
+                                                // must pass taps through (no tap-to-copy).
+                                                translatorService.translateCapturedScreen(bmp, TRANSLATE_TRIGGER_DELAY_MS, tapToCopy = false)
                                                 onClose()
                                             } else {
                                                 // No accessibility service: long-press behaves like a

@@ -1,0 +1,26 @@
+# mozilla/translations pipeline/train/configs/training/student.finetune.yml
+# Finetune stage on clean parallel; quantize-bits: 8 = quantization-aware.
+beam-size: 1
+clip-norm: 0
+cost-type: ce-mean-words
+disp-first: 10
+disp-freq: 100
+early-stopping: 4
+exponential-smoothing: True
+learn-rate: 0.0003
+lr-decay-inv-sqrt: 32000
+lr-report: True
+lr-warmup: 16000
+max-length: 200
+maxi-batch: 1000
+mini-batch-fit: True
+mini-batch: 1000
+normalize: 1
+optimizer-delay: 4
+optimizer-params: [0.9, 0.98, 1e-09]
+quantize-bits: 8
+save-freq: 500
+valid-freq: 500
+valid-mini-batch: 16
+sentencepiece-alphas: [0.5, 0.5]
+guided-alignment: 2

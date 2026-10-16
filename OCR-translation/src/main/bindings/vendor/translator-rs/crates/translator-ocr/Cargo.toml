@@ -1,0 +1,22 @@
+[package]
+name = "translator-ocr"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+
+[lib]
+name = "translator_ocr"
+path = "src/lib.rs"
+
+[dependencies]
+translator-core = { path = "../translator-core" }
+translator-raster = { path = "../translator-raster" }
+translator-translate = { path = "../translator-translate" }
+mnn-sys = { git = "https://github.com/DavidVentura/mnn-sys" }
+image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
+imageproc = { version = "0.25", default-features = false }
+rayon = "1"
+log = "0.4"
+
+[target.'cfg(all(target_arch = "aarch64", any(target_os = "linux", target_os = "android")))'.dependencies]
+libc = "0.2"

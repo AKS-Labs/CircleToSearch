@@ -1,0 +1,51 @@
+# browsermt marian (CPU) + the alignment tools. Co-located because shortlist.sh needs
+# both halves (spm_encode + marian-conv from browsermt, fast_align/extract_lex from
+# here) and a vast box can only ever have one image.
+FROM ubuntu:22.04 AS build
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y \
+    build-essential cmake git ca-certificates \
+    libboost-all-dev \
+    libprotobuf-dev protobuf-compiler \
+    libopenblas-dev \
+    zlib1g-dev libbz2-dev liblzma-dev \
+    libicu-dev pkg-config \
+    libsparsehash-dev \
+ && apt-get clean && rm -rf /var/lib/apt/lists/*
+WORKDIR /opt
+# This fork is the anchor of the train->convert->slimt-load chain.
+RUN git clone https://github.com/browsermt/marian-dev.git \
+ && cd marian-dev \
+ && git checkout 2781d735d4a10dca876d61be587afdab2726293c \
+ && git submodule update --init --recursive
+RUN cd marian-dev && mkdir build && cd build \
+ && cmake .. -DCOMPILE_CUDA=off -DCOMPILE_CPU=on -DUSE_SENTENCEPIECE=on -DCMAKE_BUILD_TYPE=Release
+RUN cd marian-dev/build && make -j"$(nproc)"
+# fast_align only links tcmalloc when it finds GooglePerfTools; omitting it keeps
+# that dep out of the runtime stage.
+RUN git clone https://github.com/clab/fast_align.git \
+ && cd fast_align && mkdir build && cd build && cmake .. && make -j"$(nproc)"
+RUN git clone https://github.com/marian-nmt/extract-lex.git \
+ && cd extract-lex && mkdir build && cd build && cmake .. && make -j"$(nproc)"
+
+# numpy: quantize_export.sh step 2 (extract_stats.py) needs it, else that step has to
+# run on a host venv. The rest is what ldd asks for: fast_align is OpenMP (libgomp),
+# extract_lex is the only thing that didn't link boost statically.
+FROM ubuntu:22.04
+ENV DEBIAN_FRONTEND=noninteractive
+LABEL org.opencontainers.image.source=https://github.com/DavidVentura/offline-translator
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libopenblas0 python3 python3-numpy \
+    libgomp1 libboost-filesystem1.74.0 libboost-iostreams1.74.0 \
+ && apt-get clean && rm -rf /var/lib/apt/lists/*
+# Paths match what the scripts hardcode: BMT=/opt/marian-dev/build, and
+# align.sh/shortlist.sh resolve fast_align + extract_lex under their TOOLS arg.
+COPY --from=build /opt/marian-dev/build/marian-conv /opt/marian-dev/build/marian-conv
+COPY --from=build /opt/marian-dev/build/marian-decoder /opt/marian-dev/build/marian-decoder
+COPY --from=build /opt/marian-dev/build/spm_encode /opt/marian-dev/build/spm_encode
+COPY --from=build /opt/fast_align/build/fast_align /opt/tools/fast_align/build/fast_align
+COPY --from=build /opt/fast_align/build/atools /opt/tools/fast_align/build/atools
+COPY --from=build /opt/extract-lex/build/extract_lex /opt/tools/extract-lex/build/extract_lex
+# A runtime stage missing a .so surfaces as a bare exit 127 with no message once a
+# caller has redirected stderr.
+RUN ! (ldd /opt/marian-dev/build/* /opt/tools/*/build/* 2>&1 | grep "not found")

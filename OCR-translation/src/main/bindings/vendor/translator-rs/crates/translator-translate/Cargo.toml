@@ -1,0 +1,27 @@
+[package]
+name = "translator-translate"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+
+[lib]
+name = "translator_translate"
+path = "src/lib.rs"
+
+[dependencies]
+translator-core = { path = "../translator-core", features = ["script-from-unicode"] }
+slimt-sys = { git = "https://github.com/DavidVentura/slimt-sys" }
+cld2 = { git = "https://github.com/DavidVentura/rust-cld2" }
+regex = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+log = "0.4"
+uniffi = { version = "0.31", optional = true, default-features = false }
+html5ever = { version = "0.38", optional = true }
+markup5ever = { version = "0.38", optional = true }
+markup5ever_rcdom = { version = "0.38", optional = true }
+
+[features]
+uniffi = ["dep:uniffi", "translator-core/uniffi"]
+dom-translate = ["dep:markup5ever", "dep:markup5ever_rcdom"]
+html = ["dom-translate", "dep:html5ever"]

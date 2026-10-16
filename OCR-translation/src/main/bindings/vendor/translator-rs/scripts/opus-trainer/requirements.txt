@@ -1,0 +1,10 @@
+transformers>=4.40
+torch>=2.2
+sentencepiece>=0.2
+sacremoses>=0.1
+sacrebleu>=2.4
+opustrainer>=0.2
+unbabel-comet>=2.2
+# comet's torchmetrics pin imports pkg_resources: absent in bare py3.12 venvs,
+# REMOVED from setuptools>=81
+setuptools<81

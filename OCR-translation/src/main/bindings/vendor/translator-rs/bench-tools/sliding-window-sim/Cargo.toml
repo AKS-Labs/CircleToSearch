@@ -1,0 +1,19 @@
+[package]
+name = "sliding-window-sim"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "sliding_window_sim"
+path = "src/main.rs"
+
+[dependencies]
+ab_glyph = "0.2"
+image = { version = "0.25", default-features = false, features = ["png"] }
+imageproc = { version = "0.25", default-features = false }
+minifb = "0.27"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
