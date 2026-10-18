@@ -28,10 +28,14 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -80,6 +84,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
         pendingSettingsPage = intent.getStringExtra(EXTRA_SETTINGS_PAGE)
         forceOnboarding = intent.getBooleanExtra(EXTRA_SHOW_ONBOARDING, false)
         Toast.makeText(this, getString(R.string.toast_getting_started), Toast.LENGTH_LONG).show()
@@ -147,6 +152,7 @@ class MainActivity : ComponentActivity() {
                                         pendingSettingsPage = null
                                         currentScreen = "settings"
                                     },
+                                    contentPadding = WindowInsets.systemBars.asPaddingValues(),
                                 )
                             }
                         }
