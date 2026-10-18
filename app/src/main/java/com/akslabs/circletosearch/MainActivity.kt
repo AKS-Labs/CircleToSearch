@@ -20,6 +20,7 @@
 
 package com.akslabs.circletosearch
 
+import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -27,9 +28,15 @@ import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -69,11 +76,14 @@ import com.akslabs.circletosearch.ui.theme.M3ExpressiveShapes
 import com.akslabs.circletosearch.ui.theme.m3ExpressivePress
 import com.akslabs.circletosearch.ui.wobblepulldown.WobbleDeviceInfoActivity
 import com.akslabs.circletosearch.ui.wobblepulldown.WobbleHomeScreen
+import com.akslabs.circletosearch.ui.wobblepulldown.isA11yGranted
+import com.akslabs.circletosearch.ui.wobblepulldown.isAssistantGranted
 import com.akslabs.circletosearch.utils.PrivacyPreferences
 import dev.davidv.translator.MainActivity as TranslatorMainActivity
 import com.akslabs.circletosearch.ui.components.DonateBottomSheet
 import com.akslabs.circletosearch.ui.components.AccessibilityDisclosureDialog
 import com.akslabs.circletosearch.ui.components.UnifiedSearchMethodSelector
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -137,23 +147,67 @@ class MainActivity : ComponentActivity() {
                                     },
                                     onBack = { currentScreen = "home" },
                                 )
-                                else -> WobbleHomeScreen(
-                                    onOpenDeviceInfo = {
-                                        val intent = Intent(context, WobbleDeviceInfoActivity::class.java)
-                                        val options = androidx.core.app.ActivityOptionsCompat.makeCustomAnimation(
-                                            context,
-                                            R.anim.anim_slide_in_top,
-                                            R.anim.anim_stay,
+                                else -> {
+                                    var wobbleTick by remember { mutableStateOf(0) }
+                                    var wizardBackdrop by remember { mutableStateOf(false) }
+                                    val wizardScope = rememberCoroutineScope()
+                                    val wizardLauncher = rememberLauncherForActivityResult(
+                                        ActivityResultContracts.StartActivityForResult()
+                                    ) { result ->
+                                        if (result.resultCode == Activity.RESULT_OK) {
+                                            wobbleTick++
+                                        }
+                                        wizardScope.launch {
+                                            delay(400)
+                                            wizardBackdrop = false
+                                        }
+                                    }
+                                    LaunchedEffect(Unit) {
+                                        val granted = isA11yGranted(context) || isAssistantGranted(context)
+                                        if (!granted) {
+                                            wizardBackdrop = true
+                                            val intent = Intent(context, WobbleDeviceInfoActivity::class.java)
+                                                .putExtra(WobbleDeviceInfoActivity.EXTRA_SETUP_WIZARD, true)
+                                            val options = androidx.core.app.ActivityOptionsCompat.makeCustomAnimation(
+                                                context,
+                                                R.anim.anim_slide_in_top,
+                                                R.anim.anim_stay,
+                                            )
+                                            wizardLauncher.launch(intent, options)
+                                        }
+                                    }
+                                    Box(modifier = Modifier.fillMaxSize()) {
+                                        WobbleHomeScreen(
+                                            onOpenDeviceInfo = {
+                                                val intent = Intent(context, WobbleDeviceInfoActivity::class.java)
+                                                val options = androidx.core.app.ActivityOptionsCompat.makeCustomAnimation(
+                                                    context,
+                                                    R.anim.anim_slide_in_top,
+                                                    R.anim.anim_stay,
+                                                )
+                                                context.startActivity(intent, options.toBundle())
+                                            },
+                                            onOpenSetup = { currentScreen = "setup" },
+                                            onOpenSettings = {
+                                                pendingSettingsPage = null
+                                                currentScreen = "settings"
+                                            },
+                                            wobbleEvent = wobbleTick,
+                                            contentPadding = WindowInsets.systemBars.asPaddingValues(),
                                         )
-                                        context.startActivity(intent, options.toBundle())
-                                    },
-                                    onOpenSetup = { currentScreen = "setup" },
-                                    onOpenSettings = {
-                                        pendingSettingsPage = null
-                                        currentScreen = "settings"
-                                    },
-                                    contentPadding = WindowInsets.systemBars.asPaddingValues(),
-                                )
+                                        AnimatedVisibility(
+                                            visible = wizardBackdrop,
+                                            enter = EnterTransition.None,
+                                            exit = fadeOut(animationSpec = tween(durationMillis = 300)),
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .background(Color.Black.copy(alpha = 0.10f)),
+                                            )
+                                        }
+                                    }
+                                }
                             }
                         }
                         BackHandler(enabled = currentScreen == "setup") {

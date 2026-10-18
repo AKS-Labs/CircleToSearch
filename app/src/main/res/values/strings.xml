@@ -249,7 +249,7 @@
 
     <!-- Accessibility Disclosure Dialog -->
     <string name="title_accessibility_permission">Grant Accessibility Permission</string>
-    <string name="body_accessibility_permission">This permission is needed to capture the screen and detect the double tap gesture to trigger Circle to Search or other actions. If the app is used as your default assistant, this permission is optional.</string>
+    <string name="body_accessibility_permission">This permission is required to capture the screen and detect the double tap gesture to trigger Circle to Search or other actions. If the app is used as your default assistant, this permission is optional.</string>
     <string name="label_accessibility_agree">I understand how this permission will be used and agree to proceed</string>
 
     <!-- Copy Text Overlay -->
@@ -395,7 +395,7 @@
     <string name="about_donate_subtitle">Support ongoing development</string>
     <string name="home_setup_title">Setup &amp; permissions</string>
     <string name="home_setup_subtitle">Review permissions and launch triggers</string>
-    <string name="wizard_title">Accessibility &amp; assistant permission</string>
+    <string name="wizard_title">Grant permissions to get started</string>
     <string name="wizard_hint">Grant any one to continue</string>
     <string name="wizard_a11y_title">Accessibility</string>
     <string name="wizard_assistant_title">Assistant</string>
