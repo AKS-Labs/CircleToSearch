@@ -45,6 +45,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Assistant
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.PowerSettingsNew
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.TouchApp
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.filled.Tune
@@ -163,6 +164,8 @@ fun WobbleHomeScreen(
     modifier: Modifier = Modifier,
     wobbleEvent: Int = 0,
     contentPadding: PaddingValues = PaddingValues(0.dp),
+    onOpenSetup: () -> Unit = {},
+    onOpenSettings: ((String) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val view = LocalView.current
@@ -639,6 +642,16 @@ fun WobbleHomeScreen(
                     ) {
                         Column {
                             HomeLinkRow(
+                                icon = Icons.Default.Security,
+                                title = stringResource(R.string.home_setup_title),
+                                subtitle = stringResource(R.string.home_setup_subtitle),
+                                onClick = {
+                                    WobbleHaptics.performUIHaptic(view)
+                                    onOpenSetup()
+                                },
+                            )
+                            HomeRowDivider()
+                            HomeLinkRow(
                                 icon = Icons.Default.Translate,
                                 title = stringResource(R.string.label_translator_title),
                                 subtitle = stringResource(R.string.label_translator_subtitle),
@@ -656,7 +669,9 @@ fun WobbleHomeScreen(
                                 icon = Icons.Default.Tune,
                                 title = stringResource(R.string.title_settings),
                                 subtitle = null,
-                                onClick = { openSettingsPage("") },
+                                onClick = {
+                                    if (onOpenSettings != null) onOpenSettings("") else openSettingsPage("")
+                                },
                             )
                         }
                     }

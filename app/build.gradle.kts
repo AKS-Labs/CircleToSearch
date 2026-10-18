@@ -37,6 +37,18 @@ android {
                 storePassword = System.getenv("KEYSTORE_PASSWORD")
                 keyAlias = System.getenv("KEY_ALIAS")
                 keyPassword = System.getenv("KEY_PASSWORD")
+            } else {
+                // Local fallback: sign with the standard debug keystore so a
+                // plain `assembleRelease` still produces an installable APK
+                // for size/perf validation. CI overrides via KEYSTORE_* env.
+                val debugKeystore =
+                    file("${System.getProperty("user.home")}/.android/debug.keystore")
+                if (debugKeystore.exists()) {
+                    storeFile = debugKeystore
+                    storePassword = "android"
+                    keyAlias = "androiddebugkey"
+                    keyPassword = "android"
+                }
             }
         }
     }
@@ -63,9 +75,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            if (System.getenv("KEYSTORE_FILE") != null) {
-                signingConfig = signingConfigs.getByName("release")
-            }
+            signingConfig = signingConfigs
+                .getByName("release")
+                .takeIf { it.storeFile?.exists() == true }
         }
         
         getByName("debug") {
@@ -103,6 +115,18 @@ android {
     }
     buildFeatures {
         compose = true
+    }
+    packaging {
+        jniLibs {
+            // Keep native libs compressed in the APK (smaller download);
+            // matches android:extractNativeLibs="true" in the manifest.
+            useLegacyPackaging = true
+        }
+        resources {
+            // Debug-agent probe bytes bundled inside kotlinx-coroutines-core;
+            // never loaded in production (only by kotlinx-coroutines-debug).
+            excludes += "DebugProbesKt.bin"
+        }
     }
 }
 

@@ -46,7 +46,6 @@ import com.akslabs.circletosearch.isAccessibilityServiceEnabled
 import com.akslabs.circletosearch.ui.components.DonateBottomSheet
 import com.akslabs.circletosearch.ui.components.UnifiedSearchMethodSelector
 import com.akslabs.circletosearch.utils.UIPreferences
-import com.akslabs.circletosearch.ui.wobblepulldown.WobbleHomeDemoActivity
 import androidx.core.app.ActivityOptionsCompat
 import dev.davidv.translator.MainActivity as TranslatorMainActivity
 
@@ -274,23 +273,6 @@ private fun SettingsRootScreen(
             )
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
-        SettingsGroup {
-            SettingsCategoryRow(
-                icon = Icons.Default.Waves,
-                title = stringResource(R.string.settings_wobble_preview),
-                subtitle = stringResource(R.string.settings_wobble_preview_subtitle),
-                onClick = {
-                    val intent = Intent(context, WobbleHomeDemoActivity::class.java)
-                    val options = ActivityOptionsCompat.makeCustomAnimation(
-                        context,
-                        R.anim.anim_slide_in_top,
-                        R.anim.anim_stay,
-                    )
-                    context.startActivity(intent, options.toBundle())
-                }
-            )
-        }
         Spacer(modifier = Modifier.height(24.dp))
     }
 }

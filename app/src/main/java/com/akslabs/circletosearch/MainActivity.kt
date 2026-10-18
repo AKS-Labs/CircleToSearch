@@ -26,6 +26,7 @@ import android.os.Bundle
 import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
@@ -35,6 +36,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -61,6 +63,8 @@ import com.akslabs.circletosearch.ui.components.PrivacyDialog
 import com.akslabs.circletosearch.ui.theme.CircleToSearchTheme
 import com.akslabs.circletosearch.ui.theme.M3ExpressiveShapes
 import com.akslabs.circletosearch.ui.theme.m3ExpressivePress
+import com.akslabs.circletosearch.ui.wobblepulldown.WobbleDeviceInfoActivity
+import com.akslabs.circletosearch.ui.wobblepulldown.WobbleHomeScreen
 import com.akslabs.circletosearch.utils.PrivacyPreferences
 import dev.davidv.translator.MainActivity as TranslatorMainActivity
 import com.akslabs.circletosearch.ui.components.DonateBottomSheet
@@ -121,13 +125,33 @@ class MainActivity : ComponentActivity() {
                                         initialPage = pendingSettingsPage,
                                     )
                                 }
-                                else -> SetupScreen(
+                                "setup" -> SetupScreen(
                                     onSettingsClick = {
                                         pendingSettingsPage = null
                                         currentScreen = "settings"
-                                    }
+                                    },
+                                    onBack = { currentScreen = "home" },
+                                )
+                                else -> WobbleHomeScreen(
+                                    onOpenDeviceInfo = {
+                                        val intent = Intent(context, WobbleDeviceInfoActivity::class.java)
+                                        val options = androidx.core.app.ActivityOptionsCompat.makeCustomAnimation(
+                                            context,
+                                            R.anim.anim_slide_in_top,
+                                            R.anim.anim_stay,
+                                        )
+                                        context.startActivity(intent, options.toBundle())
+                                    },
+                                    onOpenSetup = { currentScreen = "setup" },
+                                    onOpenSettings = {
+                                        pendingSettingsPage = null
+                                        currentScreen = "settings"
+                                    },
                                 )
                             }
+                        }
+                        BackHandler(enabled = currentScreen == "setup") {
+                            currentScreen = "home"
                         }
                     }
                 }
@@ -151,7 +175,7 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SetupScreen(onSettingsClick: () -> Unit) {
+fun SetupScreen(onSettingsClick: () -> Unit, onBack: (() -> Unit)? = null) {
     val context = LocalContext.current
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     val prefs = context.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
@@ -235,6 +259,17 @@ fun SetupScreen(onSettingsClick: () -> Unit) {
         topBar = {
             // App icon + title on the left, settings gear on the right
             TopAppBar(
+                navigationIcon = {
+                    if (onBack != null) {
+                        IconButton(onClick = onBack) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.cd_back),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                },
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         val launcherIcon = remember {

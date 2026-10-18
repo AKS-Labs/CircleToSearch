@@ -325,7 +325,9 @@ dependencies {
     implementation(libs.material)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.exifinterface)
-    implementation(libs.androidx.uiautomator)
+    // Test-only: unused in main sources; androidx.test.uiautomator pulls junit
+    // onto any runtime classpath it is declared with, leaking it into the APK.
+    androidTestImplementation(libs.androidx.uiautomator)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

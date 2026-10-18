@@ -393,8 +393,8 @@
     <string name="about_source_code">Source code</string>
     <string name="about_source_subtitle">github.com/aks-labs</string>
     <string name="about_donate_subtitle">Support ongoing development</string>
-    <string name="settings_wobble_preview">Wobble home (preview)</string>
-    <string name="settings_wobble_preview_subtitle">Test the pull-down wobble gesture</string>
+    <string name="home_setup_title">Setup &amp; permissions</string>
+    <string name="home_setup_subtitle">Review permissions and launch triggers</string>
     <string name="wizard_title">Accessibility &amp; assistant permission</string>
     <string name="wizard_hint">Grant any one to continue</string>
     <string name="wizard_a11y_title">Accessibility</string>
