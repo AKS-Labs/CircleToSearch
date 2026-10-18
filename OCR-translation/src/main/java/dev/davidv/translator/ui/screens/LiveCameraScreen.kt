@@ -56,6 +56,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -74,6 +75,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -98,6 +100,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -106,10 +110,14 @@ import androidx.core.content.FileProvider
 import dev.davidv.translator.Language
 import dev.davidv.translator.LanguageAvailabilityState
 import dev.davidv.translator.LanguageMetadata
+import dev.davidv.translator.LanguageMetadataManager
+import dev.davidv.translator.LanguageStateManager
 import dev.davidv.translator.LivePlanarOcrEngine
 import dev.davidv.translator.R
+import dev.davidv.translator.TranslatorApplication
 import dev.davidv.translator.TranslatorMessage
-import dev.davidv.translator.ui.components.LanguageSelector
+import dev.davidv.translator.localizedName
+import dev.davidv.translator.overlayChrome.ActivityLanguagePicker
 import dev.davidv.translator.ui.components.LiveGlSurfaceView
 import java.io.File
 import java.util.concurrent.Executor
@@ -163,6 +171,7 @@ fun LiveCameraScreen(
   canSwap: Boolean,
   languageState: LanguageAvailabilityState,
   languageMetadata: Map<Language, LanguageMetadata>,
+  languageStateManager: LanguageStateManager,
   onMessage: (TranslatorMessage) -> Unit,
   showAutoOption: Boolean,
   liveOverlayDefaultEnabled: Boolean,
@@ -215,6 +224,7 @@ fun LiveCameraScreen(
           canSwap = canSwap,
           languageState = languageState,
           languageMetadata = languageMetadata,
+          languageStateManager = languageStateManager,
           onMessage = onMessage,
           showAutoOption = showAutoOption,
           liveOverlayDefaultEnabled = liveOverlayDefaultEnabled,
@@ -283,6 +293,7 @@ private fun CameraSurface(
   canSwap: Boolean,
   languageState: LanguageAvailabilityState,
   languageMetadata: Map<Language, LanguageMetadata>,
+  languageStateManager: LanguageStateManager,
   onMessage: (TranslatorMessage) -> Unit,
   showAutoOption: Boolean,
   liveOverlayDefaultEnabled: Boolean,
@@ -291,6 +302,37 @@ private fun CameraSurface(
   onImageCaptured: (Uri) -> Unit,
 ) {
   val context = LocalContext.current
+  // The same language picker dialog the translate toolbar uses, hosted in this
+  // activity (the camera screen has no overlay window of its own). Added to a
+  // full-screen container only while the dialog is up, torn down on dismiss.
+  val activity = context as? Activity
+  val languagePicker =
+    remember(languageStateManager, activity) {
+      activity?.let {
+        val app = it.application as? TranslatorApplication
+        if (app == null) {
+          null
+        } else {
+          ActivityLanguagePicker(it, languageStateManager, LanguageMetadataManager(it, app.languagesFlow))
+        }
+      }
+    }
+  DisposableEffect(languagePicker) {
+    onDispose { languagePicker?.destroy() }
+  }
+  val openLanguagePicker: (Boolean) -> Unit = { isSource ->
+    languagePicker?.show(
+      isSource = isSource,
+      allowAuto = isSource && showAutoOption,
+    ) { lang ->
+      when {
+        lang != null && isSource -> onMessage(TranslatorMessage.FromLang(lang))
+        lang != null -> onMessage(TranslatorMessage.ToLang(lang))
+        isSource -> onMessage(TranslatorMessage.EnableAutoSource)
+        else -> Unit
+      }
+    }
+  }
   val lifecycleOwner = LocalLifecycleOwner.current
   val mainExecutor: Executor = remember { ContextCompat.getMainExecutor(context) }
 
@@ -771,10 +813,8 @@ private fun CameraSurface(
       to = to,
       isAutoSource = isAutoSource,
       canSwap = canSwap,
-      languageState = languageState,
-      languageMetadata = languageMetadata,
       onMessage = onMessage,
-      showAutoOption = showAutoOption,
+      onOpenLanguagePicker = openLanguagePicker,
       modifier =
         Modifier
           .fillMaxWidth()
@@ -846,24 +886,42 @@ private fun TopLanguagePills(
   to: Language,
   isAutoSource: Boolean,
   canSwap: Boolean,
-  languageState: LanguageAvailabilityState,
-  languageMetadata: Map<Language, LanguageMetadata>,
   onMessage: (TranslatorMessage) -> Unit,
-  showAutoOption: Boolean,
+  onOpenLanguagePicker: (isSource: Boolean) -> Unit,
   modifier: Modifier = Modifier,
 ) {
-  val fromLanguages =
-    languageState.allLanguages().filter { x ->
-      (isAutoSource || x != from) && (languageState.availabilityFor(x)?.hasToEnglish == true || x.isEnglish)
-    }
-  val toLanguages =
-    languageState.allLanguages().filter { x ->
-      (isAutoSource || x != from) && x != to && (languageState.availabilityFor(x)?.hasFromEnglish == true || x.isEnglish)
-    }
   val pillShape = RoundedCornerShape(50)
   val pillBackground = Color.Black.copy(alpha = 0.5f)
 
   val pillWidth = 110.dp
+
+  // Pill label with the same typography/hit shape LanguageSelector used, but a
+  // tap opens the toolbar's language picker dialog instead of an inline menu.
+  @Composable
+  fun PillLabel(
+    text: String,
+    onClick: () -> Unit,
+  ) {
+    Text(
+      modifier =
+        Modifier
+          .fillMaxWidth()
+          .clip(RoundedCornerShape(10.dp))
+          .clickable(
+            interactionSource = remember { MutableInteractionSource() },
+            indication = null,
+            onClick = onClick,
+          )
+          .padding(vertical = 8.dp, horizontal = 4.dp),
+      text = text,
+      textAlign = TextAlign.Center,
+      maxLines = 1,
+      overflow = TextOverflow.Ellipsis,
+      style = MaterialTheme.typography.bodyMedium,
+      color = Color.White,
+    )
+  }
+
   Row(
     modifier = modifier,
     horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
@@ -876,16 +934,14 @@ private fun TopLanguagePills(
           .clip(pillShape)
           .background(pillBackground),
     ) {
-      LanguageSelector(
-        selectedLanguage = from,
-        availableLanguages = fromLanguages,
-        languageMetadata = languageMetadata,
-        onLanguageSelected = { onMessage(TranslatorMessage.FromLang(it)) },
-        isAutoSource = isAutoSource,
-        showAutoOption = showAutoOption,
-        onAutoSelected = { onMessage(TranslatorMessage.EnableAutoSource) },
-        textColor = Color.White,
-        marquee = false,
+      PillLabel(
+        text =
+          if (isAutoSource) {
+            stringResource(R.string.langsel_auto)
+          } else {
+            from.localizedName()
+          },
+        onClick = { onOpenLanguagePicker(true) },
       )
     }
     CompositionLocalProvider(LocalContentColor provides Color.White) {
@@ -907,13 +963,9 @@ private fun TopLanguagePills(
           .clip(pillShape)
           .background(pillBackground),
     ) {
-      LanguageSelector(
-        selectedLanguage = to,
-        availableLanguages = toLanguages,
-        languageMetadata = languageMetadata,
-        onLanguageSelected = { onMessage(TranslatorMessage.ToLang(it)) },
-        textColor = Color.White,
-        marquee = false,
+      PillLabel(
+        text = to.localizedName(),
+        onClick = { onOpenLanguagePicker(false) },
       )
     }
   }

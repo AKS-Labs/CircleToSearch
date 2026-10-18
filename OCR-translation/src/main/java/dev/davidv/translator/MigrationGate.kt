@@ -109,9 +109,18 @@ private fun convertGroup(
 fun MigrationGate(
   filePathManager: FilePathManager,
   onMigrated: () -> Unit,
+  showContentImmediately: Boolean = false,
   content: @Composable () -> Unit,
 ) {
-  var state by remember { mutableStateOf<MigrationUiState>(MigrationUiState.Working) }
+  // Camera deep link (showContentImmediately): compose the app right away instead
+  // of flashing the blocking screen for the plan check's IO roundtrip. The check
+  // still runs; if something actually needs migrating the blocking screen takes
+  // over then (first launch only).
+  var state by remember {
+    mutableStateOf<MigrationUiState>(
+      if (showContentImmediately) MigrationUiState.Passed else MigrationUiState.Working
+    )
+  }
   var ttsJobs by remember { mutableStateOf<List<MigrationJobRecord>>(emptyList()) }
   // Guards against the Accept/Delete tap registering more than once: without it a
   // second invocation re-runs convertGroup over already-migrated jobs (whose

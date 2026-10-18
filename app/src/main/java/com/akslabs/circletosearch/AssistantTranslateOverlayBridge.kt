@@ -59,6 +59,13 @@ class AssistantTranslateOverlayBridge(
   private var capturedScanning = false
   private var capturedRegion: Rect? = null
   private var overlaySession = 0
+  /** Whether the translated result consumes taps (word selection / copy).
+   *  False for live-screen mode (long-press translate, Screen button): the
+   *  hosting activity window is made FLAG_NOT_TOUCHABLE so taps reach the app
+   *  underneath instead of being swallowed by the full-screen container. */
+  private var resultTapToCopy = true
+  /** 1×1 outside-touch watcher used in live-screen mode (see ensureOutsideWatcher). */
+  private var outsideWatcher: android.widget.PopupWindow? = null
 
   private data class TranslatedScreen(
     val original: Bitmap,
@@ -113,8 +120,11 @@ class AssistantTranslateOverlayBridge(
     screenshot: Bitmap,
     uiDelayMs: Long = 0L,
     onClosed: (() -> Unit)? = null,
+    tapToCopy: Boolean = true,
   ) {
     this.returnToCaller = onClosed
+    this.resultTapToCopy = tapToCopy
+    applyResultTouchMode(tapToCopy)
     providedScreenshot = screenshot
 
     if (active) {
@@ -161,13 +171,74 @@ class AssistantTranslateOverlayBridge(
     capturedChrome = null
   }
 
+  /**
+   * Pass-through for live-screen mode: the container is a full-screen window,
+   * so taps reach the app underneath only if the hosting activity window is
+   * FLAG_NOT_TOUCHABLE (chrome in it stops receiving taps; key events still do —
+   * Back goes to the focused window, so the overlay can still be dismissed).
+   * Tap-to-copy sessions restore touchability.
+   */
+  private fun applyResultTouchMode(tapToCopy: Boolean) {
+    val w = activity.window ?: return
+    if (tapToCopy) {
+      w.clearFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE)
+      dismissOutsideWatcher()
+    } else {
+      w.addFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE)
+      ensureOutsideWatcher()
+    }
+  }
+
+  /**
+   * Live-screen mode: the window is FLAG_NOT_TOUCHABLE so taps reach the app
+   * underneath — which also means no view in it ever sees a touch, so the
+   * drawn translations would sit on screen forever. A 1×1 outside-touchable
+   * popup (a sub-window, unaffected by the activity window's FLAG_NOT_TOUCHABLE)
+   * watches for any touch elsewhere and clears the overlays the same way the
+   * accessibility path does on click/scroll; the touch itself still lands on
+   * the app below.
+   */
+  private fun ensureOutsideWatcher() {
+    if (outsideWatcher != null) return
+    val anchor = activity.window?.decorView ?: return
+    val popup = android.widget.PopupWindow(android.view.View(activity), 1, 1, false)
+    popup.isOutsideTouchable = true
+    popup.isFocusable = false
+    popup.contentView.setOnTouchListener { _, event ->
+      if (event.actionMasked == android.view.MotionEvent.ACTION_OUTSIDE) {
+        ui.removeTranslationOverlays()
+      }
+      true
+    }
+    popup.setOnDismissListener { outsideWatcher = null }
+    anchor.post {
+      if (outsideWatcher != null || !active || resultTapToCopy) {
+        runCatching { popup.dismiss() }
+        return@post
+      }
+      runCatching {
+        popup.showAtLocation(anchor, android.view.Gravity.TOP, 0, 0)
+        outsideWatcher = popup
+      }
+    }
+  }
+
+  private fun dismissOutsideWatcher() {
+    outsideWatcher?.let { w ->
+      outsideWatcher = null
+      runCatching { w.dismiss() }
+    }
+  }
+
   private fun showTranslatorChrome() {
     ui.showToolbar(
       forcedSourceLanguage,
       forcedTargetLanguage,
       currentReadingOrderFor(forcedSourceLanguage),
       isAutoSource,
-      showSelectButton = false,
+      // Parity with the accessibility path: live-screen modes expose select-text
+      // (taps pass through the result there), frozen modes get flip instead.
+      showSelectButton = !resultTapToCopy,
     )
   }
 
@@ -189,6 +260,8 @@ class AssistantTranslateOverlayBridge(
     overlaySession++
     active = false
     selectMode = false
+    resultTapToCopy = true
+    applyResultTouchMode(true)
     showingOriginal = false
     ui.removeSelectSurface()
     surfaceState.clear()
@@ -224,7 +297,7 @@ class AssistantTranslateOverlayBridge(
     selectMode = false
     showingOriginal = false
     ui.setFlipActive(false)
-    lastResult?.let { ui.showBitmapOverlay(it.translated, it.region) }
+    lastResult?.let { ui.showBitmapOverlay(it.translated, it.region, tapToCopy = resultTapToCopy) }
     ui.removeSelectSurface()
     surfaceState.clear()
     ui.setSelectModeUi(false)
@@ -245,7 +318,11 @@ class AssistantTranslateOverlayBridge(
     showingOriginal = !showingOriginal
     ui.setFlipActive(showingOriginal)
     ui.removeTranslationOverlays()
-    ui.showBitmapOverlay(if (showingOriginal) res.original else res.translated, res.region)
+    ui.showBitmapOverlay(
+      if (showingOriginal) res.original else res.translated,
+      res.region,
+      tapToCopy = resultTapToCopy,
+    )
   }
 
   override fun swapLanguages() {
@@ -327,17 +404,24 @@ class AssistantTranslateOverlayBridge(
       return
     }
 
-    val region = fullCaptureRegion()
     ui.dismissMenu()
 
+    // No a11y permission means no on-demand screen capture: the assist pipeline
+    // only ever hands us the screenshot captured at invocation time, so refresh
+    // re-translates that capture (language/reading-order changes) — the same
+    // stored-capture behavior the accessibility path uses in select mode.
     val provided = providedScreenshot
     if (provided != null) {
-      val cropped = cropToRegion(provided, region) ?: return
-      surfaceState.regions.value = null
-      ui.showScanOverlay(surfaceState, region)
-      serviceScope.launch { translateRegionBitmap(cropped, region) }
-      return
+      startRegionTranslation(provided, fullCaptureRegion())
     }
+  }
+
+  /** Crops [screenshot] to [region], shows the scan overlay and translates it. */
+  private fun startRegionTranslation(screenshot: Bitmap, region: Rect) {
+    val cropped = cropToRegion(screenshot, region) ?: return
+    surfaceState.regions.value = null
+    ui.showScanOverlay(surfaceState, region)
+    serviceScope.launch { translateRegionBitmap(cropped, region) }
   }
 
   private fun fullCaptureRegion(): Rect =
@@ -428,7 +512,7 @@ class AssistantTranslateOverlayBridge(
         ui.showSelectSurface(surfaceState, region) { onSelectSurfaceDismissed() }
       }
     } else {
-      ui.showBitmapOverlay(result.correctedBitmap, region)
+      ui.showBitmapOverlay(result.correctedBitmap, region, tapToCopy = resultTapToCopy)
     }
   }
 

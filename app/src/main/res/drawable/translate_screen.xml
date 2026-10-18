@@ -1,0 +1,24 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="960"
+    android:viewportHeight="960">
+  <!-- Screen / device frame -->
+  <path
+      android:pathData="M172,140 H788 Q872,140 872,224 V736 Q872,820 788,820 H172 Q88,820 88,736 V224 Q88,140 172,140 Z"
+      android:fillColor="#00000000"
+      android:strokeColor="#FF000000"
+      android:strokeWidth="56"
+      android:strokeLineJoin="round"
+      android:strokeLineCap="round" />
+  <!-- Translate glyph (A + foreign character), scaled to fit the screen -->
+  <group
+      android:pivotX="480"
+      android:pivotY="480"
+      android:scaleX="0.56"
+      android:scaleY="0.56">
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="m476,880 l182,-480h84L924,880h-84l-43,-122L603,758L560,880zM160,760l-56,-56 202,-202q-35,-35 -63.5,-80T190,320h84q20,39 40,68t48,58q33,-33 68.5,-92.5T484,240L40,240v-80h280v-80h80v80h280v80L564,240q-21,72 -63,148t-83,116l96,98 -30,82 -122,-125zM628,688h144l-72,-204z" />
+  </group>
+</vector>

@@ -96,7 +96,6 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.LightMode
-import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.QrCode
@@ -107,7 +106,6 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.Translate
-import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Phone
@@ -1890,6 +1888,45 @@ fun CircleToSearchScreen(
                     }
                 }
             }
+            // Translate the live screen underneath Circle to Search: close CTS and
+            // run the overlay on the frozen capture over the interactive screen
+            // (tap-through, no tap-to-copy). Shared by the translate button's
+            // long-press and the bottom-bar "Screen" button.
+            val translateLiveScreen: () -> Unit = {
+                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                val bmp = screenshot
+                if (bmp != null) {
+                    selectionRect = null
+                    selectedBitmap = null
+                    isSearching = false
+                    currentPathPoints.clear()
+                    scope.launch { selectionAnim.snapTo(0f) }
+
+                    val translatorService = CircleToSearchAccessibilityService.instance
+                    // The live screen stays interactive underneath, so the result
+                    // overlay must pass taps through (no tap-to-copy).
+                    val started = translatorService?.translateCapturedScreen(bmp, TRANSLATE_TRIGGER_DELAY_MS, tapToCopy = false) ?: false
+                    if (started) {
+                        onClose()
+                    } else {
+                        // No accessibility service: assistant permission can't run the
+                        // live screen (no current-screen capture, no touch-to-clear),
+                        // so fall back to the regular captured translate — what a
+                        // short press does — instead of a degraded live mode.
+                        isTranslatorMode = true
+                        val startedTranslate = com.akslabs.circletosearch.AssistantTranslateOverlay.start(bmp, TRANSLATE_HIDE_DELAY_MS) {
+                            isTranslatorMode = false
+                        }
+                        if (!startedTranslate) {
+                            isTranslatorMode = false
+                            android.widget.Toast.makeText(context, context.getString(R.string.toast_translate_unavailable), android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                } else {
+                    android.widget.Toast.makeText(context, context.getString(R.string.toast_translate_unavailable), android.widget.Toast.LENGTH_SHORT).show()
+                }
+            }
+
             // 5. Bottom Bar — Material 3 Expressive two-row card
             androidx.compose.animation.AnimatedVisibility(
                 visible = isUIVisible && !isEntityExtractMode && !isTranslatorMode && !wordSelected,
@@ -1955,25 +1992,6 @@ fun CircleToSearchScreen(
                                     )
 
                                     Spacer(modifier = Modifier.weight(1f))
-
-                                    // Mic Button
-                                    IconButton(
-                                        onClick = {
-                                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                                            try {
-                                                val intent = android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                                                    putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                                                    addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                                                }
-                                                context.startActivity(intent)
-                                            } catch (e: Exception) {}
-                                        },
-                                        modifier = Modifier.size(44.dp)
-                                    ) {
-                                        Icon(Icons.Default.Mic, contentDescription = stringResource(R.string.cd_voice_search))
-                                    }
-
-                                    Spacer(modifier = Modifier.width(4.dp))
 
                                     // Lens Button
                                     IconButton(
@@ -2041,43 +2059,16 @@ fun CircleToSearchScreen(
                                             }
                                         },
                                         onLongClick = {
-                                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                                            val bmp = screenshot
-                                            if (bmp == null) {
-                                                android.widget.Toast.makeText(context, context.getString(R.string.toast_translate_unavailable), android.widget.Toast.LENGTH_SHORT).show()
-                                                return@combinedClickable
-                                            }
-                                            selectionRect = null
-                                            selectedBitmap = null
-                                            isSearching = false
-                                            currentPathPoints.clear()
-                                            scope.launch { selectionAnim.snapTo(0f) }
-
-                                            val translatorService = CircleToSearchAccessibilityService.instance
-                                            if (translatorService != null) {
-                                                // Long-press closes Circle to Search: the live screen
-                                                // stays interactive underneath, so the result overlay
-                                                // must pass taps through (no tap-to-copy).
-                                                translatorService.translateCapturedScreen(bmp, TRANSLATE_TRIGGER_DELAY_MS, tapToCopy = false)
-                                                onClose()
-                                            } else {
-                                                // No accessibility service: long-press behaves like a
-                                                // short press — show the module's translate overlay
-                                                // hosted in our own activity.
-                                                isTranslatorMode = true
-                                                val startedTranslate = com.akslabs.circletosearch.AssistantTranslateOverlay.start(bmp, TRANSLATE_TRIGGER_DELAY_MS) {
-                                                    isTranslatorMode = false
-                                                }
-                                                if (!startedTranslate) {
-                                                    isTranslatorMode = false
-                                                    android.widget.Toast.makeText(context, context.getString(R.string.toast_translate_unavailable), android.widget.Toast.LENGTH_SHORT).show()
-                                                }
-                                            }
+                                            translateLiveScreen()
                                         }
                                     ),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.Default.Translate, contentDescription = stringResource(R.string.cd_translate))
+                                Icon(
+                                    painterResource(id = com.akslabs.circletosearch.R.drawable.translate_indic_24px),
+                                    contentDescription = stringResource(R.string.cd_translate),
+                                    tint = MaterialTheme.colorScheme.onSurface
+                                )
                             }
                         }
 
@@ -2130,6 +2121,26 @@ fun CircleToSearchScreen(
                                             modifier = Modifier.padding(horizontal = 0.dp)
                                         )
                                     }
+                                }
+                            }
+
+                            // Camera — open the translator module's live camera directly.
+                            // CLEAR_TASK so backing out of the camera returns here instead
+                            // of any module screen left over from a previous session.
+                            BottomBarButton(stringResource(R.string.label_camera), {
+                                Icon(painterResource(id = dev.davidv.translator.R.drawable.camera), null, modifier = Modifier.size(22.dp))
+                            }) {
+                                // Clear any lingering translator overlay windows so a
+                                // stale touchable result/select window can't intercept
+                                // taps inside the camera screen.
+                                CircleToSearchAccessibilityService.instance?.closeTranslateOverlay()
+                                val cameraIntent = android.content.Intent(context, dev.davidv.translator.MainActivity::class.java)
+                                    .putExtra(dev.davidv.translator.MainActivity.EXTRA_OPEN_LIVE_CAMERA, true)
+                                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                                runCatching {
+                                    context.startActivity(cameraIntent)
+                                }.onFailure {
+                                    android.widget.Toast.makeText(context, context.getString(R.string.toast_translate_unavailable), android.widget.Toast.LENGTH_SHORT).show()
                                 }
                             }
 
@@ -2257,11 +2268,26 @@ fun CircleToSearchScreen(
                                 }
                             }
 
-                            // Upload — pick a gallery image and run Circle to Search on it
-                            BottomBarButton(stringResource(R.string.label_upload), { Icon(Icons.Default.Upload, null) }) {
+                            // Gallery — pick an image and run Circle to Search on it
+                            BottomBarButton(stringResource(R.string.label_gallery), { Icon(painterResource(id = com.akslabs.circletosearch.R.drawable.ic_gallery), null, modifier = Modifier.size(22.dp)) }) {
                                 pickImageLauncher.launch(
                                     PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                                 )
+                            }
+
+                            // Screen — translate the current live screen (same as long-pressing
+                            // Translate). Only with accessibility: assistant permission can't
+                            // offer the live screen behavior, so the button is hidden.
+                            if (CircleToSearchAccessibilityService.instance != null) {
+                                BottomBarButton(stringResource(R.string.label_translate_screen), {
+                                    Icon(
+                                        painterResource(id = com.akslabs.circletosearch.R.drawable.translate_screen),
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }) {
+                                    translateLiveScreen()
+                                }
                             }
                         }
                     }

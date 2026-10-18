@@ -201,7 +201,10 @@ class TranslatorOverlayBridge(
     if (active) {
       if (selectMode) exitSelectMode()
       beginProvidedTranslation(screenshot)
-      showScanIfScanning()
+      // Re-sync the chrome for this trigger instead of leaving whatever the
+      // previous session drew: showToolbar rebuilds when the mode (select
+      // button vs flip-only) changed, otherwise just updates the labels.
+      showCapturedChrome()
       return
     }
 

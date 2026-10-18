@@ -99,7 +99,9 @@
     <string name="label_smartscan">SmartScan</string>
     <string name="label_scan_qr">Scan QR</string>
     <string name="label_fullscreen">Fullscreen</string>
-    <string name="label_upload">Upload</string>
+    <string name="label_gallery">Gallery</string>
+    <string name="label_camera">Camera</string>
+    <string name="label_translate_screen">Screen</string>
     <string name="toast_image_load_failed">Unable to load that image</string>
     <string name="label_share">Share</string>
     <string name="label_extracting_entities">Extracting links &amp; info\u2026</string>

@@ -230,6 +230,13 @@ class TranslatorViewModel(
   private val _languageManagerRequests = Channel<Unit>(Channel.CONFLATED)
   val languageManagerRequests: Flow<Unit> = _languageManagerRequests.receiveAsFlow()
 
+  // Deep link from another in-app surface (Circle to Search bottom bar) straight
+  // into the live camera screen. A state flag (not a channel) so navigation can
+  // be folded into the single loading→main→camera transition without ever
+  // rendering the home screen in between.
+  private val _openLiveCameraRequest = MutableStateFlow(false)
+  val openLiveCameraRequest: StateFlow<Boolean> = _openLiveCameraRequest.asStateFlow()
+
   val navigationState: StateFlow<NavigationState> =
     combine(languageStateManager.languageState, _from, to) { langState, fromLang, toLang ->
       when {
@@ -587,6 +594,14 @@ class TranslatorViewModel(
 
   fun requestLanguageManager() {
     _languageManagerRequests.trySend(Unit)
+  }
+
+  fun requestLiveCamera() {
+    _openLiveCameraRequest.value = true
+  }
+
+  fun clearLiveCameraRequest() {
+    _openLiveCameraRequest.value = false
   }
 
   // A shared document (pdf/odt/txt/epub) reaches the same drawer as a picked one:

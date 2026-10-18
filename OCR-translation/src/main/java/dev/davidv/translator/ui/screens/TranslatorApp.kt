@@ -33,6 +33,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -68,6 +69,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -558,13 +560,22 @@ fun TranslatorApp(
 
   val navigationState by viewModel.navigationState.collectAsState()
 
-  // Map navigation state to route
+  val openLiveCameraRequest by viewModel.openLiveCameraRequest.collectAsState()
+
+  // Map navigation state to route. A pending camera deep link (set by MainActivity
+  // before the first frame) becomes the start destination so the home screen is
+  // never composed — navigating main → live_camera would flash it first. Even
+  // while the language check is still LOADING go straight to the camera: it
+  // renders a black placeholder until the languages arrive, which beats the
+  // loading spinner screen for a launch that never wanted the home screen.
   val startDestination =
     remember {
       when (navigationState) {
-        TranslatorViewModel.NavigationState.LOADING -> "loading"
         TranslatorViewModel.NavigationState.NO_LANGUAGES -> "no_languages"
-        TranslatorViewModel.NavigationState.READY -> "main"
+        TranslatorViewModel.NavigationState.LOADING ->
+          if (openLiveCameraRequest) "live_camera" else "loading"
+        TranslatorViewModel.NavigationState.READY ->
+          if (openLiveCameraRequest) "live_camera" else "main"
       }
     }
 
@@ -573,8 +584,55 @@ fun TranslatorApp(
   // current entry re-runs these once the host is actually there.
   val currentBackStackEntry by navController.currentBackStackEntryAsState()
 
-  LaunchedEffect(navigationState, currentBackStackEntry) {
+  LaunchedEffect(navigationState, currentBackStackEntry, openLiveCameraRequest) {
     val currentRoute = currentBackStackEntry?.destination?.route
+    if (openLiveCameraRequest) {
+      if (navigationState == TranslatorViewModel.NavigationState.READY) {
+        // Same as the home screen's camera entry: tear down any lingering
+        // overlay session (floating bubble / screen-translate chrome) — its
+        // touchable result or selection window would sit over the camera and
+        // swallow taps (including the language pills').
+        (dev.davidv.translator.OverlayWindowHosts.primary as? dev.davidv.translator.accessibilityOverlay.TranslatorOverlayHost)
+          ?.deactivate()
+      }
+      // Fold the camera deep link into this one transition so the home screen
+      // is never composed. While the NavHost has no back stack yet
+      // (currentRoute == null) the request must be KEPT — clearing it here
+      // dropped the deep link and left the user on the home screen; this
+      // effect re-runs when the first entry appears.
+      when {
+        currentRoute == null -> Unit
+        // Already on the camera (e.g. a repeated deep link) — just consume it.
+        currentRoute == "live_camera" -> viewModel.clearLiveCameraRequest()
+        navigationState == TranslatorViewModel.NavigationState.READY -> {
+          // From the loading gate go straight to the camera so the home screen
+          // is never composed; from anywhere else stack the camera on top.
+          if (currentRoute == "loading") {
+            navController.navigate("live_camera") {
+              popUpTo("loading") { inclusive = true }
+            }
+          } else {
+            navController.navigate("live_camera")
+          }
+          viewModel.clearLiveCameraRequest()
+        }
+        navigationState != TranslatorViewModel.NavigationState.LOADING -> {
+          // no_languages (or another terminal state): packs must be downloaded
+          // before the live camera works — drop the request. If the camera
+          // route was the start destination (deep link while still LOADING),
+          // leave it for the download screen.
+          viewModel.clearLiveCameraRequest()
+          if (currentRoute == "live_camera") {
+            navController.navigate("no_languages") {
+              popUpTo("live_camera") { inclusive = true }
+            }
+          }
+        }
+        // else: still loading — keep the request; this effect re-runs when the
+        // navigation state or back stack changes.
+      }
+      return@LaunchedEffect
+    }
     val targetRoute =
       when (navigationState) {
         TranslatorViewModel.NavigationState.LOADING -> null
@@ -754,7 +812,14 @@ fun TranslatorApp(
               val targetTtsPlaybackSpeed = ttsPlaybackSpeedFor(settings, currentTo, selectedTtsVoiceName)
               MainScreen(
                 onSettings = { navController.navigate("settings") },
-                onLiveCamera = { navController.navigate("live_camera") },
+                onLiveCamera = {
+                  // Tear down any lingering overlay session (floating bubble /
+                  // screen-translate chrome) first — its touchable result or
+                  // selection window would sit over the camera and swallow taps.
+                  (dev.davidv.translator.OverlayWindowHosts.primary as? dev.davidv.translator.accessibilityOverlay.TranslatorOverlayHost)
+                    ?.deactivate()
+                  navController.navigate("live_camera")
+                },
                 input = input,
                 inputTransliteration = inputTransliterated,
                 output = output,
@@ -950,14 +1015,32 @@ fun TranslatorApp(
                 canSwap = viewModel.languageStateManager.canSwapLanguages(currentFrom, currentTo),
                 languageState = languageState,
                 languageMetadata = languageMetadata,
+                languageStateManager = viewModel.languageStateManager,
                 onMessage = viewModel::handleMessage,
                 showAutoOption = !settings.disableCLD,
                 liveOverlayDefaultEnabled = settings.liveCameraOverlayEnabled,
                 catalog = liveCatalog,
                 onClose = {
-                  navController.popBackStack("main", inclusive = false)
+                  // Deep-linked straight onto the camera (start destination or
+                  // loading → live_camera): no home entry sits under it, so
+                  // popBackStack("main") fails — close the activity instead so
+                  // Back/close returns to the caller (Circle to Search) rather
+                  // than dropping the user on the module's home screen.
+                  if (!navController.popBackStack("main", inclusive = false)) {
+                    (context as? android.app.Activity)?.finish()
+                  }
                 },
                 onImageCaptured = viewModel::setSharedImageUri,
+              )
+            } else {
+              // Deep-linked in while the language check is still running: the
+              // camera screen needs from/to, so hold a black frame (the camera
+              // screen's own background) until they arrive instead of flashing
+              // the loading spinner or an empty white frame.
+              Box(
+                modifier = Modifier
+                  .fillMaxSize()
+                  .background(Color.Black)
               )
             }
           }

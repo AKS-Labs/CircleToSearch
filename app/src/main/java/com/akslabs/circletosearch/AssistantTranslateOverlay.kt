@@ -23,10 +23,18 @@ object AssistantTranslateOverlay {
   /**
    * Starts OCR + translation of an already-captured screenshot using the
    * activity-hosted overlay. Returns false if no bridge is attached.
+   * [tapToCopy] — false for live-screen modes: the overlay window stops
+   * consuming taps (FLAG_NOT_TOUCHABLE on the hosting activity) so the app
+   * underneath stays interactive, mirroring the accessibility path.
    */
-  fun start(screenshot: Bitmap, uiDelayMs: Long = 0L, onClosed: (() -> Unit)? = null): Boolean {
+  fun start(
+    screenshot: Bitmap,
+    uiDelayMs: Long = 0L,
+    tapToCopy: Boolean = true,
+    onClosed: (() -> Unit)? = null,
+  ): Boolean {
     val b = bridge ?: return false
-    b.startCapturedTranslation(screenshot, uiDelayMs, onClosed)
+    b.startCapturedTranslation(screenshot, uiDelayMs, onClosed, tapToCopy)
     return true
   }
 

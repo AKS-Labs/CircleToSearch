@@ -6,6 +6,10 @@
         <item name="android:windowAnimationStyle">@null</item>
         <!-- Set window background to match Material3 surface color -->
         <item name="android:windowBackground">?attr/colorSurface</item>
+        <!-- No system starting-window/splash preview: it is light-surface colored
+             and flashes white over the screen for the camera deep link (and delays
+             every launch since the app's own first frame already covers startup). -->
+        <item name="android:windowDisablePreview">true</item>
         <!-- Ensure no window enter/exit transitions -->
         <item name="android:windowEnterTransition">@null</item>
         <item name="android:windowExitTransition">@null</item>

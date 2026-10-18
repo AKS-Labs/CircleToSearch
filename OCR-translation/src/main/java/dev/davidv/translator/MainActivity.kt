@@ -43,6 +43,7 @@ import kotlinx.coroutines.flow.asStateFlow
 class MainActivity : ComponentActivity() {
   companion object {
     const val EXTRA_OPEN_LANGUAGE_MANAGER = "dev.davidv.translator.OPEN_LANGUAGE_MANAGER"
+    const val EXTRA_OPEN_LIVE_CAMERA = "dev.davidv.translator.OPEN_LIVE_CAMERA"
   }
 
   // Identity in production; only the UI-export test flips UiExportRecorder.active to record which
@@ -56,6 +57,7 @@ class MainActivity : ComponentActivity() {
   private var sharedImageUri: Uri? = null
   private var sharedDocumentUri: Uri? = null
   private var openLanguageManager: Boolean = false
+  private var openLiveCamera: Boolean = false
   private lateinit var viewModel: TranslatorViewModel
   private var downloadService: DownloadService? = null
   private lateinit var serviceConnection: ServiceConnection
@@ -91,11 +93,19 @@ class MainActivity : ComponentActivity() {
       viewModel.requestLanguageManager()
       openLanguageManager = false
     }
+    // Captured before it is consumed so MigrationGate can skip its blocking
+    // screen: the camera deep link must show the camera on the first frame.
+    val openedForLiveCamera = openLiveCamera
+    if (openLiveCamera) {
+      viewModel.requestLiveCamera()
+      openLiveCamera = false
+    }
 
     setContent {
       TranslatorTheme {
         MigrationGate(
           filePathManager = app.filePathManager,
+          showContentImmediately = openedForLiveCamera,
           onMigrated = {
             TranslatorTtsEngine.notifyVoiceDataChanged(applicationContext)
             // The Application holds its own catalog instance (used by e.g. the
@@ -160,12 +170,20 @@ class MainActivity : ComponentActivity() {
         viewModel.requestLanguageManager()
         openLanguageManager = false
       }
+      if (openLiveCamera) {
+        viewModel.requestLiveCamera()
+        openLiveCamera = false
+      }
     }
   }
 
   private fun handleIntent(intent: Intent?) {
     Log.d("MainActivity", "Got intent $intent")
     openLanguageManager = intent?.getBooleanExtra(EXTRA_OPEN_LANGUAGE_MANAGER, false) == true
+    // Consume the camera extra immediately so a configuration-changed
+    // recreation doesn't yank the user back into the camera screen.
+    openLiveCamera = intent?.getBooleanExtra(EXTRA_OPEN_LIVE_CAMERA, false) == true
+    intent?.removeExtra(EXTRA_OPEN_LIVE_CAMERA)
     when (intent?.action) {
       Intent.ACTION_SEND -> {
         val text = intent.getStringExtra(Intent.EXTRA_TEXT)

@@ -68,6 +68,8 @@ class OverlayUI(
   private var launcherBubble: FloatingBubble? = null
   private var toolbarView: View? = null
   private var toolbarParams: WindowManager.LayoutParams? = null
+  /** Mode the current toolbar was built for (select-text button vs flip-only). */
+  private var toolbarShowSelectButton: Boolean? = null
   private var hasSelectButton = false
   private var sourceLabelView: TextView? = null
   private var targetLabelView: TextView? = null
@@ -196,7 +198,17 @@ class OverlayUI(
     isAutoSource: Boolean,
     showSelectButton: Boolean = false,
   ) {
-    if (toolbarView != null) return
+    if (toolbarView != null) {
+      // The toolbar is mode-dependent: live-screen modes get the select-text
+      // button, frozen captured modes get flip. Re-triggering with a different
+      // mode used to keep the stale chrome (captured toolbar shown for a
+      // long-press/screen translate, select hidden). Same mode → just sync labels.
+      if (toolbarShowSelectButton == showSelectButton) {
+        updateToolbarState(forcedSourceLanguage, forcedTargetLanguage, readingOrder, isAutoSource)
+        return
+      }
+      removeToolbar()
+    }
 
     val toolbarViews =
       OverlayChromeFactory.createLanguageToolbar(
@@ -252,7 +264,9 @@ class OverlayUI(
           WindowManager.LayoutParams.WRAP_CONTENT,
           WindowManager.LayoutParams.WRAP_CONTENT,
           windowType(),
-          WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+          WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+            WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
           PixelFormat.TRANSLUCENT,
         ).apply {
           gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
@@ -265,6 +279,7 @@ class OverlayUI(
     addChromeView(toolbar, lp)
     toolbarView = toolbar
     toolbarParams = lp as? WindowManager.LayoutParams
+    toolbarShowSelectButton = showSelectButton
     makeToolbarDraggable(toolbar)
   }
 
@@ -334,6 +349,7 @@ class OverlayUI(
       removeChromeView(it)
       toolbarView = null
       toolbarParams = null
+      toolbarShowSelectButton = null
       sourceLabelView = null
       targetLabelView = null
       readingOrderButtonView = null
@@ -345,12 +361,14 @@ class OverlayUI(
     }
   }
 
-  /** Swap the mode-dependent toolbar slot: refresh drives the live screen, flip the frozen one. */
+  /** Select-mode toolbar slot: flip joins in select mode; refresh stays put —
+   *  hiding it when select mode engaged (by tapping the translated text) made
+   *  the refresh control vanish mid-read, which users hit as a bug. */
   fun setSelectModeUi(active: Boolean) {
     val onSurface = OverlayChromeFactory.palette(serviceContext).onSurface
     val activeTint = OverlayChromeFactory.activeIconTint(serviceContext)
     selectIconView?.setColorFilter(if (active) activeTint else onSurface)
-    refreshButtonView?.visibility = if (active) View.GONE else View.VISIBLE
+    refreshButtonView?.visibility = View.VISIBLE
     // Without a select button, flip is a permanent control — only hide it when
     // leaving select mode if select mode is what made it visible.
     flipButtonView?.visibility =
