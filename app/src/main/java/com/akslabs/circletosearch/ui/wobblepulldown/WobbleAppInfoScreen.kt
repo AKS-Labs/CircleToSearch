@@ -144,7 +144,7 @@ private fun loadAppInfo(context: Context): AppInfoData {
 
 private fun loadLaunchMethods(context: Context): List<LaunchMethod> {
     val a11y = isA11yGranted(context)
-    val overlayOn = OverlayConfigurationManager(context).getConfig().isEnabled
+    val overlayOn = OverlayConfigurationManager(context).getStatusBarConfig().isEnabled
     val appPrefs = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
     val bubbleOn = appPrefs.getBoolean("bubble_enabled", false)
     val hwCount = HW_TRIGGER_KEYS.count { appPrefs.getBoolean(it, false) }

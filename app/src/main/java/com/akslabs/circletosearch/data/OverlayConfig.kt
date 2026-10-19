@@ -17,7 +17,7 @@ data class OverlayConfig(
     @SerializedName("isVisible") val isVisible: Boolean = false, // Debug visibility (colored)
     @SerializedName("previewVisible") val previewVisible: Boolean = false, // true only while the settings dropdown is open
     @SerializedName("activeSegmentIndex") val activeSegmentIndex: Int = -1, // Currently being edited in settings
-    @SerializedName("segments") val segments: List<OverlaySegment> = listOf(OverlaySegment(width = 1080)) // Default to a common large width
+    @SerializedName("segments") val segments: List<OverlaySegment> = emptyList() // No default overlay — users add their own in Custom overlay
 )
 
 data class OverlaySegment(
@@ -41,6 +41,20 @@ data class BottomEdgeConfig(
     @SerializedName("cornerSizeDp") val cornerSizeDp: Int = 72, // arc radius-ish size
     @SerializedName("midSizeDp") val midSizeDp: Int = 48, // semicircle size (actual overlay)
     @SerializedName("previewVisible") val previewVisible: Boolean = false, // true only while settings dropdown open
+)
+
+/**
+ * Dedicated config for the always-on status-bar double-tap strip configured from
+ * the home screen. Fully separate from the user-defined Custom overlay segments:
+ * neither its visibility nor its master switch affects OverlayConfig.segments,
+ * and vice versa.
+ */
+data class StatusBarConfig(
+    @SerializedName("isEnabled") val isEnabled: Boolean = true,
+    @SerializedName("widthPx") val widthPx: Int = 0,      // 0 = full screen width
+    @SerializedName("heightPx") val heightPx: Int = 0,     // 0 = default 24dp
+    @SerializedName("yOffsetPx") val yOffsetPx: Int = 0,   // below the 3dp system inset
+    @SerializedName("previewVisible") val previewVisible: Boolean = false, // true while home dropdown is open
 )
 
 enum class GestureType {
@@ -144,7 +158,9 @@ class OverlayConfigurationManager(context: Context) {
     companion object {
 private const val KEY_CONFIG = "overlay_config"
 private const val KEY_BOTTOM_EDGE = "bottom_edge_config"
+private const val KEY_STATUS_BAR = "status_bar_config"
 private const val KEY_BOTTOM_EDGE_MID_MIGRATED = "bottom_edge_mid_migrated_v1"
+private const val KEY_STATUS_BAR_DEDICATED_MIGRATED = "status_bar_dedicated_migrated_v1"
     }
 
     fun getConfig(): OverlayConfig {
@@ -156,6 +172,20 @@ private const val KEY_BOTTOM_EDGE_MID_MIGRATED = "bottom_edge_mid_migrated_v1"
                 val sanitizedSegments = config.segments.map { segment ->
                      val cleanGestures = segment.gestures.filterKeys { it != null }.toMutableMap()
                      segment.copy(gestures = cleanGestures)
+                }.toMutableList()
+                // One-time migration: the legacy default segment (full-width status-bar
+                // strip, double-tap -> CTS) is now provided by a dedicated always-on
+                // overlay in the accessibility service. Remove it from saved user
+                // segments so the two aren't duplicated.
+                if (!prefs.getBoolean(KEY_STATUS_BAR_DEDICATED_MIGRATED, false)) {
+                    sanitizedSegments.removeAll { seg ->
+                        seg.width == 1080 && seg.height == 60 && seg.xOffset == 0 && seg.yOffset == 0 &&
+                            seg.gestures == mapOf(GestureType.DOUBLE_TAP to ActionType.CTS_AUTO)
+                    }
+                    prefs.edit()
+                        .putBoolean(KEY_STATUS_BAR_DEDICATED_MIGRATED, true)
+                        .putString(KEY_CONFIG, gson.toJson(config.copy(segments = sanitizedSegments)))
+                        .apply()
                 }
                 return config.copy(segments = sanitizedSegments)
             } catch (e: Exception) {
@@ -200,5 +230,19 @@ private const val KEY_BOTTOM_EDGE_MID_MIGRATED = "bottom_edge_mid_migrated_v1"
 
     fun saveBottomEdgeConfig(config: BottomEdgeConfig) {
         prefs.edit().putString(KEY_BOTTOM_EDGE, gson.toJson(config)).apply()
+    }
+
+    fun getStatusBarConfig(): StatusBarConfig {
+        val json = prefs.getString(KEY_STATUS_BAR, null)
+            ?: return StatusBarConfig()
+        return try {
+            gson.fromJson(json, StatusBarConfig::class.java) ?: StatusBarConfig()
+        } catch (e: Exception) {
+            StatusBarConfig()
+        }
+    }
+
+    fun saveStatusBarConfig(config: StatusBarConfig) {
+        prefs.edit().putString(KEY_STATUS_BAR, gson.toJson(config)).apply()
     }
 }

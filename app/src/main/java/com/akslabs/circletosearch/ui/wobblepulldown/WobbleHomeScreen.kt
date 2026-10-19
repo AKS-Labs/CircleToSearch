@@ -117,9 +117,8 @@ import com.akslabs.circletosearch.SupportDialogHost
 import com.akslabs.circletosearch.data.ActionType
 import com.akslabs.circletosearch.data.BottomEdgeConfig
 import com.akslabs.circletosearch.data.GestureType
-import com.akslabs.circletosearch.data.OverlayConfig
 import com.akslabs.circletosearch.data.OverlayConfigurationManager
-import com.akslabs.circletosearch.data.OverlaySegment
+import com.akslabs.circletosearch.data.StatusBarConfig
 import com.akslabs.circletosearch.ui.SettingsSectionHeader
 import com.akslabs.circletosearch.ui.components.UnifiedSearchMethodSelector
 import com.akslabs.circletosearch.utils.UIPreferences
@@ -209,8 +208,7 @@ fun WobbleHomeScreen(
     val uiPreferences = remember { UIPreferences(context) }
     var a11yGranted by remember { mutableStateOf(isA11yGranted(context)) }
     var assistantGranted by remember { mutableStateOf(isAssistantGranted(context)) }
-    var overlayEnabled by remember { mutableStateOf(configManager.getConfig().isEnabled) }
-    var overlayConfig by remember { mutableStateOf(configManager.getConfig()) }
+    var statusBarCfg by remember { mutableStateOf(configManager.getStatusBarConfig()) }
     var bubbleEnabled by remember { mutableStateOf(appPrefs.getBoolean("bubble_enabled", false)) }
     var hwTriggers by remember {
         mutableStateOf(HW_TRIGGER_KEYS.associateWith { appPrefs.getBoolean(it, false) })
@@ -222,13 +220,12 @@ fun WobbleHomeScreen(
     val bottomEdgeActive = bottomEdge.leftEnabled || bottomEdge.rightEnabled || bottomEdge.midEnabled
     val hwEnabledCount = hwTriggers.values.count { it }
     val running = assistantGranted ||
-        (a11yGranted && (overlayEnabled || bubbleEnabled || bottomEdgeActive || hwEnabledCount > 0))
+        (a11yGranted && (statusBarCfg.isEnabled || bubbleEnabled || bottomEdgeActive || hwEnabledCount > 0))
 
     val refreshHomeState = {
         a11yGranted = isA11yGranted(context)
         assistantGranted = isAssistantGranted(context)
-        overlayEnabled = configManager.getConfig().isEnabled
-        overlayConfig = configManager.getConfig()
+        statusBarCfg = configManager.getStatusBarConfig()
         bubbleEnabled = appPrefs.getBoolean("bubble_enabled", false)
         hwTriggers = HW_TRIGGER_KEYS.associateWith { appPrefs.getBoolean(it, false) }
         bottomEdge = configManager.getBottomEdgeConfig()
@@ -267,10 +264,9 @@ fun WobbleHomeScreen(
         context.startActivity(intent, options.toBundle())
     }
 
-    val saveOverlayConfig: (OverlayConfig) -> Unit = { cfg ->
-        configManager.saveConfig(cfg)
-        overlayConfig = cfg
-        overlayEnabled = cfg.isEnabled
+    val saveStatusBar: (StatusBarConfig) -> Unit = { cfg ->
+        configManager.saveStatusBarConfig(cfg)
+        statusBarCfg = cfg
     }
 
     val setBubbleEnabled: (Boolean) -> Unit = { on ->
@@ -305,6 +301,8 @@ fun WobbleHomeScreen(
         onDispose {
             val cur = configManager.getBottomEdgeConfig()
             if (cur.previewVisible) configManager.saveBottomEdgeConfig(cur.copy(previewVisible = false))
+            val status = configManager.getStatusBarConfig()
+            if (status.previewVisible) configManager.saveStatusBarConfig(status.copy(previewVisible = false))
         }
     }
 
@@ -560,11 +558,11 @@ fun WobbleHomeScreen(
                     ) {
                         Column {
                             HomeStatusBarSection(
-                                config = overlayConfig,
+                                config = statusBarCfg,
                                 a11yGranted = a11yGranted,
                                 expanded = statusBarExpanded,
                                 onExpandedChange = { statusBarExpanded = it },
-                                onChange = saveOverlayConfig,
+                                onChange = saveStatusBar,
                             )
                             HomeRowDivider()
                             HomeToggleItem(
@@ -880,14 +878,15 @@ private fun HomeHwSheet(
  * Expandable block for the status-bar overlay, mirroring [HomeBottomEdgeSection]:
  * a header row with a master switch, and a dropdown with an animated strip preview
  * plus width / height / vertical-position sliders for the top trigger strip.
+ * Driven by [StatusBarConfig] — fully independent from Custom overlay segments.
  */
 @Composable
 private fun HomeStatusBarSection(
-    config: OverlayConfig,
+    config: StatusBarConfig,
     a11yGranted: Boolean,
     expanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
-    onChange: (OverlayConfig) -> Unit,
+    onChange: (StatusBarConfig) -> Unit,
 ) {
     val masterOn = config.isEnabled
     val density = LocalDensity.current
@@ -905,18 +904,10 @@ private fun HomeStatusBarSection(
         }
     }
 
-    val segment = config.segments.firstOrNull() ?: OverlaySegment()
-    fun saveSegment(newSegment: OverlaySegment) {
-        val segments = config.segments.toMutableList()
-        if (segments.isEmpty()) segments.add(newSegment) else segments[0] = newSegment
-        onChange(config.copy(segments = segments))
-    }
-
     val screenWidthDp = LocalConfiguration.current.screenWidthDp.toFloat()
-    val screenWidthPx = screenWidthDp * density.density
-    val widthDp = segment.width / density.density
-    val heightDp = segment.height / density.density
-    val yDp = segment.yOffset / density.density
+    val widthDp = if (config.widthPx > 0) config.widthPx / density.density else screenWidthDp
+    val heightDp = if (config.heightPx > 0) config.heightPx / density.density else 24f
+    val yDp = config.yOffsetPx / density.density
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -992,7 +983,7 @@ private fun HomeStatusBarSection(
                                 contentAlignment = Alignment.TopCenter,
                             ) {
                                 val stripWidthFraction =
-                                    (segment.width / screenWidthPx).coerceIn(0.08f, 1f)
+                                    (widthDp / screenWidthDp).coerceIn(0.08f, 1f)
                                 Box(
                                     modifier = Modifier
                                         .padding(top = yDp.dp)
@@ -1013,7 +1004,7 @@ private fun HomeStatusBarSection(
                             valueRange = 60f..maxOf(screenWidthDp, widthDp),
                             valueText = "${widthDp.toInt()}dp",
                             onValueChange = {
-                                saveSegment(segment.copy(width = (it * density.density).toInt()))
+                                onChange(config.copy(widthPx = (it * density.density).toInt()))
                             },
                         )
                         LabelledSlider(
@@ -1022,7 +1013,7 @@ private fun HomeStatusBarSection(
                             valueRange = 24f..140f,
                             valueText = "${heightDp.toInt()}dp",
                             onValueChange = {
-                                saveSegment(segment.copy(height = (it * density.density).toInt()))
+                                onChange(config.copy(heightPx = (it * density.density).toInt()))
                             },
                         )
                         LabelledSlider(
@@ -1031,7 +1022,7 @@ private fun HomeStatusBarSection(
                             valueRange = 0f..160f,
                             valueText = "${yDp.toInt()}dp",
                             onValueChange = {
-                                saveSegment(segment.copy(yOffset = (it * density.density).toInt()))
+                                onChange(config.copy(yOffsetPx = (it * density.density).toInt()))
                             },
                         )
                     }

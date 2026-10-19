@@ -111,6 +111,7 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
 
     private var windowManager: WindowManager? = null
     private val overlayViews = mutableListOf<View>() // Track all added segment views
+    private var statusBarView: View? = null // Dedicated status-bar double-tap strip (independent of segments)
     private val bottomEdgeViews = mutableListOf<BottomEdgeOverlayView>() // Track bottom-edge corner/mid overlays
     private val executor: Executor = Executors.newSingleThreadExecutor()
     private lateinit var configManager: OverlayConfigurationManager
@@ -135,6 +136,7 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         // On any overlay config change, rebuild the overlay
         updateOverlay()
         updateBottomEdgeOverlays()
+        updateStatusBarOverlay()
     }
 
     override fun onServiceConnected() {
@@ -172,12 +174,14 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         updateBubbleState()
         updateOverlay()
         updateBottomEdgeOverlays()
+        updateStatusBarOverlay()
     }
     
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
         updateOverlay()
         updateBottomEdgeOverlays()
+        updateStatusBarOverlay()
     }
 
     private fun updateBubbleState() {
@@ -328,6 +332,124 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         if (!::configManager.isInitialized) return
         updateOverlay()
         updateBottomEdgeOverlays()
+        updateStatusBarOverlay()
+    }
+
+    private fun statusBarPrimaryColor(): Int =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            getColor(android.R.color.system_accent1_500)
+        } else {
+            Color.parseColor("#FF6200EE") // Default Material Primary
+        }
+
+    private fun themeOverlayPalette(): List<Int> =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            listOf(
+                android.R.color.system_accent1_200,
+                android.R.color.system_accent2_200,
+                android.R.color.system_accent3_200,
+                android.R.color.system_neutral1_200,
+                android.R.color.system_neutral2_200
+            ).map {
+                val color = getColor(it)
+                // Solid fill so the visible overlay is clearly distinguishable
+                Color.argb(255, Color.red(color), Color.green(color), Color.blue(color))
+            }
+        } else {
+            // Legacy fallbacks (solid)
+            listOf(
+                Color.parseColor("#FFFF0000"), // Red
+                Color.parseColor("#FF00FF00"), // Green
+                Color.parseColor("#FF0000FF"), // Blue
+                Color.parseColor("#FFFFFF00"), // Yellow
+                Color.parseColor("#FFFF00FF")  // Magenta
+            )
+        }
+
+    /**
+     * Dedicated, always-on status-bar double-tap strip (Circle to Search),
+     * configured from the home screen's status-bar section. Fully independent
+     * from the user-defined Custom overlay segments: neither its existence nor
+     * its visibility is affected by OverlayConfig.segments or the "Show overlay"
+     * switch, and vice versa. Transparent while running; tinted only while the
+     * home dropdown preview is open.
+     */
+    private fun updateStatusBarOverlay() {
+        val wm = windowManager ?: return
+        if (!::configManager.isInitialized) return
+        val cfg = configManager.getStatusBarConfig()
+        val density = resources.displayMetrics.density
+        val screenWidth = resources.displayMetrics.widthPixels
+        val width = if (cfg.widthPx > 0) cfg.widthPx else screenWidth
+        val height = if (cfg.heightPx > 0) cfg.heightPx else (24 * density).toInt()
+        val yOffset = (3 * density).toInt() + cfg.yOffsetPx
+        fun buildSegment() = OverlaySegment(
+            width = width,
+            height = height,
+            xOffset = 0,
+            yOffset = cfg.yOffsetPx,
+            gestures = mutableMapOf(GestureType.DOUBLE_TAP to ActionType.CTS_AUTO)
+        )
+
+        if (!cfg.isEnabled && !cfg.previewVisible) {
+            statusBarView?.let { view ->
+                try { wm.removeView(view) } catch (_: Exception) {}
+            }
+            statusBarView = null
+            return
+        }
+
+        val existing = statusBarView
+        if (existing != null) {
+            val params = existing.layoutParams as WindowManager.LayoutParams
+            var changed = false
+            if (params.width != width) { params.width = width; changed = true }
+            if (params.height != height) { params.height = height; changed = true }
+            if (params.y != yOffset) { params.y = yOffset; changed = true }
+            if (changed) {
+                try { wm.updateViewLayout(existing, params) } catch (_: Exception) {}
+                // Re-attach so the full-width smart-swipe check uses the new width.
+                attachTouchListener(existing, buildSegment(), 0)
+            }
+            applyStatusBarTint(existing, cfg.previewVisible)
+            return
+        }
+        val view = View(this)
+        val params = WindowManager.LayoutParams(
+            width,
+            height,
+            WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            PixelFormat.TRANSLUCENT
+        )
+        params.gravity = Gravity.TOP or Gravity.START
+        params.x = 0
+        params.y = yOffset
+        attachTouchListener(view, buildSegment(), 0)
+        applyStatusBarTint(view, cfg.previewVisible)
+        try {
+            wm.addView(view, params)
+            statusBarView = view
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun applyStatusBarTint(view: View, tinted: Boolean) {
+        if (tinted) {
+            val drawable = GradientDrawable().apply {
+                setColor(themeOverlayPalette()[0])
+                cornerRadius = 3 * resources.displayMetrics.density
+                setStroke(2, statusBarPrimaryColor())
+            }
+            view.background = drawable
+        } else {
+            view.background = null
+            view.setBackgroundColor(Color.TRANSPARENT)
+        }
     }
 
     private fun updateOverlay() {
@@ -349,34 +471,8 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         }
 
         // --- Resolution of Colors ---
-        val primaryColor = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            getColor(android.R.color.system_accent1_500)
-        } else {
-            Color.parseColor("#FF6200EE") // Default Material Primary
-        }
-
-        val themePalette = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            listOf(
-                android.R.color.system_accent1_200,
-                android.R.color.system_accent2_200,
-                android.R.color.system_accent3_200,
-                android.R.color.system_neutral1_200,
-                android.R.color.system_neutral2_200
-            ).map { 
-                val color = getColor(it)
-                // Set alpha to 40% (approx 102/255) for subtle blending
-                Color.argb(102, Color.red(color), Color.green(color), Color.blue(color))
-            }
-        } else {
-            // Legacy fallbacks with 40% opacity
-            listOf(
-                Color.parseColor("#66FF0000"), // Red
-                Color.parseColor("#6600FF00"), // Green
-                Color.parseColor("#660000FF"), // Blue
-                Color.parseColor("#66FFFF00"), // Yellow
-                Color.parseColor("#66FF00FF")  // Magenta
-            )
-        }
+        val primaryColor = statusBarPrimaryColor()
+        val themePalette = themeOverlayPalette()
         
         // Landscape check
         val currentOrientation = resources.configuration.orientation
@@ -421,6 +517,7 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
                     val color = themePalette[index % themePalette.size]
                     val drawable = GradientDrawable().apply {
                         setColor(color)
+                        cornerRadius = 3 * resources.displayMetrics.density
                         // Outline every visible strip so its position is obvious while
                         // adjusting; the strip being edited gets a thicker border.
                         setStroke(
@@ -474,6 +571,7 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
                     val color = themePalette[index % themePalette.size]
                     val drawable = GradientDrawable().apply {
                         setColor(color)
+                        cornerRadius = 3 * resources.displayMetrics.density
                         // Outline every visible strip so its position is obvious while
                         // adjusting; the strip being edited gets a thicker border.
                         setStroke(
@@ -1895,6 +1993,10 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
                 e.printStackTrace()
             }
         }
+        statusBarView?.let { view ->
+            try { windowManager?.removeView(view) } catch (_: Exception) {}
+        }
+        statusBarView = null
         bottomEdgeViews.forEach { view ->
             try { windowManager?.removeView(view) } catch (_: Exception) {}
         }
