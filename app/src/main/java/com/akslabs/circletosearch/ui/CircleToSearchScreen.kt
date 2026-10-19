@@ -308,6 +308,35 @@ private fun fitCrop(
     )
 
 /**
+ * Smooths raw pointer samples into a flowing curve (Catmull-Rom → cubic bezier),
+ * so the drawn circle reads as a soft neon stroke instead of a jagged polyline.
+ * With fewer than 3 points it falls back to straight segments.
+ */
+private fun buildSmoothPath(points: List<Offset>): Path {
+    val path = Path()
+    val n = points.size
+    if (n == 0) return path
+    if (n < 3) {
+        path.moveTo(points[0].x, points[0].y)
+        for (i in 1 until n) path.lineTo(points[i].x, points[i].y)
+        return path
+    }
+    path.moveTo(points[0].x, points[0].y)
+    for (i in 0 until n - 1) {
+        val p0 = points[if (i - 1 < 0) 0 else i - 1]
+        val p1 = points[i]
+        val p2 = points[i + 1]
+        val p3 = points[if (i + 2 >= n) n - 1 else i + 2]
+        val c1x = p1.x + (p2.x - p0.x) / 6f
+        val c1y = p1.y + (p2.y - p0.y) / 6f
+        val c2x = p2.x - (p3.x - p1.x) / 6f
+        val c2y = p2.y - (p3.y - p1.y) / 6f
+        path.cubicTo(c1x, c1y, c2x, c2y, p2.x, p2.y)
+    }
+    return path
+}
+
+/**
  * The device's physical screen corner radii in px: upper-left, upper-right,
  * lower-right, lower-left. `Display.getRoundedCorner` (Android 12+) reports the
  * real bezel radius per corner and returns null where the screen is rectangular;
@@ -535,11 +564,18 @@ fun CircleToSearchScreen(
             if (m != null) {
                 val a = m.groupValues[4].toFloatOrNull() ?: 1f
                 if (a > 0f) {
-                    pageBackgroundColor = Color(
-                        red = m.groupValues[1].toInt() / 255f,
-                        green = m.groupValues[2].toInt() / 255f,
-                        blue = m.groupValues[3].toInt() / 255f
-                    )
+                    val r = m.groupValues[1].toInt() / 255f
+                    val g = m.groupValues[2].toInt() / 255f
+                    val b = m.groupValues[3].toInt() / 255f
+                    val luminance = 0.2126f * r + 0.7152f * g + 0.0722f * b
+                    // Accept the page's own color only when it's clearly white or
+                    // clearly dark. Mid-tones (the "greyish header" cases) fall
+                    // back to a clean white chrome.
+                    pageBackgroundColor = if (luminance > 0.88f || luminance < 0.18f) {
+                        Color(red = r, green = g, blue = b)
+                    } else {
+                        Color.White
+                    }
                 }
             }
         }
@@ -728,7 +764,12 @@ fun CircleToSearchScreen(
                 selectionRect = newRect
             }
         } else {
-            currentPathPoints.add(change.position)
+            // Thin dense pointer samples (~2.5px): Catmull-Rom smoothing in the
+            // canvas fills the gaps, so this only cuts jitter without hurting shapes.
+            val last = currentPathPoints.lastOrNull()
+            if (last == null || (change.position - last).getDistance() > 2.5f) {
+                currentPathPoints.add(change.position)
+            }
         }
     }
 
@@ -1167,7 +1208,23 @@ fun CircleToSearchScreen(
                         .height(800.dp)
                         .background(pageBackgroundColor, RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
                 ) {
-                Spacer(modifier = Modifier.height(16.dp))
+                // Drag pill — visual affordance for the half-expanded sheet
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterHorizontally)
+                        .padding(top = 12.dp)
+                        .width(36.dp)
+                        .height(4.dp)
+                        .background(
+                            color = if (
+                                (0.2126f * pageBackgroundColor.red +
+                                0.7152f * pageBackgroundColor.green +
+                                0.0722f * pageBackgroundColor.blue) > 0.5f
+                            ) Color.Black.copy(alpha = 0.25f) else Color.White.copy(alpha = 0.5f),
+                            shape = RoundedCornerShape(2.dp)
+                        )
+                )
+                Spacer(modifier = Modifier.height(8.dp))
 
                 // Tabs - Polished UI
                 ScrollableTabRow(
@@ -1223,6 +1280,9 @@ fun CircleToSearchScreen(
                     searchUrl = null
                     preloadedUrls.clear()
                     initializedEngines.clear() // Reset smart loading
+                    // Never carry the previous page's sampled tint into a new
+                    // search — start clean (white) until this page is sampled.
+                    pageBackgroundColor = Color.White
                     // Do NOT destroy webviews here to keep them cached if possible? 
                     // PROBABLY safer to destroy to avoid stale state from previous searches.
                     webViews.values.forEach { 
@@ -1268,8 +1328,9 @@ fun CircleToSearchScreen(
                             }
                         }
 
-                        // 2. Multi-Search Mode (Expanded UI)
-                        scope.launch { scaffoldState.bottomSheetState.expand() }
+                        // 2. Multi-Search Mode: reveal at the half (peek) height, not
+                        // fully expanded — the user can swipe up for more.
+                        scope.launch { scaffoldState.bottomSheetState.partialExpand() }
 
                         // 3. Upload to host if needed (Multi-Search Mode)
                         if (hostedImageUrl == null) {
@@ -1542,27 +1603,42 @@ fun CircleToSearchScreen(
             if (!isTranslatorMode) {                Canvas(
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    // Draw current path (Real-time)
+                    // Draw current path (Real-time): smoothed curve + layered neon
+                    // glow. This canvas is a sibling composed AFTER the screenshot
+                    // Box (which holds the dim tint), so the dim can only darken the
+                    // screenshot underneath — the stroke itself always renders at
+                    // full vibrancy on top.
                     if (currentPathPoints.size > 1) {
-                        val path = Path().apply {
-                            moveTo(currentPathPoints.first().x, currentPathPoints.first().y)
-                            for (i in 1 until currentPathPoints.size) {
-                                lineTo(currentPathPoints[i].x, currentPathPoints[i].y)
-                            }
-                        }
-                        
-                        // Glow
+                        val path = buildSmoothPath(currentPathPoints)
+                        val strokeCap = StrokeCap.Round
+                        val strokeJoin = StrokeJoin.Round
+                        // Gradient anchored to the full canvas (not the path's
+                        // bounding box), so colors stay stable while drawing
+                        // instead of "swimming" with the growing path.
+                        val glowBrush = Brush.linearGradient(
+                            colors = OverlayGradientColors,
+                            start = Offset.Zero,
+                            end = Offset(size.width, size.height)
+                        )
+                        // Soft outer halo
                         drawPath(
                             path = path,
-                            brush = Brush.linearGradient(OverlayGradientColors),
-                            style = Stroke(width = 30f, cap = StrokeCap.Round, join = StrokeJoin.Round),
-                            alpha = 0.6f
+                            brush = glowBrush,
+                            style = Stroke(width = 36f, cap = strokeCap, join = strokeJoin),
+                            alpha = 0.22f
                         )
-                        // Core
+                        // Inner glow
+                        drawPath(
+                            path = path,
+                            brush = glowBrush,
+                            style = Stroke(width = 22f, cap = strokeCap, join = strokeJoin),
+                            alpha = 0.5f
+                        )
+                        // Bright opaque core
                         drawPath(
                             path = path,
                             color = Color.White,
-                            style = Stroke(width = 12f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+                            style = Stroke(width = 12f, cap = strokeCap, join = strokeJoin)
                         )
                     }
 
