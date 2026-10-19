@@ -7,12 +7,8 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateIntAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
@@ -87,8 +83,6 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -1308,15 +1302,6 @@ private fun BottomEdgeIllustration(
     val primary = MaterialTheme.colorScheme.primary
     val outline = MaterialTheme.colorScheme.outlineVariant
 
-    // Subtle idle pulse so the enabled shapes feel alive.
-    val infiniteTransition = rememberInfiniteTransition(label = "edgePulse")
-    val pulse by infiniteTransition.animateFloat(
-        initialValue = 0.85f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(1100), RepeatMode.Reverse),
-        label = "pulse",
-    )
-
     Canvas(
         modifier = Modifier
             .fillMaxWidth()
@@ -1375,8 +1360,7 @@ private fun BottomEdgeIllustration(
                 }
                 close()
             }
-            drawPath(path, color = primary.copy(alpha = 0.35f * pulse * expandProgress))
-            drawPath(path, color = primary.copy(alpha = 0.8f * expandProgress), style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round))
+            drawPath(path, color = primary.copy(alpha = expandProgress))
         }
 
         if (leftEnabled) drawArcShape(true, cornerScale)
@@ -1396,8 +1380,7 @@ private fun BottomEdgeIllustration(
                 )
                 close()
             }
-            drawPath(path, color = primary.copy(alpha = 0.35f * pulse * expandProgress))
-            drawPath(path, color = primary.copy(alpha = 0.8f * expandProgress), style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round))
+            drawPath(path, color = primary.copy(alpha = expandProgress))
         }
     }
 }

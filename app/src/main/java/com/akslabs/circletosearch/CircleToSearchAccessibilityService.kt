@@ -342,30 +342,6 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
             Color.parseColor("#FF6200EE") // Default Material Primary
         }
 
-    private fun themeOverlayPalette(): List<Int> =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            listOf(
-                android.R.color.system_accent1_200,
-                android.R.color.system_accent2_200,
-                android.R.color.system_accent3_200,
-                android.R.color.system_neutral1_200,
-                android.R.color.system_neutral2_200
-            ).map {
-                val color = getColor(it)
-                // Solid fill so the visible overlay is clearly distinguishable
-                Color.argb(255, Color.red(color), Color.green(color), Color.blue(color))
-            }
-        } else {
-            // Legacy fallbacks (solid)
-            listOf(
-                Color.parseColor("#FFFF0000"), // Red
-                Color.parseColor("#FF00FF00"), // Green
-                Color.parseColor("#FF0000FF"), // Blue
-                Color.parseColor("#FFFFFF00"), // Yellow
-                Color.parseColor("#FFFF00FF")  // Magenta
-            )
-        }
-
     /**
      * Dedicated, always-on status-bar double-tap strip (Circle to Search),
      * configured from the home screen's status-bar section. Fully independent
@@ -378,6 +354,15 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         val wm = windowManager ?: return
         if (!::configManager.isInitialized) return
         val cfg = configManager.getStatusBarConfig()
+
+        // Landscape gate: the Custom overlay screen's "Landscape Mode" switch
+        // (OverlayConfig.isEnabledInLandscape) disables every overlay in
+        // landscape when off; an open home preview still shows the strip so it
+        // can be adjusted on-device.
+        val landscapeBlocked =
+            resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE &&
+                !configManager.getConfig().isEnabledInLandscape && !cfg.previewVisible
+
         val density = resources.displayMetrics.density
         val screenWidth = resources.displayMetrics.widthPixels
         val width = if (cfg.widthPx > 0) cfg.widthPx else screenWidth
@@ -391,7 +376,7 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
             gestures = mutableMapOf(GestureType.DOUBLE_TAP to ActionType.CTS_AUTO)
         )
 
-        if (!cfg.isEnabled && !cfg.previewVisible) {
+        if ((!cfg.isEnabled && !cfg.previewVisible) || landscapeBlocked) {
             statusBarView?.let { view ->
                 try { wm.removeView(view) } catch (_: Exception) {}
             }
@@ -441,9 +426,8 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
     private fun applyStatusBarTint(view: View, tinted: Boolean) {
         if (tinted) {
             val drawable = GradientDrawable().apply {
-                setColor(themeOverlayPalette()[0])
+                setColor(statusBarPrimaryColor())
                 cornerRadius = 3 * resources.displayMetrics.density
-                setStroke(2, statusBarPrimaryColor())
             }
             view.background = drawable
         } else {
@@ -472,7 +456,6 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
 
         // --- Resolution of Colors ---
         val primaryColor = statusBarPrimaryColor()
-        val themePalette = themeOverlayPalette()
         
         // Landscape check
         val currentOrientation = resources.configuration.orientation
@@ -514,16 +497,9 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
                 
                 // Update Color (Debug / dropdown preview)
                 if (config.isVisible || previewing) {
-                    val color = themePalette[index % themePalette.size]
                     val drawable = GradientDrawable().apply {
-                        setColor(color)
-                        cornerRadius = 3 * resources.displayMetrics.density
-                        // Outline every visible strip so its position is obvious while
-                        // adjusting; the strip being edited gets a thicker border.
-                        setStroke(
-                            if (index == config.activeSegmentIndex) 3 else 2,
-                            primaryColor
-                        )
+                        setColor(primaryColor)
+                        cornerRadius = 6 * resources.displayMetrics.density
                     }
                     view.background = drawable
                     view.elevation = 0f
@@ -568,16 +544,9 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
                         if (segment.yOffset == 0) (3 * resources.displayMetrics.density).toInt() else 0
                 
                  if (config.isVisible || previewing) {
-                    val color = themePalette[index % themePalette.size]
                     val drawable = GradientDrawable().apply {
-                        setColor(color)
-                        cornerRadius = 3 * resources.displayMetrics.density
-                        // Outline every visible strip so its position is obvious while
-                        // adjusting; the strip being edited gets a thicker border.
-                        setStroke(
-                            if (index == config.activeSegmentIndex) 3 else 2,
-                            primaryColor
-                        )
+                        setColor(primaryColor)
+                        cornerRadius = 6 * resources.displayMetrics.density
                     }
                     view.background = drawable
                     view.elevation = 0f
@@ -627,11 +596,7 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         val screenW = bounds?.width() ?: dm.widthPixels
         val screenH = bounds?.height() ?: dm.heightPixels
 
-        val accent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            getColor(android.R.color.system_accent1_400)
-        } else {
-            Color.parseColor("#FF6200EE")
-        }
+        val accent = statusBarPrimaryColor()
 
         fun addView(view: BottomEdgeOverlayView, w: Int, h: Int, x: Int, y: Int) {
             val params = WindowManager.LayoutParams(
@@ -2073,10 +2038,6 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         private val fillPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
             style = android.graphics.Paint.Style.FILL
         }
-        private val strokePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-            style = android.graphics.Paint.Style.STROKE
-            strokeWidth = 3f * resources.displayMetrics.density
-        }
 
         private val handler = android.os.Handler(android.os.Looper.getMainLooper())
         private val touchSlop = android.view.ViewConfiguration.get(context).scaledTouchSlop
@@ -2188,21 +2149,10 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
                 return path
             }
 
-            val a = (0.28f * 255).toInt()
             fillPaint.color = android.graphics.Color.argb(
-                a, android.graphics.Color.red(accent), android.graphics.Color.green(accent), android.graphics.Color.blue(accent),
+                255, android.graphics.Color.red(accent), android.graphics.Color.green(accent), android.graphics.Color.blue(accent),
             )
-            strokePaint.color = android.graphics.Color.argb(
-                (0.6f * 255).toInt(), android.graphics.Color.red(accent), android.graphics.Color.green(accent), android.graphics.Color.blue(accent),
-            )
-            // Even border, guaranteed: the fill sits half a stroke width from the view
-            // (screen) edge, and the stroke is placed so its OUTER edge lands exactly on
-            // the fill boundary. The stroke therefore lies entirely on top of the fill
-            // (one uniform tone along the whole border), is never clipped by the view
-            // bounds, and leaves no fill rim outside the border.
-            val sw = strokePaint.strokeWidth
-            canvas.drawPath(buildPath(sw / 2f), fillPaint)
-            canvas.drawPath(buildPath(sw), strokePaint)
+            canvas.drawPath(buildPath(0f), fillPaint)
         }
 
         @SuppressLint("ClickableViewAccessibility")

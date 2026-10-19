@@ -425,7 +425,7 @@
     <string name="home_statusbar_width">Width</string>
     <string name="home_statusbar_height">Height</string>
     <string name="home_statusbar_ypos">Vertical position</string>
-    <string name="trigger_bubble_subtitle">Floating button you can drag anywhere â€” tap to start</string>
+    <string name="trigger_bubble_subtitle">Floating button you can drag anywhere tap to start</string>
     <string name="trigger_double_vol_up_title">Double-tap Volume Up</string>
     <string name="trigger_double_vol_down_title">Double-tap Volume Down</string>
     <string name="trigger_double_power_title">Double-tap Power</string>
