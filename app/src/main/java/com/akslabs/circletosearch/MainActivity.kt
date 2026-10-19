@@ -160,8 +160,8 @@ class MainActivity : ComponentActivity() {
                                                 )
                                                 context.startActivity(intent, options.toBundle())
                                             },
-                                            onOpenSettings = {
-                                                pendingSettingsPage = null
+                                            onOpenSettings = { page ->
+                                                pendingSettingsPage = page
                                                 currentScreen = "settings"
                                             },
                                             wobbleEvent = wobbleTick,

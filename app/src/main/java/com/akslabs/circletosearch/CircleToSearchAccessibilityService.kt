@@ -323,14 +323,24 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         }
     }
 
+    /** Force a rebuild/redraw from the latest saved config (called by the settings UI). */
+    fun refreshOverlays() {
+        if (!::configManager.isInitialized) return
+        updateOverlay()
+        updateBottomEdgeOverlays()
+    }
+
     private fun updateOverlay() {
         val config = configManager.getConfig()
-        
+
         // Keep strips alive while their settings dropdown is open (preview), even
         // when the master switch is off, and tint them so slider adjustments are
         // visible live (normal running strips are fully transparent).
         val previewing = config.previewVisible
-        if (!config.isEnabled && !config.previewVisible) {
+        // "Show overlay" or an open segment preview forces the strips to exist and
+        // tint — including in landscape, so position can be adjusted on-device.
+        val forceShow = config.isVisible || previewing
+        if (!config.isEnabled && !forceShow) {
             overlayViews.forEach { 
                 try { windowManager?.removeView(it) } catch(e: Exception) {} 
             }
@@ -370,7 +380,7 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         
         // Landscape check
         val currentOrientation = resources.configuration.orientation
-        if (currentOrientation == Configuration.ORIENTATION_LANDSCAPE && !config.isEnabledInLandscape) {
+        if (currentOrientation == Configuration.ORIENTATION_LANDSCAPE && !config.isEnabledInLandscape && !forceShow) {
              overlayViews.forEach { 
                 try { windowManager?.removeView(it) } catch(e: Exception) {} 
             }
@@ -411,10 +421,12 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
                     val color = themePalette[index % themePalette.size]
                     val drawable = GradientDrawable().apply {
                         setColor(color)
-                        // Only show solid primary border for the expanded/active overlay
-                        if (index == config.activeSegmentIndex) {
-                            setStroke(3, primaryColor)
-                        }
+                        // Outline every visible strip so its position is obvious while
+                        // adjusting; the strip being edited gets a thicker border.
+                        setStroke(
+                            if (index == config.activeSegmentIndex) 3 else 2,
+                            primaryColor
+                        )
                     }
                     view.background = drawable
                     view.elevation = 0f
@@ -462,10 +474,12 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
                     val color = themePalette[index % themePalette.size]
                     val drawable = GradientDrawable().apply {
                         setColor(color)
-                        // Only show solid primary border for the expanded/active overlay
-                        if (index == config.activeSegmentIndex) {
-                            setStroke(3, primaryColor)
-                        }
+                        // Outline every visible strip so its position is obvious while
+                        // adjusting; the strip being edited gets a thicker border.
+                        setStroke(
+                            if (index == config.activeSegmentIndex) 3 else 2,
+                            primaryColor
+                        )
                     }
                     view.background = drawable
                     view.elevation = 0f

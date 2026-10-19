@@ -163,6 +163,9 @@
     <string name="overlay_setting_landscape_subtitle">Keep overlay active in landscape</string>
     <string name="overlay_setting_show_title">Show Overlay</string>
     <string name="overlay_setting_show_subtitle">Show overlay to adjust position</string>
+    <string name="overlay_a11y_off_title">Accessibility service is off</string>
+    <string name="overlay_a11y_off_subtitle">Overlay strips can\'t appear until the accessibility service is enabled</string>
+    <string name="overlay_a11y_off_enable">Enable</string>
     <string name="section_overlays">Overlays</string>
     <string name="btn_add_overlay">Add Overlay</string>
     <string name="label_no_overlays">No overlays added. Click Add Overlay to start.</string>
@@ -359,7 +362,7 @@
 
     <!-- Settings hierarchy -->
     <string name="settings_cat_triggers_subtitle">Status bar, bubble &amp; hardware buttons</string>
-    <string name="settings_cat_zones">Overlay zones</string>
+    <string name="settings_cat_zones">Custom overlay</string>
     <string name="settings_cat_zones_subtitle">Position, size &amp; gestures</string>
     <string name="settings_cat_search">Search</string>
     <string name="settings_cat_search_subtitle">Lens or Multi-Search launch mode</string>
@@ -384,6 +387,8 @@
     <string name="home_running_title">Circle to search</string>
     <string name="home_running_state">running</string>
     <string name="home_section_more">More</string>
+    <string name="home_custom_overlay">Custom overlay</string>
+    <string name="home_additional_settings">Additional settings</string>
     <string name="home_bottom_edge_title">Bottom edge long-press</string>
     <string name="home_bottom_edge_subtitle">Hold a bottom corner or the centre to search</string>
     <string name="home_corner_left">Left</string>

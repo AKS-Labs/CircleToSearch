@@ -639,8 +639,17 @@ fun WobbleHomeScreen(
                     ) {
                         Column {
                             HomeLinkRow(
+                                icon = Icons.Default.Layers,
+                                title = stringResource(R.string.home_custom_overlay),
+                                subtitle = null,
+                                onClick = {
+                                    if (onOpenSettings != null) onOpenSettings("zones") else openSettingsPage("zones")
+                                },
+                            )
+                            HomeRowDivider()
+                            HomeLinkRow(
                                 icon = Icons.Default.Tune,
-                                title = stringResource(R.string.title_settings),
+                                title = stringResource(R.string.home_additional_settings),
                                 subtitle = null,
                                 onClick = {
                                     if (onOpenSettings != null) onOpenSettings("") else openSettingsPage("")

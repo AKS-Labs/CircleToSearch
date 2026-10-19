@@ -7,6 +7,7 @@ package com.akslabs.circletosearch.ui
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.provider.Settings
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.tween
@@ -39,8 +40,12 @@ import android.os.Build
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import com.akslabs.circletosearch.R
+import com.akslabs.circletosearch.CircleToSearchAccessibilityService
 import com.akslabs.circletosearch.data.*
 import com.akslabs.circletosearch.isAccessibilityServiceEnabled
 import com.akslabs.circletosearch.ui.components.DonateBottomSheet
@@ -92,6 +97,9 @@ private class OverlaySettingsState(context: Context) {
     fun updateConfig(newConfig: OverlayConfig) {
         _config.value = newConfig
         configManager.saveConfig(newConfig)
+        // Direct refresh: don't rely solely on the SharedPreferences listener,
+        // some devices delay it — poke the running service so changes apply live.
+        CircleToSearchAccessibilityService.instance?.refreshOverlays()
     }
 
     private val _bubbleEnabled = mutableStateOf(appPrefs.getBoolean("bubble_enabled", false))
@@ -132,12 +140,16 @@ fun OverlaySettingsScreen(
     val backStack = remember {
         val startPage = settingsPageFromName(initialPage)
         if (startPage != null) {
-            mutableStateListOf<SettingsPage>(SettingsPage.Root, startPage)
+            // Deep link (e.g. "Custom overlay" row): start directly on the target
+            // page — back from it returns home, not to the settings root.
+            mutableStateListOf<SettingsPage>(startPage)
         } else {
             mutableStateListOf<SettingsPage>(SettingsPage.Root)
         }
     }
-    val pop: () -> Unit = { backStack.removeAt(backStack.lastIndex) }
+    val pop: () -> Unit = {
+        if (backStack.size > 1) backStack.removeAt(backStack.lastIndex) else onBack()
+    }
 
     androidx.activity.compose.BackHandler {
         if (backStack.size > 1) pop() else onBack()
@@ -237,34 +249,6 @@ private fun SettingsRootScreen(
     ) {
         Spacer(modifier = Modifier.height(8.dp))
         SettingsGroup {
-            SettingsCategoryRow(
-                icon = Icons.Default.RocketLaunch,
-                title = stringResource(R.string.triggers_card_title),
-                subtitle = stringResource(R.string.settings_cat_triggers_subtitle),
-                onClick = { onNavigate(SettingsPage.Triggers) }
-            )
-            SettingsGroupDivider()
-            SettingsCategoryRow(
-                icon = Icons.Default.Layers,
-                title = stringResource(R.string.settings_cat_zones),
-                subtitle = stringResource(R.string.settings_cat_zones_subtitle),
-                onClick = { onNavigate(SettingsPage.Zones) }
-            )
-            SettingsGroupDivider()
-            SettingsCategoryRow(
-                icon = Icons.Default.Search,
-                title = stringResource(R.string.settings_cat_search),
-                subtitle = stringResource(R.string.settings_cat_search_subtitle),
-                onClick = { onNavigate(SettingsPage.Search) }
-            )
-            SettingsGroupDivider()
-            SettingsCategoryRow(
-                icon = Icons.Default.Tune,
-                title = stringResource(R.string.general),
-                subtitle = stringResource(R.string.settings_cat_general_subtitle),
-                onClick = { onNavigate(SettingsPage.General) }
-            )
-            SettingsGroupDivider()
             SettingsCategoryRow(
                 icon = Icons.Default.Info,
                 title = stringResource(R.string.settings_cat_about),
@@ -385,6 +369,31 @@ private fun ZonesSettingsScreen(
     val config = state.config
     val overlayPalette = rememberOverlayPalette(context)
 
+    // Overlay strips can only render while the accessibility service is running.
+    // Re-check on resume so enabling the service elsewhere updates this screen.
+    var a11yOn by remember { mutableStateOf(isAccessibilityServiceEnabled(context)) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                a11yOn = isAccessibilityServiceEnabled(context)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    // Clear the editing preview when leaving the screen (deep-link back goes
+    // straight home, so no later screen reset can happen).
+    DisposableEffect(Unit) {
+        onDispose {
+            val cfg = state.config
+            if (cfg.previewVisible || cfg.activeSegmentIndex != -1) {
+                state.updateConfig(cfg.copy(previewVisible = false, activeSegmentIndex = -1))
+            }
+        }
+    }
+
     SettingsDetailScaffold(
         title = stringResource(R.string.settings_cat_zones),
         onBack = onBack,
@@ -395,6 +404,46 @@ private fun ZonesSettingsScreen(
         }
     ) {
         Spacer(modifier = Modifier.height(8.dp))
+
+        if (!a11yOn) {
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.errorContainer,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.Warning,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.overlay_a11y_off_title),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                        Text(
+                            text = stringResource(R.string.overlay_a11y_off_subtitle),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    TextButton(onClick = {
+                        context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                    }) {
+                        Text(stringResource(R.string.overlay_a11y_off_enable))
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+        }
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -428,7 +477,9 @@ private fun ZonesSettingsScreen(
                 isExpanded = config.activeSegmentIndex == index,
                 onExpandToggle = {
                     val nextIndex = if (config.activeSegmentIndex == index) -1 else index
-                    state.updateConfig(config.copy(activeSegmentIndex = nextIndex))
+                    // While a segment editor is open, force the real overlay strips
+                    // visible so position/size changes can be seen live.
+                    state.updateConfig(config.copy(activeSegmentIndex = nextIndex, previewVisible = nextIndex != -1))
                 },
                 onUpdate = { updatedSegment ->
                     val newSegments = config.segments.toMutableList()
@@ -441,7 +492,7 @@ private fun ZonesSettingsScreen(
                     val nextActiveIndex = if (config.activeSegmentIndex == index) -1
                     else if (config.activeSegmentIndex > index) config.activeSegmentIndex - 1
                     else config.activeSegmentIndex
-                    state.updateConfig(config.copy(segments = newSegments, activeSegmentIndex = nextActiveIndex))
+                    state.updateConfig(config.copy(segments = newSegments, activeSegmentIndex = nextActiveIndex, previewVisible = nextActiveIndex != -1))
                 }
             )
             Spacer(modifier = Modifier.height(16.dp))
