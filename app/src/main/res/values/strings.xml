@@ -74,8 +74,6 @@
     <!-- Content Descriptions -->
     <string name="cd_granted">Granted</string>
     <string name="cd_active">Active</string>
-    <string name="cd_collapse">Collapse</string>
-    <string name="cd_expand">Expand</string>
     <string name="cd_overlay_settings">Overlay Settings</string>
     <string name="cd_screenshot">Screenshot</string>
     <string name="cd_close">Close</string>
@@ -280,22 +278,8 @@
     <string name="tile_label">Circle to Search</string>
 
     <!-- Support / Donate Dialog -->
-    <string name="support_title">Help Keep this Project \n Alive! \u2764\uFE0F</string>
-    <string name="support_body">Please consider donating to this project Your\n support helps keep this project alive and \n enable us to add amazing \nnew features.</string>
-    <string name="support_planned_features">Planned Features:</string>
-    <string name="feature_1">Self-hosted image upload (remove catbox/litterbox dependency)</string>
-    <string name="feature_2">More triggers: volume button, power button, shake gesture etc.</string>
-    <string name="feature_3">Add more actions to trigger with overlay</string>
-    <string name="feature_4">Offline on-device translation</string>
-    <string name="feature_5">Improved text detection accuracy</string>
-    <string name="feature_6">More Search engines support SearXNG, DuckDuckGo, Brave Search</string>
-    <string name="feature_7">Add more QS tiles to directly launch copy text, QR code, SmartScan etc.</string>
-    <string name="feature_8">Multi-language support</string>
-    <string name="feature_9">More Overlay actions</string>
-    <string name="feature_10">Long-press image to download or share</string>
-    <string name="feature_11">Image result context menu (reverse search, save, open etc.)</string>
-    <string name="feature_12">Material You dynamic theming improvements</string>
-    <string name="feature_13">Floating bubble customization (size, opacity, position)</string>
+    <string name="support_title">Help Keep This Project Alive! \u2764\uFE0F</string>
+    <string name="support_body">If you like CircleToSearch and want to support its development, please consider donating. Your support will help me dedicate more time and resources to this project and help make it even better. Thank you for your support!</string>
 
     <!-- Friendly Messages -->
     <string name="friendly_msg_1">Ready when you are, boss. What\'s the mission today? &#x1F575;&#xFE0F;&#x200D;&#x2642;&#xFE0F;&#x1F602;</string>

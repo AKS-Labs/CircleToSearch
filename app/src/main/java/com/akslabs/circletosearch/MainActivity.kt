@@ -34,7 +34,6 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
@@ -288,18 +287,7 @@ fun SetupScreen(onSettingsClick: () -> Unit, onBack: (() -> Unit)? = null) {
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    val showSupportDialog = remember { mutableStateOf(!prefs.getBoolean("support_dialog_dismissed", false)) }
-    val dontShowAgain = remember { mutableStateOf(false) }
-    
-    // Manage Support Dialog Show Count
-    val showCount = remember { prefs.getInt("support_dialog_show_count", 0) }
-    LaunchedEffect(showSupportDialog.value) {
-        if (showSupportDialog.value) {
-            prefs.edit().putInt("support_dialog_show_count", showCount + 1).apply()
-        }
-    }
-    
-    var showDonateSheet by remember { mutableStateOf(false) }
+    val showDonateSheet = remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState()
     val scope = rememberCoroutineScope()
     
@@ -674,7 +662,7 @@ fun SetupScreen(onSettingsClick: () -> Unit, onBack: (() -> Unit)? = null) {
             // 5. Footer
             SocialLinksRow(
                 context = context,
-                onDonateClick = { showDonateSheet = true }
+                onDonateClick = { showDonateSheet.value = true }
             )
             Spacer(modifier = Modifier.height(20.dp))
             Surface(
@@ -699,40 +687,7 @@ fun SetupScreen(onSettingsClick: () -> Unit, onBack: (() -> Unit)? = null) {
     }
 
     // Support Dialog & Sheet
-    if (showSupportDialog.value) {
-        SupportDialog(
-            showCount = showCount + 1,
-            onDismiss = {
-                showSupportDialog.value = false
-                if (dontShowAgain.value) {
-                    prefs.edit().putBoolean("support_dialog_dismissed", true).apply()
-                }
-            },
-            onDonate = {
-                showDonateSheet = true
-                showSupportDialog.value = false
-                if (dontShowAgain.value) {
-                    prefs.edit().putBoolean("support_dialog_dismissed", true).apply()
-                }
-            },
-            dontShowAgain = dontShowAgain
-        )
-    }
-    
-    if (showDonateSheet) {
-        DonateBottomSheet(
-            onDismiss = { showDonateSheet = false },
-            onDonateOptionSelected = { url ->
-                try {
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                    context.startActivity(intent)
-                } catch (e: Exception) {
-                    android.widget.Toast.makeText(context, context.getString(R.string.toast_could_not_open_link), android.widget.Toast.LENGTH_SHORT).show()
-                }
-                showDonateSheet = false
-            }
-        )
-    }
+    SupportDialogHost(showDonateSheet = showDonateSheet)
 
     if (showAccessibilityDisclosure) {
         AccessibilityDisclosureDialog(
@@ -894,13 +849,14 @@ fun SupportDialog(
                             text = stringResource(R.string.support_title),
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.ExtraBold,
-                            textAlign = TextAlign.Center
+                            textAlign = TextAlign.Center,
+                            lineHeight = 28.sp,
+                            modifier = Modifier.fillMaxWidth()
                         )
                         Spacer(modifier = Modifier.height(16.dp))
                     }
 
                     // ── Scrollable body ────────────────────────────────────────
-                    var isExpanded by remember { mutableStateOf(false) }
                     Column(
                         modifier = Modifier
                             .weight(1f, fill = false)
@@ -911,73 +867,11 @@ fun SupportDialog(
                         Text(
                             text = stringResource(R.string.support_body),
                             style = MaterialTheme.typography.bodyLarge,
-                            lineHeight = 22.sp,
+                            lineHeight = 24.sp,
                             textAlign = TextAlign.Center,
-                            fontWeight = FontWeight.Medium
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.fillMaxWidth()
                         )
-
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
-                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                                .padding(16.dp)
-                                .animateContentSize()
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth().clickable { isExpanded = !isExpanded },
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(
-                                    text = stringResource(R.string.support_planned_features),
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                                TextButton(onClick = { isExpanded = !isExpanded }, contentPadding = PaddingValues(0.dp)) {
-                                    Icon(
-                                        imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                                        contentDescription = stringResource(if (isExpanded) R.string.cd_collapse else R.string.cd_expand),
-                                        tint = MaterialTheme.colorScheme.primary
-                                    )
-                                }
-                            }
-
-                            val allFeatures = listOf(
-                                stringResource(R.string.feature_1),
-                                stringResource(R.string.feature_2),
-                                stringResource(R.string.feature_3),
-                                stringResource(R.string.feature_4),
-                                stringResource(R.string.feature_5),
-                                stringResource(R.string.feature_6),
-                                stringResource(R.string.feature_7),
-                                stringResource(R.string.feature_8),
-                                stringResource(R.string.feature_9),
-                                stringResource(R.string.feature_10),
-                                stringResource(R.string.feature_11),
-                                stringResource(R.string.feature_12),
-                                stringResource(R.string.feature_13),
-                            )
-
-                            val features = if (isExpanded) allFeatures else allFeatures.take(5)
-
-                            Spacer(modifier = Modifier.height(12.dp))
-                            features.forEach { feature ->
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.padding(vertical = 4.dp)
-                                ) {
-                                    Icon(
-                                        Icons.Default.Check, null,
-                                        modifier = Modifier.size(16.dp),
-                                        tint = MaterialTheme.colorScheme.primary
-                                    )
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    Text(text = feature, style = MaterialTheme.typography.bodyMedium)
-                                }
-                            }
-                        }
 
                         if (showCount >= 7) {
                             Row(
@@ -1025,6 +919,56 @@ fun SupportDialog(
                 }
             }
         }
+    }
+}
+
+@Composable
+fun SupportDialogHost(showDonateSheet: MutableState<Boolean>) {
+    val context = LocalContext.current
+    val prefs = context.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
+    val showSupportDialog = remember { mutableStateOf(!prefs.getBoolean("support_dialog_dismissed", false)) }
+    val dontShowAgain = remember { mutableStateOf(false) }
+    val showCount = remember { prefs.getInt("support_dialog_show_count", 0) }
+
+    LaunchedEffect(showSupportDialog.value) {
+        if (showSupportDialog.value) {
+            prefs.edit().putInt("support_dialog_show_count", showCount + 1).apply()
+        }
+    }
+
+    if (showSupportDialog.value) {
+        SupportDialog(
+            showCount = showCount + 1,
+            onDismiss = {
+                showSupportDialog.value = false
+                if (dontShowAgain.value) {
+                    prefs.edit().putBoolean("support_dialog_dismissed", true).apply()
+                }
+            },
+            onDonate = {
+                showDonateSheet.value = true
+                showSupportDialog.value = false
+                if (dontShowAgain.value) {
+                    prefs.edit().putBoolean("support_dialog_dismissed", true).apply()
+                }
+            },
+            dontShowAgain = dontShowAgain
+        )
+    }
+
+    if (showDonateSheet.value) {
+        DonateBottomSheet(
+            onDismiss = { showDonateSheet.value = false },
+            onDonateOptionSelected = { url ->
+                try {
+                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                    context.startActivity(intent)
+                } catch (e: Exception) {
+                    android.widget.Toast.makeText(context, context.getString(R.string.toast_could_not_open_link), android.widget.Toast.LENGTH_SHORT).show()
+                }
+                showDonateSheet.value = false
+            }
+        )
     }
 }
 

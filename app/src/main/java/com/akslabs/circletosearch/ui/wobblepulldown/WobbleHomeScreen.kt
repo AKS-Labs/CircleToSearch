@@ -115,6 +115,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.akslabs.circletosearch.MainActivity
 import com.akslabs.circletosearch.R
+import com.akslabs.circletosearch.SupportDialogHost
 import com.akslabs.circletosearch.data.ActionType
 import com.akslabs.circletosearch.data.BottomEdgeConfig
 import com.akslabs.circletosearch.data.GestureType
@@ -687,6 +688,12 @@ fun WobbleHomeScreen(
             onToggle = onHwToggle,
             onDismiss = { showHwSheet = false },
         )
+    }
+
+    val grantedOnEntry = remember { a11yGranted || assistantGranted }
+    if (grantedOnEntry) {
+        val showDonateSheet = remember { mutableStateOf(false) }
+        SupportDialogHost(showDonateSheet = showDonateSheet)
     }
 }
 
