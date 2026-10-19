@@ -63,11 +63,9 @@
     <string name="label_set_default_assistant_subtitle">Tap to set it up and see how your device launches assistants.</string>
     <string name="section_customization">CUSTOMIZATION</string>
     <string name="info_lens_needs_google">Lens needs Google App Installed. But Degoogled friends can stick with the versatile Multi-Search Engine mode.</string>
-    <string name="label_from_akslabs">From AKS-Labs With \u2764\uFE0F</string>
     <string name="toast_could_not_open_link">Could not open link</string>
     <string name="toast_accessibility_settings_error">Could not open Accessibility Settings</string>
     <string name="label_floating_bubble">Floating Bubble</string>
-    <string name="label_floating_bubble_subtitle">Show a floating button triggers search</string>
     <string name="label_dont_show_again">Don\'t show this again</string>
     <string name="btn_donate">Donate</string>
 
@@ -358,9 +356,6 @@
     <string name="section_search">SEARCH</string>
     <string name="section_app">APP</string>
     <string name="triggers_card_title">Triggers</string>
-    <string name="triggers_card_subtitle_none">No triggers configured yet â€” tap to choose how to launch</string>
-    <string name="triggers_card_subtitle_list">%1$s</string>
-    <string name="triggers_more">+%1$d more</string>
 
     <!-- Settings hierarchy -->
     <string name="settings_cat_triggers_subtitle">Status bar, bubble &amp; hardware buttons</string>
@@ -377,8 +372,6 @@
     <string name="about_source_code">Source code</string>
     <string name="about_source_subtitle">github.com/aks-labs</string>
     <string name="about_donate_subtitle">Support ongoing development</string>
-    <string name="home_setup_title">Setup &amp; permissions</string>
-    <string name="home_setup_subtitle">Review permissions and launch triggers</string>
     <string name="wizard_title">Grant permissions to get started</string>
     <string name="wizard_hint">Grant any one to continue</string>
     <string name="wizard_a11y_title">Accessibility</string>

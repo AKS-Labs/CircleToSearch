@@ -45,9 +45,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Assistant
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.PowerSettingsNew
-import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.TouchApp
-import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
@@ -125,7 +123,6 @@ import com.akslabs.circletosearch.data.OverlaySegment
 import com.akslabs.circletosearch.ui.SettingsSectionHeader
 import com.akslabs.circletosearch.ui.components.UnifiedSearchMethodSelector
 import com.akslabs.circletosearch.utils.UIPreferences
-import dev.davidv.translator.MainActivity as TranslatorMainActivity
 import kotlinx.coroutines.delay
 
 private const val BOTTOM_EDGE_MARKER = "cts_bottom_edge"
@@ -165,7 +162,6 @@ fun WobbleHomeScreen(
     modifier: Modifier = Modifier,
     wobbleEvent: Int = 0,
     contentPadding: PaddingValues = PaddingValues(0.dp),
-    onOpenSetup: () -> Unit = {},
     onOpenSettings: ((String) -> Unit)? = null,
 ) {
     val context = LocalContext.current
@@ -642,30 +638,6 @@ fun WobbleHomeScreen(
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Column {
-                            HomeLinkRow(
-                                icon = Icons.Default.Security,
-                                title = stringResource(R.string.home_setup_title),
-                                subtitle = stringResource(R.string.home_setup_subtitle),
-                                onClick = {
-                                    WobbleHaptics.performUIHaptic(view)
-                                    onOpenSetup()
-                                },
-                            )
-                            HomeRowDivider()
-                            HomeLinkRow(
-                                icon = Icons.Default.Translate,
-                                title = stringResource(R.string.label_translator_title),
-                                subtitle = stringResource(R.string.label_translator_subtitle),
-                                onClick = {
-                                    WobbleHaptics.performUIHaptic(view)
-                                    runCatching {
-                                        context.startActivity(
-                                            Intent(context, TranslatorMainActivity::class.java),
-                                        )
-                                    }
-                                },
-                            )
-                            HomeRowDivider()
                             HomeLinkRow(
                                 icon = Icons.Default.Tune,
                                 title = stringResource(R.string.title_settings),

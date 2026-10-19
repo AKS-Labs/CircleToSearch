@@ -27,7 +27,6 @@ import android.os.Bundle
 import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -42,46 +41,28 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.systemBars
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.DialogProperties
 import com.akslabs.circletosearch.onboarding.PixelCircleSearchOnboardingScreen
-import com.akslabs.circletosearch.ui.components.PrivacyDialog
 import com.akslabs.circletosearch.ui.theme.CircleToSearchTheme
-import com.akslabs.circletosearch.ui.theme.M3ExpressiveShapes
-import com.akslabs.circletosearch.ui.theme.m3ExpressivePress
 import com.akslabs.circletosearch.ui.wobblepulldown.WobbleDeviceInfoActivity
 import com.akslabs.circletosearch.ui.wobblepulldown.WobbleHomeScreen
 import com.akslabs.circletosearch.ui.wobblepulldown.isA11yGranted
 import com.akslabs.circletosearch.ui.wobblepulldown.isAssistantGranted
-import com.akslabs.circletosearch.utils.PrivacyPreferences
-import dev.davidv.translator.MainActivity as TranslatorMainActivity
 import com.akslabs.circletosearch.ui.components.DonateBottomSheet
-import com.akslabs.circletosearch.ui.components.AccessibilityDisclosureDialog
-import com.akslabs.circletosearch.ui.components.UnifiedSearchMethodSelector
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -139,13 +120,6 @@ class MainActivity : ComponentActivity() {
                                         initialPage = pendingSettingsPage,
                                     )
                                 }
-                                "setup" -> SetupScreen(
-                                    onSettingsClick = {
-                                        pendingSettingsPage = null
-                                        currentScreen = "settings"
-                                    },
-                                    onBack = { currentScreen = "home" },
-                                )
                                 else -> {
                                     var wobbleTick by remember { mutableStateOf(0) }
                                     var wizardBackdrop by remember { mutableStateOf(false) }
@@ -186,7 +160,6 @@ class MainActivity : ComponentActivity() {
                                                 )
                                                 context.startActivity(intent, options.toBundle())
                                             },
-                                            onOpenSetup = { currentScreen = "setup" },
                                             onOpenSettings = {
                                                 pendingSettingsPage = null
                                                 currentScreen = "settings"
@@ -209,9 +182,6 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                         }
-                        BackHandler(enabled = currentScreen == "setup") {
-                            currentScreen = "home"
-                        }
                     }
                 }
             }
@@ -229,481 +199,6 @@ class MainActivity : ComponentActivity() {
         const val EXTRA_SETTINGS_PAGE = "settings_page"
         /** Dev/testing: re-show the onboarding flow without clearing app data. */
         const val EXTRA_SHOW_ONBOARDING = "show_onboarding"
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun SetupScreen(onSettingsClick: () -> Unit, onBack: (() -> Unit)? = null) {
-    val context = LocalContext.current
-    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
-    val prefs = context.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
-    
-    // Privacy Dialog State
-    val privacyPreferences = remember { PrivacyPreferences(context) }
-    var showPrivacyDialog by remember { mutableStateOf(!privacyPreferences.hasAcceptedPrivacyPolicy()) }
-    
-    // Permission States
-    var isAccessibilityEnabled by remember { mutableStateOf(isAccessibilityServiceEnabled(context)) }
-    var isDefaultAssistant by remember { mutableStateOf(isDefaultAssistant(context)) }
-    var showAccessibilityDisclosure by remember { mutableStateOf(false) }
-
-    // Summary of enabled triggers for the home card (refreshed on resume)
-    var triggerSummary by remember { mutableStateOf("") }
-    fun refreshTriggerSummary() {
-        val names = mutableListOf<String>()
-        val overlayConfig = runCatching {
-            com.akslabs.circletosearch.data.OverlayConfigurationManager(context).getConfig()
-        }.getOrNull()
-        if (overlayConfig?.isEnabled == true) names.add(context.getString(R.string.trigger_name_statusbar))
-        if (prefs.getBoolean("bubble_enabled", false)) names.add(context.getString(R.string.trigger_name_bubble))
-        if (prefs.getBoolean("trigger_double_vol_up", false)) names.add(context.getString(R.string.trigger_double_vol_up_title))
-        if (prefs.getBoolean("trigger_double_vol_down", false)) names.add(context.getString(R.string.trigger_double_vol_down_title))
-        if (prefs.getBoolean("trigger_double_power", false)) names.add(context.getString(R.string.trigger_double_power_title))
-        if (prefs.getBoolean("trigger_power_vol_up", false)) names.add(context.getString(R.string.trigger_power_vol_up_title))
-        if (prefs.getBoolean("trigger_power_vol_down", false)) names.add(context.getString(R.string.trigger_power_vol_down_title))
-        if (prefs.getBoolean("trigger_vol_up_down", false)) names.add(context.getString(R.string.trigger_vol_up_down_title))
-        if (isDefaultAssistant(context)) names.add(context.getString(R.string.trigger_name_assistant))
-        val shown = names.take(3)
-        val hidden = names.size - shown.size
-        triggerSummary = when {
-            names.isEmpty() -> context.getString(R.string.triggers_card_subtitle_none)
-            hidden > 0 -> shown.joinToString(" \u00B7 ") + " \u00B7 " + context.getString(R.string.triggers_more, hidden)
-            else -> shown.joinToString(" \u00B7 ")
-        }
-    }
-    LaunchedEffect(Unit) { refreshTriggerSummary() }
-
-    // Check permissions on Resume
-    DisposableEffect(lifecycleOwner) {
-        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
-            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
-                isAccessibilityEnabled = isAccessibilityServiceEnabled(context)
-                isDefaultAssistant = isDefaultAssistant(context)
-                refreshTriggerSummary()
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
-
-    val showDonateSheet = remember { mutableStateOf(false) }
-    val sheetState = rememberModalBottomSheetState()
-    val scope = rememberCoroutineScope()
-    
-    // Show Privacy Dialog First - User must accept before seeing main UI
-    if (showPrivacyDialog) {
-        PrivacyDialog(
-            onAccept = {
-                privacyPreferences.setPrivacyAccepted()
-                showPrivacyDialog = false
-            }
-        )
-        return // Don't show main UI until accepted
-    }
-
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            // App icon + title on the left, settings gear on the right
-            TopAppBar(
-                navigationIcon = {
-                    if (onBack != null) {
-                        IconButton(onClick = onBack) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = stringResource(R.string.cd_back),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                },
-                title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        val launcherIcon = remember {
-                            val drawable = context.getDrawable(R.mipmap.ic_launcher)
-                            requireNotNull(drawable) { "ic_launcher drawable missing" }
-                            val w = drawable.intrinsicWidth.coerceAtLeast(1)
-                            val h = drawable.intrinsicHeight.coerceAtLeast(1)
-                            val bitmap = android.graphics.Bitmap.createBitmap(
-                                w, h, android.graphics.Bitmap.Config.ARGB_8888
-                            )
-                            drawable.setBounds(0, 0, w, h)
-                            drawable.draw(android.graphics.Canvas(bitmap))
-                            bitmap.asImageBitmap()
-                        }
-                        Icon(
-                            bitmap = launcherIcon,
-                            contentDescription = stringResource(R.string.cd_app_icon),
-                            tint = Color.Unspecified,
-                            modifier = Modifier
-                                .size(34.dp)
-                                .clip(androidx.compose.foundation.shape.RoundedCornerShape(9.dp))
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(
-                            text = stringResource(R.string.header_title),
-                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                            color = MaterialTheme.colorScheme.onBackground
-                        )
-                    }
-                },
-                actions = {
-                    IconButton(onClick = onSettingsClick) {
-                        Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = stringResource(R.string.cd_overlay_settings),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    titleContentColor = MaterialTheme.colorScheme.onBackground,
-                    actionIconContentColor = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            )
-        }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Surface(
-                shape = M3ExpressiveShapes.SlantedPill,
-                color = (if (isAccessibilityEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error).copy(alpha = 0.12f),
-                modifier = Modifier.align(Alignment.Start)
-            ) {
-                Text(
-                    text = stringResource(R.string.label_required),
-                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                    color = if (isAccessibilityEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
-                )
-            }
-            Spacer(modifier = Modifier.height(10.dp))
-            
-            if (isAccessibilityEnabled) {
-                Card(
-                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
-                    ),
-                    shape = M3ExpressiveShapes.AsymmetricCard,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier.padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Surface(
-                            shape = M3ExpressiveShapes.Clover4,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(48.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Default.CheckCircle,
-                                    contentDescription = stringResource(R.string.cd_granted),
-                                    tint = MaterialTheme.colorScheme.onPrimary,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Column {
-                            Text(
-                                text = stringResource(R.string.label_accessibility_active),
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                            Text(
-                                text = stringResource(R.string.label_accessibility_active_subtitle),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
-                            )
-                        }
-                    }
-                }
-            } else {
-                Card(
-                    onClick = {
-                        showAccessibilityDisclosure = true
-                    },
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.errorContainer
-                    ),
-                    shape = M3ExpressiveShapes.AsymmetricCard,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .m3ExpressivePress()
-                ) {
-                    Row(
-                        modifier = Modifier.padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Surface(
-                            shape = M3ExpressiveShapes.Clover4,
-                            color = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(48.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Default.Accessibility,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(24.dp),
-                                    tint = MaterialTheme.colorScheme.onError
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Column {
-                            Text(
-                                text = stringResource(R.string.label_enable_accessibility),
-                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                color = MaterialTheme.colorScheme.onErrorContainer
-                            )
-                             Text(
-                                text = stringResource(R.string.label_enable_accessibility_subtitle),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f)
-                            )
-                        }
-                    }
-                }
-            }
-            
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Surface(
-                shape = M3ExpressiveShapes.SlantedPill,
-                color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.12f),
-                modifier = Modifier.align(Alignment.Start)
-            ) {
-                Text(
-                    text = stringResource(R.string.label_optional_assistant),
-                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                    color = MaterialTheme.colorScheme.secondary,
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
-                )
-            }
-            Spacer(modifier = Modifier.height(10.dp))
-
-            if (isDefaultAssistant) {
-                Card(
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f)
-                    ),
-                    shape = M3ExpressiveShapes.AsymmetricCard,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier.padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Surface(
-                            shape = M3ExpressiveShapes.Clover4,
-                            color = MaterialTheme.colorScheme.secondary,
-                            modifier = Modifier.size(48.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Default.CheckCircle,
-                                    contentDescription = stringResource(R.string.cd_active),
-                                    tint = MaterialTheme.colorScheme.onSecondary,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.width(16.dp))
-                         Text(
-                            text = stringResource(R.string.label_default_assistant_set),
-                            style = MaterialTheme.typography.titleMedium,
-                             color = MaterialTheme.colorScheme.onSecondaryContainer
-                        )
-                    }
-                }
-            } else {
-                Card(
-                    onClick = {
-                        val intent = Intent(Settings.ACTION_VOICE_INPUT_SETTINGS)
-                        context.startActivity(intent)
-                    },
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer
-                    ),
-                    shape = M3ExpressiveShapes.AsymmetricCard,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .m3ExpressivePress()
-                ) {
-                    Row(
-                        modifier = Modifier.padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Surface(
-                            shape = M3ExpressiveShapes.Clover4,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(48.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    imageVector = Icons.Default.TouchApp,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(24.dp),
-                                    tint = MaterialTheme.colorScheme.onPrimary
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = stringResource(R.string.label_set_default_assistant),
-                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                            Text(
-                                text = stringResource(R.string.label_set_default_assistant_subtitle),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
-                            )
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Surface(
-                shape = M3ExpressiveShapes.SlantedPill,
-                color = MaterialTheme.colorScheme.secondary.copy(alpha = 0.12f),
-                modifier = Modifier.align(Alignment.Start)
-            ) {
-                Text(
-                    text = stringResource(R.string.label_triggers),
-                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-                    color = MaterialTheme.colorScheme.secondary,
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
-                )
-            }
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // Quick glance at what's configured — tap to manage all triggers
-            Card(
-                onClick = onSettingsClick,
-                shape = M3ExpressiveShapes.AsymmetricCard,
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .m3ExpressivePress()
-            ) {
-                Row(
-                    modifier = Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Surface(
-                        shape = M3ExpressiveShapes.Clover4,
-                        color = MaterialTheme.colorScheme.tertiaryContainer,
-                        modifier = Modifier.size(48.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = Icons.Default.SettingsSuggest,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onTertiaryContainer,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = stringResource(R.string.triggers_card_title),
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = triggerSummary,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 2,
-                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                        )
-                    }
-                    Icon(
-                        Icons.Default.KeyboardArrowRight,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-//            Spacer(modifier = Modifier.height(25.dp))
-//
-//            // Privacy Note
-//            Text(
-//                text = "That’s it. No more permissions.\n We’re not trying to adopt your phone.",
-//                style = MaterialTheme.typography.bodySmall,
-//                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-//                textAlign = TextAlign.Center
-//            )
-
-            Spacer(modifier = Modifier.height(22.dp))
-
-
-            // 5. Footer
-            SocialLinksRow(
-                context = context,
-                onDonateClick = { showDonateSheet.value = true }
-            )
-            Spacer(modifier = Modifier.height(20.dp))
-            Surface(
-                shape = M3ExpressiveShapes.SlantedPill,
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
-                modifier = Modifier.m3ExpressivePress(onClick = {
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/aks-labs"))
-                    context.startActivity(intent)
-                })
-            ) {
-                Text(
-                    text = stringResource(R.string.label_from_akslabs),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
-                    textAlign = TextAlign.Center,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp)
-                )
-            }
-            Spacer(modifier = Modifier.height(2.dp))
-        }
-    }
-
-    // Support Dialog & Sheet
-    SupportDialogHost(showDonateSheet = showDonateSheet)
-
-    if (showAccessibilityDisclosure) {
-        AccessibilityDisclosureDialog(
-            onAccept = {
-                showAccessibilityDisclosure = false
-                try {
-                    val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
-                    context.startActivity(intent)
-                } catch (e: Exception) {
-                    android.widget.Toast.makeText(context, context.getString(R.string.toast_accessibility_settings_error), android.widget.Toast.LENGTH_LONG).show()
-                }
-            },
-            onDismiss = {
-                showAccessibilityDisclosure = false
-            }
-        )
     }
 }
 
@@ -740,64 +235,6 @@ fun isDefaultAssistant(context: android.content.Context): Boolean {
     
     // Check if our VoiceInteractionService is the one currently set as default
     return assistant == myComponentString
-}
-
-// ... SocialLinksRow, SupportDialog, BubbleSwitch same as before ...
-@Composable
-fun SocialLinksRow(
-    context: android.content.Context,
-    onDonateClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        IconButton(
-            onClick = {
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/aks-labs"))
-                context.startActivity(intent)
-            }, 
-            colors = IconButtonDefaults.filledTonalIconButtonColors(),
-            modifier = Modifier.padding(horizontal = 8.dp)
-        ) {
-            Icon(
-                painter = painterResource(id = com.akslabs.circletosearch.R.drawable.github),
-                contentDescription = stringResource(R.string.cd_github),
-                tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                modifier = Modifier.padding(8.dp)
-            )
-        }
-        
-        IconButton(
-            onClick = onDonateClick, 
-            colors = IconButtonDefaults.filledTonalIconButtonColors(),
-            modifier = Modifier.padding(horizontal = 8.dp)
-        ) {
-            Icon(
-                painter = painterResource(id = com.akslabs.circletosearch.R.drawable.donation),
-                contentDescription = stringResource(R.string.cd_donate),
-                tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                modifier = Modifier.padding(8.dp)
-            )
-        }
-        
-        IconButton(
-            onClick = {
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/akslabs"))
-                context.startActivity(intent)
-            }, 
-            colors = IconButtonDefaults.filledTonalIconButtonColors(),
-            modifier = Modifier.padding(horizontal = 8.dp)
-        ) {
-            Icon(
-                painter = painterResource(id = com.akslabs.circletosearch.R.drawable.telegram),
-                contentDescription = stringResource(R.string.cd_telegram),
-                tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                modifier = Modifier.padding(8.dp).size(23.dp)
-            )
-        }
-    }
 }
 
 @Composable
@@ -969,60 +406,6 @@ fun SupportDialogHost(showDonateSheet: MutableState<Boolean>) {
                 showDonateSheet.value = false
             }
         )
-    }
-}
-
-@Composable
-fun BubbleSwitch(context: android.content.Context) {
-    val prefs = context.getSharedPreferences("app_prefs", android.content.Context.MODE_PRIVATE)
-    val isBubbleEnabled = remember { mutableStateOf(prefs.getBoolean("bubble_enabled", false)) }
-
-    Card(
-        shape = M3ExpressiveShapes.AsymmetricCard,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
-        ),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Surface(
-                shape = M3ExpressiveShapes.Clover4,
-                color = MaterialTheme.colorScheme.tertiaryContainer,
-                modifier = Modifier.size(48.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.Default.TouchApp,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onTertiaryContainer,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.width(16.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = stringResource(R.string.label_floating_bubble),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    text = stringResource(R.string.label_floating_bubble_subtitle),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Switch(
-                checked = isBubbleEnabled.value,
-                onCheckedChange = { enabled ->
-                    isBubbleEnabled.value = enabled
-                    prefs.edit().putBoolean("bubble_enabled", enabled).apply()
-                }
-            )
-        }
     }
 }
 
