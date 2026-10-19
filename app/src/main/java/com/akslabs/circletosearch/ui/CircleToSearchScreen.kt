@@ -149,6 +149,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.asImageBitmap
@@ -689,6 +690,22 @@ fun CircleToSearchScreen(
 
     // Drawing State
     val currentPathPoints = remember { mutableStateListOf<Offset>() }
+    // Glow is motion-bound: it stays lit while the finger moves, then on pause
+    // drains away starting from the TAIL (oldest glow) toward the fingertip —
+    // each tail segment starts dying first, every newer segment 60ms later, so
+    // the glow visibly recedes instead of vanishing all at once.
+    var lastPathMoveAt by remember { mutableStateOf(0L) }
+    var glowPauseMs by remember { mutableStateOf(0L) }
+    LaunchedEffect(currentPathPoints.isNotEmpty()) {
+        if (currentPathPoints.isNotEmpty()) {
+            glowPauseMs = 0L
+            while (currentPathPoints.isNotEmpty()) {
+                val elapsed = android.os.SystemClock.uptimeMillis() - lastPathMoveAt
+                glowPauseMs = if (elapsed <= 150L) 0L else elapsed - 150L
+                delay(32L)
+            }
+        }
+    }
     
     // Selection State
     var selectedBitmap by remember { mutableStateOf<Bitmap?>(null) }
@@ -740,6 +757,8 @@ fun CircleToSearchScreen(
         // Clear previous state if starting new draw
         currentPathPoints.clear()
         currentPathPoints.add(offset)
+        lastPathMoveAt = android.os.SystemClock.uptimeMillis()
+        glowPauseMs = 0L
         selectionRect = null
         scope.launch { selectionAnim.snapTo(0f) }
         // Text selection and drawing are exclusive from the first moment of the gesture:
@@ -764,6 +783,8 @@ fun CircleToSearchScreen(
                 selectionRect = newRect
             }
         } else {
+            // Movement keeps the glow lit, even below the decimation threshold.
+            lastPathMoveAt = android.os.SystemClock.uptimeMillis()
             // Thin dense pointer samples (~2.5px): Catmull-Rom smoothing in the
             // canvas fills the gaps, so this only cuts jitter without hurting shapes.
             val last = currentPathPoints.lastOrNull()
@@ -1600,45 +1621,149 @@ fun CircleToSearchScreen(
             }
 
             // 3. Drawing Canvas (Interactive Layer)
-            if (!isTranslatorMode) {                Canvas(
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    // Draw current path (Real-time): smoothed curve + layered neon
-                    // glow. This canvas is a sibling composed AFTER the screenshot
-                    // Box (which holds the dim tint), so the dim can only darken the
-                    // screenshot underneath — the stroke itself always renders at
-                    // full vibrancy on top.
-                    if (currentPathPoints.size > 1) {
-                        val path = buildSmoothPath(currentPathPoints)
-                        val strokeCap = StrokeCap.Round
-                        val strokeJoin = StrokeJoin.Round
-                        // Gradient anchored to the full canvas (not the path's
-                        // bounding box), so colors stay stable while drawing
-                        // instead of "swimming" with the growing path.
+            if (!isTranslatorMode) {
+                // Neon glow layer: real gaussian blur (API 31+) turns strong
+                // Google-color strokes into a soft cloud that hugs the line.
+                // Composed BELOW the sharp canvas, so the white line drawn later
+                // covers the glow's interior — color only shows around the edges.
+                if (currentPathPoints.size > 1 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    Canvas(
+                        modifier = Modifier.fillMaxSize().graphicsLayer {
+                            renderEffect = android.graphics.RenderEffect
+                                .createBlurEffect(24f, 24f, android.graphics.Shader.TileMode.CLAMP)
+                                .asComposeRenderEffect()
+                            compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen
+                        }
+                    ) {
+                        val glowPath = buildSmoothPath(currentPathPoints)
+                        // Per-segment pause scale: k=0 (tail) fades first, each
+                        // newer segment 60ms later, fingertip last.
+                        val segGlowScale: (Int) -> Float = { k ->
+                            (1f - (glowPauseMs - k * 60L) / 450f).coerceIn(0f, 1f)
+                        }
                         val glowBrush = Brush.linearGradient(
                             colors = OverlayGradientColors,
                             start = Offset.Zero,
                             end = Offset(size.width, size.height)
                         )
-                        // Soft outer halo
+                        val measure = androidx.compose.ui.graphics.PathMeasure().apply {
+                            setPath(glowPath, false)
+                        }
+                        val total = measure.length
+                        if (total > 4f) {
+                            val segCount = 6
+                            val segLen = 44.dp.toPx()
+                            val fadeStart = maxOf(0f, total - segLen * segCount)
+                            for (k in 0 until segCount) {
+                                val segStart = maxOf(fadeStart, total - segLen * (segCount - k))
+                                val segEnd = minOf(total, segStart + segLen + 2f)
+                                if (segEnd - segStart < 2f) continue
+                                val frac = (k + 1) / segCount.toFloat()
+                                val seg = androidx.compose.ui.graphics.Path().apply {
+                                    measure.getSegment(segStart, segEnd, this, true)
+                                }
+                                drawPath(path = seg, brush = glowBrush,
+                                    style = Stroke(width = 44f, cap = StrokeCap.Round, join = StrokeJoin.Round),
+                                    alpha = 0.55f * frac * segGlowScale(k))
+                                drawPath(path = seg, brush = glowBrush,
+                                    style = Stroke(width = 28f, cap = StrokeCap.Round, join = StrokeJoin.Round),
+                                    alpha = 0.75f * frac * segGlowScale(k))
+                            }
+                            // Soft fingertip bloom (blurred halo around the line)
+                            drawCircle(
+                                brush = Brush.radialGradient(
+                                    0f to OverlayGradientColors[0].copy(alpha = 0.55f),
+                                    0.5f to OverlayGradientColors[2].copy(alpha = 0.30f),
+                                    1f to Color.Transparent,
+                                    center = currentPathPoints.last(),
+                                    radius = 40.dp.toPx()
+                                ),
+                                alpha = segGlowScale(segCount - 1)
+                            )
+                        }
+                    }
+                }
+                Canvas(
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    // Draw current path (Real-time): solid white trail with the
+                    // Google-color gradient glow riding the fingertip, exactly like
+                    // the original Circle to Search. This canvas composes AFTER the
+                    // screenshot Box (which holds the dim tint), so the dim can only
+                    // darken the screenshot underneath — the stroke stays vivid.
+                    if (currentPathPoints.size > 1) {
+                        val path = buildSmoothPath(currentPathPoints)
+                        // Same tail-first stagger as the blur layer
+                        val segGlowScale: (Int) -> Float = { k ->
+                            (1f - (glowPauseMs - k * 60L) / 450f).coerceIn(0f, 1f)
+                        }
+                        val strokeCap = StrokeCap.Round
+                        val strokeJoin = StrokeJoin.Round
+                        val glowBrush = Brush.linearGradient(
+                            colors = OverlayGradientColors,
+                            start = Offset.Zero,
+                            end = Offset(size.width, size.height)
+                        )
+
+                        // 1) Neon glow (pure Google colors) drawn UNDER the stroke so
+                        // the color lives AROUND the line, never inside it. Four
+                        // concentric widths (wide→narrow) fake an outward falloff;
+                        // alpha ramps toward the fingertip so the glow rides the finger.
+                        val measure = androidx.compose.ui.graphics.PathMeasure().apply {
+                            setPath(path, false)
+                        }
+                        val total = measure.length
+                        if (total > 4f) {
+                            val segCount = 6
+                            val segLen = 44.dp.toPx()
+                            val fadeStart = maxOf(0f, total - segLen * segCount)
+                            for (k in 0 until segCount) {
+                                val segStart = maxOf(fadeStart, total - segLen * (segCount - k))
+                                val segEnd = minOf(total, segStart + segLen + 2f)
+                                if (segEnd - segStart < 2f) continue
+                                val frac = (k + 1) / segCount.toFloat()
+                                val seg = androidx.compose.ui.graphics.Path().apply {
+                                    measure.getSegment(segStart, segEnd, this, true)
+                                }
+                                drawPath(path = seg, brush = glowBrush,
+                                    style = Stroke(width = 64f, cap = strokeCap, join = strokeJoin),
+                                    alpha = 0.06f * frac * segGlowScale(k))
+                                drawPath(path = seg, brush = glowBrush,
+                                    style = Stroke(width = 52f, cap = strokeCap, join = strokeJoin),
+                                    alpha = 0.10f * frac * segGlowScale(k))
+                                drawPath(path = seg, brush = glowBrush,
+                                    style = Stroke(width = 40f, cap = strokeCap, join = strokeJoin),
+                                    alpha = 0.17f * frac * segGlowScale(k))
+                                drawPath(path = seg, brush = glowBrush,
+                                    style = Stroke(width = 30f, cap = strokeCap, join = strokeJoin),
+                                    alpha = 0.30f * frac * segGlowScale(k))
+                                drawPath(path = seg, brush = glowBrush,
+                                    style = Stroke(width = 24f, cap = strokeCap, join = strokeJoin),
+                                    alpha = 0.45f * frac * segGlowScale(k))
+                            }
+                            // Soft Google-blue bloom around the line at the fingertip
+                            drawCircle(
+                                brush = Brush.radialGradient(
+                                    0f to OverlayGradientColors[0].copy(alpha = 0.35f),
+                                    1f to Color.Transparent,
+                                    center = currentPathPoints.last(),
+                                    radius = 30.dp.toPx()
+                                ),
+                                alpha = segGlowScale(segCount - 1)
+                            )
+                        }
+
+                        // 2) Solid white line drawn ON TOP: the glow only shows
+                        // around its edges and the trail itself stays pure white.
                         drawPath(
                             path = path,
-                            brush = glowBrush,
-                            style = Stroke(width = 36f, cap = strokeCap, join = strokeJoin),
-                            alpha = 0.22f
+                            color = Color.White.copy(alpha = 0.16f),
+                            style = Stroke(width = 26f, cap = strokeCap, join = strokeJoin)
                         )
-                        // Inner glow
-                        drawPath(
-                            path = path,
-                            brush = glowBrush,
-                            style = Stroke(width = 22f, cap = strokeCap, join = strokeJoin),
-                            alpha = 0.5f
-                        )
-                        // Bright opaque core
                         drawPath(
                             path = path,
                             color = Color.White,
-                            style = Stroke(width = 12f, cap = strokeCap, join = strokeJoin)
+                            style = Stroke(width = 16f, cap = strokeCap, join = strokeJoin)
                         )
                     }
 
