@@ -40,7 +40,6 @@ import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Assistant
 import androidx.compose.material.icons.filled.Layers
-import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.TouchApp
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Widgets
@@ -123,28 +122,33 @@ private const val BOTTOM_EDGE_MARKER = "cts_bottom_edge"
 private val HW_TRIGGER_KEYS = listOf(
     "trigger_double_vol_up",
     "trigger_double_vol_down",
-    "trigger_double_power",
-    "trigger_power_vol_up",
-    "trigger_power_vol_down",
+    "trigger_long_vol_up",
+    "trigger_long_vol_down",
     "trigger_vol_up_down",
 )
 
 private val HW_TRIGGER_TITLES = listOf(
     R.string.trigger_double_vol_up_title,
     R.string.trigger_double_vol_down_title,
-    R.string.trigger_double_power_title,
-    R.string.trigger_power_vol_up_title,
-    R.string.trigger_power_vol_down_title,
+    R.string.trigger_long_vol_up_title,
+    R.string.trigger_long_vol_down_title,
     R.string.trigger_vol_up_down_title,
+)
+
+private val HW_TRIGGER_SUBTITLES = listOf(
+    R.string.trigger_hw_vol_subtitle,
+    R.string.trigger_hw_vol_subtitle,
+    R.string.trigger_hw_long_subtitle,
+    R.string.trigger_hw_long_subtitle,
+    R.string.trigger_hw_subtitle,
 )
 
 private val HW_TRIGGER_ICONS: List<ImageVector>
     get() = listOf(
         Icons.AutoMirrored.Filled.VolumeUp,
         Icons.AutoMirrored.Filled.VolumeDown,
-        Icons.Default.PowerSettingsNew,
-        Icons.Default.Add,
-        Icons.Default.Add,
+        Icons.AutoMirrored.Filled.VolumeUp,
+        Icons.AutoMirrored.Filled.VolumeDown,
         Icons.Default.Add,
     )
 
@@ -857,7 +861,7 @@ private fun HomeHwSheet(
                 if (index > 0) HomeRowDivider()
                 HomeToggleItem(
                     title = stringResource(HW_TRIGGER_TITLES[index]),
-                    subtitle = stringResource(R.string.trigger_hw_subtitle),
+                    subtitle = stringResource(HW_TRIGGER_SUBTITLES[index]),
                     icon = HW_TRIGGER_ICONS[index],
                     checked = hwTriggers[key] ?: false,
                     enabled = a11yGranted,

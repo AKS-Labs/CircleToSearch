@@ -396,8 +396,8 @@
     <string name="home_bottom_mid_title">Mid</string>
     <string name="home_corner_size">Corner size</string>
     <string name="home_mid_size">Mid size</string>
-    <string name="home_assistant_setup_subtitle">Set as default assistant to use the home button and swipes</string>
-    <string name="home_assistant_ready_subtitle">Home button and bottom-edge gestures work automatically</string>
+    <string name="home_assistant_setup_subtitle">Set as default assistant, then long-press the Home button to launch Circle to Search</string>
+    <string name="home_assistant_ready_subtitle">Long-press the Home button (or hold the gesture bar) to launch Circle to Search</string>
     <string name="home_ready">Ready</string>
     <string name="home_set_up">Set up</string>
     <string name="home_hw_title">Hardware buttons</string>
@@ -428,11 +428,12 @@
     <string name="trigger_bubble_subtitle">Floating button you can drag anywhere tap to start</string>
     <string name="trigger_double_vol_up_title">Double-tap Volume Up</string>
     <string name="trigger_double_vol_down_title">Double-tap Volume Down</string>
-    <string name="trigger_double_power_title">Double-tap Power</string>
-    <string name="trigger_power_vol_up_title">Power + Volume Up</string>
-    <string name="trigger_power_vol_down_title">Power + Volume Down</string>
+    <string name="trigger_long_vol_up_title">Hold Volume Up</string>
+    <string name="trigger_long_vol_down_title">Hold Volume Down</string>
     <string name="trigger_vol_up_down_title">Volume Up + Volume Down</string>
     <string name="trigger_hw_subtitle">Starts Circle to Search</string>
+    <string name="trigger_hw_vol_subtitle">Double-tap starts Circle to Search; a single tap still works normally</string>
+    <string name="trigger_hw_long_subtitle">Hold briefly starts Circle to Search; tapping still works normally</string>
     <string name="trigger_qs_title">Quick Settings tile</string>
     <string name="trigger_qs_subtitle">Add the CTS tile from the Quick Settings edit screen</string>
     <string name="trigger_hw_notice">Hardware button triggers need the accessibility service enabled.</string>

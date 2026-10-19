@@ -122,9 +122,8 @@ private class OverlaySettingsState(context: Context) {
         val HW_TRIGGER_KEYS = listOf(
             "trigger_double_vol_up",
             "trigger_double_vol_down",
-            "trigger_double_power",
-            "trigger_power_vol_up",
-            "trigger_power_vol_down",
+            "trigger_long_vol_up",
+            "trigger_long_vol_down",
             "trigger_vol_up_down"
         )
     }
@@ -310,7 +309,7 @@ private fun TriggersSettingsScreen(
         SettingsGroup {
             SettingsToggleItem(
                 title = stringResource(R.string.trigger_double_vol_up_title),
-                subtitle = stringResource(R.string.trigger_hw_subtitle),
+                subtitle = stringResource(R.string.trigger_hw_vol_subtitle),
                 icon = Icons.AutoMirrored.Filled.VolumeUp,
                 checked = state.hwTriggers["trigger_double_vol_up"] ?: false,
                 onCheckedChange = { state.setTrigger("trigger_double_vol_up", it) }
@@ -318,34 +317,26 @@ private fun TriggersSettingsScreen(
             SettingsGroupDivider()
             SettingsToggleItem(
                 title = stringResource(R.string.trigger_double_vol_down_title),
-                subtitle = stringResource(R.string.trigger_hw_subtitle),
+                subtitle = stringResource(R.string.trigger_hw_vol_subtitle),
                 icon = Icons.AutoMirrored.Filled.VolumeDown,
                 checked = state.hwTriggers["trigger_double_vol_down"] ?: false,
                 onCheckedChange = { state.setTrigger("trigger_double_vol_down", it) }
             )
             SettingsGroupDivider()
             SettingsToggleItem(
-                title = stringResource(R.string.trigger_double_power_title),
-                subtitle = stringResource(R.string.trigger_hw_subtitle),
-                icon = Icons.Default.PowerSettingsNew,
-                checked = state.hwTriggers["trigger_double_power"] ?: false,
-                onCheckedChange = { state.setTrigger("trigger_double_power", it) }
+                title = stringResource(R.string.trigger_long_vol_up_title),
+                subtitle = stringResource(R.string.trigger_hw_long_subtitle),
+                icon = Icons.AutoMirrored.Filled.VolumeUp,
+                checked = state.hwTriggers["trigger_long_vol_up"] ?: false,
+                onCheckedChange = { state.setTrigger("trigger_long_vol_up", it) }
             )
             SettingsGroupDivider()
             SettingsToggleItem(
-                title = stringResource(R.string.trigger_power_vol_up_title),
-                subtitle = stringResource(R.string.trigger_hw_subtitle),
-                icon = Icons.Default.Add,
-                checked = state.hwTriggers["trigger_power_vol_up"] ?: false,
-                onCheckedChange = { state.setTrigger("trigger_power_vol_up", it) }
-            )
-            SettingsGroupDivider()
-            SettingsToggleItem(
-                title = stringResource(R.string.trigger_power_vol_down_title),
-                subtitle = stringResource(R.string.trigger_hw_subtitle),
-                icon = Icons.Default.Add,
-                checked = state.hwTriggers["trigger_power_vol_down"] ?: false,
-                onCheckedChange = { state.setTrigger("trigger_power_vol_down", it) }
+                title = stringResource(R.string.trigger_long_vol_down_title),
+                subtitle = stringResource(R.string.trigger_hw_long_subtitle),
+                icon = Icons.AutoMirrored.Filled.VolumeDown,
+                checked = state.hwTriggers["trigger_long_vol_down"] ?: false,
+                onCheckedChange = { state.setTrigger("trigger_long_vol_down", it) }
             )
             SettingsGroupDivider()
             SettingsToggleItem(
