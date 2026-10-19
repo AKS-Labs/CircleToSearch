@@ -166,7 +166,7 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
-    implementation("androidx.webkit:webkit:1.9.0")
+    implementation("androidx.webkit:webkit:1.17.0")
     implementation("com.google.code.gson:gson:2.10.1")
     implementation("com.google.zxing:core:3.5.4")
 }
