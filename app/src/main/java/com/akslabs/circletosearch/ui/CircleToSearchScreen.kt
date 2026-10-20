@@ -114,6 +114,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Email
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalIconButton
@@ -124,6 +125,7 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
@@ -191,6 +193,7 @@ import com.akslabs.circletosearch.utils.QrResultWithBounds
 import dev.davidv.translator.localizedName
 import com.akslabs.circletosearch.utils.QrScanner
 import com.akslabs.circletosearch.ui.qrResultShortLabel
+import com.akslabs.circletosearch.utils.OcrLanguagePreferences
 import com.akslabs.circletosearch.utils.UIPreferences
 import com.akslabs.circletosearch.ui.components.MoreAppsBottomSheet
 import com.akslabs.circletosearch.ui.components.DonateBottomSheet
@@ -249,9 +252,22 @@ private suspend fun runInstantScreenshotOcr(
         ?: return null
     var ocrMissing = false
     var sourceDetectFailed = false
+    // User's OCR language whitelist: empty = auto, one = forced source (PULC and
+    // CLD skipped), many = detection narrowed to the checked languages.
+    val checkedLanguages = OcrLanguagePreferences.getChecked(context)
+    val sourceSelection = when (checkedLanguages.size) {
+        0 -> uniffi.translator_core.OcrSourceSelection.Auto
+        1 -> uniffi.translator_core.OcrSourceSelection.Specific(
+            uniffi.translator_core.LanguageCode(checkedLanguages.first()),
+        )
+        else -> uniffi.translator_core.OcrSourceSelection.Restricted(
+            checkedLanguages.map { uniffi.translator_core.LanguageCode(it) },
+        )
+    }
     val result = coordinator.ocrWordsOnly(
         bitmap = bmp,
         to = target,
+        sourceSelection = sourceSelection,
         onDetectedRegions = { boxes, w, h -> onRegions(DetectedRegions(w, h, boxes)) },
         onOcrUnavailable = { ocrMissing = true },
         onAutoSourceFailed = { sourceDetectFailed = true },
@@ -557,6 +573,12 @@ fun CircleToSearchScreen(
     // New Sheet States
     var showMoreAppsSheet by remember { mutableStateOf(false) }
     var showDonateSheet by remember { mutableStateOf(false) }
+
+    // Circle to Search's OCR language whitelist (empty = auto-detect all).
+    // Read once per overlay open; writes from the sheet land in the pref store
+    // and this state, so the next screenshot OCR picks them up immediately.
+    var showOcrLangSheet by remember { mutableStateOf(false) }
+    var ocrCheckedLanguages by remember { mutableStateOf(OcrLanguagePreferences.getChecked(context)) }
 
     // Material You logic for colors
     val isDark = isSystemInDarkTheme()
@@ -2053,6 +2075,35 @@ fun CircleToSearchScreen(
                     }
                     Spacer(modifier = Modifier.weight(1f))
 
+                    // OCR language whitelist button — shows at a glance whether
+                    // detection is restricted (dot badge) or fully automatic.
+                    Box(
+                        modifier = Modifier
+                            .background(Color.Black.copy(alpha = 0.35f), CircleShape)
+                            .size(40.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        IconButton(onClick = {
+                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                            showOcrLangSheet = true
+                        }) {
+                            Icon(
+                                Icons.Default.Translate,
+                                contentDescription = stringResource(R.string.ocr_lang_button_cd),
+                                tint = Color.White
+                            )
+                        }
+                        if (ocrCheckedLanguages.isNotEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .padding(end = 5.dp, bottom = 5.dp)
+                                    .size(8.dp)
+                                    .background(Color(0xFF8AB4F8), CircleShape)
+                            )
+                        }
+                    }
+
                     // Action Button (Menu)
                     Box(
                         modifier = Modifier
@@ -3013,6 +3064,16 @@ fun CircleToSearchScreen(
             )
         }
 
+        if (showOcrLangSheet) {
+            OcrLanguageBottomSheet(
+                onDismiss = { showOcrLangSheet = false },
+                onCheckedChange = { codes ->
+                    ocrCheckedLanguages = codes
+                    OcrLanguagePreferences.setChecked(context, codes)
+                }
+            )
+        }
+
         if (showSettingsScreen) {
             SettingsScreen(
                 uiPreferences = uiPreferences,
@@ -3022,6 +3083,142 @@ fun CircleToSearchScreen(
     }
 }
 }
+}
+
+/**
+ * Checklist of the app's bundled OCR languages. `Auto-detect (all languages)`
+ * is checked exactly when the whitelist is empty — picking languages unchecks
+ * it, picking it clears everything, and every state persists via
+ * [OcrLanguagePreferences].
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun OcrLanguageBottomSheet(
+    onDismiss: () -> Unit,
+    onCheckedChange: (Set<String>) -> Unit,
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val checked = remember { mutableStateListOf(*OcrLanguagePreferences.getChecked(context).toTypedArray()) }
+    var query by remember { mutableStateOf("") }
+
+    // Bundled/installed OCR languages only: a checked language whose recognizer
+    // pack is missing on this device would be unusable, so it never appears.
+    val languages = remember {
+        runCatching {
+            (context.applicationContext as? TranslatorApplication)
+                ?.languageCatalog
+                ?.languageRows
+                .orEmpty()
+                .filter { it.availability.ocrFiles }
+                .map { it.language }
+                .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.localizedName() })
+        }.getOrDefault(emptyList())
+    }
+    val filtered = remember(languages, query) {
+        if (query.isBlank()) {
+            languages
+        } else {
+            languages.filter {
+                it.localizedName().contains(query, ignoreCase = true) ||
+                    it.code.contains(query, ignoreCase = true)
+            }
+        }
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surface,
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = stringResource(R.string.ocr_lang_title),
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            )
+            Text(
+                text = stringResource(R.string.ocr_lang_hint),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp),
+            )
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                placeholder = { Text(stringResource(R.string.ocr_lang_search)) },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                singleLine = true,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+            )
+
+            // Auto-detect: checked exactly when no language is checked.
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        checked.clear()
+                        onCheckedChange(emptySet())
+                    }
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.ocr_lang_auto),
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.weight(1f),
+                )
+                Checkbox(
+                    checked = checked.isEmpty(),
+                    onCheckedChange = {
+                        checked.clear()
+                        onCheckedChange(emptySet())
+                    },
+                )
+            }
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp))
+
+            LazyColumn(modifier = Modifier.heightIn(max = 420.dp)) {
+                items(filtered, key = { it.code }) { language ->
+                    val isChecked = language.code in checked
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                if (isChecked) checked.remove(language.code)
+                                else checked.add(language.code)
+                                onCheckedChange(checked.toSet())
+                            }
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = language.localizedName(),
+                                style = MaterialTheme.typography.bodyLarge,
+                            )
+                            Text(
+                                text = language.code,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Checkbox(
+                            checked = isChecked,
+                            onCheckedChange = {
+                                if (isChecked) checked.remove(language.code)
+                                else checked.add(language.code)
+                                onCheckedChange(checked.toSet())
+                            },
+                        )
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(24.dp))
+        }
+    }
 }
 
 // --- Phase 44: Smart Entity Extractor Models ---

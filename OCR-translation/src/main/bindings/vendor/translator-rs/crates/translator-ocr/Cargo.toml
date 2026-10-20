@@ -9,7 +9,7 @@ name = "translator_ocr"
 path = "src/lib.rs"
 
 [dependencies]
-translator-core = { path = "../translator-core" }
+translator-core = { path = "../translator-core", features = ["script-from-unicode"] }
 translator-raster = { path = "../translator-raster" }
 translator-translate = { path = "../translator-translate" }
 mnn-sys = { git = "https://github.com/DavidVentura/mnn-sys" }

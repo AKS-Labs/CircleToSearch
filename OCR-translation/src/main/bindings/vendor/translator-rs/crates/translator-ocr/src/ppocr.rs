@@ -414,6 +414,7 @@ impl InkStrip {
     }
 }
 
+#[derive(Clone)]
 pub struct DewarpedStrip {
     pub image: RgbImage,
     /// `None` for the oriented-box fallback — only the contour warp can map pixels back.

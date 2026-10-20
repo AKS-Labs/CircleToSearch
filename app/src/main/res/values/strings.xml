@@ -226,6 +226,12 @@
     <string name="donate_paypal_subtitle">Works, but not recommended</string>
     <string name="donate_paypal_note" formatted="false">PayPal cuts heavy fees on small donations — e.g. $1 sent arrives as about ₹53 ($0.60); roughly 40% is lost to fees &amp; conversion</string>
     <string name="label_foss">FOSS</string>
+    <!-- Circle to Search OCR language picker -->
+    <string name="ocr_lang_button_cd">OCR language</string>
+    <string name="ocr_lang_title">OCR languages</string>
+    <string name="ocr_lang_hint">Circle to Search will only try to detect the languages you check here. Leave Auto-detect checked to try all bundled languages.</string>
+    <string name="ocr_lang_auto">Auto-detect (all languages)</string>
+    <string name="ocr_lang_search">Search languages</string>
 
     <!-- Privacy Dialog -->
     <string name="title_privacy">Privacy &amp; Data Usage Transparency</string>

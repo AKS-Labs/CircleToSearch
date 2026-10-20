@@ -789,7 +789,9 @@ impl translator_live::live_session::LiveRecognizer for TranslatorSession {
         let snap = self.snapshot();
         let ppocr = self.ocr().engine(&snap).map_err(|e| format!("{e:?}"))?;
         let script = match source_selection {
-            OcrSourceSelection::Auto => None,
+            // Both auto paths let PULC pick per box; the whitelist's recognition
+            // narrowing is applied by the still-image runtime, not here.
+            OcrSourceSelection::Auto | OcrSourceSelection::Restricted { .. } => None,
             OcrSourceSelection::Specific { language_code } => Some(
                 crate::ocr_runtime::recognizer_script_for_language(&snap, language_code)
                     .map_err(|e| format!("{e:?}"))?,
@@ -803,7 +805,7 @@ impl translator_live::live_session::LiveRecognizer for TranslatorSession {
             canonical_quadrant,
         )
         .map_err(|e| format!("{e:?}"))?;
-        if matches!(source_selection, OcrSourceSelection::Auto) {
+        if !matches!(source_selection, OcrSourceSelection::Specific { .. }) {
             if let Some(code) = crate::ocr_runtime::ocr_source_for_lines(&snap, &lines, None) {
                 let code = code.as_str().to_owned();
                 for line in &mut lines {
