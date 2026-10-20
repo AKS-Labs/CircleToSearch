@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <style name="Theme.Translator" parent="android:Theme.Material.Light.NoActionBar">
+        <!-- Disable window enter/exit animations -->
+        <item name="android:windowAnimationStyle">@null</item>
+        <!-- Set window background to match Material3 surface color -->
+        <item name="android:windowBackground">?attr/colorSurface</item>
+        <!-- No system starting-window/splash preview: it is light-surface colored
+             and flashes white over the screen for the camera deep link (and delays
+             every launch since the app's own first frame already covers startup). -->
+        <item name="android:windowDisablePreview">true</item>
+        <!-- Ensure no window enter/exit transitions -->
+        <item name="android:windowEnterTransition">@null</item>
+        <item name="android:windowExitTransition">@null</item>
+        <item name="android:windowSharedElementEnterTransition">@null</item>
+        <item name="android:windowSharedElementExitTransition">@null</item>
+    </style>
+
+    <style name="Theme.Translator.CropImage" parent="Theme.AppCompat.NoActionBar">
+        <item name="colorPrimary">@android:color/black</item>
+        <item name="colorPrimaryDark">@android:color/black</item>
+        <item name="android:windowBackground">@android:color/black</item>
+        <item name="android:windowAnimationStyle">@null</item>
+    </style>
+
+    <style name="Theme.Translator.WebView.Light" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:isLightTheme">true</item>
+    </style>
+
+    <style name="Theme.Translator.WebView.Dark" parent="android:Theme.Material.NoActionBar">
+        <item name="android:isLightTheme">false</item>
+    </style>
+</resources>

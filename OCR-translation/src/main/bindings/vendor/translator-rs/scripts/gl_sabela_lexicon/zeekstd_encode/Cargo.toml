@@ -1,0 +1,11 @@
+[package]
+name = "zeekstd_encode"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "zeekstd_encode"
+path = "main.rs"
+
+[dependencies]
+zeekstd = "0.6"

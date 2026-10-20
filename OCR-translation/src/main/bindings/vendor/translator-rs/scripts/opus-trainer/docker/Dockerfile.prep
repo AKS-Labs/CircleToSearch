@@ -1,0 +1,14 @@
+# Corpus prep (prep_data.py): OPUS download -> clean -> LID -> dedup [-> SPM].
+# Retires the hub's hand-built venv and its traps: Debian-11 python3.9,
+# fasttext-wheel's numpy<2 pin, and the relative-path lid.176.ftz (baked here at
+# a fixed absolute path). Bigserver-only image; no CUDA.
+FROM python:3.11-slim
+LABEL org.opencontainers.image.source=https://github.com/DavidVentura/offline-translator
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates \
+ && apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN pip install --no-cache-dir opustools sentencepiece fasttext-wheel "numpy<2"
+RUN curl -sL --fail -o /opt/lid.176.ftz \
+      https://dl.fbaipublicfiles.com/fasttext/supervised-models/lid.176.ftz
+# A broken install surfaces as a crash-looping Pool worker with a swallowed
+# traceback (2026-07-15); fail the build instead.
+RUN python -c "import fasttext, sentencepiece; fasttext.load_model('/opt/lid.176.ftz')"

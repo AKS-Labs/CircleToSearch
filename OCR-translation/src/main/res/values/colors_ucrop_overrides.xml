@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <color name="ucrop_color_progress_wheel_line" tools:override="true">#B3FFFFFF</color>
+    <color name="ucrop_color_widget_rotate_angle" tools:override="true">#B3FFFFFF</color>
+</resources>

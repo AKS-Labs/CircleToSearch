@@ -1,0 +1,19 @@
+[package]
+name = "translator-transliterate"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+
+[lib]
+name = "translator_transliterate"
+path = "src/lib.rs"
+
+[dependencies]
+translator-core = { path = "../translator-core", features = ["script-from-unicode"] }
+icu_experimental = { version = "0.4", features = ["compiled_data"] }
+icu_locale_core = "2.2"
+unicode-script = { version = "0.5", default-features = false }
+translator-mucab = { path = "../translator-mucab", optional = true }
+
+[features]
+mucab = ["dep:translator-mucab"]

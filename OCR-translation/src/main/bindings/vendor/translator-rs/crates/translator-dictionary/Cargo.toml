@@ -1,0 +1,13 @@
+[package]
+name = "translator-dictionary"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+
+[lib]
+name = "translator_dictionary"
+path = "src/lib.rs"
+
+[dependencies]
+translator-core = { path = "../translator-core" }
+tarkka = { git = "https://github.com/DavidVentura/tarkka" }

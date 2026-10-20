@@ -1,0 +1,91 @@
+[package]
+name = "bindings"
+version = "0.1.0"
+edition = "2024"
+# F-Droid builds with rustc 1.88
+# need to bump both in tandem
+rust-version = "1.88"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "bindings"
+path = "src/lib.rs"
+
+[features]
+default = ["dictionary", "mucab", "tts", "pdf", "odt", "epub", "transliterate", "image-render", "pdf-image-translate", "doc-align", "ppocr", "planar-tracker", "gpu", "http"]
+dictionary = ["translator/dictionary"]
+gpu = ["translator/gpu"]
+mucab = ["translator/mucab"]
+tts = ["translator/tts"]
+pdf = ["translator/pdf"]
+odt = ["translator/odt"]
+epub = ["translator/epub"]
+transliterate = ["translator/transliterate"]
+image-render = ["translator/image-render"]
+pdf-image-translate = ["translator/pdf-image-translate"]
+doc-align = ["translator/doc-align"]
+ppocr = ["translator/ppocr"]
+planar-tracker = ["translator/planar-tracker"]
+http = ["translator/http"]
+
+[dependencies]
+adblock = { version = "0.12.2", default-features = false, features = ["full-regex-handling", "embedded-domain-resolver"] }
+serde_json = "1"
+uniffi = { version = "0.31", default-features = false }
+thiserror = "2"
+log = "0.4"
+xml5ever = "0.38"
+markup5ever = "0.38"
+# Used for the live-OCR GPU per-frame fast path: a hand-rolled JNI entry
+# (`LivePipelineJni.processFrameGl`) takes the camera's external-OES
+# texture id + a couple of small float arrays and returns a packed
+# tracker-result `jlong`, avoiding uniffi's per-call marshalling
+# overhead on the 30 fps hot path.
+jni = { version = "0.21", default-features = false }
+
+[dependencies.translator]
+default-features = false
+git = "https://github.com/DavidVentura/translator-rs.git"
+# path = "/home/david/git/translator-rs"
+features = ["uniffi", "html"]
+
+# Local vendored copy of translator-rs with image-OCR patches for Circle to Search:
+#  - Auto source-detection decline keeps the per-box recognized words (falls back to
+#    source=target identity) instead of erroring, which made the caller re-OCR with
+#    the target language's script and turn non-Latin text into garbage.
+#  - Per-block source detection so mixed-language screens translate each block from
+#    its own detected language.
+#  - Mixed-script routing keeps confident minority scripts (never folds a genuine
+#    second language into the dominant script).
+[patch."https://github.com/DavidVentura/translator-rs.git"]
+translator = { path = "vendor/translator-rs" }
+
+[target.'cfg(target_os = "android")'.dependencies]
+android_logger = { version = "0.14", default-features = false }
+
+# [patch."https://github.com/DavidVentura/slimt-sys"]
+# slimt-sys = { path = "/home/david/git/slimt-sys" }
+
+# [patch."https://github.com/DavidVentura/piper-rs"]
+# piper-rs = { path = "/home/david/git/piper-rs" }
+#
+# [patch."https://github.com/DavidVentura/mnn-sys"]
+# mnn-sys = { path = "/home/david/git/mnn-sys" }
+
+[profile.release]
+lto = "thin"
+debug = false
+strip = "debuginfo"
+
+# Fast on-device dev builds. Override the built-in `dev` profile rather than
+# a custom one: -sys build scripts (espeak/slimt/mnn) locate their target dir
+# by matching the `PROFILE` env var against a path component, and cargo only
+# ever sets PROFILE to debug/release — a custom profile name lands in an
+# unmatched dir and the build scripts panic. dev defaults already give
+# incremental=true, codegen-units=256, lto=off; we only raise opt-level so the
+# Rust hot paths aren't unusably slow on the phone, and strip to keep the .so
+# small for fast adb push.
+[profile.dev]
+opt-level = 1
+debug = false
+strip = "debuginfo"

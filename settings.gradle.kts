@@ -44,3 +44,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "CircleToSearch"
 include(":app")
+include(":OCR-translation")

@@ -16,7 +16,7 @@
         }
       ],
       "attributes": [],
-      "versionCode": 7,
+      "versionCode": 71,
       "versionName": "0.5",
       "outputFile": "app-armeabi-v7a-release.apk"
     },
@@ -29,7 +29,7 @@
         }
       ],
       "attributes": [],
-      "versionCode": 7,
+      "versionCode": 72,
       "versionName": "0.5",
       "outputFile": "app-arm64-v8a-release.apk"
     }

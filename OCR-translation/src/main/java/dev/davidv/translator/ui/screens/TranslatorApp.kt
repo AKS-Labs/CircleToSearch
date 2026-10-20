@@ -1,0 +1,1051 @@
+/*
+ * Copyright (C) 2024 David V
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package dev.davidv.translator.ui.screens
+
+import android.app.Activity
+import android.content.Context
+import android.content.Intent
+import android.graphics.Bitmap
+import android.net.Uri
+import android.util.Log
+import android.view.Gravity
+import android.view.ViewGroup
+import android.view.WindowManager
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat.startActivity
+import androidx.core.content.FileProvider
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
+import dev.davidv.translator.AppSettings
+import dev.davidv.translator.DocumentTranslationService
+import dev.davidv.translator.DownloadService
+import dev.davidv.translator.DownloadState
+import dev.davidv.translator.Language
+import dev.davidv.translator.LaunchMode
+import dev.davidv.translator.PcmAudioPlayer
+import dev.davidv.translator.R
+import dev.davidv.translator.TranslatorMessage
+import dev.davidv.translator.encodeVoiceOverride
+import dev.davidv.translator.parseVoiceOverride
+import dev.davidv.translator.ui.DocumentTranslationUiState
+import dev.davidv.translator.ui.TranslatorViewModel
+import dev.davidv.translator.ui.UiEvent
+import dev.davidv.translator.ui.components.DocumentConfigureSheet
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.FileOutputStream
+import java.io.IOException
+import java.text.SimpleDateFormat
+import java.util.Date
+import kotlin.math.roundToInt
+
+private fun defaultVoiceNameForLanguage(packs: List<uniffi.translator_core.InstalledTtsPack>): String? =
+  packs.firstOrNull()?.voices?.firstOrNull()?.name
+
+private fun packsContainVoice(
+  packs: List<uniffi.translator_core.InstalledTtsPack>,
+  voiceName: String,
+): Boolean = packs.any { pack -> pack.voices.any { it.name == voiceName } }
+
+private enum class SpeechTarget { INPUT, OUTPUT }
+
+private data class PendingDocumentSave(
+  val path: String,
+  val mimeType: String,
+)
+
+private fun quantizePlaybackSpeed(speed: Float): Float = ((speed.coerceIn(0.5f, 2.0f) * 10.0f).roundToInt() / 10.0f)
+
+private fun ttsPlaybackSpeedFor(
+  settings: AppSettings,
+  language: Language,
+  voiceName: String?,
+): Float =
+  voiceName
+    ?.let { settings.ttsPlaybackSpeedOverrides[ttsPlaybackSpeedOverrideKey(language, it)] }
+    ?: settings.ttsPlaybackSpeed
+
+private fun ttsPlaybackSpeedOverrideKey(
+  language: Language,
+  voiceName: String,
+): String = "${language.code}:$voiceName"
+
+fun shareImageUri(
+  uri: Uri,
+  context: Context,
+) {
+  val intent = Intent(Intent.ACTION_SEND)
+  intent.putExtra(Intent.EXTRA_STREAM, uri)
+  intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+  intent.setType("image/jpeg")
+
+  startActivity(context, intent, null)
+}
+
+fun openDocumentPath(
+  path: String,
+  mimeType: String,
+  context: Context,
+) {
+  val uri =
+    FileProvider.getUriForFile(
+      context,
+      "${context.packageName}.fileprovider",
+      File(path),
+    )
+  val intent =
+    Intent(Intent.ACTION_VIEW).apply {
+      setDataAndType(uri, mimeType)
+      addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+  startActivity(context, Intent.createChooser(intent, "Open translated document"), null)
+}
+
+suspend fun saveDocumentPathToUri(
+  path: String,
+  uri: Uri,
+  context: Context,
+) {
+  withContext(Dispatchers.IO) {
+    File(path).inputStream().use { input ->
+      val output = requireNotNull(context.contentResolver.openOutputStream(uri)) { "Unable to open output file" }
+      output.use {
+        input.copyTo(it)
+      }
+    }
+  }
+}
+
+suspend fun saveImage(
+  image: Bitmap,
+  context: Context,
+): Uri? =
+  withContext(Dispatchers.IO) {
+    val imagesFolder: File =
+      File(
+        context.cacheDir,
+        "images",
+      )
+    var uri: Uri? = null
+    try {
+      imagesFolder.mkdirs()
+      val date = Date()
+      val sdf = SimpleDateFormat("yyyyMMdd-hhmmss")
+      val dateString = sdf.format(date)
+      val fileName = "shared_image-" + dateString + ".jpg"
+      val file = File(imagesFolder, fileName)
+
+      val stream = FileOutputStream(file)
+      image.compress(Bitmap.CompressFormat.JPEG, 90, stream)
+      stream.flush()
+      stream.close()
+      uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+    } catch (e: IOException) {
+      Log.e("Share", "IOException while trying to write file for sharing: " + e.message)
+    }
+    uri
+  }
+
+@Composable
+private fun DocumentTranslationDialog(
+  document: DocumentTranslationUiState,
+  onDismiss: () -> Unit,
+  onSave: (String, String, String) -> Unit,
+  onOpen: (String, String) -> Unit,
+) {
+  val outputPath = document.outputPath
+  val outputMimeType = document.outputMimeType
+  val outputFileName = document.outputFileName ?: document.fileName
+
+  AlertDialog(
+    onDismissRequest = onDismiss,
+    title = {
+      Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+      ) {
+        Text(
+          text =
+            if (document.isTranslating) {
+              stringResource(R.string.doc_notif_translating)
+            } else {
+              stringResource(R.string.doc_notif_translated)
+            },
+          modifier = Modifier.weight(1f),
+        )
+        if (document.isTranslating) {
+          IconButton(onClick = onDismiss) {
+            Icon(
+              painter = painterResource(R.drawable.cancel),
+              contentDescription = stringResource(R.string.a11y_close),
+            )
+          }
+        }
+      }
+    },
+    text = {
+      Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          verticalAlignment = Alignment.CenterVertically,
+        ) {
+          Text(
+            text = document.fileName,
+            modifier = Modifier.weight(1f),
+          )
+        }
+        if (document.isTranslating) {
+          val phases = document.pdfPhases
+          if (phases != null) {
+            PdfPhaseFractionRow("Text", phases.textFraction)
+            PdfPhaseRow("Images", phases.imageCurrent, phases.imageTotal)
+            PdfPhaseRow("Bitmap pages", phases.rasterCurrent, phases.rasterTotal)
+          } else {
+            val progressFraction = document.progressFraction
+            if (progressFraction != null) {
+              LinearProgressIndicator(
+                progress = { progressFraction },
+                modifier = Modifier.fillMaxWidth(),
+              )
+              Text(stringResource(R.string.translator_percent, (progressFraction * 100).toInt()))
+            } else {
+              Text(stringResource(document.progressLabelRes))
+            }
+          }
+        }
+        if (document.errorMessage != null) {
+          Text(document.errorMessage)
+        } else if (outputPath != null) {
+          Text(stringResource(R.string.translator_translated_file, outputFileName ?: ""))
+        }
+      }
+    },
+    confirmButton = {
+      if (outputPath != null && outputMimeType != null) {
+        TextButton(onClick = { onOpen(outputPath, outputMimeType) }) {
+          Text(stringResource(R.string.common_open))
+        }
+      } else if (document.errorMessage != null) {
+        TextButton(onClick = onDismiss) {
+          Text(stringResource(R.string.common_close))
+        }
+      }
+    },
+    dismissButton = {
+      if (outputPath != null && outputMimeType != null) {
+        TextButton(onClick = { onSave(outputPath, outputMimeType, outputFileName) }) {
+          Text(stringResource(R.string.common_save))
+        }
+      }
+    },
+  )
+}
+
+@Composable
+private fun PdfPhaseRow(
+  label: String,
+  current: Int,
+  total: Int,
+) {
+  val fraction = if (total > 0) (current.toFloat() / total.toFloat()).coerceIn(0f, 1f) else 0f
+  Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    Row(
+      modifier = Modifier.fillMaxWidth(),
+      verticalAlignment = Alignment.CenterVertically,
+    ) {
+      Text(label, modifier = Modifier.weight(1f))
+      Text("$current/$total")
+    }
+    LinearProgressIndicator(
+      progress = { fraction },
+      modifier = Modifier.fillMaxWidth(),
+    )
+  }
+}
+
+@Composable
+private fun PdfPhaseFractionRow(
+  label: String,
+  fraction: Float,
+) {
+  val f = fraction.coerceIn(0f, 1f)
+  Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    Row(
+      modifier = Modifier.fillMaxWidth(),
+      verticalAlignment = Alignment.CenterVertically,
+    ) {
+      Text(label, modifier = Modifier.weight(1f))
+      Text("${(f * 100).toInt()}%")
+    }
+    LinearProgressIndicator(
+      progress = { f },
+      modifier = Modifier.fillMaxWidth(),
+    )
+  }
+}
+
+@Composable
+fun TranslatorApp(
+  viewModel: TranslatorViewModel,
+  downloadServiceState: StateFlow<DownloadService?>,
+  onClose: () -> Unit = {},
+) {
+  val navController = rememberNavController()
+  val context = LocalContext.current
+  val scope = rememberCoroutineScope()
+  var isAudioPlaying by remember { mutableStateOf(false) }
+  var isAudioLoading by remember { mutableStateOf(false) }
+  var activeSpeechTarget by remember { mutableStateOf<SpeechTarget?>(null) }
+  var pendingDocumentSave by remember { mutableStateOf<PendingDocumentSave?>(null) }
+  val saveTranslatedDocument =
+    rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+      val pending = pendingDocumentSave
+      pendingDocumentSave = null
+      val uri = result.data?.data
+      if (result.resultCode == Activity.RESULT_OK && pending != null && uri != null) {
+        scope.launch {
+          try {
+            saveDocumentPathToUri(pending.path, uri, context)
+            Toast.makeText(context, context.getString(R.string.translator_document_saved), Toast.LENGTH_SHORT).show()
+          } catch (e: Exception) {
+            Log.e("DocumentSave", "Failed to save translated document", e)
+            Toast.makeText(context, context.getString(R.string.translator_document_save_failed), Toast.LENGTH_SHORT).show()
+          }
+        }
+      }
+    }
+  val pcmAudioPlayer =
+    remember {
+      PcmAudioPlayer { playing ->
+        isAudioPlaying = playing
+        if (playing) {
+          isAudioLoading = false
+        } else if (!playing) {
+          isAudioLoading = false
+          activeSpeechTarget = null
+        }
+      }
+    }
+
+  // Collect ViewModel state
+  val input by viewModel.input.collectAsState()
+  val inputTransliterated by viewModel.inputTransliterated.collectAsState()
+  val output by viewModel.output.collectAsState()
+  val from by viewModel.from.collectAsState()
+  val to by viewModel.to.collectAsState()
+  val targetTabs by viewModel.targets.collectAsState()
+  val displayImage by viewModel.displayImage.collectAsState()
+  val originalImage by viewModel.originalImage.collectAsState()
+  val imageWordSelection by viewModel.imageWordSelection.collectAsState()
+  val detectedRegions by viewModel.detectedRegions.collectAsState()
+  val ocrReadingOrder by viewModel.ocrReadingOrder.collectAsState()
+  val currentDetectedLanguage by viewModel.currentDetectedLanguage.collectAsState()
+  val isAutoSource by viewModel.isAutoSource.collectAsState()
+  val currentLaunchMode by viewModel.currentLaunchMode.collectAsState()
+  val modalVisible by viewModel.modalVisible.collectAsState()
+  val dictionaryWord by viewModel.dictionaryWord.collectAsState()
+  val dictionaryStack by viewModel.dictionaryStack.collectAsState()
+  val dictionaryLookupLanguage by viewModel.dictionaryLookupLanguage.collectAsState()
+  val documentTranslation by viewModel.documentTranslation.collectAsState()
+
+  val settings by viewModel.settingsManager.settings.collectAsState()
+  val languageMetadata by viewModel.languageMetadataManager.metadata.collectAsState()
+  val downloadService by downloadServiceState.collectAsState()
+  val languageState by viewModel.languageStateManager.languageState.collectAsState()
+  val downloadStates by downloadService?.downloadStates?.collectAsState() ?: remember {
+    kotlinx.coroutines.flow.MutableStateFlow<Map<Language, DownloadState>>(emptyMap())
+  }.collectAsState()
+  val adblockDownloadState by downloadService?.adblockDownloadState?.collectAsState() ?: remember {
+    kotlinx.coroutines.flow.MutableStateFlow(DownloadState())
+  }.collectAsState()
+  val isTranslating by viewModel.translationCoordinator.isTranslating.collectAsState()
+  val ttsVoicesByLanguage by viewModel.ttsVoices.collectAsState()
+
+  LaunchedEffect(to?.code, to?.let { languageState.availabilityFor(it)?.ttsFiles } == true) {
+    val targetLanguage = to ?: return@LaunchedEffect
+    if (languageState.availabilityFor(targetLanguage)?.ttsFiles == true) {
+      viewModel.refreshTtsVoices(targetLanguage)
+    } else {
+      viewModel.clearTtsVoices(targetLanguage.code)
+    }
+  }
+
+  LaunchedEffect(from?.code, from?.let { languageState.availabilityFor(it)?.ttsFiles } == true) {
+    val sourceLanguage = from ?: return@LaunchedEffect
+    if (languageState.availabilityFor(sourceLanguage)?.ttsFiles == true) {
+      viewModel.refreshTtsVoices(sourceLanguage)
+    } else {
+      viewModel.clearTtsVoices(sourceLanguage.code)
+    }
+  }
+
+  // Connect/disconnect download service
+  LaunchedEffect(downloadService) {
+    downloadService?.let { service ->
+      viewModel.connectDownloadService(service)
+    }
+  }
+
+  // Collect UI events (toasts, share intents)
+  LaunchedEffect(Unit) {
+    viewModel.uiEvents.collect { event ->
+      when (event) {
+        is UiEvent.ShowToast -> {
+          Toast.makeText(context, event.message, Toast.LENGTH_SHORT).show()
+        }
+        UiEvent.AudioLoadingStarted -> {
+          isAudioLoading = true
+        }
+        UiEvent.AudioLoadingStopped -> {
+          isAudioLoading = false
+          activeSpeechTarget = null
+        }
+        is UiEvent.ShareImage -> {
+          val imageUri = saveImage(event.bitmap, context)
+          if (imageUri != null) {
+            shareImageUri(imageUri, context)
+          }
+        }
+        is UiEvent.PlayAudio -> {
+          pcmAudioPlayer.play(event.audioChunks) { message ->
+            isAudioLoading = false
+            activeSpeechTarget = null
+            Toast.makeText(context, context.getString(R.string.translator_audio_playback_failed, message), Toast.LENGTH_SHORT).show()
+          }
+        }
+      }
+    }
+  }
+
+  DisposableEffect(pcmAudioPlayer) {
+    onDispose {
+      pcmAudioPlayer.release()
+    }
+  }
+
+  val pendingDocument by viewModel.pendingDocument.collectAsState()
+  pendingDocument?.let { pending ->
+    val docCatalog = viewModel.languageStateManager.catalog.collectAsState().value
+    val docAvailableLanguages =
+      (languageState.translatorLanguages() + listOfNotNull(docCatalog?.english))
+        .distinctBy { it.code }
+    val initialFrom = from ?: docAvailableLanguages.firstOrNull()
+    val initialTo = to ?: docCatalog?.english ?: docAvailableLanguages.firstOrNull()
+    if (initialFrom != null && initialTo != null) {
+      DocumentConfigureSheet(
+        fileName = pending.displayName,
+        fileSizeBytes = pending.sizeBytes,
+        extension = pending.extension,
+        initialFrom = initialFrom,
+        initialTo = initialTo,
+        availableLanguages = docAvailableLanguages,
+        languageMetadata = languageMetadata,
+        defaultTranslatePdfImages = settings.translatePdfImages,
+        onDismiss = { viewModel.dismissPendingDocument() },
+        onTranslate = { selFrom, selTo, txtLayout, translatePdfImages ->
+          viewModel.startPendingDocumentTranslation(selFrom, selTo, txtLayout, translatePdfImages)
+        },
+      )
+    }
+  }
+
+  documentTranslation?.let { document ->
+    DocumentTranslationDialog(
+      document = document,
+      onDismiss = {
+        if (document.isTranslating) {
+          viewModel.cancelDocumentTranslation()
+        } else {
+          DocumentTranslationService.dismiss(context)
+          viewModel.dismissDocumentTranslation()
+        }
+      },
+      onSave = { path, mimeType, fileName ->
+        pendingDocumentSave = PendingDocumentSave(path = path, mimeType = mimeType)
+        saveTranslatedDocument.launch(
+          Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = mimeType
+            putExtra(Intent.EXTRA_TITLE, fileName)
+          },
+        )
+      },
+      onOpen = { path, mimeType ->
+        DocumentTranslationService.dismiss(context)
+        viewModel.dismissDocumentTranslation()
+        try {
+          openDocumentPath(path, mimeType, context)
+        } catch (e: Exception) {
+          Toast.makeText(context, context.getString(R.string.translator_no_app_to_open), Toast.LENGTH_SHORT).show()
+        }
+      },
+    )
+  }
+
+  // Retranslate when isTranslating becomes false (queued translation)
+  LaunchedEffect(isTranslating) {
+    if (!isTranslating) {
+      viewModel.retranslateIfNeeded()
+    }
+  }
+
+  val navigationState by viewModel.navigationState.collectAsState()
+
+  val openLiveCameraRequest by viewModel.openLiveCameraRequest.collectAsState()
+
+  // Map navigation state to route. A pending camera deep link (set by MainActivity
+  // before the first frame) becomes the start destination so the home screen is
+  // never composed — navigating main → live_camera would flash it first. Even
+  // while the language check is still LOADING go straight to the camera: it
+  // renders a black placeholder until the languages arrive, which beats the
+  // loading spinner screen for a launch that never wanted the home screen.
+  val startDestination =
+    remember {
+      when (navigationState) {
+        TranslatorViewModel.NavigationState.NO_LANGUAGES -> "no_languages"
+        TranslatorViewModel.NavigationState.LOADING ->
+          if (openLiveCameraRequest) "live_camera" else "loading"
+        TranslatorViewModel.NavigationState.READY ->
+          if (openLiveCameraRequest) "live_camera" else "main"
+      }
+    }
+
+  // The NavHost lives inside an AnimatedVisibility that only composes its content on a
+  // later frame, so the graph is not set while the first effects run; keying on the
+  // current entry re-runs these once the host is actually there.
+  val currentBackStackEntry by navController.currentBackStackEntryAsState()
+
+  LaunchedEffect(navigationState, currentBackStackEntry, openLiveCameraRequest) {
+    val currentRoute = currentBackStackEntry?.destination?.route
+    if (openLiveCameraRequest) {
+      if (navigationState == TranslatorViewModel.NavigationState.READY) {
+        // Same as the home screen's camera entry: tear down any lingering
+        // overlay session (floating bubble / screen-translate chrome) — its
+        // touchable result or selection window would sit over the camera and
+        // swallow taps (including the language pills').
+        (dev.davidv.translator.OverlayWindowHosts.primary as? dev.davidv.translator.accessibilityOverlay.TranslatorOverlayHost)
+          ?.deactivate()
+      }
+      // Fold the camera deep link into this one transition so the home screen
+      // is never composed. While the NavHost has no back stack yet
+      // (currentRoute == null) the request must be KEPT — clearing it here
+      // dropped the deep link and left the user on the home screen; this
+      // effect re-runs when the first entry appears.
+      when {
+        currentRoute == null -> Unit
+        // Already on the camera (e.g. a repeated deep link) — just consume it.
+        currentRoute == "live_camera" -> viewModel.clearLiveCameraRequest()
+        navigationState == TranslatorViewModel.NavigationState.READY -> {
+          // From the loading gate go straight to the camera so the home screen
+          // is never composed; from anywhere else stack the camera on top.
+          if (currentRoute == "loading") {
+            navController.navigate("live_camera") {
+              popUpTo("loading") { inclusive = true }
+            }
+          } else {
+            navController.navigate("live_camera")
+          }
+          viewModel.clearLiveCameraRequest()
+        }
+        navigationState != TranslatorViewModel.NavigationState.LOADING -> {
+          // no_languages (or another terminal state): packs must be downloaded
+          // before the live camera works — drop the request. If the camera
+          // route was the start destination (deep link while still LOADING),
+          // leave it for the download screen.
+          viewModel.clearLiveCameraRequest()
+          if (currentRoute == "live_camera") {
+            navController.navigate("no_languages") {
+              popUpTo("live_camera") { inclusive = true }
+            }
+          }
+        }
+        // else: still loading — keep the request; this effect re-runs when the
+        // navigation state or back stack changes.
+      }
+      return@LaunchedEffect
+    }
+    val targetRoute =
+      when (navigationState) {
+        TranslatorViewModel.NavigationState.LOADING -> null
+        TranslatorViewModel.NavigationState.NO_LANGUAGES -> "no_languages"
+        TranslatorViewModel.NavigationState.READY -> "main"
+      }
+    if (targetRoute != null && currentRoute != targetRoute && currentRoute == "loading") {
+      navController.navigate(targetRoute) {
+        popUpTo(currentRoute!!) { inclusive = true }
+      }
+    }
+  }
+
+  LaunchedEffect(Unit) {
+    viewModel.languageManagerRequests.collect {
+      val entry = navController.currentBackStackEntryFlow.first { it.destination.route != "loading" }
+      if (entry.destination.route != "language_manager") {
+        navController.navigate("language_manager")
+      }
+    }
+  }
+
+  val isReadonlyPopup = currentLaunchMode == LaunchMode.ReadonlyModal
+
+  val heightFactor by animateFloatAsState(
+    targetValue =
+      when {
+        currentLaunchMode == LaunchMode.Normal -> 1f
+        isReadonlyPopup -> settings.readonlyModalCompactHeightFactor
+        else -> 0.6f
+      },
+    animationSpec = tween(300),
+    label = "heightFactor",
+  )
+  val widthFactor by animateFloatAsState(
+    targetValue = if (currentLaunchMode == LaunchMode.Normal) 1f else 0.9f,
+    animationSpec = tween(300),
+    label = "widthFactor",
+  )
+  val popupAlignment =
+    when (settings.readonlyModalOutputAlignment) {
+      dev.davidv.translator.ReadonlyModalOutputAlignment.TOP -> Alignment.TopCenter
+      dev.davidv.translator.ReadonlyModalOutputAlignment.MIDDLE -> Alignment.Center
+      dev.davidv.translator.ReadonlyModalOutputAlignment.BOTTOM -> Alignment.BottomCenter
+    }
+
+  SideEffect {
+    val activity = context as? Activity ?: return@SideEffect
+    val window = activity.window ?: return@SideEffect
+    window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+    window.setDimAmount(0f)
+    window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+    window.setGravity(Gravity.CENTER)
+  }
+
+  Box(
+    modifier = Modifier.fillMaxSize(),
+    contentAlignment = Alignment.Center,
+  ) {
+    // Click-outside-to-dismiss (invisible)
+    if (currentLaunchMode != LaunchMode.Normal) {
+      Box(
+        modifier =
+          Modifier
+            .fillMaxSize()
+            .clickable(
+              interactionSource = remember { MutableInteractionSource() },
+              indication = null,
+            ) {
+              viewModel.setModalVisible(false)
+              kotlinx.coroutines.MainScope().launch {
+                kotlinx.coroutines.delay(400)
+                onClose()
+              }
+            },
+      )
+    }
+
+    val slideFromTop = popupAlignment != Alignment.BottomCenter
+    val slideMultiplier = if (popupAlignment == Alignment.Center) 2.5f else 1.5f
+    val modalTransitionState =
+      remember { androidx.compose.animation.core.MutableTransitionState(false) }
+    LaunchedEffect(modalVisible) { modalTransitionState.targetState = modalVisible }
+    AnimatedVisibility(
+      visibleState = modalTransitionState,
+      modifier =
+        Modifier
+          .align(popupAlignment)
+          .then(
+            if (currentLaunchMode != LaunchMode.Normal) {
+              Modifier
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .padding(vertical = 8.dp)
+            } else {
+              Modifier
+            },
+          ),
+      enter = androidx.compose.animation.EnterTransition.None,
+      exit =
+        slideOutVertically(
+          animationSpec = tween(300),
+          targetOffsetY = { fullHeight ->
+            val sign = if (slideFromTop) -1 else 1
+            (fullHeight * slideMultiplier).toInt() * sign
+          },
+        ),
+    ) {
+      Box(
+        modifier =
+          Modifier
+            .fillMaxHeight(heightFactor)
+            .fillMaxWidth(widthFactor)
+            .then(
+              if (currentLaunchMode == LaunchMode.Normal) {
+                Modifier
+              } else {
+                Modifier.clip(RoundedCornerShape(10.dp))
+              },
+            ),
+      ) {
+        NavHost(
+          navController = navController,
+          startDestination = startDestination,
+        ) {
+          composable("loading") {
+            Box(
+              modifier = Modifier.fillMaxSize(),
+              contentAlignment = Alignment.Center,
+            ) {
+              CircularProgressIndicator()
+            }
+          }
+
+          composable("no_languages") {
+            val currentDownloadService = downloadService
+            if (currentDownloadService != null) {
+              NoLanguagesScreen(
+                settingsManager = viewModel.settingsManager,
+                onDone = {
+                  if (languageState.hasLanguages) {
+                    MainScope().launch {
+                      navController.navigate("main") {
+                        popUpTo("no_languages") { inclusive = true }
+                      }
+                    }
+                  }
+                },
+                onSettings = {
+                  navController.navigate("settings")
+                },
+                languageStateManager = viewModel.languageStateManager,
+                languageMetadataManager = viewModel.languageMetadataManager,
+                downloadService = currentDownloadService,
+              )
+            }
+          }
+
+          composable("main") {
+            // Safe to use from/to non-null here: navigationState is READY
+            val currentFrom = from
+            val currentTo = to
+            if (currentFrom != null && currentTo != null) {
+              val availableSourceTtsVoices = ttsVoicesByLanguage[currentFrom.code].orEmpty()
+              val selectedSourceTtsVoiceName =
+                parseVoiceOverride(settings.ttsVoiceOverrides[currentFrom.code])
+                  ?.voiceName
+                  ?.takeIf { voiceName -> packsContainVoice(availableSourceTtsVoices, voiceName) }
+                  ?: defaultVoiceNameForLanguage(availableSourceTtsVoices)
+              val sourceTtsPlaybackSpeed = ttsPlaybackSpeedFor(settings, currentFrom, selectedSourceTtsVoiceName)
+              val availableTtsVoices = ttsVoicesByLanguage[currentTo.code].orEmpty()
+              val selectedTtsVoiceName =
+                parseVoiceOverride(settings.ttsVoiceOverrides[currentTo.code])
+                  ?.voiceName
+                  ?.takeIf { voiceName -> packsContainVoice(availableTtsVoices, voiceName) }
+                  ?: defaultVoiceNameForLanguage(availableTtsVoices)
+              val targetTtsPlaybackSpeed = ttsPlaybackSpeedFor(settings, currentTo, selectedTtsVoiceName)
+              MainScreen(
+                onSettings = { navController.navigate("settings") },
+                onLiveCamera = {
+                  // Tear down any lingering overlay session (floating bubble /
+                  // screen-translate chrome) first — its touchable result or
+                  // selection window would sit over the camera and swallow taps.
+                  (dev.davidv.translator.OverlayWindowHosts.primary as? dev.davidv.translator.accessibilityOverlay.TranslatorOverlayHost)
+                    ?.deactivate()
+                  navController.navigate("live_camera")
+                },
+                input = input,
+                inputTransliteration = inputTransliterated,
+                output = output,
+                from = currentFrom,
+                to = currentTo,
+                targetTabs = targetTabs?.tabs ?: listOf(currentTo),
+                detectedLanguage = currentDetectedLanguage,
+                displayImage = displayImage,
+                originalImage = originalImage,
+                imageWordSelection = imageWordSelection,
+                detectedRegions = detectedRegions,
+                ocrReadingOrder = ocrReadingOrder,
+                isTranslating = viewModel.translationCoordinator.isTranslating,
+                isOcrInProgress = viewModel.translationCoordinator.isOcrInProgress,
+                dictionaryWord = dictionaryWord,
+                dictionaryStack = dictionaryStack,
+                dictionaryLookupLanguage = dictionaryLookupLanguage,
+                isAudioPlaying = isAudioPlaying,
+                isAudioLoading = isAudioLoading,
+                isInputAudioPlaying = activeSpeechTarget == SpeechTarget.INPUT && isAudioPlaying,
+                isInputAudioLoading = activeSpeechTarget == SpeechTarget.INPUT && isAudioLoading,
+                isOutputAudioPlaying = activeSpeechTarget == SpeechTarget.OUTPUT && isAudioPlaying,
+                isOutputAudioLoading = activeSpeechTarget == SpeechTarget.OUTPUT && isAudioLoading,
+                onMessage = viewModel::handleMessage,
+                onSteerPreview = viewModel::steerPreview,
+                canSwapLanguages = viewModel.languageStateManager.canSwapLanguages(currentFrom, currentTo),
+                onStopAudio = {
+                  isAudioLoading = false
+                  activeSpeechTarget = null
+                  pcmAudioPlayer.stop()
+                },
+                languageState = languageState,
+                languageMetadata = languageMetadata,
+                downloadStates = downloadStates,
+                settings = settings,
+                availableSourceTtsVoices = availableSourceTtsVoices,
+                selectedSourceTtsVoiceName = selectedSourceTtsVoiceName,
+                sourceTtsPlaybackSpeed = sourceTtsPlaybackSpeed,
+                availableTtsVoices = availableTtsVoices,
+                selectedTtsVoiceName = selectedTtsVoiceName,
+                targetTtsPlaybackSpeed = targetTtsPlaybackSpeed,
+                onTtsPlaybackSpeedChange = { newSpeed ->
+                  val voiceName = selectedTtsVoiceName
+                  val quantizedSpeed = quantizePlaybackSpeed(newSpeed)
+                  viewModel.settingsManager.updateSettings(
+                    if (voiceName != null) {
+                      settings.copy(
+                        ttsPlaybackSpeedOverrides =
+                          settings.ttsPlaybackSpeedOverrides +
+                            (ttsPlaybackSpeedOverrideKey(currentTo, voiceName) to quantizedSpeed),
+                      )
+                    } else {
+                      settings.copy(ttsPlaybackSpeed = quantizedSpeed)
+                    },
+                  )
+                },
+                onSourceTtsPlaybackSpeedChange = { newSpeed ->
+                  val voiceName = selectedSourceTtsVoiceName
+                  val quantizedSpeed = quantizePlaybackSpeed(newSpeed)
+                  viewModel.settingsManager.updateSettings(
+                    if (voiceName != null) {
+                      settings.copy(
+                        ttsPlaybackSpeedOverrides =
+                          settings.ttsPlaybackSpeedOverrides +
+                            (ttsPlaybackSpeedOverrideKey(currentFrom, voiceName) to quantizedSpeed),
+                      )
+                    } else {
+                      settings.copy(ttsPlaybackSpeed = quantizedSpeed)
+                    },
+                  )
+                },
+                onSourceTtsVoiceSelected = { packId, voiceName ->
+                  viewModel.settingsManager.updateSettings(
+                    settings.copy(
+                      ttsVoiceOverrides =
+                        settings.ttsVoiceOverrides +
+                          (currentFrom.code to encodeVoiceOverride(packId, voiceName)),
+                    ),
+                  )
+                },
+                onTtsVoiceSelected = { packId, voiceName ->
+                  viewModel.settingsManager.updateSettings(
+                    settings.copy(
+                      ttsVoiceOverrides =
+                        settings.ttsVoiceOverrides +
+                          (currentTo.code to encodeVoiceOverride(packId, voiceName)),
+                    ),
+                  )
+                },
+                onSpeakInput = { text, language ->
+                  activeSpeechTarget = SpeechTarget.INPUT
+                  viewModel.handleMessage(TranslatorMessage.SpeakTranslatedText(text, language))
+                },
+                onSpeakOutput = { text, language ->
+                  activeSpeechTarget = SpeechTarget.OUTPUT
+                  viewModel.handleMessage(TranslatorMessage.SpeakTranslatedText(text, language))
+                },
+                launchMode = currentLaunchMode,
+                pendingSharedImage = viewModel.pendingSharedImage,
+                isAutoSource = isAutoSource,
+              )
+            }
+          }
+          composable("language_manager") {
+            val curDownloadService = downloadService
+            val catalog = viewModel.languageStateManager.catalog.collectAsState().value
+            if (curDownloadService != null && catalog != null) {
+              val dictionaryDownloadStates by curDownloadService.dictionaryDownloadStates.collectAsState()
+              val ttsDownloadStates by curDownloadService.ttsDownloadStates.collectAsState()
+              val activeTtsPackIds by curDownloadService.activeTtsPackIds.collectAsState()
+              val queuedTtsPackIds by curDownloadService.queuedTtsPackIds.collectAsState()
+              val repairDownloadState by curDownloadService.repairDownloadState.collectAsState()
+              Scaffold(
+                modifier =
+                  Modifier
+                    .fillMaxSize()
+                    .navigationBarsPadding()
+                    .imePadding(),
+              ) { padding ->
+                Box(modifier = Modifier.padding(padding)) {
+                  LanguageAssetManagerScreen(
+                    context = context,
+                    languageStateManager = viewModel.languageStateManager,
+                    languageMetadataManager = viewModel.languageMetadataManager,
+                    settingsManager = viewModel.settingsManager,
+                    catalog = catalog,
+                    languageAvailabilityState = languageState,
+                    downloadStates = downloadStates,
+                    dictionaryDownloadStates = dictionaryDownloadStates,
+                    ttsDownloadStates = ttsDownloadStates,
+                    activeTtsPackIds = activeTtsPackIds,
+                    queuedTtsPackIds = queuedTtsPackIds,
+                    repairDownloadState = repairDownloadState,
+                  )
+                }
+              }
+            }
+          }
+          composable("settings") {
+            val catalog = viewModel.languageStateManager.catalog.collectAsState().value
+            val englishLang = catalog?.english
+            val availableWithEnglish =
+              if (englishLang != null) {
+                (languageState.translatorLanguages() + englishLang).distinctBy { it.code }
+              } else {
+                languageState.translatorLanguages()
+              }
+            val app = context.applicationContext as dev.davidv.translator.TranslatorApplication
+            val adblockReady by app.adblockManager.ready.collectAsState()
+            SettingsScreen(
+              settings = settings,
+              languageMetadataManager = viewModel.languageMetadataManager,
+              availableLanguages = availableWithEnglish,
+              catalog = catalog,
+              adblockDownloadState = adblockDownloadState,
+              adblockInstalled = adblockReady || catalog?.supportInstalledByKind("adblock") == true,
+              onSettingsChange = { newSettings ->
+                viewModel.settingsManager.updateSettings(newSettings)
+                if (newSettings.defaultTargetLanguageCode != settings.defaultTargetLanguageCode) {
+                  val targetLang = catalog?.languageByCode(newSettings.defaultTargetLanguageCode)
+                  if (targetLang != null) {
+                    viewModel.handleMessage(dev.davidv.translator.TranslatorMessage.ToLang(targetLang))
+                  }
+                }
+                if (newSettings.useExternalStorage != settings.useExternalStorage) {
+                  viewModel.languageStateManager.refreshLanguageAvailability()
+                }
+              },
+              onManageLanguages = {
+                navController.navigate("language_manager")
+              },
+              onDeleteAdblockSupport = {
+                viewModel.languageStateManager.deleteSupportByKind("adblock")
+                app.adblockManager.reload()
+              },
+              onHowToUse = {
+                navController.navigate("how_to_use")
+              },
+            )
+          }
+          composable("how_to_use") {
+            HowToUseScreen(onBack = { navController.popBackStack() })
+          }
+          composable("live_camera") {
+            val currentFrom = from
+            val currentTo = to
+            val liveCatalog by viewModel.languageStateManager.catalog.collectAsState()
+            if (currentFrom != null && currentTo != null) {
+              LiveCameraScreen(
+                from = currentFrom,
+                to = currentTo,
+                isAutoSource = isAutoSource,
+                canSwap = viewModel.languageStateManager.canSwapLanguages(currentFrom, currentTo),
+                languageState = languageState,
+                languageMetadata = languageMetadata,
+                languageStateManager = viewModel.languageStateManager,
+                onMessage = viewModel::handleMessage,
+                showAutoOption = !settings.disableCLD,
+                liveOverlayDefaultEnabled = settings.liveCameraOverlayEnabled,
+                catalog = liveCatalog,
+                onClose = {
+                  // Deep-linked straight onto the camera (start destination or
+                  // loading → live_camera): no home entry sits under it, so
+                  // popBackStack("main") fails — close the activity instead so
+                  // Back/close returns to the caller (Circle to Search) rather
+                  // than dropping the user on the module's home screen.
+                  if (!navController.popBackStack("main", inclusive = false)) {
+                    (context as? android.app.Activity)?.finish()
+                  }
+                },
+                onImageCaptured = viewModel::setSharedImageUri,
+              )
+            } else {
+              // Deep-linked in while the language check is still running: the
+              // camera screen needs from/to, so hold a black frame (the camera
+              // screen's own background) until they arrive instead of flashing
+              // the loading spinner or an empty white frame.
+              Box(
+                modifier = Modifier
+                  .fillMaxSize()
+                  .background(Color.Black)
+              )
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,7 @@
+[package]
+name = "translator-convert"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+mnn-sys = { git = "https://github.com/DavidVentura/mnn-sys", features = ["converter"] }

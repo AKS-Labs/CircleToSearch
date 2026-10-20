@@ -1,0 +1,22 @@
+[package]
+name = "translator-render"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+
+[lib]
+name = "translator_render"
+path = "src/lib.rs"
+
+[dependencies]
+translator-core = { path = "../translator-core", features = ["script-from-unicode"] }
+ttf-parser = { version = "0.25", default-features = false, features = ["std", "opentype-layout", "variable-fonts"] }
+rustybuzz = { version = "0.20", default-features = false, features = ["std"] }
+unicode-bidi = { version = "0.3", default-features = false, features = ["std", "hardcoded-data"] }
+unicode-script = { version = "0.5", default-features = false }
+unicode-linebreak = "0.1"
+zeno = { version = "0.3", default-features = false, features = ["std", "eval"] }
+uniffi = { version = "0.31", optional = true, default-features = false }
+
+[features]
+uniffi = ["dep:uniffi", "translator-core/uniffi"]

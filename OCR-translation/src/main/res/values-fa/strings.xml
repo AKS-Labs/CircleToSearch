@@ -1,0 +1,217 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="stop">توقف</string>
+    <string name="pause">مکث</string>
+    <string name="resume">ادامه</string>
+    <string name="region_select_menu">تعیین محدوده ترجمه</string>
+    <string name="screen_translate_needs_source">زبان مبدأ را مشخص کنید</string>
+    <string name="live_tile_label">ترجمه زنده صفحه</string>
+    <string name="translate_text">ترجمه</string>
+    <string name="translate_link">ترجمه پیوند</string>
+    <string name="accessibility_service_description">این سرویس را فعال کنید تا متن روی صفحه ترجمه شود. برای ترجمه صفحه فعلی روی دکمه شناور ترجمه بزنید، یا یک ترجمه زنده صفحه را شروع کنید.</string>
+    <string name="tap_to_translate_title">ترجمه سریع روشن است</string>
+    <string name="tap_to_translate_body">برای باز کردن پنجره مترجم بزنید</string>
+    <string name="tap_to_translate_channel">ترجمه سریع</string>
+    <string name="tap_to_translate_channel_description">اعلان همیشگی برای دسترسی سریع به پنجره مترجم</string>
+    <string name="quick_tile_label">ترجمه</string>
+    <!-- common -->
+    <string name="common_ok">تأیید</string>
+    <string name="common_cancel">لغو</string>
+    <string name="common_done">انجام شد</string>
+    <string name="common_grant">اعطا</string>
+    <string name="common_manage">مدیریت</string>
+    <!-- settings -->
+    <string name="settings_title">تنظیمات</string>
+    <string name="settings_languages">زبان‌ها</string>
+    <string name="settings_language_packs">بسته‌های زبان</string>
+    <string name="settings_general">عمومی</string>
+    <string name="settings_font_size">اندازه فونت</string>
+    <string name="settings_font_sample">این یک متن نمونه است</string>
+    <string name="settings_tap_notification">اعلان ترجمه سریع</string>
+    <string name="settings_tap_notification_desc">اعلان همیشگی که پنجره را باز می‌کند.</string>
+    <string name="settings_web_translator">مترجم وب</string>
+    <string name="settings_clear_browsing">پاک کردن داده‌های مرور هنگام بستن</string>
+    <string name="settings_clear_browsing_desc">کوکی‌ها، حافظه پنهان و ذخیره‌سازی محلی را حذف می‌کند.</string>
+    <string name="settings_tts_section">تبدیل متن به گفتار</string>
+    <string name="settings_tts_read_urls_hashtags">خواندن نشانی‌ها و هشتگ‌ها</string>
+    <string name="settings_popup_settings">پنجره بازشو</string>
+    <string name="settings_popup_desc">هنگام انتخاب \'ترجمه\' از منوی انتخاب متن، پنجره بازشو نمایش داده می‌شود</string>
+    <string name="settings_hide_input">پنهان کردن ورودی</string>
+    <string name="settings_popup_position">موقعیت پنجره بازشو</string>
+    <string name="settings_popup_size">اندازه پنجره: %1$d%%</string>
+    <string name="settings_screen_translation">ترجمه صفحه</string>
+    <string name="settings_screen_translation_desc">متن را مستقیماً روی برنامه‌های دیگر ترجمه کنید.</string>
+    <string name="settings_floating_button">دکمه همیشه‌فعال</string>
+    <string name="settings_floating_button_desc">به مجوز دسترس‌پذیری نیاز دارد</string>
+    <string name="settings_shortcut">ترجمه صفحه با میانبر</string>
+    <string name="settings_shortcut_desc">برای فعال‌سازی، دکمه خانه یا روشن/خاموش را نگه دارید</string>
+    <string name="settings_on_shortcut">هنگام فراخوانی میانبر</string>
+    <string name="settings_ocr">تصاویر</string>
+    <string name="settings_background_mode">جایگزینی متن با</string>
+    <string name="settings_min_confidence">حداقل اطمینان: %1$d%%</string>
+    <string name="settings_max_image_size">حداکثر اندازه تصویر: %1$dpx</string>
+    <string name="settings_advanced">پیشرفته</string>
+    <string name="settings_catalog_url">نشانی کاتالوگ (URL)</string>
+    <string name="settings_external_storage">استفاده از حافظه خارجی</string>
+    <string name="settings_disable_autodetect">غیرفعال کردن تشخیص خودکار زبان</string>
+    <string name="settings_translit_output">نمایش آوانگاری متن ترجمه‌شده</string>
+    <string name="settings_translit_input">نمایش آوانگاری متن اصلی</string>
+    <string name="settings_translit_japanese_spaces">افزودن فاصله در آوانگاری ژاپنی</string>
+    <string name="settings_translate_pdf_images">ترجمه تصاویر داخل فایل‌های PDF</string>
+    <string name="settings_camera_live_default">ترجمه زنده دوربین به‌صورت پیش‌فرض</string>
+    <string name="settings_register_browser">ثبت به‌عنوان مرورگر</string>
+    <string name="settings_register_browser_desc">پیشنهاد ترجمه پیوندهای برنامه‌های دیگر.</string>
+    <string name="settings_external_storage_perm_title">مجوز حافظه خارجی</string>
+    <string name="settings_about">درباره</string>
+    <string name="settings_version">نسخه %1$s</string>
+    <string name="settings_no_languages_available">هیچ زبانی در دسترس نیست</string>
+    <string name="settings_default_from">زبان مبدأ پیش‌فرض</string>
+    <string name="settings_default_to">زبان مقصد پیش‌فرض</string>
+    <string name="settings_adblock_support">مسدود کردن تبلیغات</string>
+    <string name="settings_about_get_help">دریافت کمک / گزارش مشکل</string>
+    <string name="settings_logs_copied">گزارش‌های برنامه در کلیپ‌بورد کپی شد</string>
+    <string name="settings_about_support">حمایت از توسعه</string>
+    <string name="settings_external_storage_perm_body">برای ذخیره فایل‌های ترجمه در پوشه اسناد شما، این برنامه به دسترسی برای مدیریت همه فایل‌ها نیاز دارد.\nبه تنظیمات هدایت می‌شوید تا بتوانید مجوز \'اجازه دسترسی برای مدیریت همه فایل‌ها\' را اعطا کنید.</string>
+    <!-- language manager / setup / how-to -->
+    <string name="langmgr_voices">صداها</string>
+    <string name="voice_section_downloaded">دانلودشده</string>
+    <string name="voice_section_available">در دسترس</string>
+    <string name="langmgr_default">پیش‌فرض</string>
+    <string name="langmgr_filter">فیلتر زبان‌ها</string>
+    <string name="langmgr_ocr_upgrade_available">یک مدل بهبودیافته برای شناسایی متن در دسترس است.</string>
+    <string name="langmgr_delete_shared_title">دیکشنری مشترک حذف شود؟</string>
+    <string name="langmgr_delete_shared_body">این دیکشنری با %1$s به اشتراک گذاشته شده است.\nبا حذف آن، دیکشنری برای همه آن‌ها حذف می‌شود.</string>
+    <string name="langmgr_download_size">دانلود %1$s</string>
+    <string name="langmgr_repair_needed">برخی از قابلیت‌های دانلودشده فایل‌های ناقص دارند و تا زمان تعمیر کار نمی‌کنند.</string>
+    <string name="langmgr_repair_size">تعمیر %1$s</string>
+    <string name="nolang_title">راه‌اندازی زبان</string>
+    <string name="nolang_prompt">برای شروع ترجمه، بسته‌های زبان را دانلود کنید</string>
+    <string name="howto_title">نحوه استفاده</string>
+    <!-- image capture / voice / dictionary / language selector -->
+    <string name="image_no_crop_remote">تصاویر آنلاین را نمی‌توان مستقیماً برش داد</string>
+    <string name="image_open_failed">باز کردن فایل ناموفق بود</string>
+    <string name="image_source_screen">صفحه</string>
+    <string name="image_source_document">سند</string>
+    <string name="image_source_photos">عکس‌ها</string>
+    <string name="image_source_gallery">گالری</string>
+    <string name="image_source_camera">دوربین</string>
+    <string name="voice_playback_speed">سرعت پخش</string>
+    <string name="voice_label">صدا</string>
+    <string name="voice_default">صدای پیش‌فرض</string>
+    <string name="langsel_auto">✨ خودکار</string>
+    <string name="dict_also_as">همچنین به‌شکل:</string>
+    <!-- camera / browser / screen translate -->
+    <string name="camera_permission_rationale">برای ترجمه زنده به مجوز دوربین نیاز است.</string>
+    <string name="camera_need_ocr_models">باید مدل‌های شناسایی متن (برای تصاویر) این زبان را دانلود کنید</string>
+    <string name="browser_no_source_language">هیچ زبان مبدئی در دسترس نیست. ابتدا یکی را از صفحه اصلی نصب کنید، یا در تنظیمات یک زبان مبدأ پیش‌فرض تعیین کنید.</string>
+    <string name="browser_reader_unavailable">حالت خواندن برای این صفحه در دسترس نیست</string>
+    <string name="browser_translate_image">ترجمه تصویر</string>
+    <string name="screen_translating_notification">در حال ترجمه صفحه</string>
+    <!-- enums -->
+    <string name="align_top">بالا</string>
+    <string name="align_middle">وسط</string>
+    <string name="align_bottom">پایین</string>
+    <string name="assistant_action_still_image">یک‌بار ترجمه کن</string>
+    <string name="assistant_action_live_screen">شروع ترجمه زنده</string>
+    <string name="background_mode_white_on_black">سفید روی سیاه</string>
+    <string name="background_mode_black_on_white">سیاه روی سفید</string>
+    <string name="background_mode_auto_detect">رنگ‌های تصویر اصلی</string>
+    <!-- tts / speech errors -->
+    <string name="tts_nothing_to_speak">چیزی برای خواندن وجود ندارد</string>
+    <string name="tts_catalog_unavailable">کاتالوگ در دسترس نیست</string>
+    <string name="tts_no_voice">هیچ صدایی برای %1$s نصب نشده است</string>
+    <string name="tts_synthesis_failed">تولید گفتار برای %1$s ناموفق بود</string>
+    <string name="tts_sample_fallback">این یک نمونه صدای Offline Translator است.</string>
+    <!-- translation -->
+    <string name="translation_error">خطای ترجمه: %1$s</string>
+    <!-- download errors -->
+    <string name="download_failed_core">دانلود %1$s ناموفق بود</string>
+    <string name="download_failed_ocr">دانلود مدل شناسایی متن %1$s ناموفق بود</string>
+    <string name="download_failed_ocr_batch">دانلود دسته‌ای مدل‌های شناسایی متن ناموفق بود</string>
+    <string name="download_failed_dictionary">دانلود دیکشنری %1$s ناموفق بود</string>
+    <string name="download_failed_tts">دانلود صدای %1$s ناموفق بود</string>
+    <string name="download_failed_adblock">دانلود مسدودکننده تبلیغات ناموفق بود</string>
+    <string name="download_failed_repair">دانلود تعمیر ناموفق بود</string>
+    <string name="download_catalog_unavailable">کاتالوگ در دسترس نیست</string>
+    <string name="download_catalog_save_failed">ذخیره کاتالوگ ناموفق بود</string>
+    <string name="download_unknown_error">خطای ناشناخته</string>
+    <string name="download_catalog_failed">دانلود کاتالوگ ناموفق بود: %1$s</string>
+    <!-- assistant overlay status -->
+    <string name="assistant_invoke_prompt">این دستیار را روی یک متن فعال کنید تا آن را ترجمه کند</string>
+    <string name="assistant_collecting_context">در حال جمع‌آوری محتوای صفحه…</string>
+    <string name="assistant_screenshot_disabled">دسترسی به اسکرین‌شات برای این دستیار غیرفعال است. آن را در تنظیمات دستیار سیستم فعال کنید.</string>
+    <string name="assistant_no_screen_data">هیچ داده‌ای از صفحه دریافت نشد. \'استفاده از اسکرین‌شات\' را برای این دستیار فعال کنید.</string>
+    <string name="assistant_no_screenshot">این برنامه اسکرین‌شاتی ارائه نکرد.</string>
+    <string name="assistant_set_source_ocr">یک زبان مبدأ پیش‌فرض برای شناسایی متن تعیین کنید.</string>
+    <string name="assistant_langs_not_ready">زبان‌های ترجمه هنوز آماده نیستند. دوباره تلاش کنید.</string>
+    <string name="assistant_ocr_failed">شناسایی متن ناموفق بود</string>
+    <string name="ocr_models_missing">مدل‌های شناسایی متن موجود نیستند. برای تعمیر، مدیریت زبان‌ها را در برنامه باز کنید.</string>
+    <string name="assistant_set_source_live">برای استفاده از ترجمه زنده صفحه، در تنظیمات یک زبان مبدأ پیش‌فرض تعیین کنید.</string>
+    <!-- migration gate -->
+    <string name="migration_updating_speech_models">در حال به‌روزرسانی مدل‌های گفتار</string>
+    <string name="migration_accept_convert">پذیرفتن و تبدیل</string>
+    <string name="migration_delete_all">در عوض همه را حذف کن</string>
+    <string name="migration_converting">در حال تبدیل %1$d از %2$d</string>
+    <string name="migration_optimizing">در حال بهینه‌سازی مدل‌ها</string>
+    <plurals name="migration_convert_prompt">
+        <item quantity="one">شما %1$d مدل گفتار برای تبدیل به قالب جدید دارید. این کار حدوداً %2$d ثانیه طول می‌کشد. شما %3$.0f مگابایت فضای دیسک را آزاد خواهید کرد.</item>
+        <item quantity="other">شما %1$d مدل گفتار برای تبدیل به قالب جدید دارید. این کار حدوداً %2$d ثانیه طول می‌کشد. شما %3$.0f مگابایت فضای دیسک را آزاد خواهید کرد.</item>
+    </plurals>
+    <!-- document translation notification + progress -->
+    <string name="doc_notif_translating">در حال ترجمه فایل</string>
+    <string name="doc_notif_translated">فایل ترجمه شد</string>
+    <string name="doc_notif_phase_text">متن %1$d%%</string>
+    <string name="doc_notif_phase_images">تصاویر %1$d/%2$d</string>
+    <string name="doc_notif_phase_raster">صفحات تصویری %1$d/%2$d</string>
+    <string name="doc_notif_channel_name">ترجمه سند</string>
+    <string name="doc_notif_channel_desc">پیشرفت را هنگام ترجمه اسناد نمایش می‌دهد</string>
+    <string name="doc_progress_preparing">در حال آماده‌سازی فایل</string>
+    <string name="doc_progress_translating">در حال ترجمه</string>
+    <string name="doc_progress_translated">فایل ترجمه شد</string>
+    <string name="doc_progress_saving">در حال ذخیره فایل ترجمه‌شده</string>
+    <string name="doc_translation_failed">ترجمه سند ناموفق بود</string>
+    <string name="doc_url_unsupported">به‌جای آن، سند را دانلود کنید و با برنامه باز کنید</string>
+    <!-- document configure sheet -->
+    <string name="document_wrap_columns">شکستن خط در %1$d ستون</string>
+    <string name="document_translate_pdf_images">ترجمه تصاویر داخل PDF</string>
+    <string name="layout_preserve">حفظ شکست خط‌ها</string>
+    <string name="layout_reflow">بازچینش در پاراگراف‌ها</string>
+    <string name="layout_reflow_wrap">بازچینش و شکستن خط</string>
+    <!-- common (additional) -->
+    <string name="common_open">باز کردن</string>
+    <string name="common_close">بستن</string>
+    <string name="common_save">ذخیره</string>
+    <!-- translator app -->
+    <string name="translator_translated_file">فایل ترجمه‌شده: %1$s</string>
+    <string name="translator_document_saved">سند ذخیره شد</string>
+    <string name="translator_document_save_failed">ذخیره سند ناموفق بود</string>
+    <string name="translator_audio_playback_failed">پخش صدا ناموفق بود: %1$s</string>
+    <string name="translator_no_app_to_open">هیچ برنامه‌ای برای باز کردن این فایل پیدا نشد</string>
+    <!-- document alignment -->
+    <string name="docalign_decode_failed">رمزگشایی تصویر ممکن نشد.</string>
+    <string name="docalign_detecting">در حال تشخیص گوشه‌ها…</string>
+    <string name="docalign_redetecting">در حال تشخیص دوباره…</string>
+    <string name="docalign_help">یک محدوده دقیق دور سند، کیفیت شناسایی متن را بهتر می‌کند. مهم است که خط‌ها موازی با متن باشند.\n\nبزرگ‌نمایی یا جابه‌جایی معمولاً باعث می‌شود الگوریتم سند را به‌صورت خودکار تشخیص دهد، اما اگر پیدا نشد می‌توانید آن را دستی تنظیم کنید.</string>
+    <!-- how to use -->
+    <string name="howto_section_other_apps">از برنامه‌های دیگر</string>
+    <string name="howto_share_title">برای ترجمه به اشتراک بگذارید</string>
+    <string name="howto_share_body">متن، پیوند یا تصویر را از هر برنامه‌ای به اشتراک بگذارید تا ترجمه شود.</string>
+    <string name="howto_copy_title">ترجمه بدون خروج از برنامه‌های دیگر</string>
+    <string name="howto_copy_body">در هر جایی متن را انتخاب کنید، سپس در نوار کپی روی \"ترجمه\" بزنید تا ترجمه را در یک پنجره کوچک ببینید.</string>
+    <string name="howto_section_in_app">داخل برنامه</string>
+    <string name="howto_docs_title">ترجمه اسناد و تصاویر</string>
+    <string name="howto_docs_body">برای ترجمه تصاویر یا فایل‌های EPUB، PDF و TXT، زبانه اسناد را باز کنید.</string>
+    <string name="howto_dict_title">جستجو در دیکشنری</string>
+    <string name="howto_dict_body">روی هر واژه در یک ترجمه نگه دارید تا تعریف آن را ببینید. داده‌ها از Wiktionary گرفته شده‌اند.</string>
+    <string name="howto_voice_title">تغییر صدا یا سرعت</string>
+    <string name="howto_voice_body">دکمه پخش را نگه دارید تا صدای دیگری انتخاب کنید یا سرعت پخش را تنظیم کنید.</string>
+    <!-- feature row labels -->
+    <string name="feature_translation">ترجمه</string>
+    <string name="feature_dictionary">دیکشنری</string>
+    <string name="feature_tts">صدا</string>
+    <!-- misc -->
+    <string name="detected_translate_from">ترجمه از</string>
+    <string name="detected_missing_language">زبان موجود نیست</string>
+    <string name="main_input_placeholder">متن را وارد کنید</string>
+    <string name="aidl_target_unavailable">زبان مقصد در دسترس نیست</string>
+</resources>

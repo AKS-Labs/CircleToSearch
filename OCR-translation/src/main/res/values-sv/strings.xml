@@ -1,0 +1,217 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="stop">Stoppa</string>
+    <string name="pause">Pausa</string>
+    <string name="resume">Återuppta</string>
+    <string name="region_select_menu">Ange översättningsområde</string>
+    <string name="screen_translate_needs_source">Ange källspråk</string>
+    <string name="live_tile_label">Översätt skärmen live</string>
+    <string name="translate_text">Översätt</string>
+    <string name="translate_link">Översätt länk</string>
+    <string name="accessibility_service_description">Aktivera den här tjänsten för att översätta text på skärmen. Tryck på den flytande översättningsknappen för att översätta den aktuella skärmen, eller starta en live-översättning av skärmen.</string>
+    <string name="tap_to_translate_title">Snabböversättning är på</string>
+    <string name="tap_to_translate_body">Tryck för att öppna översättningsfönstret</string>
+    <string name="tap_to_translate_channel">Snabböversättning</string>
+    <string name="tap_to_translate_channel_description">Beständig avisering för snabb åtkomst till översättningsfönstret</string>
+    <string name="quick_tile_label">Översätt</string>
+    <!-- common -->
+    <string name="common_ok">OK</string>
+    <string name="common_cancel">Avbryt</string>
+    <string name="common_done">Klar</string>
+    <string name="common_grant">Bevilja</string>
+    <string name="common_manage">Hantera</string>
+    <!-- settings -->
+    <string name="settings_title">Inställningar</string>
+    <string name="settings_languages">Språk</string>
+    <string name="settings_language_packs">Språkpaket</string>
+    <string name="settings_general">Allmänt</string>
+    <string name="settings_font_size">Teckenstorlek</string>
+    <string name="settings_font_sample">Det här är lite exempeltext</string>
+    <string name="settings_tap_notification">Avisering för snabböversättning</string>
+    <string name="settings_tap_notification_desc">Beständig avisering som öppnar fönstret.</string>
+    <string name="settings_web_translator">Webböversättare</string>
+    <string name="settings_clear_browsing">Rensa webbdata vid stängning</string>
+    <string name="settings_clear_browsing_desc">Tar bort cookies, cache och lokal lagring.</string>
+    <string name="settings_tts_section">Text till tal</string>
+    <string name="settings_tts_read_urls_hashtags">Läs upp URL:er och hashtaggar</string>
+    <string name="settings_popup_settings">Fönster</string>
+    <string name="settings_popup_desc">Fönstret visas när du väljer \'Översätt\' i textmarkeringsmenyn</string>
+    <string name="settings_hide_input">Dölj inmatning</string>
+    <string name="settings_popup_position">Fönsterposition</string>
+    <string name="settings_popup_size">Fönsterstorlek: %1$d%%</string>
+    <string name="settings_screen_translation">Skärmöversättning</string>
+    <string name="settings_screen_translation_desc">Översätt text direkt ovanpå andra appar.</string>
+    <string name="settings_floating_button">Alltid-på-knapp</string>
+    <string name="settings_floating_button_desc">Kräver tillgänglighetsroll</string>
+    <string name="settings_shortcut">Översätt skärmen via genväg</string>
+    <string name="settings_shortcut_desc">Håll in hem- eller strömknappen för att utlösa</string>
+    <string name="settings_on_shortcut">Vid genvägsaktivering</string>
+    <string name="settings_ocr">Bilder</string>
+    <string name="settings_background_mode">Ersätt text med</string>
+    <string name="settings_min_confidence">Lägsta säkerhet: %1$d%%</string>
+    <string name="settings_max_image_size">Max bildstorlek: %1$dpx</string>
+    <string name="settings_advanced">Avancerat</string>
+    <string name="settings_catalog_url">Katalog-URL</string>
+    <string name="settings_external_storage">Använd extern lagring</string>
+    <string name="settings_disable_autodetect">Inaktivera automatisk språkidentifiering</string>
+    <string name="settings_translit_output">Visa translitterering för översatt text</string>
+    <string name="settings_translit_input">Visa translitterering för originaltext</string>
+    <string name="settings_translit_japanese_spaces">Lägg till mellanslag för japansk translitterering</string>
+    <string name="settings_translate_pdf_images">Översätt bilder i PDF-filer</string>
+    <string name="settings_camera_live_default">Översätt kameran live som standard</string>
+    <string name="settings_register_browser">Registrera som webbläsare</string>
+    <string name="settings_register_browser_desc">Erbjud att översätta länkar från andra appar.</string>
+    <string name="settings_external_storage_perm_title">Behörighet för extern lagring</string>
+    <string name="settings_about">Om</string>
+    <string name="settings_version">Version %1$s</string>
+    <string name="settings_no_languages_available">Inga språk tillgängliga</string>
+    <string name="settings_default_from">Standardspråk att översätta \'från\'</string>
+    <string name="settings_default_to">Standardspråk att översätta \'till\'</string>
+    <string name="settings_adblock_support">Annonsblockering</string>
+    <string name="settings_about_get_help">Få hjälp / rapportera problem</string>
+    <string name="settings_logs_copied">Apploggar kopierade till urklipp</string>
+    <string name="settings_about_support">Stöd utvecklingen</string>
+    <string name="settings_external_storage_perm_body">För att lagra översättningsfiler i din Dokument-mapp behöver den här appen åtkomst för att hantera alla filer.\nDu kommer att tas till Inställningar där du kan bevilja behörigheten \'Tillåt åtkomst för att hantera alla filer\'.</string>
+    <!-- language manager / setup / how-to -->
+    <string name="langmgr_voices">Röster</string>
+    <string name="langmgr_default">STANDARD</string>
+    <string name="langmgr_filter">Filtrera språk</string>
+    <string name="langmgr_delete_shared_title">Ta bort delad ordbok?</string>
+    <string name="langmgr_delete_shared_body">Den här ordboken delas med %1$s.\nOm du tar bort den försvinner ordboken för alla.</string>
+    <string name="langmgr_download_size">Ladda ner %1$s</string>
+    <string name="langmgr_repair_needed">Vissa nedladdade funktioner saknar filer och fungerar inte förrän de reparerats.</string>
+    <string name="langmgr_repair_size">Reparera %1$s</string>
+    <string name="nolang_title">Språkinställning</string>
+    <string name="nolang_prompt">Ladda ner språkpaket för att börja översätta</string>
+    <string name="howto_title">Så här använder du</string>
+    <!-- image capture / voice / dictionary / language selector -->
+    <string name="image_no_crop_remote">Fjärrbilder kan inte beskäras direkt</string>
+    <string name="image_open_failed">Det gick inte att öppna filen</string>
+    <string name="image_source_screen">Skärm</string>
+    <string name="image_source_document">Dokument</string>
+    <string name="image_source_photos">Foton</string>
+    <string name="image_source_gallery">Galleri</string>
+    <string name="image_source_camera">Kamera</string>
+    <string name="voice_playback_speed">Uppspelningshastighet</string>
+    <string name="voice_label">Röst</string>
+    <string name="voice_default">Standardröst</string>
+    <string name="langsel_auto">✨ Auto</string>
+    <string name="dict_also_as">Även som:</string>
+    <!-- camera / browser / screen translate -->
+    <string name="camera_permission_rationale">Kamerabehörighet krävs för live-översättning.</string>
+    <string name="camera_need_ocr_models">Du behöver ladda ner textigenkänningsmodellerna för det här språket</string>
+    <string name="browser_no_source_language">Inget källspråk tillgängligt. Installera ett från huvudskärmen först, eller ange ett standardkällspråk i inställningarna.</string>
+    <string name="browser_reader_unavailable">Läsläge är inte tillgängligt för den här sidan</string>
+    <string name="browser_translate_image">Översätt bild</string>
+    <string name="screen_translating_notification">Översätter skärmen</string>
+    <!-- enums -->
+    <string name="align_top">Överst</string>
+    <string name="align_middle">Mitten</string>
+    <string name="align_bottom">Nederst</string>
+    <string name="assistant_action_still_image">Översätt en gång</string>
+    <string name="assistant_action_live_screen">Starta live-översättning</string>
+    <string name="background_mode_white_on_black">Vitt på svart</string>
+    <string name="background_mode_black_on_white">Svart på vitt</string>
+    <string name="background_mode_auto_detect">Identifiera färger automatiskt</string>
+    <!-- tts / speech errors -->
+    <string name="tts_nothing_to_speak">Inget att läsa upp</string>
+    <string name="tts_catalog_unavailable">Katalogen är inte tillgänglig</string>
+    <string name="tts_no_voice">Ingen röst installerad för %1$s</string>
+    <string name="tts_synthesis_failed">Talsyntes misslyckades för %1$s</string>
+    <string name="tts_sample_fallback">Det här är ett text-till-tal-exempel från Offline Translator.</string>
+    <!-- translation -->
+    <string name="translation_error">Översättningsfel: %1$s</string>
+    <!-- download errors -->
+    <string name="download_failed_core">Nedladdningen av %1$s misslyckades</string>
+    <string name="download_failed_ocr">Nedladdningen av textigenkänning för %1$s misslyckades</string>
+    <string name="download_failed_ocr_batch">Batchnedladdningen av textigenkänning misslyckades</string>
+    <string name="download_failed_dictionary">Ordboksnedladdningen för %1$s misslyckades</string>
+    <string name="download_failed_tts">Röstnedladdningen för %1$s misslyckades</string>
+    <string name="download_failed_adblock">Adblock-nedladdningen misslyckades</string>
+    <string name="download_failed_repair">Nedladdning av reparation misslyckades</string>
+    <string name="download_catalog_unavailable">Katalogen är inte tillgänglig</string>
+    <string name="download_catalog_save_failed">Det gick inte att spara katalogen</string>
+    <string name="download_unknown_error">Okänt fel</string>
+    <string name="download_catalog_failed">Det gick inte att ladda ner katalogen: %1$s</string>
+    <!-- assistant overlay status -->
+    <string name="assistant_invoke_prompt">Aktivera den här assistenten ovanpå text för att översätta den</string>
+    <string name="assistant_collecting_context">Samlar in skärmkontext…</string>
+    <string name="assistant_screenshot_disabled">Skärmdumpsåtkomst är inaktiverad för den här assistenten. Aktivera den i systemets assistentinställningar.</string>
+    <string name="assistant_no_screen_data">Inga skärmdata mottagna. Aktivera \'Använd skärmdump\' för den här assistenten.</string>
+    <string name="assistant_no_screenshot">Den här appen tillhandahöll ingen skärmdump.</string>
+    <string name="assistant_set_source_ocr">Ange ett standardkällspråk för textigenkänning.</string>
+    <string name="assistant_langs_not_ready">Översättningsspråken är inte redo än. Försök igen.</string>
+    <string name="assistant_ocr_failed">Textigenkänning misslyckades</string>
+    <string name="ocr_models_missing">Textigenkänningsmodeller saknas. Öppna Hantera språk i appen för att reparera.</string>
+    <string name="assistant_set_source_live">Ange ett standardkällspråk i Inställningar för att använda live-översättning av skärmen.</string>
+    <!-- migration gate -->
+    <string name="migration_updating_speech_models">Uppdaterar talmodeller</string>
+    <string name="migration_accept_convert">Acceptera och konvertera</string>
+    <string name="migration_delete_all">Ta bort alla i stället</string>
+    <string name="migration_converting">Konverterar %1$d av %2$d</string>
+    <string name="migration_optimizing">Optimerar modeller</string>
+    <plurals name="migration_convert_prompt">
+        <item quantity="one">Du har %1$d text-till-tal-modell att konvertera till ett nytt format. Det tar ungefär %2$d sekunder. Du sparar %3$.0f MB diskutrymme.</item>
+        <item quantity="other">Du har %1$d text-till-tal-modeller att konvertera till ett nytt format. Det tar ungefär %2$d sekunder. Du sparar %3$.0f MB diskutrymme.</item>
+    </plurals>
+    <!-- document translation notification + progress -->
+    <string name="doc_notif_translating">Översätter fil</string>
+    <string name="doc_notif_translated">Översatt fil</string>
+    <string name="doc_notif_phase_text">Text %1$d%%</string>
+    <string name="doc_notif_phase_images">Bilder %1$d/%2$d</string>
+    <string name="doc_notif_phase_raster">Bitmappssidor %1$d/%2$d</string>
+    <string name="doc_notif_channel_name">Dokumentöversättning</string>
+    <string name="doc_notif_channel_desc">Visar förlopp medan dokument översätts</string>
+    <string name="doc_progress_preparing">Förbereder fil</string>
+    <string name="doc_progress_translating">Översätter</string>
+    <string name="doc_progress_translated">Översatt fil</string>
+    <string name="doc_progress_saving">Sparar översatt fil</string>
+    <string name="doc_translation_failed">Dokumentöversättningen misslyckades</string>
+    <string name="doc_url_unsupported">Ladda ner dokumentet och öppna det med appen i stället</string>
+    <!-- document configure sheet -->
+    <string name="document_wrap_columns">Radbryt vid %1$d kolumner</string>
+    <string name="document_translate_pdf_images">Översätt bilder i PDF</string>
+    <string name="layout_preserve">Behåll radbrytningar</string>
+    <string name="layout_reflow">Omforma till stycken</string>
+    <string name="layout_reflow_wrap">Omforma och radbryt</string>
+    <!-- common (additional) -->
+    <string name="common_open">Öppna</string>
+    <string name="common_close">Stäng</string>
+    <string name="common_save">Spara</string>
+    <!-- translator app -->
+    <string name="translator_translated_file">Översatt fil: %1$s</string>
+    <string name="translator_document_saved">Dokumentet sparat</string>
+    <string name="translator_document_save_failed">Det gick inte att spara dokumentet</string>
+    <string name="translator_audio_playback_failed">Ljuduppspelningen misslyckades: %1$s</string>
+    <string name="translator_no_app_to_open">Ingen app hittades för att öppna den här filen</string>
+    <!-- document alignment -->
+    <string name="docalign_decode_failed">Det gick inte att avkoda bilden.</string>
+    <string name="docalign_detecting">Identifierar hörn…</string>
+    <string name="docalign_redetecting">Identifierar igen…</string>
+    <string name="docalign_help">En exakt avgränsning runt dokumentet förbättrar igenkänningskvaliteten. Det är viktigt att linjerna är parallella med texten.\n\nGenom att zooma eller panorera plockar algoritmen oftast upp dokumentet automatiskt, men du kan fortfarande justera manuellt om det inte hittas.</string>
+    <!-- how to use -->
+    <string name="howto_section_other_apps">Från andra appar</string>
+    <string name="howto_share_title">Dela för att översätta</string>
+    <string name="howto_share_body">Dela text, länkar eller bilder från valfri app för att översätta dem.</string>
+    <string name="howto_copy_title">Översätt utan att lämna andra appar</string>
+    <string name="howto_copy_body">Markera text var som helst och tryck sedan på \"Översätt\" i kopieringsverktygsfältet för att se översättningen i ett kompakt fönster.</string>
+    <string name="howto_section_in_app">Inuti appen</string>
+    <string name="howto_docs_title">Översätt dokument</string>
+    <string name="howto_docs_body">Öppna fliken Dokument för att översätta EPUB-, PDF- och TXT-filer.</string>
+    <string name="howto_dict_title">Slå upp i ordbok</string>
+    <string name="howto_dict_body">Håll in valfritt ord i en översättning för att se dess definition. Data hämtad från Wiktionary.</string>
+    <string name="howto_voice_title">Ändra röst eller hastighet</string>
+    <string name="howto_voice_body">Håll in uppspelningsknappen för att välja en annan röst eller justera uppspelningshastigheten.</string>
+    <!-- feature row labels -->
+    <string name="feature_translation">Översättning</string>
+    <string name="feature_dictionary">Ordbok</string>
+    <string name="feature_tts">Röst</string>
+    <!-- misc -->
+    <string name="main_input_placeholder">Skriv text</string>
+    <string name="aidl_target_unavailable">Målspråket är inte tillgängligt</string>
+    <string name="voice_section_downloaded">NEDLADDADE</string>
+    <string name="voice_section_available">TILLGÄNGLIGA</string>
+    <string name="detected_translate_from">Översätt från</string>
+    <string name="detected_missing_language">Språk saknas</string>
+    <string name="langmgr_ocr_upgrade_available">En förbättrad textigenkänningsmodell är tillgänglig.</string>
+</resources>

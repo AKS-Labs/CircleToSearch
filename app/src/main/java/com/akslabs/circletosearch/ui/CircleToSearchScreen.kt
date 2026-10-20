@@ -21,6 +21,7 @@ package com.akslabs.circletosearch.ui
 
 import android.graphics.Bitmap
 import android.graphics.Rect
+import com.akslabs.circletosearch.AssistSessionService
 import com.akslabs.circletosearch.CircleToSearchAccessibilityService
 import android.util.Base64
 import android.view.Display
@@ -30,6 +31,10 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.PredictiveBackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
@@ -40,12 +45,16 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -59,6 +68,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -66,24 +76,27 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BorderOuter
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.automirrored.filled.FormatTextdirectionRToL
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.DesktopWindows
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.LightMode
-import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.Refresh
@@ -97,10 +110,10 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Email
-import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
@@ -109,8 +122,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.SheetValue
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -139,19 +154,25 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.window.Dialog
 import com.akslabs.circletosearch.R
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
-import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.webkit.WebSettingsCompat
 import com.akslabs.circletosearch.data.SearchEngine
 import com.akslabs.circletosearch.ui.components.FriendlyMessageBubble
@@ -162,11 +183,17 @@ import com.akslabs.circletosearch.utils.ImageSearchUploader
 import com.akslabs.circletosearch.utils.ImageUtils
 import com.akslabs.circletosearch.utils.QrResult
 import com.akslabs.circletosearch.utils.QrResultWithBounds
+import dev.davidv.translator.localizedName
 import com.akslabs.circletosearch.utils.QrScanner
 import com.akslabs.circletosearch.ui.qrResultShortLabel
 import com.akslabs.circletosearch.utils.UIPreferences
 import com.akslabs.circletosearch.ui.components.MoreAppsBottomSheet
 import com.akslabs.circletosearch.ui.components.DonateBottomSheet
+import dev.davidv.translator.TranslatorApplication
+import dev.davidv.translator.ui.components.DetectedRegions
+import dev.davidv.translator.ui.components.ImageWordSelection
+import dev.davidv.translator.ui.components.ScanAnimationOverlay
+import dev.davidv.translator.ui.components.WordSelectionOverlay
 import android.net.Uri
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
@@ -174,6 +201,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
 import androidx.webkit.WebViewFeature
+import androidx.webkit.UserAgentMetadata
 import com.akslabs.circletosearch.data.isDirectUpload
 import kotlin.math.max
 import kotlin.math.min
@@ -185,18 +213,187 @@ import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material3.Surface
 
-@OptIn(ExperimentalMaterial3Api::class)
+/** Lets the Circle to Search UI finish closing before the translator overlay draws. */
+private const val TRANSLATE_TRIGGER_DELAY_MS = 400L
+
+/** Lets the Circle to Search chrome hide before the translator overlay draws. */
+private const val TRANSLATE_HIDE_DELAY_MS = 150L
+
+/**
+ * Runs the translator module's OCR over [bmp] and returns its recognized source words —
+ * no translation, no overlay bitmap. [onRegions] fires as soon as detection boxes arrive
+ * (for the scan animation). Returns null on failure: missing OCR models and no-text both
+ * show a toast.
+ */
+private suspend fun runInstantScreenshotOcr(
+    context: android.content.Context,
+    bmp: Bitmap,
+    onRegions: (DetectedRegions) -> Unit,
+): ImageWordSelection? {
+    val app = context.applicationContext as? TranslatorApplication ?: return null
+    val coordinator = runCatching { app.translationCoordinator }.getOrNull() ?: return null
+    // The accessibility service exposes the configured target language when it is
+    // running, but the assistant launch path must also work with accessibility
+    // disabled — resolve the same setting from the translator application directly.
+    val target = CircleToSearchAccessibilityService.instance?.defaultTargetLanguage()
+        ?: runCatching {
+            app.languageCatalog?.languageByCode(
+                app.settingsManager.settings.value.defaultTargetLanguageCode
+            )
+        }.getOrNull()
+        ?: return null
+    var ocrMissing = false
+    var sourceDetectFailed = false
+    val result = coordinator.ocrWordsOnly(
+        bitmap = bmp,
+        to = target,
+        onDetectedRegions = { boxes, w, h -> onRegions(DetectedRegions(w, h, boxes)) },
+        onOcrUnavailable = { ocrMissing = true },
+        onAutoSourceFailed = { sourceDetectFailed = true },
+    )
+    if (result == null) {
+        val messageId =
+            when {
+                ocrMissing -> dev.davidv.translator.R.string.ocr_models_missing
+                sourceDetectFailed -> R.string.label_language_detect_failed
+                else -> R.string.label_no_text_found
+            }
+        withContext(Dispatchers.Main) {
+            android.widget.Toast.makeText(
+                context,
+                context.getString(messageId),
+                android.widget.Toast.LENGTH_SHORT,
+            ).show()
+        }
+        return null
+    }
+    return ImageWordSelection(
+        imageWidth = result.imageWidth,
+        imageHeight = result.imageHeight,
+        sourceWords = result.sourceWords,
+        translatedWords = result.sourceWords,
+    )
+}
+
+/**
+ * Fit (contain) mapping for a bitmap centered in a view — the app-side mirror of the
+ * module's internal fitTransform, which the word/scan overlays use. Unit-agnostic: pass
+ * view/image sizes in px (crop path) or dp (chip path) consistently for both.
+ */
+private class FitMapping(val scale: Float, val offsetX: Float, val offsetY: Float) {
+    fun unmapX(x: Float) = (x - offsetX) / scale
+    fun unmapY(y: Float) = (y - offsetY) / scale
+}
+
+private fun fitMapping(viewW: Float, viewH: Float, imageW: Float, imageH: Float): FitMapping {
+    val scale = min(viewW / imageW, viewH / imageH)
+    return FitMapping(scale, (viewW - imageW * scale) / 2f, (viewH - imageH * scale) / 2f)
+}
+
+/**
+ * Maps a screen-space rect into bitmap space for the ContentScale.Fit display, clamping to
+ * the bitmap. For screen captures (bitmap size == view size) this is the identity.
+ */
+private fun fitCrop(
+    rect: android.graphics.Rect,
+    t: FitMapping,
+    imageW: Int,
+    imageH: Int,
+): android.graphics.Rect =
+    android.graphics.Rect(
+        t.unmapX(rect.left.toFloat()).toInt().coerceIn(0, imageW),
+        t.unmapY(rect.top.toFloat()).toInt().coerceIn(0, imageH),
+        t.unmapX(rect.right.toFloat()).toInt().coerceIn(0, imageW),
+        t.unmapY(rect.bottom.toFloat()).toInt().coerceIn(0, imageH),
+    )
+
+/**
+ * The device's physical screen corner radii in px: upper-left, upper-right,
+ * lower-right, lower-left. `Display.getRoundedCorner` (Android 12+) reports the
+ * real bezel radius per corner and returns null where the screen is rectangular;
+ * older OEM builds usually expose the physical radius as an `android` framework
+ * dimen. Every unresolved path yields 0, so the overlay border follows the true
+ * screen shape on any device.
+ */
+private fun deviceCornerRadiiPx(context: android.content.Context): FloatArray {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        val display = context.display
+            ?: (context as? android.app.Activity)?.windowManager?.let {
+                @Suppress("DEPRECATION")
+                it.defaultDisplay
+            }
+        if (display != null) {
+            fun radiusAt(position: Int): Float =
+                display.getRoundedCorner(position)?.radius?.toFloat() ?: 0f
+            return floatArrayOf(
+                radiusAt(android.view.RoundedCorner.POSITION_TOP_LEFT),
+                radiusAt(android.view.RoundedCorner.POSITION_TOP_RIGHT),
+                radiusAt(android.view.RoundedCorner.POSITION_BOTTOM_RIGHT),
+                radiusAt(android.view.RoundedCorner.POSITION_BOTTOM_LEFT),
+            )
+        }
+    }
+    val id = context.resources.getIdentifier("rounded_corner_radius", "dimen", "android")
+    val r = if (id != 0) context.resources.getDimension(id) else 0f
+    return floatArrayOf(r, r, r, r)
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun CircleToSearchScreen(
-    screenshot: Bitmap?,
+    capturedScreenshot: Bitmap?,
     onClose: () -> Unit,
     searchModeOverride: Boolean? = null,
-    copyTextManager: com.akslabs.circletosearch.ui.components.CopyTextOverlayManager? = null,
-    onCopyText: () -> Unit = {},
-    onExitCopyMode: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+
+    // Border shape follows the physical screen corners (rounded bezel vs.
+    // rectangular) so the overlay outline matches the device on any screen ratio.
+    val density = LocalDensity.current
+    val deviceCornerShape = remember(density, context) {
+        val radii = deviceCornerRadiiPx(context)
+        with(density) {
+            RoundedCornerShape(
+                topStart = radii[0].toDp(),
+                topEnd = radii[1].toDp(),
+                bottomEnd = radii[2].toDp(),
+                bottomStart = radii[3].toDp(),
+            )
+        }
+    }
+
+    // Upload flow: the user can swap the canvas for a gallery image and run Circle to
+    // Search on it. Keyed on the capture param so a fresh capture supersedes a pick.
+    var uploadedImage by remember(capturedScreenshot) { mutableStateOf<Bitmap?>(null) }
+    val screenshot = uploadedImage ?: capturedScreenshot
+
+    // Pixel size of the canvas layer — the image-fit mapping (crop-to-search, chips) needs it.
+    var canvasSizePx by remember { mutableStateOf(IntSize.Zero) }
+
+    val pickImageLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) {
+            // Decode at original proportions (EXIF-rotated, only sampled past a 12 MP budget).
+            // The display fits the bitmap to the screen, so nothing is cropped or stretched.
+            val maxPixels = 12 * 1000 * 1000
+            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                val picked = ImageUtils.loadImageUri(context, uri, maxPixels)
+                if (picked != null) {
+                    uploadedImage = picked
+                } else {
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        android.widget.Toast.makeText(
+                            context,
+                            context.getString(R.string.toast_image_load_failed),
+                            android.widget.Toast.LENGTH_SHORT,
+                        ).show()
+                    }
+                }
+            }
+        }
+    }
     
     // Initialize preferences
     val uiPreferences = remember { UIPreferences(context) }
@@ -229,6 +426,15 @@ fun CircleToSearchScreen(
     val bubbleColor = if (isDark) Color(0xFF1F1F1F) else colorScheme.secondaryContainer.copy(alpha = 0.9f)
     val contentColor = if (isDark) Color.White else colorScheme.onSecondaryContainer
 
+    // Publish the exact CTS bottom-bar colors so the translate toolbar matches them
+    // pixel-for-pixel (the overlay can't read the Compose theme directly).
+    androidx.compose.runtime.SideEffect {
+        dev.davidv.translator.overlayChrome.OverlayChromeFactory.appBarContainerColor =
+            colorScheme.surfaceContainerLow.toArgb()
+        dev.davidv.translator.overlayChrome.OverlayChromeFactory.appPillColor =
+            colorScheme.surfaceContainerLowest.toArgb()
+    }
+
     //Haptic feedback
     val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
 
@@ -255,16 +461,12 @@ fun CircleToSearchScreen(
     }
     val searchEngines = preferredOrder
     
-    // Copy Mode internal state
-    var isCopyMode by remember { mutableStateOf(false) }
-
     // Support Settings Sheet
     var showSettingsScreen by remember { mutableStateOf(false) }
 
     // Friendly Message State
     var friendlyMessage by remember { mutableStateOf("") }
     var isMessageVisible by remember { mutableStateOf(false) }
-    var isCopyTextTriggered by remember { mutableStateOf(false) }
     
     // Resizing state
     var isResizing by remember { mutableStateOf(false) }
@@ -280,6 +482,9 @@ fun CircleToSearchScreen(
     var isEntityExtractMode by remember { mutableStateOf(false) }
     var detectedEntities by remember { mutableStateOf<List<SmartEntity>>(emptyList()) }
     var isExtractingEntities by remember { mutableStateOf(false) }
+    // Bumped whenever the canvas image changes so an in-flight SmartScan can't deliver
+    // entities extracted for the previous image.
+    var entityScanGeneration by remember { mutableStateOf(0) }
     
     LaunchedEffect(Unit) {
         if (uiPreferences.isShowFriendlyMessages()) {
@@ -296,6 +501,8 @@ fun CircleToSearchScreen(
     var selectedEngine by remember(searchEngines) { mutableStateOf<SearchEngine>(searchEngines.first()) }
     var searchUrl by remember { mutableStateOf<String?>(null) }
     var hostedImageUrl by remember { mutableStateOf<String?>(null) }
+    var pageBackgroundColor by remember { mutableStateOf(Color.White) }
+    var refreshingEngine by remember { mutableStateOf<SearchEngine?>(null) }
     var isLoading by remember { mutableStateOf(false) }
     
     // Desktop Mode - Per Tab
@@ -315,6 +522,34 @@ fun CircleToSearchScreen(
 
     // Track initialized engines for Smart Loading
     val initializedEngines = remember { mutableStateListOf<SearchEngine>() }
+
+    // Keep the tab strip background equal to the webpage's own background so
+    // the sheet never shows a Material color that clashes with the page.
+    fun samplePageBackgroundColor(view: WebView?) {
+        if (view == null) return
+        val js = "(function(){var b=getComputedStyle(document.body).backgroundColor;" +
+            "if(b==='rgba(0, 0, 0, 0)'||b==='transparent'){b=getComputedStyle(document.documentElement).backgroundColor;}" +
+            "return b;})()"
+        val parse: (String) -> Unit = { raw ->
+            val m = Regex("""rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([\d.]+))?\s*\)""").find(raw.trim('"'))
+            if (m != null) {
+                val a = m.groupValues[4].toFloatOrNull() ?: 1f
+                if (a > 0f) {
+                    pageBackgroundColor = Color(
+                        red = m.groupValues[1].toInt() / 255f,
+                        green = m.groupValues[2].toInt() / 255f,
+                        blue = m.groupValues[3].toInt() / 255f
+                    )
+                }
+            }
+        }
+        try {
+            view.evaluateJavascript(js) { raw -> parse(raw ?: "") }
+            view.postDelayed({
+                try { view.evaluateJavascript(js) { raw -> parse(raw ?: "") } } catch (_: Exception) {}
+            }, 800L)
+        } catch (_: Exception) {}
+    }
     
     // Save global preference if user toggles it for the MAIN engine (Google) - Optional choice, 
     // or we just keep it per session. Let's keep it simple: no auto-save of per-tab state to verify complex persistence yet.
@@ -340,6 +575,12 @@ fun CircleToSearchScreen(
     
     // WebView Cache
     val webViews = remember { mutableMapOf<SearchEngine, WebView>() }
+
+    // Clears the pull-to-refresh spinner once the refreshed tab finishes loading.
+    fun clearRefreshIfDone(view: WebView?) {
+        val re = refreshingEngine
+        if (view != null && re != null && view === webViews[re]) refreshingEngine = null
+    }
     
     // Update User Agent dynamically when desktop mode changes for a specific engine
     // This is now handled in the AndroidView update block or individual engine effects
@@ -352,7 +593,7 @@ fun CircleToSearchScreen(
             } else {
                 "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
             }
-            
+
             if (wv.settings.userAgentString != newUserAgent) {
                 wv.settings.userAgentString = newUserAgent
                 wv.reload()
@@ -370,8 +611,10 @@ fun CircleToSearchScreen(
                     wv.webViewClient = object : android.webkit.WebViewClient() {
                         override fun onPageFinished(view: android.webkit.WebView?, url: String?) {
                             super.onPageFinished(view, url)
+                            samplePageBackgroundColor(view)
+                            clearRefreshIfDone(view)
                             val darkModeCSS = """
-                                javascript:(function() {
+                                (function() {
                                     var style = document.createElement('style');
                                     style.innerHTML = `
                                         html { filter: invert(1) hue-rotate(180deg) !important; background: #000 !important; }
@@ -380,11 +623,17 @@ fun CircleToSearchScreen(
                                     document.head.appendChild(style);
                                 })()
                             """.trimIndent()
-                            view?.loadUrl(darkModeCSS)
+                            view?.evaluateJavascript(darkModeCSS, null)
                         }
                     }
                 } else {
-                    wv.webViewClient = android.webkit.WebViewClient()
+                    wv.webViewClient = object : android.webkit.WebViewClient() {
+                        override fun onPageFinished(view: android.webkit.WebView?, url: String?) {
+                            super.onPageFinished(view, url)
+                            samplePageBackgroundColor(view)
+                            clearRefreshIfDone(view)
+                        }
+                    }
                 }
                 wv.reload()
                 android.util.Log.d("CircleToSearch", "Dark mode changed to: $isDarkMode - Reloaded WebViews")
@@ -410,16 +659,146 @@ fun CircleToSearchScreen(
     var isSearching by remember { mutableStateOf(false) }
     var selectionRect by remember { mutableStateOf<Rect?>(null) }
     val selectionAnim = remember { androidx.compose.animation.core.Animatable(0f) }
-    
+
+    // Translator overlay mode: Circle to Search chrome hidden, the frozen screenshot
+    // stays visible as the backdrop under the module's scan/result overlays.
+    var isTranslatorMode by remember { mutableStateOf(false) }
+
+    // Instant OCR over the screenshot: scan animation boxes while recognizing, then the
+    // recognized source words — tap a word to select and copy (original text, no translation).
+    var instantWords by remember { mutableStateOf<ImageWordSelection?>(null) }
+    var instantRegions by remember { mutableStateOf<DetectedRegions?>(null) }
+    // OCR finished with no words (plan failed / nothing recognized): stop the scan
+    // animation instead of breathing over the image forever.
+    var instantOcrDone by remember { mutableStateOf(false) }
+    // A word selection in the instant-OCR overlay hides the bottom bar; tapping outside the
+    // text clears the selection and the bar comes back.
+    var wordSelected by remember { mutableStateOf(false) }
+    // Bumped to force the word overlay to drop its selection — text selection and a drawn
+    // circle are mutually exclusive, so completing a circle clears any active selection.
+    var wordSelectionClearSignal by remember { mutableStateOf(0) }
+
+    // Circle-draw gesture handlers, shared by the drag-detector wrapper above the drawing
+    // layer (see "Circle-draw gestures" below). Plain drags draw; handle grabs and taps are
+    // claimed by the word overlay (child, seen first) so text selection keeps priority.
+    fun beginCircleDrag(offset: Offset) {
+        val rect = selectionRect
+        if (rect != null && selectionAnim.value == 1f) {
+            val handleSize = 64f // px for hit testing
+            val tl = Offset(rect.left.toFloat(), rect.top.toFloat())
+            val tr = Offset(rect.right.toFloat(), rect.top.toFloat())
+            val bl = Offset(rect.left.toFloat(), rect.bottom.toFloat())
+            val br = Offset(rect.right.toFloat(), rect.bottom.toFloat())
+
+            when {
+                (offset - tl).getDistance() < handleSize -> { isResizing = true; activeHandle = "tl" }
+                (offset - tr).getDistance() < handleSize -> { isResizing = true; activeHandle = "tr" }
+                (offset - bl).getDistance() < handleSize -> { isResizing = true; activeHandle = "bl" }
+                (offset - br).getDistance() < handleSize -> { isResizing = true; activeHandle = "br" }
+                else -> { isResizing = false; activeHandle = null }
+            }
+
+            if (isResizing) return
+        }
+
+        // Clear previous state if starting new draw
+        currentPathPoints.clear()
+        currentPathPoints.add(offset)
+        selectionRect = null
+        scope.launch { selectionAnim.snapTo(0f) }
+        // Text selection and drawing are exclusive from the first moment of the gesture:
+        // drop any active selection as soon as the user starts drawing, not when the
+        // circle completes.
+        if (wordSelected) wordSelectionClearSignal++
+    }
+
+    fun moveCircleDrag(change: PointerInputChange) {
+        if (isResizing && activeHandle != null) {
+            val rect = selectionRect ?: return
+            val pos = change.position
+            val newRect = android.graphics.Rect(rect)
+            when (activeHandle) {
+                "tl" -> { newRect.left = pos.x.toInt(); newRect.top = pos.y.toInt() }
+                "tr" -> { newRect.right = pos.x.toInt(); newRect.top = pos.y.toInt() }
+                "bl" -> { newRect.left = pos.x.toInt(); newRect.bottom = pos.y.toInt() }
+                "br" -> { newRect.right = pos.x.toInt(); newRect.bottom = pos.y.toInt() }
+            }
+            // Basic validation (min size)
+            if (newRect.width() > 20 && newRect.height() > 20) {
+                selectionRect = newRect
+            }
+        } else {
+            currentPathPoints.add(change.position)
+        }
+    }
+
+    fun endCircleDrag() {
+        val bmp = screenshot
+        // View size in px — with no bitmap the old behavior (degenerate rect) is kept.
+        val viewW = bmp?.let { if (canvasSizePx.width > 0) canvasSizePx.width else it.width } ?: 0
+        val viewH = bmp?.let { if (canvasSizePx.height > 0) canvasSizePx.height else it.height } ?: 0
+        if (isResizing) {
+            isResizing = false
+            activeHandle = null
+            // Update cropped bitmap after resize. selectionRect is screen-space; map it into
+            // image space first (the Fit display may letterbox/scale the bitmap).
+            if (bmp != null && selectionRect != null) {
+                val t = fitMapping(viewW.toFloat(), viewH.toFloat(), bmp.width.toFloat(), bmp.height.toFloat())
+                selectedBitmap = ImageUtils.cropBitmap(bmp, fitCrop(selectionRect!!, t, bmp.width, bmp.height))
+            }
+        } else if (currentPathPoints.isNotEmpty()) {
+            var minX = Float.MAX_VALUE
+            var minY = Float.MAX_VALUE
+            var maxX = Float.MIN_VALUE
+            var maxY = Float.MIN_VALUE
+            currentPathPoints.forEach { p ->
+                minX = kotlin.math.min(minX, p.x)
+                minY = kotlin.math.min(minY, p.y)
+                maxX = kotlin.math.max(maxX, p.x)
+                maxY = kotlin.math.max(maxY, p.y)
+            }
+
+            val border = 20
+            val rect = android.graphics.Rect(
+                (minX - border).toInt().coerceAtLeast(0),
+                (minY - border).toInt().coerceAtLeast(0),
+                (maxX + border).toInt().coerceAtMost(viewW),
+                (maxY + border).toInt().coerceAtMost(viewH)
+            )
+
+            if (rect.width() > 10 && rect.height() > 10) {
+                selectionRect = rect
+                currentPathPoints.clear() // Hide the drawn circle
+                if (bmp != null) {
+                    val t = fitMapping(viewW.toFloat(), viewH.toFloat(), bmp.width.toFloat(), bmp.height.toFloat())
+                    selectedBitmap = ImageUtils.cropBitmap(bmp, fitCrop(rect, t, bmp.width, bmp.height))
+                }
+                scope.launch {
+                    selectionAnim.animateTo(1f, tween(600))
+                    isSearching = true
+                }
+            }
+        }
+    }
+
     // Lifecycle reset: When screenshot changes, reset selection and modes
     LaunchedEffect(screenshot) {
         if (screenshot != null) {
-            isCopyMode = false
             selectionRect = null
             selectedBitmap = null
             isSearching = false
             currentPathPoints.clear()
             selectionAnim.snapTo(0f)
+            // The canvas image changed: drop entities extracted for the previous image and
+            // invalidate any extraction still in flight.
+            detectedEntities = emptyList()
+            isExtractingEntities = false
+            entityScanGeneration = entityScanGeneration + 1
+            if (isTranslatorMode) {
+                val a11y = CircleToSearchAccessibilityService.instance
+                if (a11y != null) a11y.closeTranslateOverlay()
+                else com.akslabs.circletosearch.AssistantTranslateOverlay.close()
+            }
         }
     }
     
@@ -447,6 +826,24 @@ fun CircleToSearchScreen(
         } else {
             detectedQrCodes = emptyList()
         }
+    }
+
+    // Instant OCR: recognize the screenshot's words as soon as it arrives (module
+    // pipeline, no translation) — shown as tappable words over the frozen capture.
+    LaunchedEffect(screenshot) {
+        instantWords = null
+        instantRegions = null
+        instantOcrDone = false
+        wordSelected = false
+        val bmp = screenshot ?: return@LaunchedEffect
+        instantWords = runInstantScreenshotOcr(context, bmp) { instantRegions = it }
+        instantOcrDone = true
+    }
+
+    // The word overlay unmounts in these modes (dropping its selection) - drop ours too so
+    // the bottom bar doesn't stay hidden after leaving them.
+    LaunchedEffect(isEntityExtractMode, isTranslatorMode) {
+        if (isEntityExtractMode || isTranslatorMode) wordSelected = false
     }
 
     // Helper to create and configure WebView
@@ -489,12 +886,12 @@ fun CircleToSearchScreen(
                 } else {
                     "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
                 }
-                
+
                 // Dark Mode - Use CSS injection for universal compatibility
                 // Algorithmic darkening alone doesn't work on many websites
                 android.util.Log.d("CircleToSearch", "Dark mode enabled: $isDarkMode")
             }
-            
+
             // UI Tweaks
             isVerticalScrollBarEnabled = false
             isHorizontalScrollBarEnabled = false
@@ -502,14 +899,167 @@ fun CircleToSearchScreen(
             // Enable Third-Party Cookies
             android.webkit.CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
 
+            // Instrument fetch/XHR so the Lens results RPC (and its status) is
+            // visible even when it fails silently. Injected at page start AND
+            // finish (start can race the document commit); per-document guard.
+            fun installNetDiag(view: WebView) {
+                val netJs = """
+                    (function() {
+                        if (window.__netDiag) return 'already';
+                        window.__netDiag = 1;
+                        try {
+                            var of = window.fetch;
+                            window.fetch = function(u, init) {
+                                var m = (init && init.method) || 'GET';
+                                var url = (typeof u === 'string') ? u : ((u && u.url) || '');
+                                console.warn('NET fetch ' + m + ' ' + url.slice(0, 200));
+                                return of.apply(this, arguments).then(function(r) {
+                                    console.warn('NET fetchdone ' + r.status + ' ' + m + ' ' + url.slice(0, 200));
+                                    if (/Validate|qfmetadata|sgasync|httpservice|batchexecute|folsrch|bgasy|\/search\?/.test(url)) {
+                                        try {
+                                            console.warn('NETBODY_CLONE ' + url.split('?')[0].slice(-70));
+                                            r.clone().text().then(function(t) {
+                                                var i = t.search(/not associated with your account|No image at the URL|Image not found|Something went wrong/);
+                                                if (i >= 0) {
+                                                    console.warn('NETBODY_HIT @' + i + '/' + t.length + ' >> ' + t.slice(Math.max(0, i - 150), i + 250));
+                                                } else {
+                                                    console.warn('NETBODY ' + url.split('?')[0].slice(-70) + ' len=' + t.length + ' head=' + t.slice(0, 200));
+                                                }
+                                            }).catch(function(e) { console.warn('NETBODY_ERR ' + e); });
+                                        } catch (e) { console.warn('NETBODY_ERR ' + e); }
+                                    }
+                                    return r;
+                                }, function(e) {
+                                    console.warn('NET fetcherr ' + m + ' ' + url.slice(0, 200) + ' ' + e);
+                                    throw e;
+                                });
+                            };
+                            var ox = XMLHttpRequest.prototype.open;
+                            var os = XMLHttpRequest.prototype.send;
+                            XMLHttpRequest.prototype.open = function(m, u) { this.__dm = m; this.__du = u; return ox.apply(this, arguments); };
+                            XMLHttpRequest.prototype.send = function() {
+                                var s = this, m = this.__dm, u = this.__du;
+                                console.warn('NET xhr ' + m + ' ' + String(u).slice(0, 200));
+                                s.addEventListener('loadend', function() {
+                                    console.warn('NET xhrdone ' + s.status + ' ' + m + ' ' + String(u).slice(0, 200));
+                                    try {
+                                        if (/Validate|qfmetadata|sgasync|httpservice|batchexecute|folsrch|bgasy/.test(String(u)) && s.responseText) {
+                                            console.warn('NETBODY_XHR ' + String(u).split('?')[0].slice(-70) + ' >> ' + String(s.responseText).slice(0, 400));
+                                        }
+                                    } catch (e) {}
+                                });
+                                return os.apply(this, arguments);
+                            };
+                            return 'installed';
+                        } catch (e) { return 'NETDIAG_ERR ' + e; }
+                    })()
+                """.trimIndent()
+                view.evaluateJavascript(netJs) { r ->
+                    if (r != null && r != "\"already\"") {
+                        android.util.Log.d("LensDiag", "NETDIAG $r")
+                    }
+                }
+            }
+            
             webViewClient = object : WebViewClient() {
+                
+                override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
+                    super.onPageStarted(view, url, favicon)
+                    if (url != null && url.contains("google.") && view != null) {
+                        android.util.Log.d("LensDiag", "NAV $url")
+                        installNetDiag(view)
+                    }
+                }
+                
+                override fun onReceivedHttpError(
+                    view: WebView?,
+                    request: android.webkit.WebResourceRequest?,
+                    response: android.webkit.WebResourceResponse?
+                ) {
+                    val host = request?.url?.host ?: ""
+                    if (response != null && response.statusCode in 400..599 &&
+                        (host.contains("google") || host.contains("imgdb") || host.contains("catbox"))
+                    ) {
+                        android.util.Log.e("LensDiag", "HTTP ${response.statusCode} ${response.reasonPhrase} ${request?.url}")
+                    }
+                }
                 
                 override fun onPageFinished(view: WebView?, url: String?) {
                     super.onPageFinished(view, url)
+                    samplePageBackgroundColor(view)
+                    clearRefreshIfDone(view)
+                    // Lens loads its result tabs via async RPCs after page finish.
+                    // Snapshot the network + DOM state so silent failures are visible.
+                    if (url != null && url.contains("google.") && view != null) {
+                        val v = view
+                        installNetDiag(v)
+                        v.postDelayed({
+                            try {
+                                val resJs = """
+                                    (function() {
+                                        try {
+                                            var noise = ['xjs', '/log', 'gen_204', 'client_204', 'folsrch', 'sprites', '.css', '.woff', '.ttf'];
+                                            var r = performance.getEntriesByType('resource')
+                                                .filter(function(e) {
+                                                    var n = e.name;
+                                                    var host = n.indexOf('google') >= 0 || n.indexOf('gstatic') >= 0;
+                                                    var bad = noise.some(function(s) { return n.indexOf(s) >= 0; });
+                                                    return host && !bad;
+                                                })
+                                                .slice(-40)
+                                                .map(function(e) { return (e.responseStatus || '?') + ' ' + e.name.split('?')[0].slice(0, 110); })
+                                                .join(String.fromCharCode(10));
+                                            return r || 'NO_GOOGLE_RESOURCES';
+                                        } catch (err) { return 'SNAP_ERR ' + err; }
+                                    })()
+                                """.trimIndent()
+                                v.evaluateJavascript(resJs) { r ->
+                                    android.util.Log.d("LensDiag", "GOOGLE_RES $r")
+                                }
+                                val envJs = """
+                                    (function() {
+                                        try {
+                                            var d = {
+                                                ua: (navigator.userAgent || '').slice(0, 110),
+                                                brands: navigator.userAgentData ? navigator.userAgentData.brands : 'NO_UADATA',
+                                                mobile: navigator.userAgentData ? navigator.userAgentData.mobile : '?',
+                                                platform: navigator.userAgentData ? navigator.userAgentData.platform : '?',
+                                                chrome: typeof window.chrome === 'undefined' ? 'UNDEFINED' : Object.keys(window.chrome).join(','),
+                                                webdriver: navigator.webdriver,
+                                                cookies: (document.cookie || '').slice(0, 300)
+                                            };
+                                            return JSON.stringify(d);
+                                        } catch (err) { return 'ENV_ERR ' + err; }
+                                    })()
+                                """.trimIndent()
+                                v.evaluateJavascript(envJs) { r ->
+                                    android.util.Log.d("LensDiag", "GOOGLE_ENV $r")
+                                }
+                                val bodyJs = """
+                                    (function() {
+                                        try {
+                                            var txt = (document.body.innerText || '').replace(/\s+/g, ' ').slice(0, 450);
+                                            return location.href.slice(0, 250) + ' >> ' + document.title + ' >> ' + txt;
+                                        } catch (err) { return 'SNAP_ERR ' + err; }
+                                    })()
+                                """.trimIndent()
+                                v.postDelayed({
+                                    try {
+                                        v.evaluateJavascript(bodyJs) { r ->
+                                            android.util.Log.d("LensDiag", "GOOGLE_BODY $r")
+                                        }
+                                        android.util.Log.d("LensDiag", "GOOGLE_COOKIES ${android.webkit.CookieManager.getInstance().getCookie("https://lens.google.com")}")
+                                    } catch (e: Exception) { android.util.Log.e("LensDiag", "snap failed", e) }
+                                }, 3000)
+                            } catch (e: Exception) {
+                                android.util.Log.e("LensDiag", "snapshot failed", e)
+                            }
+                        }, 4000)
+                    }
                     // Inject dark mode CSS if enabled
                     if (isDarkMode) {
                         val darkModeCSS = """
-                            javascript:(function() {
+                            (function() {
                                 var style = document.createElement('style');
                                 style.innerHTML = `
                                     html { filter: invert(1) hue-rotate(180deg) !important; background: #000 !important; }
@@ -518,9 +1068,23 @@ fun CircleToSearchScreen(
                                 document.head.appendChild(style);
                             })()
                         """.trimIndent()
-                        view?.loadUrl(darkModeCSS)
+                        view?.evaluateJavascript(darkModeCSS, null)
                         android.util.Log.d("CircleToSearch", "Dark mode CSS injected for: $url")
                     }
+                }
+            }
+            webChromeClient = object : android.webkit.WebChromeClient() {
+                override fun onConsoleMessage(consoleMessage: android.webkit.ConsoleMessage?): Boolean {
+                    val msg = consoleMessage?.message() ?: return super.onConsoleMessage(consoleMessage)
+                    val isNet = msg.contains("NET ") || msg.contains("NETBODY")
+                    val isGoogleSrc = consoleMessage.sourceId()?.contains("google") == true
+                    when {
+                        consoleMessage.messageLevel() == android.webkit.ConsoleMessage.MessageLevel.ERROR ->
+                            android.util.Log.e("LensDiag", "JS $msg @${consoleMessage.sourceId()}:${consoleMessage.lineNumber()}")
+                        consoleMessage.messageLevel() == android.webkit.ConsoleMessage.MessageLevel.WARNING && (isNet || isGoogleSrc) ->
+                            android.util.Log.w("LensDiag", "JSW $msg")
+                    }
+                    return super.onConsoleMessage(consoleMessage)
                 }
             }
             isNestedScrollingEnabled = true
@@ -540,9 +1104,13 @@ fun CircleToSearchScreen(
 
     // Back Handler Logic
     BackHandler(enabled = true) {
-        if (isCopyMode) {
-            isCopyMode = false
-            onExitCopyMode()
+        if (isTranslatorMode) {
+            val service = CircleToSearchAccessibilityService.instance
+            if (service != null) {
+                service.closeTranslateOverlay()
+            } else {
+                com.akslabs.circletosearch.AssistantTranslateOverlay.close()
+            }
             return@BackHandler
         }
         val currentWebView = webViews[selectedEngine]
@@ -557,6 +1125,26 @@ fun CircleToSearchScreen(
         }
     }
 
+    // Predictive back arrow: the system animates the back gesture (edge arrow + progress)
+    // only when a prioritized callback receives it. In translator mode back is consumed
+    // with no window transition, so a predictive handler keeps the arrow visible — and
+    // the overlay windows (drawn above the arrow) fade out while the gesture runs.
+    // Only the accessibility path draws its chrome in separate windows it can fade, so
+    // assistant mode (activity-hosted chrome) falls back to the plain BackHandler above.
+    PredictiveBackHandler(enabled = isTranslatorMode && CircleToSearchAccessibilityService.instance != null) { progress ->
+        val service = CircleToSearchAccessibilityService.instance
+        try {
+            progress.collect { event ->
+                val fade = (1f - event.progress * 6f).coerceIn(0f, 1f)
+                service?.setTranslatorGestureAlpha(fade)
+            }
+            service?.closeTranslateOverlay()
+        } catch (_: java.util.concurrent.CancellationException) {
+            // Gesture cancelled — restore the overlay windows.
+            service?.setTranslatorGestureAlpha(1f)
+        }
+    }
+
     Surface(
         color = Color.Transparent,
         tonalElevation = 0.dp
@@ -567,18 +1155,20 @@ fun CircleToSearchScreen(
             containerColor = Color.Transparent,
             sheetContainerColor = Color.Transparent,
             sheetContentColor = MaterialTheme.colorScheme.onSurface,
-            sheetDragHandle = { BottomSheetDefaults.DragHandle() },
+            sheetDragHandle = null,
             sheetSwipeEnabled = true,
             sheetContent = {
                 // Bottom Sheet Content (Results)
+                // Background tracks the loaded page's own background color so the
+                // tab strip matches the webpage instead of Material surface colors.
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(800.dp)
-                        .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
+                        .background(pageBackgroundColor, RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
                 ) {
                 Spacer(modifier = Modifier.height(16.dp))
-                
+
                 // Tabs - Polished UI
                 ScrollableTabRow(
                     selectedTabIndex = searchEngines.indexOf(selectedEngine),
@@ -610,12 +1200,12 @@ fun CircleToSearchScreen(
                                     ),
                                     modifier = Modifier
                                         .background(
-                                            if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha=0.5f),
+                                            pageBackgroundColor,
                                             RoundedCornerShape(16.dp)
                                         )
                                         .border(
                                              width = 1.dp,
-                                             color = if(selected) MaterialTheme.colorScheme.primary.copy(alpha=0.5f) else Color.Transparent,
+                                             color = if(selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) else Color.Transparent,
                                              shape = RoundedCornerShape(16.dp)
                                         )
                                         .padding(horizontal = 16.dp, vertical = 8.dp),
@@ -629,6 +1219,7 @@ fun CircleToSearchScreen(
                 // Reset everything when bitmap changes (new area selected)
                 LaunchedEffect(selectedBitmap) {
                     hostedImageUrl = null
+                    refreshingEngine = null
                     searchUrl = null
                     preloadedUrls.clear()
                     initializedEngines.clear() // Reset smart loading
@@ -748,7 +1339,17 @@ fun CircleToSearchScreen(
                 }
                 */
 
-                Box(modifier = Modifier.fillMaxSize()) {
+                PullToRefreshBox(
+                    isRefreshing = refreshingEngine != null,
+                    onRefresh = {
+                        val wv = webViews[selectedEngine]
+                        if (wv != null) {
+                            refreshingEngine = selectedEngine
+                            wv.reload()
+                        }
+                    },
+                    modifier = Modifier.fillMaxSize()
+                ) {
                     // Show loading only if the SELECTED engine isn't ready or just starting
                     if (isLoading || (preloadedUrls.containsKey(selectedEngine) && !webViews.containsKey(selectedEngine))) {
                          // We delay showing the loader slightly to avoid flicker if WebView attaches instantly
@@ -795,26 +1396,8 @@ fun CircleToSearchScreen(
                                             // Should not happen with key(), but safety check
                                             val v = webViews[engine]!!
                                             (v.parent as? ViewGroup)?.removeView(v)
-                                            
-                                            val swipeRefresh = SwipeRefreshLayout(ctx).apply {
-                                                layoutParams = ViewGroup.LayoutParams(
-                                                    ViewGroup.LayoutParams.MATCH_PARENT,
-                                                    ViewGroup.LayoutParams.MATCH_PARENT
-                                                )
-                                            }
-                                            swipeRefresh.addView(v)
-                                            swipeRefresh.setOnRefreshListener {
-                                                v.reload()
-                                                swipeRefresh.isRefreshing = false
-                                            }
-                                            swipeRefresh
+                                            v
                                         } else {
-                                            val swipeRefresh = SwipeRefreshLayout(ctx).apply {
-                                                layoutParams = ViewGroup.LayoutParams(
-                                                    ViewGroup.LayoutParams.MATCH_PARENT,
-                                                    ViewGroup.LayoutParams.MATCH_PARENT
-                                                )
-                                            }
                                             val webView = createWebView(ctx, engine)
                                             // Apply current settings
                                              if (isDesktop(engine)) {
@@ -823,29 +1406,12 @@ fun CircleToSearchScreen(
                                             
                                             webViews[engine] = webView
                                             webView.loadUrl(url)
-                                            
-                                            swipeRefresh.addView(webView)
-                                            swipeRefresh.setOnRefreshListener {
-                                                webView.reload()
-                                                swipeRefresh.isRefreshing = false
-                                            }
-                                            swipeRefresh
+                                            webView
                                         }
                                     },
-                                    update = { swipeRefresh ->
-                                        var webView: WebView? = null
-                                        for (i in 0 until swipeRefresh.childCount) {
-                                            val child = swipeRefresh.getChildAt(i)
-                                            if (child is WebView) {
-                                                webView = child
-                                                break
-                                            }
-                                        }
-                                        
-                                        if (webView != null) {
-                                            if (webView.url != url && url != webView.originalUrl) {
-                                                webView.loadUrl(url)
-                                            }
+                                    update = { webView ->
+                                        if (webView.url != url && url != webView.originalUrl) {
+                                            webView.loadUrl(url)
                                         }
                                     },
                                     modifier = Modifier
@@ -871,7 +1437,7 @@ fun CircleToSearchScreen(
             // Close button for Copy Mode (Top Left)
 
             // Friendly Message Overlay (Top Center)
-            if (!isCopyMode) {
+            if (!isTranslatorMode) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -887,27 +1453,35 @@ fun CircleToSearchScreen(
             }
 
             // 1. Screenshot Layer
-            if (screenshot != null && !isCopyMode) {
+            if (screenshot != null) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .graphicsLayer {
-                            // Required for BlendMode.Clear to work in child Canvas
-                            compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen
-                        }
+                        // Letterbox bars behind the Fit image are solid black, not see-through.
+                        .background(Color.Black)
+                        // View size for the image-fit mapping (crop-to-search, chips).
+                        .onSizeChanged { canvasSizePx = it }
                 ) {
                     Image(
                         bitmap = screenshot.asImageBitmap(),
                         contentDescription = stringResource(R.string.cd_screenshot),
-                        contentScale = ContentScale.FillBounds,
+                        contentScale = ContentScale.Fit,
                         modifier = Modifier.fillMaxSize()
                     )
 
 
-                    // Tint Overlay (Punch-out style)
-                    Canvas(modifier = Modifier.fillMaxSize()) {
-                        val strokeWidth = 0f
-                        val dimAlpha = 0.15f
+                    // Tint Overlay (Punch-out style) — dimmed during normal CTS use,
+                    // hidden in translator mode so the frozen backdrop stays undimmed.
+                    // The Canvas renders to its OWN offscreen buffer: BlendMode.Clear then
+                    // erases only the tint (the hole), while the image underneath — drawn in
+                    // the parent, a separate buffer — stays intact and shows through the hole.
+                    // (Offscreen on the parent Box would share one buffer: Clear would erase
+                    // the image too and the hole would punch through to the black window.)
+                    Canvas(modifier = Modifier.fillMaxSize().graphicsLayer {
+                        alpha = if (isTranslatorMode) 0f else 1f
+                        compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen
+                    }) {
+                        val dimAlpha = 0.08f
                         
                         // 1. Draw global dim
                         drawRect(Color.Black.copy(alpha = dimAlpha))
@@ -933,7 +1507,7 @@ fun CircleToSearchScreen(
                                 color = Color.Transparent,
                                 topLeft = holeRect.topLeft,
                                 size = holeRect.size,
-                                cornerRadius = CornerRadius(48f),
+                                cornerRadius = CornerRadius(min(48f, min(holeRect.width, holeRect.height) / 2f)),
                                 blendMode = androidx.compose.ui.graphics.BlendMode.Clear
                             )
                         }
@@ -942,7 +1516,9 @@ fun CircleToSearchScreen(
             }
 
             // 2. Gradient Border Layer (Overlaying screenshot, clipped to rounded corners)
-            if (showGradientBorder && !isCopyMode) {
+            // Sibling drawn AFTER the dim/tint layer, so overlay dimness can never
+            // wash the border out — it stays at its own alpha regardless of dimAlpha.
+            if (showGradientBorder && !isTranslatorMode) {
                 androidx.compose.animation.AnimatedVisibility(
                     visible = isUIVisible,
                     enter = androidx.compose.animation.fadeIn(animationSpec = tween(700))
@@ -951,111 +1527,20 @@ fun CircleToSearchScreen(
                         modifier = Modifier
                             .fillMaxSize()
                             .border(
-                                width = 8.dp,
+                                width = 2.dp,
                                 brush = Brush.verticalGradient(
-                                    colors = OverlayGradientColors.map { it.copy(alpha = 0.5f) }
+                                    colors = OverlayGradientColors.map { it.copy(alpha = 0.9f) }
                                 ),
-                                shape = RoundedCornerShape(24.dp) // Rounded corners for device
+                                shape = deviceCornerShape
                             )
-                            .clip(RoundedCornerShape(24.dp))
+                            .clip(deviceCornerShape)
                     )
                 }
             }
 
             // 3. Drawing Canvas (Interactive Layer)
-            if (!isCopyMode) {                Canvas(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .pointerInput(Unit) {
-                            detectDragGestures(
-                                onDragStart = { offset ->
-                                    val rect = selectionRect
-                                    if (rect != null && selectionAnim.value == 1f) {
-                                        val handleSize = 64f // px for hit testing
-                                        val tl = Offset(rect.left.toFloat(), rect.top.toFloat())
-                                        val tr = Offset(rect.right.toFloat(), rect.top.toFloat())
-                                        val bl = Offset(rect.left.toFloat(), rect.bottom.toFloat())
-                                        val br = Offset(rect.right.toFloat(), rect.bottom.toFloat())
-                                        
-                                        when {
-                                            (offset - tl).getDistance() < handleSize -> { isResizing = true; activeHandle = "tl" }
-                                            (offset - tr).getDistance() < handleSize -> { isResizing = true; activeHandle = "tr" }
-                                            (offset - bl).getDistance() < handleSize -> { isResizing = true; activeHandle = "bl" }
-                                            (offset - br).getDistance() < handleSize -> { isResizing = true; activeHandle = "br" }
-                                            else -> { isResizing = false; activeHandle = null }
-                                        }
-                                        
-                                        if (isResizing) return@detectDragGestures
-                                    }
-
-                                    // Clear previous state if starting new draw
-                                    currentPathPoints.clear()
-                                    currentPathPoints.add(offset)
-                                    selectionRect = null
-                                    scope.launch { selectionAnim.snapTo(0f) }
-                                },
-                                onDrag = { change, _ ->
-                                    if (isResizing && activeHandle != null) {
-                                        val rect = selectionRect ?: return@detectDragGestures
-                                        val pos = change.position
-                                        val newRect = android.graphics.Rect(rect)
-                                        when (activeHandle) {
-                                            "tl" -> { newRect.left = pos.x.toInt(); newRect.top = pos.y.toInt() }
-                                            "tr" -> { newRect.right = pos.x.toInt(); newRect.top = pos.y.toInt() }
-                                            "bl" -> { newRect.left = pos.x.toInt(); newRect.bottom = pos.y.toInt() }
-                                            "br" -> { newRect.right = pos.x.toInt(); newRect.bottom = pos.y.toInt() }
-                                        }
-                                        // Basic validation (min size)
-                                        if (newRect.width() > 20 && newRect.height() > 20) {
-                                            selectionRect = newRect
-                                        }
-                                    } else {
-                                        currentPathPoints.add(change.position)
-                                    }
-                                },
-                                onDragEnd = {
-                                    if (isResizing) {
-                                        isResizing = false
-                                        activeHandle = null
-                                        // Update cropped bitmap after resize
-                                        if (screenshot != null && selectionRect != null) {
-                                            selectedBitmap = ImageUtils.cropBitmap(screenshot, selectionRect!!)
-                                        }
-                                    } else if (currentPathPoints.isNotEmpty()) {
-                                        var minX = Float.MAX_VALUE
-                                        var minY = Float.MAX_VALUE
-                                        var maxX = Float.MIN_VALUE
-                                        var maxY = Float.MIN_VALUE
-                                        currentPathPoints.forEach { p ->
-                                            minX = kotlin.math.min(minX, p.x)
-                                            minY = kotlin.math.min(minY, p.y)
-                                            maxX = kotlin.math.max(maxX, p.x)
-                                            maxY = kotlin.math.max(maxY, p.y)
-                                        }
-
-                                        val border = 20
-                                        val rect = android.graphics.Rect(
-                                            (minX - border).toInt().coerceAtLeast(0),
-                                            (minY - border).toInt().coerceAtLeast(0),
-                                            (maxX + border).toInt().coerceAtMost(screenshot?.width ?: 0),
-                                            (maxY + border).toInt().coerceAtMost(screenshot?.height ?: 0)
-                                        )
-
-                                        if (rect.width() > 10 && rect.height() > 10) {
-                                            selectionRect = rect
-                                            currentPathPoints.clear() // Hide the drawn circle
-                                            if (screenshot != null) {
-                                                selectedBitmap = ImageUtils.cropBitmap(screenshot!!, rect)
-                                            }
-                                            scope.launch {
-                                                selectionAnim.animateTo(1f, tween(600))
-                                                isSearching = true
-                                            }
-                                        }
-                                    }
-                                }
-                            )
-                        }
+            if (!isTranslatorMode) {                Canvas(
+                    modifier = Modifier.fillMaxSize()
                 ) {
                     // Draw current path (Real-time)
                     if (currentPathPoints.size > 1) {
@@ -1092,8 +1577,12 @@ fun CircleToSearchScreen(
                         
                         val width = right - left
                         val height = bottom - top
-                        val cornerRadius = 48f // Slightly smaller radius
-                        val armLength = min(width, height) * 0.15f // Slightly shorter arms
+                        // Constant corner look for every frame size: fixed radius and fixed
+                        // arm length (what a small square frame used to draw), clamped only
+                        // so frames smaller than the radius/arm still render correctly.
+                        val maxRadius = min(width, height) / 2f
+                        val cornerRadius = min(48f, maxRadius)
+                        val armLength = max(cornerRadius, min(64f, maxRadius))
 
                         // Top Left
                         val tlPath = Path().apply {
@@ -1157,7 +1646,7 @@ fun CircleToSearchScreen(
                             color = Color.White,
                             topLeft = Offset(left, top),
                             size = Size(width, height),
-                            cornerRadius = CornerRadius(48f),
+                            cornerRadius = CornerRadius(cornerRadius),
                             style = Stroke(width = 4f),
                             alpha = (1f - progress) * 0.5f
                          )
@@ -1166,9 +1655,57 @@ fun CircleToSearchScreen(
 
             }
 
+            // Circle-draw gestures + instant OCR overlays. The drag detector is the PARENT of
+            // the word overlay, not a lower sibling: an ancestor is always in the hit path, the
+            // child sees events first (taps and handle-drags stay with text selection, since it
+            // consumes them), and plain drags fall through to circle drawing — the same
+            // container/overlay split the translator module uses for pan vs. word selection.
+            if (!isTranslatorMode) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .pointerInput(Unit) {
+                            detectDragGestures(
+                                onDragStart = { beginCircleDrag(it) },
+                                onDrag = { change, _ -> moveCircleDrag(change) },
+                                onDragEnd = { endCircleDrag() },
+                            )
+                        }
+                ) {
+                    if (screenshot != null && !isEntityExtractMode) {
+                        val words = instantWords
+                        if (words != null) {
+                            WordSelectionOverlay(
+                                words = words.sourceWords,
+                                imageWidth = words.imageWidth,
+                                imageHeight = words.imageHeight,
+                                modifier = Modifier.fillMaxSize(),
+                                onSelectionChanged = { selected ->
+                                    wordSelected = selected
+                                    // Mutually exclusive with the drawn circle: selecting
+                                    // text drops the frame (and its crop) so only one stays.
+                                    if (selected && selectionRect != null) {
+                                        selectionRect = null
+                                        selectedBitmap = null
+                                    }
+                                },
+                                clearSelectionSignal = wordSelectionClearSignal,
+                            )
+                        } else if (!instantOcrDone) {
+                            instantRegions?.let { regions ->
+                                ScanAnimationOverlay(
+                                    regions = regions,
+                                    modifier = Modifier.fillMaxSize(),
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
             // 4. Header (Top)
             androidx.compose.animation.AnimatedVisibility(
-                visible = isUIVisible && !isCopyMode && !isEntityExtractMode,
+                visible = isUIVisible && !isEntityExtractMode && !isTranslatorMode,
                 enter = androidx.compose.animation.slideInVertically(
                     initialOffsetY = { -it }, // Commence au-dessus de l'écran (-100%)
                     animationSpec = tween(500, easing = androidx.compose.animation.core.FastOutSlowInEasing)
@@ -1179,7 +1716,7 @@ fun CircleToSearchScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .statusBarsPadding()
-                        .padding(top = 16.dp, start = 16.dp, end = 16.dp)
+                        .padding(top = 4.dp, start = 16.dp, end = 16.dp)
                         .align(Alignment.TopCenter),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -1351,12 +1888,48 @@ fun CircleToSearchScreen(
                     }
                 }
             }
-            // 5. Bottom Bar — Material 3 Expressive two-row card
-            // State for Copy Text mode
-            var isCopyTextTriggered by remember { mutableStateOf(false) }
+            // Translate the live screen underneath Circle to Search: close CTS and
+            // run the overlay on the frozen capture over the interactive screen
+            // (tap-through, no tap-to-copy). Shared by the translate button's
+            // long-press and the bottom-bar "Screen" button.
+            val translateLiveScreen: () -> Unit = {
+                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                val bmp = screenshot
+                if (bmp != null) {
+                    selectionRect = null
+                    selectedBitmap = null
+                    isSearching = false
+                    currentPathPoints.clear()
+                    scope.launch { selectionAnim.snapTo(0f) }
 
+                    val translatorService = CircleToSearchAccessibilityService.instance
+                    // The live screen stays interactive underneath, so the result
+                    // overlay must pass taps through (no tap-to-copy).
+                    val started = translatorService?.translateCapturedScreen(bmp, TRANSLATE_TRIGGER_DELAY_MS, tapToCopy = false) ?: false
+                    if (started) {
+                        onClose()
+                    } else {
+                        // No accessibility service: assistant permission can't run the
+                        // live screen (no current-screen capture, no touch-to-clear),
+                        // so fall back to the regular captured translate — what a
+                        // short press does — instead of a degraded live mode.
+                        isTranslatorMode = true
+                        val startedTranslate = com.akslabs.circletosearch.AssistantTranslateOverlay.start(bmp, TRANSLATE_HIDE_DELAY_MS) {
+                            isTranslatorMode = false
+                        }
+                        if (!startedTranslate) {
+                            isTranslatorMode = false
+                            android.widget.Toast.makeText(context, context.getString(R.string.toast_translate_unavailable), android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                } else {
+                    android.widget.Toast.makeText(context, context.getString(R.string.toast_translate_unavailable), android.widget.Toast.LENGTH_SHORT).show()
+                }
+            }
+
+            // 5. Bottom Bar — Material 3 Expressive two-row card
             androidx.compose.animation.AnimatedVisibility(
-                visible = isUIVisible && !isCopyMode && !isEntityExtractMode,
+                visible = isUIVisible && !isEntityExtractMode && !isTranslatorMode && !wordSelected,
                 enter = slideInVertically(
                     initialOffsetY = { it }, // slides up from below
                     animationSpec = tween(300, easing = androidx.compose.animation.core.CubicBezierEasing(0f, 0f, 0.2f, 1f))
@@ -1420,25 +1993,6 @@ fun CircleToSearchScreen(
 
                                     Spacer(modifier = Modifier.weight(1f))
 
-                                    // Mic Button
-                                    IconButton(
-                                        onClick = {
-                                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                                            try {
-                                                val intent = android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                                                    putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                                                    addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                                                }
-                                                context.startActivity(intent)
-                                            } catch (e: Exception) {}
-                                        },
-                                        modifier = Modifier.size(44.dp)
-                                    ) {
-                                        Icon(Icons.Default.Mic, contentDescription = stringResource(R.string.cd_voice_search))
-                                    }
-
-                                    Spacer(modifier = Modifier.width(4.dp))
-
                                     // Lens Button
                                     IconButton(
                                         onClick = {
@@ -1459,39 +2013,62 @@ fun CircleToSearchScreen(
                                 }
                             }
 
-                            // Circular Button: Assist Copy (Music Icon)
-                            IconButton(
-                                onClick = {
-                                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                                    copyTextManager?.setOcrOnlyMode()
-                                    isCopyMode = true
-                                    isCopyTextTriggered = true
-                                },
-                                modifier = Modifier
-                                    .size(60.dp)
-                                    .background(MaterialTheme.colorScheme.surfaceContainer, CircleShape),
-                            ) {
-                                Icon(Icons.Default.MusicNote, contentDescription = stringResource(R.string.cd_assist_copy), tint = MaterialTheme.colorScheme.onSurface)
-                            }
-
                             // Circular Button: Translate
-                            IconButton(
-                                onClick = {
-                                    haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                                    android.widget.Toast.makeText(context, context.getString(R.string.toast_coming_soon), android.widget.Toast.LENGTH_SHORT).show()
-                                    /*
-                                    try {
-                                        val intent = context.packageManager.getLaunchIntentForPackage("com.google.android.apps.translate")?.apply { addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK) }
-                                        if (intent != null) context.startActivity(intent)
-                                        else context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("https://translate.google.com")).apply { addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK) })
-                                    } catch (e: Exception) {}
-                                    */
-                                },
+                            // Short press: freeze CTS (chrome hides, screenshot stays) and run the module's
+                            //   translator overlay on the capture; close/back returns to Circle to Search.
+                            // Long press: close CTS and run the same overlay on the real screen (bubble behavior).
+                            Box(
                                 modifier = Modifier
                                     .size(60.dp)
-                                    .background(MaterialTheme.colorScheme.surfaceContainer, CircleShape),
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.surfaceContainer)
+                                    .combinedClickable(
+                                        onClick = {
+                                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                                            val bmp = screenshot
+                                            if (bmp == null) {
+                                                android.widget.Toast.makeText(context, context.getString(R.string.toast_translate_unavailable), android.widget.Toast.LENGTH_SHORT).show()
+                                                return@combinedClickable
+                                            }
+                                            selectionRect = null
+                                            selectedBitmap = null
+                                            isSearching = false
+                                            currentPathPoints.clear()
+                                            scope.launch { selectionAnim.snapTo(0f) }
+
+                                            val translatorService = CircleToSearchAccessibilityService.instance
+                                            if (translatorService != null) {
+                                                isTranslatorMode = true
+                                                // OCR starts now; only the overlay chrome waits for the hide delay.
+                                                val started = translatorService.translateCapturedScreen(bmp, TRANSLATE_HIDE_DELAY_MS, onClosed = {
+                                                    isTranslatorMode = false
+                                                })
+                                                if (started) return@combinedClickable
+                                                isTranslatorMode = false
+                                            }
+                                            // No accessibility service (or its bridge failed):
+                                            // show the module's translate overlay hosted in our
+                                            // own activity — same OverlayUI chrome as the a11y path.
+                                            isTranslatorMode = true
+                                            val startedTranslate = com.akslabs.circletosearch.AssistantTranslateOverlay.start(bmp, TRANSLATE_HIDE_DELAY_MS) {
+                                                isTranslatorMode = false
+                                            }
+                                            if (!startedTranslate) {
+                                                isTranslatorMode = false
+                                                android.widget.Toast.makeText(context, context.getString(R.string.toast_translate_unavailable), android.widget.Toast.LENGTH_SHORT).show()
+                                            }
+                                        },
+                                        onLongClick = {
+                                            translateLiveScreen()
+                                        }
+                                    ),
+                                contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.Default.Translate, contentDescription = stringResource(R.string.cd_translate))
+                                Icon(
+                                    painterResource(id = com.akslabs.circletosearch.R.drawable.translate_indic_24px),
+                                    contentDescription = stringResource(R.string.cd_translate),
+                                    tint = MaterialTheme.colorScheme.onSurface
+                                )
                             }
                         }
 
@@ -1547,6 +2124,26 @@ fun CircleToSearchScreen(
                                 }
                             }
 
+                            // Camera — open the translator module's live camera directly.
+                            // CLEAR_TASK so backing out of the camera returns here instead
+                            // of any module screen left over from a previous session.
+                            BottomBarButton(stringResource(R.string.label_camera), {
+                                Icon(painterResource(id = dev.davidv.translator.R.drawable.camera), null, modifier = Modifier.size(22.dp))
+                            }) {
+                                // Clear any lingering translator overlay windows so a
+                                // stale touchable result/select window can't intercept
+                                // taps inside the camera screen.
+                                CircleToSearchAccessibilityService.instance?.closeTranslateOverlay()
+                                val cameraIntent = android.content.Intent(context, dev.davidv.translator.MainActivity::class.java)
+                                    .putExtra(dev.davidv.translator.MainActivity.EXTRA_OPEN_LIVE_CAMERA, true)
+                                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                                runCatching {
+                                    context.startActivity(cameraIntent)
+                                }.onFailure {
+                                    android.widget.Toast.makeText(context, context.getString(R.string.toast_translate_unavailable), android.widget.Toast.LENGTH_SHORT).show()
+                                }
+                            }
+
                             // More Apps
 //                            BottomBarButton("More Apps", { Icon(Icons.Default.Apps, null) }) {
 //                                showMoreAppsSheet = true
@@ -1565,23 +2162,44 @@ fun CircleToSearchScreen(
 //                                }
 //                            }
 
-                            // Smart Entity Extractor
+                            // Smart Entity Extractor — instant OCR over the screenshot using
+                            // the translator module's recognition (no Tesseract, no re-OCR).
                             BottomBarButton(stringResource(R.string.label_smartscan), { Icon(Icons.Default.Search, null, modifier = Modifier.size(22.dp)) }) {
                                 isEntityExtractMode = true
                                 if (detectedEntities.isEmpty() && !isExtractingEntities) {
                                     isExtractingEntities = true
+                                    val cachedWords = instantWords?.sourceWords
+                                    val scanGeneration = entityScanGeneration
                                     scope.launch(kotlinx.coroutines.Dispatchers.IO) {
                                         val bmp = screenshot ?: return@launch
-                                        val textNodes = com.akslabs.circletosearch.ocr.TesseractEngine.extractText(context, bmp)
+                                        val sourceWords = cachedWords ?: runInstantScreenshotOcr(context, bmp) { }?.sourceWords
+                                        if (sourceWords == null) {
+                                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                                isExtractingEntities = false
+                                            }
+                                            return@launch
+                                        }
                                         val entities = mutableListOf<SmartEntity>()
-                                        
+
                                         val urlRegex = android.util.Patterns.WEB_URL.toRegex()
                                         val emailRegex = android.util.Patterns.EMAIL_ADDRESS.toRegex()
                                         val phoneRegexLine = Regex("""(\+?[\d\s\-\(\).]{9,20})""")
                                         val upiRegex = Regex("""[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z]{2,64}""")
 
-                                        textNodes.forEach { node ->
-                                            val lineText = node.fullText
+                                        // Group recognized words into lines; phone matches map into
+                                        // the line's union bounds by character ratio, like before.
+                                        sourceWords.groupBy { it.lineIndex }.forEach { (_, lineWords) ->
+                                            val lineText = lineWords.joinToString(" ") { it.text }
+                                            var left = Float.MAX_VALUE
+                                            var top = Float.MAX_VALUE
+                                            var right = -Float.MAX_VALUE
+                                            var bottom = -Float.MAX_VALUE
+                                            lineWords.forEach { w ->
+                                                left = min(left, w.bounds.cx - w.bounds.width / 2f)
+                                                top = min(top, w.bounds.cy - w.bounds.height / 2f)
+                                                right = max(right, w.bounds.cx + w.bounds.width / 2f)
+                                                bottom = max(bottom, w.bounds.cy + w.bounds.height / 2f)
+                                            }
                                             phoneRegexLine.findAll(lineText).forEach { match ->
                                                 val phoneCandidate = match.value.trim()
                                                 if (phoneCandidate.count { it.isDigit() } >= 10) {
@@ -1590,24 +2208,33 @@ fun CircleToSearchScreen(
                                                     val ratioStart = startIdx.toFloat() / lineText.length.coerceAtLeast(1)
                                                     val ratioEnd = endIdx.toFloat() / lineText.length.coerceAtLeast(1)
                                                     val entityBounds = android.graphics.RectF(
-                                                        node.bounds.left.toFloat() + (ratioStart * node.bounds.width().toFloat()),
-                                                        node.bounds.top.toFloat(),
-                                                        node.bounds.left.toFloat() + (ratioEnd * node.bounds.width().toFloat()),
-                                                        node.bounds.bottom.toFloat()
+                                                        left + (ratioStart * (right - left)),
+                                                        top,
+                                                        left + (ratioEnd * (right - left)),
+                                                        bottom
                                                     )
                                                     entities.add(SmartEntity.Phone(phoneCandidate, entityBounds, context.getString(R.string.entity_type_phone)))
                                                 }
                                             }
-                                            node.words.forEach { word ->
-                                                val txt = word.text.trim()
-                                                if (emailRegex.matches(txt)) entities.add(SmartEntity.Email(txt, word.bounds, context.getString(R.string.entity_type_email)))
-                                                else if (upiRegex.matches(txt)) entities.add(SmartEntity.Upi(txt, word.bounds, context.getString(R.string.entity_type_upi)))
-                                                else if (urlRegex.matches(txt)) entities.add(SmartEntity.Url(txt, word.bounds, context.getString(R.string.entity_type_link)))
-                                            }
+                                        }
+                                        sourceWords.forEach { word ->
+                                            val txt = word.text.trim()
+                                            val wordBounds = android.graphics.RectF(
+                                                word.bounds.cx - word.bounds.width / 2f,
+                                                word.bounds.cy - word.bounds.height / 2f,
+                                                word.bounds.cx + word.bounds.width / 2f,
+                                                word.bounds.cy + word.bounds.height / 2f
+                                            )
+                                            if (emailRegex.matches(txt)) entities.add(SmartEntity.Email(txt, wordBounds, context.getString(R.string.entity_type_email)))
+                                            else if (upiRegex.matches(txt)) entities.add(SmartEntity.Upi(txt, wordBounds, context.getString(R.string.entity_type_upi)))
+                                            else if (urlRegex.matches(txt)) entities.add(SmartEntity.Url(txt, wordBounds, context.getString(R.string.entity_type_link)))
                                         }
                                         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                                            detectedEntities = entities
                                             isExtractingEntities = false
+                                            // Discard results if the canvas image changed mid-scan.
+                                            if (scanGeneration == entityScanGeneration) {
+                                                detectedEntities = entities
+                                            }
                                         }
                                     }
                                 }
@@ -1618,13 +2245,6 @@ fun CircleToSearchScreen(
 //                                showDonateSheet = true
 //                            }
 
-                            // Copy Text
-                            BottomBarButton(stringResource(R.string.label_copy_text), { Icon(painterResource(id = com.akslabs.circletosearch.R.drawable.ocr), null, modifier = Modifier.size(20.dp)) }) {
-                                copyTextManager?.setOcrOnlyMode()
-                                isCopyMode = true
-                                isCopyTextTriggered = true
-                            }
-
                             // QR Scan
                             BottomBarButton(stringResource(R.string.label_scan_qr), { Icon(Icons.Default.QrCode, null) }) {
                                 qrScanBitmap = selectedBitmap ?: screenshot
@@ -1634,7 +2254,10 @@ fun CircleToSearchScreen(
                             // Fullscreen
                             BottomBarButton(stringResource(R.string.label_fullscreen), { Icon(Icons.Default.Fullscreen, null) }) {
                                 if (screenshot != null) {
-                                    selectionRect = Rect(0, 0, screenshot.width, screenshot.height)
+                                    // Full-image selection in screen space (view size, not bitmap size).
+                                    val viewW = if (canvasSizePx.width > 0) canvasSizePx.width else screenshot.width
+                                    val viewH = if (canvasSizePx.height > 0) canvasSizePx.height else screenshot.height
+                                    selectionRect = Rect(0, 0, viewW, viewH)
                                     currentPathPoints.clear()
                                     scope.launch { 
                                         selectionAnim.snapTo(0f)
@@ -1642,6 +2265,28 @@ fun CircleToSearchScreen(
                                         selectedBitmap = screenshot
                                         isSearching = true 
                                     }
+                                }
+                            }
+
+                            // Gallery — pick an image and run Circle to Search on it
+                            BottomBarButton(stringResource(R.string.label_gallery), { Icon(painterResource(id = com.akslabs.circletosearch.R.drawable.ic_gallery), null, modifier = Modifier.size(22.dp)) }) {
+                                pickImageLauncher.launch(
+                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                )
+                            }
+
+                            // Screen — translate the current live screen (same as long-pressing
+                            // Translate). Only with accessibility: assistant permission can't
+                            // offer the live screen behavior, so the button is hidden.
+                            if (CircleToSearchAccessibilityService.instance != null) {
+                                BottomBarButton(stringResource(R.string.label_translate_screen), {
+                                    Icon(
+                                        painterResource(id = com.akslabs.circletosearch.R.drawable.translate_screen),
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }) {
+                                    translateLiveScreen()
                                 }
                             }
                         }
@@ -1663,40 +2308,26 @@ fun CircleToSearchScreen(
                 )
             }
 
-            // Copy Text overlay integration (Activity-based)
-            if (isCopyMode && copyTextManager != null) {
-                AndroidView(
-                    factory = { ctx ->
-                        copyTextManager.getOverlayView(onDismiss = {
-                            isCopyMode = false
-                            onExitCopyMode()
-                        })
-                    },
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .zIndex(150f)
-                )
-            }
-
-            // 4. Selection Actions (Share) — Positioned at the very end for absolute top-layer rendering
-            if (selectionRect != null && selectionAnim.value == 1f && !isCopyMode) {
+            // 4. Selection Actions (Share/Save/Pin) - in-window toolbar styled like the
+            // system text-selection toolbar. Drawn inside the scaffold content so the
+            // bottom sheet always covers it (lower z than the sheet).
+            if (selectionRect != null && selectionAnim.value == 1f && !isTranslatorMode) {
                 val rect = selectionRect!!
                 val density = androidx.compose.ui.platform.LocalDensity.current
                 val leftPx = rect.left.toFloat()
                 val topPx = rect.top.toFloat()
                 val rightPx = rect.right.toFloat()
                 val bottomPx = rect.bottom.toFloat()
-                
+
                 val leftDp = with(density) { leftPx.toDp() }
                 val topDp = with(density) { topPx.toDp() }
                 val rightDp = with(density) { rightPx.toDp() }
                 val bottomDp = with(density) { bottomPx.toDp() }
-                val widthDp = rightDp - leftDp
-                
+
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .zIndex(2000f) // Highest Z-index
+                        .zIndex(2000f)
                 ) {
                     val screenWidth = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp.dp
                     val screenHeight = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp
@@ -1710,7 +2341,6 @@ fun CircleToSearchScreen(
                             .width(320.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        // Wrapped in Surface to match Bottom Bar tonal environment
                         androidx.compose.material3.Surface(
                             color = MaterialTheme.colorScheme.surfaceContainerHigh,
                             shape = CircleShape,
@@ -1718,7 +2348,7 @@ fun CircleToSearchScreen(
                             shadowElevation = 8.dp
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                // 1. SHARE BUTTON
+                                // SHARE
                                 androidx.compose.material3.FilledTonalButton(
                                     onClick = {
                                         if (selectedBitmap != null) {
@@ -1728,15 +2358,15 @@ fun CircleToSearchScreen(
                                                     val path = ImageUtils.saveBitmap(context, selectedBitmap!!, fileName)
                                                     val file = java.io.File(path)
                                                     val uri = androidx.core.content.FileProvider.getUriForFile(context, "com.akslabs.circletosearch.fileprovider", file)
-                                                    val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply { 
+                                                    val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
                                                         type = "image/png"
                                                         putExtra(android.content.Intent.EXTRA_STREAM, uri)
                                                         clipData = android.content.ClipData.newRawUri("Selection", uri)
                                                         addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                                         addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
                                                     }
-                                                    context.startActivity(android.content.Intent.createChooser(shareIntent, context.getString(R.string.share_chooser_title)).apply { 
-                                                        addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK) 
+                                                    context.startActivity(android.content.Intent.createChooser(shareIntent, context.getString(R.string.share_chooser_title)).apply {
+                                                        addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
                                                     })
                                                 } catch (e: Exception) {
                                                     android.util.Log.e("CircleToSearch", "Failed to share selection", e)
@@ -1747,29 +2377,21 @@ fun CircleToSearchScreen(
                                     modifier = Modifier.height(48.dp),
                                     shape = CircleShape,
                                     colors = androidx.compose.material3.ButtonDefaults.filledTonalButtonColors(
-                                        containerColor = Color.Transparent, // Parent surface handles color
+                                        containerColor = Color.Transparent,
                                         contentColor = MaterialTheme.colorScheme.onSurface
                                     ),
                                     elevation = null,
-                                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp)
+                                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp)
                                 ) {
                                     Text(
-                                        stringResource(R.string.label_share), 
+                                        stringResource(R.string.label_share),
                                         style = MaterialTheme.typography.labelLarge.copy(
                                             fontWeight = androidx.compose.ui.text.font.FontWeight.Normal
                                         )
                                     )
                                 }
 
-
-
-                                // Separator
-                                androidx.compose.material3.VerticalDivider(
-                                    modifier = Modifier.height(24.dp).padding(horizontal = 2.dp),
-                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                                )
-
-                                // 2. SAVE BUTTON
+                                // SAVE
                                 androidx.compose.material3.FilledTonalButton(
                                     onClick = {
                                         if (selectedBitmap != null) {
@@ -1789,23 +2411,17 @@ fun CircleToSearchScreen(
                                         contentColor = MaterialTheme.colorScheme.onSurface
                                     ),
                                     elevation = null,
-                                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp)
+                                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp)
                                 ) {
                                     Text(
-                                        stringResource(R.string.save), 
+                                        stringResource(R.string.save),
                                         style = MaterialTheme.typography.labelLarge.copy(
                                             fontWeight = androidx.compose.ui.text.font.FontWeight.Normal
                                         )
                                     )
                                 }
 
-                                // Separator
-                                androidx.compose.material3.VerticalDivider(
-                                    modifier = Modifier.height(24.dp).padding(horizontal = 2.dp),
-                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                                )
-
-                                // 3. PIN BUTTON
+                                // PIN
                                 androidx.compose.material3.FilledTonalButton(
                                     onClick = {
                                         if (selectedBitmap != null && selectionRect != null) {
@@ -1824,7 +2440,7 @@ fun CircleToSearchScreen(
                                         contentColor = MaterialTheme.colorScheme.onSurface
                                     ),
                                     elevation = null,
-                                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 20.dp)
+                                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp)
                                 ) {
                                     Text(
                                         stringResource(R.string.pin),
@@ -1840,18 +2456,20 @@ fun CircleToSearchScreen(
             }
 
         // --- NEW: QR Overlay Chips (High Layer) ---
-        if (screenshot != null && !isCopyMode) {
+        if (screenshot != null && !isTranslatorMode) {
             BoxWithConstraints(modifier = Modifier.fillMaxSize().zIndex(2500f)) {
                 val screenWidth = maxWidth
                 val screenHeight = maxHeight
                 val bitmapWidth = screenshot.width.toFloat()
                 val bitmapHeight = screenshot.height.toFloat()
+                // ContentScale.Fit mapping — chips sit over the letterboxed image, in dp.
+                val t = fitMapping(screenWidth.value, screenHeight.value, bitmapWidth, bitmapHeight)
 
                 android.util.Log.d("CircleToSearch", "Rendering QR Chips: count=${detectedQrCodes.size}")
                 detectedQrCodes.forEach { qr ->
                     qr.bounds?.let { bounds ->
-                        val chipX = (bounds.centerX() / bitmapWidth) * screenWidth.value
-                        val chipY = (bounds.centerY() / bitmapHeight) * screenHeight.value
+                        val chipX = t.offsetX + bounds.centerX() * t.scale
+                        val chipY = t.offsetY + bounds.centerY() * t.scale
                         val isUrl = qr.result is QrResult.Url
 
                         // Using a Box with pointerInput to consume taps and prevent circling
@@ -1915,12 +2533,14 @@ fun CircleToSearchScreen(
         }
 
         // --- Phase 44: Smart Entity Extractor Overlay Chips ---
-        if (isEntityExtractMode && screenshot != null && !isCopyMode) {
+        if (isEntityExtractMode && screenshot != null) {
             BoxWithConstraints(modifier = Modifier.fillMaxSize().zIndex(2600f)) {
                 val screenWidth = maxWidth
                 val screenHeight = maxHeight
                 val bitmapWidth = screenshot.width.toFloat()
                 val bitmapHeight = screenshot.height.toFloat()
+                // ContentScale.Fit mapping — chips sit over the letterboxed image, in dp.
+                val t = fitMapping(screenWidth.value, screenHeight.value, bitmapWidth, bitmapHeight)
 
                 if (isExtractingEntities) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -1933,8 +2553,8 @@ fun CircleToSearchScreen(
                 }
 
                 detectedEntities.forEach { entity ->
-                    val chipX = (entity.bounds.centerX() / bitmapWidth) * screenWidth.value
-                    val chipY = (entity.bounds.centerY() / bitmapHeight) * screenHeight.value
+                    val chipX = t.offsetX + entity.bounds.centerX() * t.scale
+                    val chipY = t.offsetY + entity.bounds.centerY() * t.scale
 
                     // Main Chip Icon
                     Box(
@@ -2003,6 +2623,25 @@ fun CircleToSearchScreen(
                     }
                 }
             }
+        }
+
+        // Input shield while the translator overlay owns the screen: consumes touches so
+        // the hidden chrome underneath can't be tapped (module windows sit above this).
+        if (isTranslatorMode) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .zIndex(4000f)
+                    .pointerInput(Unit) {
+                        awaitEachGesture {
+                            awaitFirstDown(requireUnconsumed = false)
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                event.changes.forEach { it.consume() }
+                            }
+                        }
+                    }
+            )
         }
 
         // QR Code Result Sheet

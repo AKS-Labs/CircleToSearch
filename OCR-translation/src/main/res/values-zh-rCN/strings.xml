@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="stop">停止</string>
+    <string name="pause">暂停</string>
+    <string name="resume">继续</string>
+    <string name="region_select_menu">设置翻译区域</string>
+    <string name="screen_translate_needs_source">请指定源语言</string>
+    <string name="live_tile_label">实时翻译屏幕</string>
+    <string name="translate_text">翻译</string>
+    <string name="translate_link">翻译链接</string>
+    <string name="accessibility_service_description">开启此服务以翻译屏幕上的文字。点按悬浮的翻译按钮即可翻译当前屏幕，或开始实时屏幕翻译。</string>
+    <string name="tap_to_translate_title">快速翻译已开启</string>
+    <string name="tap_to_translate_body">点按打开翻译弹窗</string>
+    <string name="tap_to_translate_channel">快速翻译</string>
+    <string name="tap_to_translate_channel_description">用于快速打开翻译弹窗的常驻通知</string>
+    <string name="quick_tile_label">翻译</string>
+    <!-- common -->
+    <string name="common_ok">确定</string>
+    <string name="common_cancel">取消</string>
+    <string name="common_done">完成</string>
+    <string name="common_grant">授权</string>
+    <string name="common_manage">管理</string>
+    <!-- settings -->
+    <string name="settings_title">设置</string>
+    <string name="settings_languages">语言</string>
+    <string name="settings_language_packs">语言包</string>
+    <string name="settings_general">通用</string>
+    <string name="settings_font_size">字体大小</string>
+    <string name="settings_font_sample">这是一段示例文字</string>
+    <string name="settings_tap_notification">快速翻译通知</string>
+    <string name="settings_tap_notification_desc">用于打开弹窗的常驻通知。</string>
+    <string name="settings_web_translator">网页翻译</string>
+    <string name="settings_clear_browsing">关闭时清除浏览数据</string>
+    <string name="settings_clear_browsing_desc">删除 Cookie、缓存和本地存储。</string>
+    <string name="settings_tts_section">文字转语音</string>
+    <string name="settings_tts_read_urls_hashtags">朗读网址和话题标签</string>
+    <string name="settings_popup_settings">弹窗</string>
+    <string name="settings_popup_desc">从文字选择菜单中选择\'翻译\'时会显示弹窗</string>
+    <string name="settings_hide_input">隐藏输入框</string>
+    <string name="settings_popup_position">弹窗位置</string>
+    <string name="settings_popup_size">弹窗大小：%1$d%%</string>
+    <string name="settings_screen_translation">屏幕翻译</string>
+    <string name="settings_screen_translation_desc">直接在其他应用之上翻译文字。</string>
+    <string name="settings_floating_button">常驻按钮</string>
+    <string name="settings_floating_button_desc">需要无障碍权限</string>
+    <string name="settings_shortcut">通过快捷方式翻译屏幕</string>
+    <string name="settings_shortcut_desc">长按主屏幕键或电源键触发</string>
+    <string name="settings_on_shortcut">快捷方式触发时</string>
+    <string name="settings_ocr">图片</string>
+    <string name="settings_background_mode">文字替换为</string>
+    <string name="settings_min_confidence">最低置信度：%1$d%%</string>
+    <string name="settings_max_image_size">最大图片尺寸：%1$dpx</string>
+    <string name="settings_advanced">高级</string>
+    <string name="settings_catalog_url">目录 URL</string>
+    <string name="settings_external_storage">使用外部存储</string>
+    <string name="settings_disable_autodetect">关闭自动语言检测</string>
+    <string name="settings_translit_output">为译文显示音译</string>
+    <string name="settings_translit_input">为原文显示音译</string>
+    <string name="settings_translit_japanese_spaces">为日语音译添加空格</string>
+    <string name="settings_translate_pdf_images">翻译 PDF 中的图片</string>
+    <string name="settings_camera_live_default">默认使用相机实时翻译</string>
+    <string name="settings_register_browser">注册为浏览器</string>
+    <string name="settings_register_browser_desc">提供翻译来自其他应用的链接。</string>
+    <string name="settings_external_storage_perm_title">外部存储权限</string>
+    <string name="settings_about">关于</string>
+    <string name="settings_version">版本 %1$s</string>
+    <string name="settings_no_languages_available">没有可用的语言</string>
+    <string name="settings_default_from">默认\'源\'语言</string>
+    <string name="settings_default_to">默认\'目标\'语言</string>
+    <string name="settings_adblock_support">广告拦截</string>
+    <string name="settings_about_get_help">获取帮助 / 反馈问题</string>
+    <string name="settings_logs_copied">应用日志已复制到剪贴板</string>
+    <string name="settings_about_support">支持开发</string>
+    <string name="settings_external_storage_perm_body">为了将翻译文件存储到你的“文档”文件夹，此应用需要管理所有文件的权限。\n你将被带到“设置”页面，在那里授予\'允许管理所有文件\'权限。</string>
+    <!-- language manager / setup / how-to -->
+    <string name="langmgr_voices">语音</string>
+    <string name="langmgr_default">默认</string>
+    <string name="langmgr_filter">筛选语言</string>
+    <string name="langmgr_delete_shared_title">删除共享词典？</string>
+    <string name="langmgr_delete_shared_body">此词典与 %1$s 共享。\n删除后将为它们全部移除该词典。</string>
+    <string name="langmgr_download_size">下载 %1$s</string>
+    <string name="langmgr_repair_needed">部分已下载的功能缺少文件，修复后才能使用。</string>
+    <string name="langmgr_repair_size">修复 %1$s</string>
+    <string name="nolang_title">语言设置</string>
+    <string name="nolang_prompt">下载语言包即可开始翻译</string>
+    <string name="howto_title">使用方法</string>
+    <!-- image capture / voice / dictionary / language selector -->
+    <string name="image_no_crop_remote">远程图片无法直接裁剪</string>
+    <string name="image_open_failed">打开文件失败</string>
+    <string name="image_source_screen">屏幕</string>
+    <string name="image_source_document">文档</string>
+    <string name="image_source_photos">照片</string>
+    <string name="image_source_gallery">相册</string>
+    <string name="image_source_camera">相机</string>
+    <string name="voice_playback_speed">播放速度</string>
+    <string name="voice_label">语音</string>
+    <string name="voice_default">默认语音</string>
+    <string name="langsel_auto">✨ 自动</string>
+    <string name="dict_also_as">也作：</string>
+    <!-- camera / browser / screen translate -->
+    <string name="camera_permission_rationale">实时翻译需要相机权限。</string>
+    <string name="camera_need_ocr_models">你需要下载此语言的文字识别模型</string>
+    <string name="browser_no_source_language">没有可用的源语言。请先在主界面安装一种，或在设置中设定默认源语言。</string>
+    <string name="browser_reader_unavailable">此页面不支持阅读模式</string>
+    <string name="browser_translate_image">翻译图片</string>
+    <string name="screen_translating_notification">正在翻译屏幕</string>
+    <!-- enums -->
+    <string name="align_top">顶部</string>
+    <string name="align_middle">居中</string>
+    <string name="align_bottom">底部</string>
+    <string name="assistant_action_still_image">翻译一次</string>
+    <string name="assistant_action_live_screen">开始实时翻译</string>
+    <string name="background_mode_white_on_black">黑底白字</string>
+    <string name="background_mode_black_on_white">白底黑字</string>
+    <string name="background_mode_auto_detect">自动检测颜色</string>
+    <!-- tts / speech errors -->
+    <string name="tts_nothing_to_speak">没有可朗读的内容</string>
+    <string name="tts_catalog_unavailable">目录不可用</string>
+    <string name="tts_no_voice">未安装 %1$s 的语音</string>
+    <string name="tts_synthesis_failed">%1$s 的语音合成失败</string>
+    <string name="tts_sample_fallback">这是来自 Offline Translator 的语音合成示例。</string>
+    <!-- translation -->
+    <string name="translation_error">翻译错误：%1$s</string>
+    <!-- download errors -->
+    <string name="download_failed_core">%1$s 下载失败</string>
+    <string name="download_failed_ocr">%1$s 文字识别下载失败</string>
+    <string name="download_failed_ocr_batch">文字识别批量下载失败</string>
+    <string name="download_failed_dictionary">%1$s 词典下载失败</string>
+    <string name="download_failed_tts">%1$s 语音下载失败</string>
+    <string name="download_failed_adblock">Adblock 下载失败</string>
+    <string name="download_failed_repair">修复下载失败</string>
+    <string name="download_catalog_unavailable">目录不可用</string>
+    <string name="download_catalog_save_failed">保存目录失败</string>
+    <string name="download_unknown_error">未知错误</string>
+    <string name="download_catalog_failed">下载目录失败：%1$s</string>
+    <!-- assistant overlay status -->
+    <string name="assistant_invoke_prompt">在文字上方调用此助手即可翻译</string>
+    <string name="assistant_collecting_context">正在收集屏幕内容…</string>
+    <string name="assistant_screenshot_disabled">此助手的截屏权限已关闭。请在系统助手设置中开启。</string>
+    <string name="assistant_no_screen_data">未收到屏幕数据。请为此助手开启\'使用截屏\'。</string>
+    <string name="assistant_no_screenshot">此应用未提供截屏。</string>
+    <string name="assistant_set_source_ocr">请为文字识别设置默认源语言。</string>
+    <string name="assistant_langs_not_ready">翻译语言尚未就绪。请重试。</string>
+    <string name="assistant_ocr_failed">文字识别失败</string>
+    <string name="ocr_models_missing">缺少文字识别模型。请在应用中打开语言管理进行修复。</string>
+    <string name="assistant_set_source_live">在设置中设定默认源语言即可使用实时屏幕翻译。</string>
+    <!-- migration gate -->
+    <string name="migration_updating_speech_models">正在更新语音模型</string>
+    <string name="migration_accept_convert">接受并转换</string>
+    <string name="migration_delete_all">改为全部删除</string>
+    <string name="migration_converting">正在转换 %2$d 个中的第 %1$d 个</string>
+    <string name="migration_optimizing">正在优化模型</string>
+    <plurals name="migration_convert_prompt">
+        <item quantity="other">你有 %1$d 个语音合成模型需要转换为新格式。大约需要 %2$d 秒。你将节省 %3$.0f MB 的磁盘空间。</item>
+    </plurals>
+    <!-- document translation notification + progress -->
+    <string name="doc_notif_translating">正在翻译文件</string>
+    <string name="doc_notif_translated">已翻译文件</string>
+    <string name="doc_notif_phase_text">文字 %1$d%%</string>
+    <string name="doc_notif_phase_images">图片 %1$d/%2$d</string>
+    <string name="doc_notif_phase_raster">位图页面 %1$d/%2$d</string>
+    <string name="doc_notif_channel_name">文档翻译</string>
+    <string name="doc_notif_channel_desc">翻译文档时显示进度</string>
+    <string name="doc_progress_preparing">正在准备文件</string>
+    <string name="doc_progress_translating">正在翻译</string>
+    <string name="doc_progress_translated">已翻译文件</string>
+    <string name="doc_progress_saving">正在保存翻译后的文件</string>
+    <string name="doc_translation_failed">文档翻译失败</string>
+    <string name="doc_url_unsupported">请改为下载该文档并用本应用打开</string>
+    <!-- document configure sheet -->
+    <string name="document_wrap_columns">在 %1$d 列处换行</string>
+    <string name="document_translate_pdf_images">翻译 PDF 中的图片</string>
+    <string name="layout_preserve">保留换行</string>
+    <string name="layout_reflow">重排为段落</string>
+    <string name="layout_reflow_wrap">重排并换行</string>
+    <!-- common (additional) -->
+    <string name="common_open">打开</string>
+    <string name="common_close">关闭</string>
+    <string name="common_save">保存</string>
+    <!-- translator app -->
+    <string name="translator_translated_file">已翻译文件：%1$s</string>
+    <string name="translator_document_saved">文档已保存</string>
+    <string name="translator_document_save_failed">保存文档失败</string>
+    <string name="translator_audio_playback_failed">音频播放失败：%1$s</string>
+    <string name="translator_no_app_to_open">未找到可打开此文件的应用</string>
+    <!-- document alignment -->
+    <string name="docalign_decode_failed">无法解码图片。</string>
+    <string name="docalign_detecting">正在检测边角…</string>
+    <string name="docalign_redetecting">正在重新检测…</string>
+    <string name="docalign_help">在文档周围画出精确的边框可以提高识别质量。重要的是边线要与文字平行。\n\n缩放或平移通常会让算法自动识别到文档，但如果未能找到，你仍然可以手动调整。</string>
+    <!-- how to use -->
+    <string name="howto_section_other_apps">从其他应用</string>
+    <string name="howto_share_title">分享以翻译</string>
+    <string name="howto_share_body">从任意应用分享文字、链接或图片即可翻译。</string>
+    <string name="howto_copy_title">无需离开其他应用即可翻译</string>
+    <string name="howto_copy_body">在任意位置选中文字，然后点按复制工具栏中的\"翻译\"，即可在紧凑的弹窗中查看译文。</string>
+    <string name="howto_section_in_app">在应用内</string>
+    <string name="howto_docs_title">翻译文档</string>
+    <string name="howto_docs_body">打开“文档”标签页即可翻译 EPUB、PDF 和 TXT 文件。</string>
+    <string name="howto_dict_title">词典查询</string>
+    <string name="howto_dict_body">长按译文中的任意词语即可查看释义。数据来自 Wiktionary。</string>
+    <string name="howto_voice_title">更改语音或速度</string>
+    <string name="howto_voice_body">长按播放按钮即可选择不同的语音或调整播放速度。</string>
+    <!-- feature row labels -->
+    <string name="feature_translation">翻译</string>
+    <string name="feature_dictionary">词典</string>
+    <string name="feature_tts">语音</string>
+    <!-- misc -->
+    <string name="main_input_placeholder">输入文字</string>
+    <string name="aidl_target_unavailable">目标语言不可用</string>
+    <string name="voice_section_downloaded">已下载</string>
+    <string name="voice_section_available">可用</string>
+    <string name="detected_translate_from">翻译自</string>
+    <string name="detected_missing_language">缺少语言</string>
+    <string name="langmgr_ocr_upgrade_available">有改进的文本检测模型可用。</string>
+    <string name="settings_experimental_screen_translate">屏幕翻译（实验性功能）</string>
+    <string name="a11y_add_target_language">添加目标翻译语言</string>
+    <string name="a11y_remove_target_language">删除目标翻译语言</string>
+    <string name="feature_unavailable_tts">文字转语音资源缺失，请从管理语言界面下载</string>
+    <string name="feature_unavailable_dictionary">字典缺失，请从管理语言界面下载</string>
+    <string name="image_crop_action">裁剪</string>
+</resources>

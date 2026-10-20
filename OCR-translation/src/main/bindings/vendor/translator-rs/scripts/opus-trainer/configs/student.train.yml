@@ -1,0 +1,46 @@
+# mozilla/translations pipeline/train/configs/training/student.train.yml
+# guided-alignment: 2 => training data is a 3-col TSV (src \t trg \t alignments)
+beam-size: 1
+clip-norm: 0
+cost-type: ce-mean-words
+disp-first: 10
+disp-freq: 1000
+# Patience is counted in VALIDATIONS, paid in wall time, and its span in UPDATES
+# is what actually matters — early-stopping x valid-freq. Three points measured
+# on the 2-GPU en->tl run (2026-07-21/22):
+#   valid-freq 5000 x 4 = 20000 updates: v3, ~1.5h tail, best ce @ Up.30000.
+#   valid-freq 1000 x 4 =  4000 updates: v4, stopped @ Up.23000 (best @ Up.19000)
+#                          — BEFORE v3's Up.30000 peak, so v4 undertrained and its
+#                          check-set score regressed, confounding the corpus test.
+#   valid-freq 2000 x 6 = 12000 updates: here. Spans past Up.19000 to ~Up.31000 if
+#                          a peak keeps improving, ~55min tail — between the two.
+early-stopping: 6
+# NO early-stopping-epsilon: the pinned fp16 marian (commit 1a743582) does not
+# have that option and ABORTS on it ("option(s) not expected"), which killed the
+# en->tl v4 launch on 2026-07-22. Upstream added a min-improvement threshold
+# later; this build only offers plain N-consecutive-non-improvement stopping.
+# The patience-tail worry that motivated epsilon is mostly handled by valid-freq
+# below (4 stalls = 4000 updates, not 20000), and --keep-best writes the best
+# checkpoint continuously, so a run that plateaus with tiny positive noise can be
+# stopped by hand losslessly — which is how v2 was handled before.
+exponential-smoothing: True
+learn-rate: 0.0003
+lr-decay-inv-sqrt: 32000
+lr-report: True
+lr-warmup: 16000
+max-length: 200
+maxi-batch: 1000
+mini-batch-fit: True
+mini-batch: 1000
+normalize: 1
+optimizer-delay: 2
+optimizer-params: [0.9, 0.98, 1e-09]
+save-freq: 5000
+# 2000: a validation costs ~4s against ~560s of training per 2000 updates (~1%
+# overhead), fine enough to catch a plateau within ~9min, coarse enough that one
+# noisy validation is 1/6 of patience rather than 1/4. valid-freq 1000 x 4 stopped
+# v4 at Up.23000 on exactly such noise, before its real peak.
+valid-freq: 2000
+valid-mini-batch: 64
+sentencepiece-alphas: [0.5, 0.5]
+guided-alignment: 2

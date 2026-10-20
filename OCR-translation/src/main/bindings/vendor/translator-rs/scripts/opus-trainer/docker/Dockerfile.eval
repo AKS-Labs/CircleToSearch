@@ -1,0 +1,53 @@
+# Scoring box for the eval steps: chrF++/spBLEU/COMET22, the mechanical checks,
+# AND the slimt engine the student bench decodes through.
+#
+# CPU-only and Bigserver-only by design — decoding a TEACHER belongs on the
+# rented GPU (model-specific, box already paid for), while scoring and the
+# student's own int8 engine belong here, so every pair's numbers come from the
+# same place and are comparable.
+#
+# prep:next cannot do this job: it carries opustools/sentencepiece/fasttext and
+# no torch, so eval_pair.py dies at import. Found before it ran, 2026-07-20.
+
+FROM python:3.11-slim
+LABEL org.opencontainers.image.source=https://github.com/DavidVentura/offline-translator
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates libgomp1 \
+ && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# CPU torch explicitly: the default wheel drags ~2.5GB of CUDA this box has no
+# GPU for, and COMET on 300-400 segments is minutes on CPU either way.
+RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu torch
+RUN pip install --no-cache-dir sacrebleu unbabel-comet
+
+# HOME must be set and world-writable: BigserverSession runs containers as
+# `--user <uid>:<gid>`, so HOME is unset, and comet 2.2.7 resolves its cache as
+# Path.home()/.cache/torch/unbabel_comet with no env override — which lands on
+# "/.cache" and dies with PermissionError. Baking as root without this also
+# hides the checkpoint in /root, unreadable to that uid. (Both hit 2026-07-20.)
+ENV HOME=/opt/home
+RUN mkdir -p /opt/home
+
+# Bake the checkpoint (~2.3GB). Every pipe step gets a fresh container, so an
+# unbaked model is re-downloaded once per eval — and there are several per pair.
+RUN python -c "from comet import download_model; download_model('Unbabel/wmt22-comet-da')" \
+ && chmod -R a+rwX /opt/home
+
+# Prebuilt rather than built here: slimt-sys cmake-builds C++ and the multi-stage
+# form needs the whole translator-rs repo as build context, which sync.sh does not
+# ship. Built in a bookworm container (glibc 2.36) so it matches this base — the
+# laptop is 2.39, and a 2.39-linked binary will not run here. Rebuild with:
+#   docker run --rm -v $PWD:/src -w /src -e CARGO_TARGET_DIR=/src/target-bookworm \
+#     rust:1-bookworm bash -c "apt-get update && apt-get install -y cmake \
+#     protobuf-compiler pkg-config && cargo build --release --bin slimt_load_test"
+COPY bin/slimt_load_test /usr/local/bin/slimt_load_test
+
+# Verify AS A NON-ROOT UID, the way pipe actually runs this image — a check that
+# passes as root proves nothing about the cache being reachable at runtime.
+USER 65534:65534
+RUN python -c "\
+import sacrebleu, torch; \
+from comet import download_model, load_from_checkpoint; \
+load_from_checkpoint(download_model('Unbabel/wmt22-comet-da')); \
+print('eval image ok as uid', __import__('os').getuid())" \
+ && slimt_load_test --help > /dev/null 2>&1 || true
+USER 0:0

@@ -1,0 +1,20 @@
+[package]
+name = "translator-core"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+
+[lib]
+name = "translator_core"
+path = "src/lib.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+log = "0.4"
+uniffi = { version = "0.31", optional = true, default-features = false }
+unicode-script = { version = "0.5", optional = true, default-features = false }
+
+[features]
+uniffi = ["dep:uniffi"]
+script-from-unicode = ["dep:unicode-script"]

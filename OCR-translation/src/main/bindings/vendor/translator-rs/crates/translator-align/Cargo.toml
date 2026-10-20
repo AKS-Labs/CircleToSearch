@@ -1,0 +1,18 @@
+[package]
+name = "translator-align"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+
+[lib]
+name = "translator_align"
+path = "src/lib.rs"
+
+[dependencies]
+translator-core = { path = "../translator-core" }
+mnn-sys = { git = "https://github.com/DavidVentura/mnn-sys" }
+log = "0.4"
+uniffi = { version = "0.31", optional = true, default-features = false }
+
+[features]
+uniffi = ["dep:uniffi", "translator-core/uniffi"]

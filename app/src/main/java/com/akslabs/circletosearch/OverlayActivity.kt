@@ -31,14 +31,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.akslabs.circletosearch.data.BitmapRepository
 import com.akslabs.circletosearch.ui.CircleToSearchScreen
-import com.akslabs.circletosearch.ui.components.CopyTextOverlayManager
 import com.akslabs.circletosearch.ui.theme.CircleToSearchTheme
 
 class OverlayActivity : ComponentActivity() {
     
     private val screenshotBitmap = androidx.compose.runtime.mutableStateOf<android.graphics.Bitmap?>(null)
-    private val copyTextManager = androidx.compose.runtime.mutableStateOf<CopyTextOverlayManager?>(null)
     private val searchModeOverride = androidx.compose.runtime.mutableStateOf<Boolean?>(null)
+    private var translateBridge: AssistantTranslateOverlayBridge? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(0))
@@ -46,19 +45,32 @@ class OverlayActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         android.util.Log.d("CircleToSearch", "OverlayActivity onCreate")
         
+        // Allow chrome://inspect attachment for diagnosing engine tabs (debug builds only)
+        if (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0) {
+            android.webkit.WebView.setWebContentsDebuggingEnabled(true)
+        }
+
+        // Fresh cookie jar each session (Incognito-equivalent): Google cookies
+        // accumulated across challenged/failed sessions may be trust-flagged,
+        // which breaks Lens ("image not associated with your account") while a
+        // clean Incognito profile loads the same URL fine.
+        try {
+            val cm = android.webkit.CookieManager.getInstance()
+            cm.removeAllCookies { cm.flush() }
+            cm.flush()
+            android.util.Log.d("LensDiag", "COOKIES_CLEARED")
+        } catch (e: Exception) {
+            android.util.Log.e("LensDiag", "cookie clear failed: $e")
+        }
+        
         // Ensure the activity can receive touches and focus properly
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL)
         window.addFlags(android.view.WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN)
         
+        com.akslabs.circletosearch.AssistSessionService.registerOverlayActivity(this)
+
         loadScreenshot()
         updateOverride(intent)
-
-        // Initialize manager for Activity-based layout
-        copyTextManager.value = CopyTextOverlayManager(
-            context = this,
-            screenshotBitmap = screenshotBitmap.value
-        )
-        CircleToSearchAccessibilityService.setCopyTextManager(copyTextManager.value)
 
         setContent {
             CircleToSearchTheme {
@@ -68,20 +80,25 @@ class OverlayActivity : ComponentActivity() {
                     tonalElevation = 0.dp
                 ) {
                     CircleToSearchScreen(
-                        screenshot = screenshotBitmap.value,
+                        capturedScreenshot = screenshotBitmap.value,
                         searchModeOverride = searchModeOverride.value,
                         onClose = { 
                             BitmapRepository.clear()
                             finish() 
-                        },
-                        copyTextManager = copyTextManager.value,
-                        onExitCopyMode = { 
-                            // Copy Mode exited
                         }
                     )
                 }
             }
         }
+
+        // Activity-hosted translate overlay: reuses the exact same OverlayUI chrome the
+        // accessibility path uses, hosted in this activity's window (no a11y permission
+        // needed for the OCR/translation — only the window type differed).
+        // NOTE: must be created AFTER setContent — setContent installs the ComposeView
+        // via setContentView, which removes any previously added content views (including
+        // the bridge's container), detaching the translate chrome from the window.
+        translateBridge = AssistantTranslateOverlayBridge(this).also { it.start() }
+        AssistantTranslateOverlay.attach(translateBridge!!)
     }
 
 
@@ -92,19 +109,10 @@ class OverlayActivity : ComponentActivity() {
         
         // IMMEDIATE NULLING to prevent flash of previous screen
         screenshotBitmap.value = null
-        copyTextManager.value?.dismiss()
-        copyTextManager.value = null
         searchModeOverride.value = null
         
         loadScreenshot()
         updateOverride(intent)
-        
-        // Recreate manager with new screenshot
-        copyTextManager.value = CopyTextOverlayManager(
-            context = this,
-            screenshotBitmap = screenshotBitmap.value
-        )
-        CircleToSearchAccessibilityService.setCopyTextManager(copyTextManager.value)
     }
 
     private fun updateOverride(intent: android.content.Intent) {
@@ -127,8 +135,11 @@ class OverlayActivity : ComponentActivity() {
     
     override fun onDestroy() {
         super.onDestroy()
-        copyTextManager.value?.dismiss()
-        copyTextManager.value = null
+        translateBridge?.let {
+            AssistantTranslateOverlay.detach(it)
+            it.destroy()
+        }
+        translateBridge = null
         if (isFinishing) {
              com.akslabs.circletosearch.data.BitmapRepository.clear()
              com.akslabs.circletosearch.utils.StorageUtils.clearAppCache(this)

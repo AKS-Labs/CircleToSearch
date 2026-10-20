@@ -1,0 +1,33 @@
+[package]
+name = "translator-pdf"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+
+[lib]
+name = "translator_pdf"
+path = "src/lib.rs"
+
+[features]
+# In-place translation of raster images embedded in PDFs (XObject decode +
+# OCR/translate overlay + re-encode). Pulls the image codecs the PDF image
+# plumbing needs; the OCR/translate capability is supplied via the
+# `ImageTranslator` trait, so no OCR-engine dependency is required here.
+image-translate = ["dep:image", "dep:fax"]
+
+[dependencies]
+translator-core = { path = "../translator-core", features = ["script-from-unicode"] }
+translator-render = { path = "../translator-render" }
+translator-translate = { path = "../translator-translate" }
+lopdf = { version = "0.40", default-features = false }
+subsetter = { version = "0.2", default-features = false }
+rustybuzz = { version = "0.20", default-features = false, features = ["std"] }
+log = "0.4"
+image = { version = "0.25", optional = true, default-features = false, features = ["jpeg", "png"] }
+fax = { version = "0.2", optional = true }
+
+[target.'cfg(target_os = "android")'.dependencies]
+mupdf = { git = "https://github.com/DavidVentura/mupdf-rs", default-features = false, features = [] }
+
+[target.'cfg(not(target_os = "android"))'.dependencies]
+mupdf = { git = "https://github.com/DavidVentura/mupdf-rs", default-features = false, features = ["system-fonts"] }

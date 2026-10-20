@@ -27,13 +27,31 @@ import android.service.voice.VoiceInteractionService
  * The actual assist handling is done by AssistSessionService.
  */
 class CircleToSearchVoiceService : VoiceInteractionService() {
+
+    companion object {
+        /** Live instance while the system has this service ready as the active assistant. */
+        var instance: CircleToSearchVoiceService? = null
+            private set
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+        android.util.Log.d("CircleToSearchVoiceService", "VoiceService onCreate")
+    }
+
     override fun onReady() {
         super.onReady()
+        instance = this
         android.util.Log.d("CircleToSearchVoiceService", "VoiceService Ready")
     }
 
     override fun onShutdown() {
         super.onShutdown()
         android.util.Log.d("CircleToSearchVoiceService", "VoiceService Shutdown")
+    }
+
+    override fun onDestroy() {
+        instance = null
+        super.onDestroy()
     }
 }

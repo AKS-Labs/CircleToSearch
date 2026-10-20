@@ -1,0 +1,10 @@
+# bicleaner-ai scoring box. tensorflow[and-cuda] bundles the CUDA libs as pip
+# wheels, so a plain python base works on any box with a driver. The multilingual
+# XLM-R model is baked so a rented box makes zero HF pulls.
+FROM python:3.11-bookworm
+LABEL org.opencontainers.image.source=https://github.com/DavidVentura/offline-translator
+RUN apt-get update && apt-get install -y --no-install-recommends openssh-server rsync \
+ && apt-get clean && rm -rf /var/lib/apt/lists/*
+RUN pip install --no-cache-dir bicleaner-ai "tensorflow[and-cuda]==2.20.0"
+ENV HF_HOME=/opt/hf
+RUN python -c "from huggingface_hub import snapshot_download; snapshot_download('bitextor/bicleaner-ai-full-en-xx')"

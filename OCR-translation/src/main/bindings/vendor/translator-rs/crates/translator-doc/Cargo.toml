@@ -1,0 +1,30 @@
+[package]
+name = "translator-doc"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+
+[lib]
+name = "translator_doc"
+path = "src/lib.rs"
+
+[features]
+odt = ["dep:zip"]
+epub = [
+    "dep:zip",
+    "dep:markup5ever",
+    "dep:markup5ever_rcdom",
+    "dep:xml5ever",
+    "dep:ttf-parser",
+    "translator-translate/dom-translate",
+]
+
+[dependencies]
+translator-core = { path = "../translator-core" }
+translator-translate = { path = "../translator-translate" }
+log = "0.4"
+zip = { version = "2.4.2", optional = true, default-features = false, features = ["deflate"] }
+markup5ever = { version = "0.38", optional = true }
+markup5ever_rcdom = { version = "0.38", optional = true }
+xml5ever = { version = "0.38", optional = true }
+ttf-parser = { version = "0.25", optional = true, default-features = false, features = ["std", "opentype-layout", "variable-fonts"] }

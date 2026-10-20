@@ -1,0 +1,545 @@
+<!doctype html>
+<!--
+  Copyright (C) 2024 David V
+
+  This program is free software: you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation, either version 3 of the License, or
+  (at your option) any later version.
+
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+  GNU General Public License for more details.
+
+  You should have received a copy of the GNU General Public License
+  along with this program. If not, see <https://www.gnu.org/licenses/>.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Translator</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #ffffff;
+    --panel: #f5f5f7;
+    --border: #d8d8de;
+    --text: #16161a;
+    --muted: #6c6c78;
+    --accent: #3b6ef5;
+    --ok: #157f3d;
+    --err: #c02626;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16161a;
+      --panel: #1f1f26;
+      --border: #33333d;
+      --text: #ececf1;
+      --muted: #9a9aa8;
+      --accent: #6b93ff;
+      --ok: #52c77e;
+      --err: #ff6b6b;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 1.5rem 1rem 3rem;
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  main { max-width: 780px; margin: 0 auto; }
+  label { display: block; font-size: .8rem; color: var(--muted); margin-bottom: .3rem; }
+  input, select, textarea, button {
+    font: inherit;
+    color: var(--text);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: .5rem .6rem;
+  }
+  textarea { width: 100%; min-height: 9rem; resize: vertical; }
+  button {
+    background: var(--accent);
+    border-color: transparent;
+    color: #fff;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button.secondary { background: var(--bg); color: var(--text); border-color: var(--border); font-weight: 500; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .row { display: flex; gap: .75rem; flex-wrap: wrap; align-items: flex-end; }
+  .row > div { flex: 1 1 8rem; }
+  .row > div > input, .row > div > select { width: 100%; }
+  .status { margin-top: .75rem; font-size: .85rem; min-height: 1.2em; }
+  .status.ok { color: var(--ok); }
+  .status.err { color: var(--err); }
+  .status.busy { color: var(--muted); }
+  .hint { font-size: .8rem; color: var(--muted); margin: .5rem 0 0; }
+  .languages { margin-bottom: 1.25rem; }
+  #load-status { margin-top: 0; }
+  #load-status:empty { display: none; }
+  .tabs { display: flex; gap: .4rem; margin-bottom: 1rem; }
+  .tabs button { background: var(--bg); color: var(--muted); border: 1px solid var(--border); }
+  .tabs button[aria-selected="true"] { background: var(--accent); color: #fff; border-color: transparent; }
+  .pane[hidden] { display: none; }
+  .io { display: grid; gap: .75rem; grid-template-columns: 1fr 1fr; }
+  @media (max-width: 620px) { .io { grid-template-columns: 1fr; } }
+  .swap { flex: 0 0 auto; }
+  .result a { display: inline-block; margin-top: .75rem; color: var(--accent); font-weight: 600; }
+  .frame {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 12rem;
+    padding: .5rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--panel);
+    color: var(--muted);
+    font-size: .85rem;
+  }
+  .frame img { max-width: 100%; max-height: 26rem; border-radius: 4px; }
+  a.button {
+    display: inline-block;
+    background: var(--accent);
+    color: #fff;
+    font-weight: 600;
+    text-decoration: none;
+    padding: .5rem .8rem;
+    border-radius: 8px;
+  }
+  a.button[hidden] { display: none; }
+  .detected { font-size: .8rem; color: var(--muted); margin-top: .4rem; min-height: 1.2em; }
+</style>
+</head>
+<body>
+<main>
+  <p id="load-status" class="status busy">Loading…</p>
+
+  <div id="app" hidden>
+  <div class="row languages">
+    <div>
+      <label for="source">From</label>
+      <select id="source"></select>
+    </div>
+    <button id="swap" class="secondary swap" title="Swap languages">⇄</button>
+    <div>
+      <label for="target">To</label>
+      <select id="target"></select>
+    </div>
+  </div>
+  <p id="lang-hint" class="hint"></p>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" data-mode="text" aria-selected="true">Text</button>
+    <button role="tab" data-mode="image" aria-selected="false">Image</button>
+    <button role="tab" data-mode="document" aria-selected="false">Document</button>
+  </div>
+
+  <section class="pane" data-pane="text">
+    <div class="io">
+      <div>
+        <label for="text-in">Source text</label>
+        <textarea id="text-in" placeholder="Type something to translate…"></textarea>
+      </div>
+      <div>
+        <label for="text-out">Translation</label>
+        <textarea id="text-out" readonly placeholder="…"></textarea>
+      </div>
+    </div>
+    <p id="text-detected" class="detected"></p>
+    <button id="text-go" title="Ctrl+Enter" disabled>Translate</button>
+    <p id="text-status" class="status"></p>
+  </section>
+
+  <section class="pane" data-pane="image" hidden>
+    <label for="image-file">Image (png, jpg, jpeg)</label>
+    <input id="image-file" type="file" accept=".png,.jpg,.jpeg,image/png,image/jpeg">
+    <p id="image-status" class="status"></p>
+    <div class="io">
+      <div>
+        <label>Original</label>
+        <div id="image-original" class="frame"></div>
+      </div>
+      <div>
+        <label>Translated</label>
+        <div id="image-translated" class="frame"></div>
+      </div>
+    </div>
+    <p><a id="image-download" class="button" hidden>Download translated image</a></p>
+  </section>
+
+  <section class="pane" data-pane="document" hidden>
+    <label for="doc-file">Document (pdf, odt, epub, txt)</label>
+    <input id="doc-file" type="file" accept=".pdf,.odt,.epub,.txt">
+    <p><button id="doc-go" disabled>Translate document</button></p>
+    <p id="doc-status" class="status"></p>
+    <div id="doc-result" class="result"></div>
+  </section>
+  </div>
+</main>
+
+<script>
+"use strict";
+
+const AUTO = "auto";
+
+// ---- pure helpers -------------------------------------------------------
+
+// The server rejects a target that the source has no model for, so the target
+// list is whatever `targets` the chosen source advertises. Under auto-detect the
+// source is unknown, so every language that is some other language's target is
+// offered and the server has the final say.
+function targetsFor(languages, sourceCode) {
+  if (sourceCode === AUTO) {
+    const reachable = new Set(languages.flatMap((l) => l.targets));
+    return languages.filter((l) => reachable.has(l.code));
+  }
+  const source = languages.find((l) => l.code === sourceCode);
+  if (!source) return [];
+  return languages.filter((l) => source.targets.includes(l.code));
+}
+
+function parseLanguages(payload) {
+  if (!Array.isArray(payload)) throw new Error("unexpected /languages response");
+  return payload
+    .map((entry) => ({
+      code: String(entry.code),
+      name: String(entry.name ?? entry.code),
+      targets: Array.isArray(entry.targets) ? entry.targets.map(String) : [],
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+const errorText = (payload, fallback) =>
+  (payload && typeof payload.error === "string" && payload.error) || fallback;
+
+// ---- state --------------------------------------------------------------
+
+const state = {
+  languages: [],
+  mode: "text",
+  imagePreview: null,
+};
+
+const $ = (id) => document.getElementById(id);
+const els = {
+  loadStatus: $("load-status"),
+  app: $("app"),
+  source: $("source"),
+  target: $("target"),
+  swap: $("swap"),
+  langHint: $("lang-hint"),
+  textIn: $("text-in"),
+  textOut: $("text-out"),
+  textGo: $("text-go"),
+  textStatus: $("text-status"),
+  textDetected: $("text-detected"),
+  imageFile: $("image-file"),
+  imageStatus: $("image-status"),
+  imageOriginal: $("image-original"),
+  imageTranslated: $("image-translated"),
+  imageDownload: $("image-download"),
+  docFile: $("doc-file"),
+  docGo: $("doc-go"),
+  docStatus: $("doc-status"),
+  docResult: $("doc-result"),
+};
+
+function setStatus(el, message, kind) {
+  el.textContent = message;
+  el.className = `status${kind ? " " + kind : ""}`;
+}
+
+// ---- server I/O ---------------------------------------------------------
+
+// This page is served by the translation server itself, so every endpoint is a
+// relative path on the origin it loaded from — there is no address to configure
+// and nothing to reach that could be down without the page failing to load.
+async function request(path, init) {
+  const response = await fetch(path, init);
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(errorText(payload, `HTTP ${response.status}`));
+  if (payload === null) throw new Error("server returned a non-JSON response");
+  return payload;
+}
+
+// The UI appears once /languages has answered, so every control below is backed
+// by a catalog that is known to have loaded.
+async function load() {
+  try {
+    const languages = parseLanguages(await request("/languages"));
+    if (languages.length === 0) throw new Error("No translation models are installed on this device");
+    state.languages = languages;
+    populateLanguages();
+    setStatus(els.loadStatus, "", null);
+    els.app.hidden = false;
+  } catch (e) {
+    setStatus(els.loadStatus, e.message, "err");
+  }
+}
+
+// ---- language pickers ---------------------------------------------------
+
+function option(value, label) {
+  const el = document.createElement("option");
+  el.value = value;
+  el.textContent = label;
+  return el;
+}
+
+function populateLanguages() {
+  const previousSource = els.source.value;
+  const previousTarget = els.target.value;
+
+  els.source.replaceChildren();
+  if (state.mode !== "document") els.source.append(option(AUTO, "Auto detect"));
+  for (const lang of state.languages) els.source.append(option(lang.code, lang.name));
+  els.source.value = [...els.source.options].some((o) => o.value === previousSource)
+    ? previousSource
+    : els.source.options[0]?.value ?? "";
+
+  populateTargets(previousTarget);
+  updateActions();
+}
+
+function populateTargets(preferred) {
+  const options = targetsFor(state.languages, els.source.value);
+  els.target.replaceChildren();
+  for (const lang of options) els.target.append(option(lang.code, lang.name));
+  if (options.some((l) => l.code === preferred)) els.target.value = preferred;
+
+  els.langHint.textContent = options.length === 0 ? "This source language has no translation targets installed." : "";
+}
+
+function updateActions() {
+  const ready = state.languages.length > 0 && !!els.target.value;
+  els.textGo.disabled = !ready;
+  els.docGo.disabled = !ready || !els.docFile.files.length || els.source.value === AUTO;
+}
+
+// ---- translation actions ------------------------------------------------
+
+// Typing schedules a translation instead of firing one per keystroke: the timer
+// restarts on every edit, so a request only goes out once typing pauses. While a
+// request is in flight further edits collapse into a single follow-up once it
+// lands, which is what actually bounds the request rate on a slow phone. Each
+// request carries a sequence number so a slow reply cannot overwrite a newer one.
+const TEXT_DEBOUNCE_MS = 300;
+const textRun = { timer: null, inFlight: false, pending: false, lastKey: null, seq: 0 };
+
+const textKey = () => JSON.stringify([els.source.value, els.target.value, els.textIn.value]);
+
+function scheduleTextTranslate() {
+  clearTimeout(textRun.timer);
+  textRun.timer = setTimeout(translateText, TEXT_DEBOUNCE_MS);
+}
+
+// Ctrl+Enter and the button mean "translate now", including a retry of whatever
+// just failed, so they clear the de-duplication key.
+function translateTextNow() {
+  textRun.lastKey = null;
+  translateText();
+}
+
+async function translateText() {
+  clearTimeout(textRun.timer);
+  const q = els.textIn.value;
+  if (!q.trim()) {
+    els.textOut.value = "";
+    els.textDetected.textContent = "";
+    setStatus(els.textStatus, "", null);
+    return;
+  }
+  if (!els.target.value) return;
+
+  const key = textKey();
+  if (key === textRun.lastKey) return;
+  if (textRun.inFlight) {
+    textRun.pending = true;
+    return;
+  }
+  textRun.inFlight = true;
+  textRun.lastKey = key;
+  const seq = ++textRun.seq;
+
+  setStatus(els.textStatus, "Translating…", "busy");
+  try {
+    const payload = await request("/translate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ q, source: els.source.value, target: els.target.value, format: "text" }),
+    });
+    if (seq !== textRun.seq) return;
+    els.textOut.value = payload.translatedText ?? "";
+    setStatus(els.textStatus, "", null);
+    const detected = payload.detectedLanguage?.language;
+    els.textDetected.textContent = detected
+      ? `Detected source language: ${state.languages.find((l) => l.code === detected)?.name ?? detected}`
+      : "";
+  } catch (e) {
+    if (seq !== textRun.seq) return;
+    textRun.lastKey = null;
+    setStatus(els.textStatus, e.message, "err");
+  } finally {
+    textRun.inFlight = false;
+    updateActions();
+    if (textRun.pending) {
+      textRun.pending = false;
+      translateText();
+    }
+  }
+}
+
+async function translateDocument() {
+  const body = new FormData();
+  body.append("file", els.docFile.files[0]);
+  body.append("source", els.source.value);
+  body.append("target", els.target.value);
+
+  els.docResult.replaceChildren();
+  setStatus(els.docStatus, "Translating", "busy");
+  try {
+    const payload = await request("/translate_file", { method: "POST", body });
+    const url = payload.translatedFileUrl;
+    if (!url) throw new Error("server did not return a download URL");
+    setStatus(els.docStatus, "", null);
+    const link = document.createElement("a");
+    link.href = url;
+    link.textContent = "Download translated document";
+    els.docResult.append(link);
+  } catch (e) {
+    setStatus(els.docStatus, e.message, "err");
+  } finally {
+    updateActions();
+  }
+}
+
+function showImage(frame, src, alt) {
+  const img = document.createElement("img");
+  img.src = src;
+  img.alt = alt;
+  frame.replaceChildren(img);
+}
+
+function placeholder(frame, message) {
+  frame.replaceChildren(document.createTextNode(message));
+}
+
+// Picking a file shows it immediately and kicks off the translation, so the pane
+// reads as a before/after pair rather than an upload form.
+async function translateImage() {
+  const file = els.imageFile.files[0];
+  els.imageDownload.hidden = true;
+  if (!file) {
+    placeholder(els.imageOriginal, "No image selected");
+    placeholder(els.imageTranslated, "…");
+    setStatus(els.imageStatus, "", null);
+    return;
+  }
+
+  if (state.imagePreview) URL.revokeObjectURL(state.imagePreview);
+  state.imagePreview = URL.createObjectURL(file);
+  showImage(els.imageOriginal, state.imagePreview, "Original image");
+
+  if (!els.target.value) {
+    placeholder(els.imageTranslated, "…");
+    setStatus(els.imageStatus, "Pick a target language first.", "err");
+    return;
+  }
+
+  const body = new FormData();
+  body.append("file", file);
+  body.append("source", els.source.value);
+  body.append("target", els.target.value);
+
+  placeholder(els.imageTranslated, "Translating…");
+  setStatus(els.imageStatus, "Detecting and translating text — this can take a while…", "busy");
+  try {
+    const payload = await request("/translate_file", { method: "POST", body });
+    const url = payload.translatedFileUrl;
+    if (!url) throw new Error("server did not return a translated image");
+    showImage(els.imageTranslated, url, "Translated image");
+    els.imageDownload.href = url;
+    els.imageDownload.hidden = false;
+    setStatus(els.imageStatus, "", null);
+  } catch (e) {
+    placeholder(els.imageTranslated, "…");
+    setStatus(els.imageStatus, e.message, "err");
+  }
+}
+
+// ---- wiring -------------------------------------------------------------
+
+function selectMode(mode) {
+  state.mode = mode;
+  for (const tab of document.querySelectorAll('[role="tab"]')) {
+    tab.setAttribute("aria-selected", String(tab.dataset.mode === mode));
+  }
+  for (const pane of document.querySelectorAll(".pane")) {
+    pane.hidden = pane.dataset.pane !== mode;
+  }
+  // Documents cannot auto-detect, so the option disappears in that mode.
+  populateLanguages();
+}
+
+els.source.addEventListener("change", () => {
+  populateTargets(els.target.value);
+  updateActions();
+  languagesChanged();
+});
+els.target.addEventListener("change", () => {
+  updateActions();
+  languagesChanged();
+});
+
+// The shown result would otherwise be stale against the newly picked pair.
+function languagesChanged() {
+  if (state.mode === "image" && els.imageFile.files.length) translateImage();
+  if (state.mode === "text") translateText();
+}
+els.swap.addEventListener("click", () => {
+  const from = els.source.value;
+  const to = els.target.value;
+  if (from === AUTO || !to) return;
+  els.source.value = to;
+  populateTargets(from);
+  els.target.value = from;
+  const text = els.textIn.value;
+  els.textIn.value = els.textOut.value;
+  els.textOut.value = text;
+  updateActions();
+  languagesChanged();
+});
+
+for (const tab of document.querySelectorAll('[role="tab"]')) {
+  tab.addEventListener("click", () => selectMode(tab.dataset.mode));
+}
+
+els.textGo.addEventListener("click", translateTextNow);
+els.textIn.addEventListener("input", scheduleTextTranslate);
+els.textIn.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+    e.preventDefault();
+    translateTextNow();
+  }
+});
+els.imageFile.addEventListener("change", translateImage);
+els.docFile.addEventListener("change", updateActions);
+els.docGo.addEventListener("click", () => {
+  els.docGo.disabled = true;
+  translateDocument();
+});
+
+placeholder(els.imageOriginal, "No image selected");
+placeholder(els.imageTranslated, "…");
+
+load();
+</script>
+</body>
+</html>

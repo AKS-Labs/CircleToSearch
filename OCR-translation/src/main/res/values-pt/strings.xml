@@ -1,0 +1,217 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="stop">Parar</string>
+    <string name="pause">Pausar</string>
+    <string name="resume">Retomar</string>
+    <string name="region_select_menu">Definir área de tradução</string>
+    <string name="screen_translate_needs_source">Informe o idioma de origem</string>
+    <string name="live_tile_label">Traduzir tela ao vivo</string>
+    <string name="translate_text">Traduzir</string>
+    <string name="translate_link">Traduzir link</string>
+    <string name="accessibility_service_description">Ative este serviço para traduzir texto na tela. Toque no botão flutuante de tradução para traduzir a tela atual ou inicie uma tradução de tela ao vivo.</string>
+    <string name="tap_to_translate_title">Tradução Rápida ativada</string>
+    <string name="tap_to_translate_body">Toque para abrir o popup do tradutor</string>
+    <string name="tap_to_translate_channel">Tradução Rápida</string>
+    <string name="tap_to_translate_channel_description">Notificação permanente para acesso rápido ao popup do tradutor</string>
+    <string name="quick_tile_label">Traduzir</string>
+    <!-- common -->
+    <string name="common_ok">OK</string>
+    <string name="common_cancel">Cancelar</string>
+    <string name="common_done">Concluído</string>
+    <string name="common_grant">Conceder</string>
+    <string name="common_manage">Gerenciar</string>
+    <!-- settings -->
+    <string name="settings_title">Configurações</string>
+    <string name="settings_languages">Idiomas</string>
+    <string name="settings_language_packs">Pacotes de idiomas</string>
+    <string name="settings_general">Geral</string>
+    <string name="settings_font_size">Tamanho da fonte</string>
+    <string name="settings_font_sample">Este é um texto de exemplo</string>
+    <string name="settings_tap_notification">Notificação de Tradução Rápida</string>
+    <string name="settings_tap_notification_desc">Notificação permanente que abre o popup.</string>
+    <string name="settings_web_translator">Tradutor web</string>
+    <string name="settings_clear_browsing">Limpar dados de navegação ao fechar</string>
+    <string name="settings_clear_browsing_desc">Exclui cookies, cache e armazenamento local.</string>
+    <string name="settings_tts_section">Conversão de texto em fala</string>
+    <string name="settings_tts_read_urls_hashtags">Ler URLs e hashtags</string>
+    <string name="settings_popup_settings">Popup</string>
+    <string name="settings_popup_desc">O popup aparece ao selecionar \'Traduzir\' no menu de seleção de texto</string>
+    <string name="settings_hide_input">Ocultar entrada</string>
+    <string name="settings_popup_position">Posição do popup</string>
+    <string name="settings_popup_size">Tamanho do popup: %1$d%%</string>
+    <string name="settings_screen_translation">Tradução de tela</string>
+    <string name="settings_screen_translation_desc">Traduza texto diretamente sobre outros apps.</string>
+    <string name="settings_floating_button">Botão sempre ativo</string>
+    <string name="settings_floating_button_desc">Requer permissão de acessibilidade</string>
+    <string name="settings_shortcut">Traduzir tela por atalho</string>
+    <string name="settings_shortcut_desc">Pressione e segure início ou ligar para acionar</string>
+    <string name="settings_on_shortcut">Ao acionar o atalho</string>
+    <string name="settings_ocr">Imagens</string>
+    <string name="settings_background_mode">Substituir texto por</string>
+    <string name="settings_min_confidence">Confiança mínima: %1$d%%</string>
+    <string name="settings_max_image_size">Tamanho máximo da imagem: %1$dpx</string>
+    <string name="settings_advanced">Avançado</string>
+    <string name="settings_catalog_url">URL do catálogo</string>
+    <string name="settings_external_storage">Usar armazenamento externo</string>
+    <string name="settings_disable_autodetect">Desativar detecção automática de idioma</string>
+    <string name="settings_translit_output">Mostrar transliteração do texto traduzido</string>
+    <string name="settings_translit_input">Mostrar transliteração do texto original</string>
+    <string name="settings_translit_japanese_spaces">Adicionar espaços na transliteração do japonês</string>
+    <string name="settings_translate_pdf_images">Traduzir imagens em PDFs</string>
+    <string name="settings_camera_live_default">Traduzir câmera ao vivo por padrão</string>
+    <string name="settings_register_browser">Registrar como navegador</string>
+    <string name="settings_register_browser_desc">Oferecer tradução de links de outros apps.</string>
+    <string name="settings_external_storage_perm_title">Permissão de armazenamento externo</string>
+    <string name="settings_about">Sobre</string>
+    <string name="settings_version">Versão %1$s</string>
+    <string name="settings_no_languages_available">Nenhum idioma disponível</string>
+    <string name="settings_default_from">Idioma de origem padrão</string>
+    <string name="settings_default_to">Idioma de destino padrão</string>
+    <string name="settings_adblock_support">Bloqueio de anúncios</string>
+    <string name="settings_about_get_help">Obter ajuda / relatar problema</string>
+    <string name="settings_logs_copied">Registos da app copiados para a área de transferência</string>
+    <string name="settings_about_support">Apoiar o desenvolvimento</string>
+    <string name="settings_external_storage_perm_body">Para guardar arquivos de tradução na sua pasta Documentos, este app precisa de acesso para gerenciar todos os arquivos.\nVocê será levado às Configurações, onde poderá conceder a permissão \'Permitir acesso para gerenciar todos os arquivos\'.</string>
+    <!-- language manager / setup / how-to -->
+    <string name="langmgr_voices">Vozes</string>
+    <string name="langmgr_default">PADRÃO</string>
+    <string name="langmgr_filter">Filtrar idiomas</string>
+    <string name="langmgr_delete_shared_title">Excluir dicionário compartilhado?</string>
+    <string name="langmgr_delete_shared_body">Este dicionário é compartilhado com %1$s.\nExcluí-lo removerá o dicionário de todos eles.</string>
+    <string name="langmgr_download_size">Baixar %1$s</string>
+    <string name="langmgr_repair_needed">Alguns recursos baixados estão com arquivos ausentes e não funcionarão até serem reparados.</string>
+    <string name="langmgr_repair_size">Reparar %1$s</string>
+    <string name="nolang_title">Configuração de idiomas</string>
+    <string name="nolang_prompt">Baixe pacotes de idiomas para começar a traduzir</string>
+    <string name="howto_title">Como usar</string>
+    <!-- image capture / voice / dictionary / language selector -->
+    <string name="image_no_crop_remote">Imagens remotas não podem ser recortadas diretamente</string>
+    <string name="image_open_failed">Falha ao abrir o arquivo</string>
+    <string name="image_source_screen">Tela</string>
+    <string name="image_source_document">Documento</string>
+    <string name="image_source_photos">Fotos</string>
+    <string name="image_source_gallery">Galeria</string>
+    <string name="image_source_camera">Câmera</string>
+    <string name="voice_playback_speed">Velocidade de reprodução</string>
+    <string name="voice_label">Voz</string>
+    <string name="voice_default">Voz padrão</string>
+    <string name="langsel_auto">✨ Automático</string>
+    <string name="dict_also_as">Também como:</string>
+    <!-- camera / browser / screen translate -->
+    <string name="camera_permission_rationale">A permissão de câmera é necessária para a tradução ao vivo.</string>
+    <string name="camera_need_ocr_models">Você precisa baixar os modelos de reconhecimento de texto para este idioma</string>
+    <string name="browser_no_source_language">Nenhum idioma de origem disponível. Instale um na tela principal primeiro ou defina um idioma de origem padrão nas configurações.</string>
+    <string name="browser_reader_unavailable">Modo leitura indisponível para esta página</string>
+    <string name="browser_translate_image">Traduzir imagem</string>
+    <string name="screen_translating_notification">Traduzindo tela</string>
+    <!-- enums -->
+    <string name="align_top">Superior</string>
+    <string name="align_middle">Meio</string>
+    <string name="align_bottom">Inferior</string>
+    <string name="assistant_action_still_image">Traduzir uma vez</string>
+    <string name="assistant_action_live_screen">Iniciar tradução ao vivo</string>
+    <string name="background_mode_white_on_black">Branco no preto</string>
+    <string name="background_mode_black_on_white">Preto no branco</string>
+    <string name="background_mode_auto_detect">Detectar cores automaticamente</string>
+    <!-- tts / speech errors -->
+    <string name="tts_nothing_to_speak">Nada para falar</string>
+    <string name="tts_catalog_unavailable">Catálogo indisponível</string>
+    <string name="tts_no_voice">Nenhuma voz instalada para %1$s</string>
+    <string name="tts_synthesis_failed">Falha na síntese de fala para %1$s</string>
+    <string name="tts_sample_fallback">Esta é uma amostra de conversão de texto em fala do Offline Translator.</string>
+    <!-- translation -->
+    <string name="translation_error">Erro de tradução: %1$s</string>
+    <!-- download errors -->
+    <string name="download_failed_core">Falha ao baixar %1$s</string>
+    <string name="download_failed_ocr">Falha ao baixar o reconhecimento de texto de %1$s</string>
+    <string name="download_failed_ocr_batch">Falha no download em lote de reconhecimento de texto</string>
+    <string name="download_failed_dictionary">Falha ao baixar o dicionário de %1$s</string>
+    <string name="download_failed_tts">Falha ao baixar a voz de %1$s</string>
+    <string name="download_failed_adblock">Falha ao baixar o Adblock</string>
+    <string name="download_failed_repair">Falha ao baixar o reparo</string>
+    <string name="download_catalog_unavailable">Catálogo indisponível</string>
+    <string name="download_catalog_save_failed">Falha ao salvar o catálogo</string>
+    <string name="download_unknown_error">Erro desconhecido</string>
+    <string name="download_catalog_failed">Falha ao baixar o catálogo: %1$s</string>
+    <!-- assistant overlay status -->
+    <string name="assistant_invoke_prompt">Acione este assistente sobre um texto para traduzi-lo</string>
+    <string name="assistant_collecting_context">Coletando contexto da tela…</string>
+    <string name="assistant_screenshot_disabled">O acesso a capturas de tela está desativado para este assistente. Ative-o nas configurações do assistente do sistema.</string>
+    <string name="assistant_no_screen_data">Nenhum dado de tela recebido. Ative \'Usar captura de tela\' para este assistente.</string>
+    <string name="assistant_no_screenshot">Este app não forneceu uma captura de tela.</string>
+    <string name="assistant_set_source_ocr">Defina um idioma de origem padrão para o reconhecimento de texto.</string>
+    <string name="assistant_langs_not_ready">Os idiomas de tradução ainda não estão prontos. Tente novamente.</string>
+    <string name="assistant_ocr_failed">Falha no reconhecimento de texto</string>
+    <string name="ocr_models_missing">Os modelos de reconhecimento de texto estão ausentes. Abra Gerenciar idiomas no app para reparar.</string>
+    <string name="assistant_set_source_live">Defina um idioma de origem padrão nas Configurações para usar a tradução de tela ao vivo.</string>
+    <!-- migration gate -->
+    <string name="migration_updating_speech_models">Atualizando modelos de fala</string>
+    <string name="migration_accept_convert">Aceitar e converter</string>
+    <string name="migration_delete_all">Excluir tudo em vez disso</string>
+    <string name="migration_converting">Convertendo %1$d de %2$d</string>
+    <string name="migration_optimizing">Otimizando modelos</string>
+    <plurals name="migration_convert_prompt">
+        <item quantity="one">Você tem %1$d modelo de conversão de texto em fala para converter para um novo formato. Levará aproximadamente %2$d segundos. Você vai economizar %3$.0f MB de espaço em disco.</item>
+        <item quantity="other">Você tem %1$d modelos de conversão de texto em fala para converter para um novo formato. Levará aproximadamente %2$d segundos. Você vai economizar %3$.0f MB de espaço em disco.</item>
+    </plurals>
+    <!-- document translation notification + progress -->
+    <string name="doc_notif_translating">Traduzindo arquivo</string>
+    <string name="doc_notif_translated">Arquivo traduzido</string>
+    <string name="doc_notif_phase_text">Texto %1$d%%</string>
+    <string name="doc_notif_phase_images">Imagens %1$d/%2$d</string>
+    <string name="doc_notif_phase_raster">Páginas em bitmap %1$d/%2$d</string>
+    <string name="doc_notif_channel_name">Tradução de documentos</string>
+    <string name="doc_notif_channel_desc">Mostra o progresso durante a tradução de documentos</string>
+    <string name="doc_progress_preparing">Preparando arquivo</string>
+    <string name="doc_progress_translating">Traduzindo</string>
+    <string name="doc_progress_translated">Arquivo traduzido</string>
+    <string name="doc_progress_saving">Salvando arquivo traduzido</string>
+    <string name="doc_translation_failed">Falha na tradução do documento</string>
+    <string name="doc_url_unsupported">Baixe o documento e abra-o com o app</string>
+    <!-- document configure sheet -->
+    <string name="document_wrap_columns">Quebrar em %1$d colunas</string>
+    <string name="document_translate_pdf_images">Traduzir imagens em PDF</string>
+    <string name="layout_preserve">Preservar quebras de linha</string>
+    <string name="layout_reflow">Reorganizar em parágrafos</string>
+    <string name="layout_reflow_wrap">Reorganizar e quebrar</string>
+    <!-- common (additional) -->
+    <string name="common_open">Abrir</string>
+    <string name="common_close">Fechar</string>
+    <string name="common_save">Salvar</string>
+    <!-- translator app -->
+    <string name="translator_translated_file">Arquivo traduzido: %1$s</string>
+    <string name="translator_document_saved">Documento salvo</string>
+    <string name="translator_document_save_failed">Falha ao salvar o documento</string>
+    <string name="translator_audio_playback_failed">Falha na reprodução de áudio: %1$s</string>
+    <string name="translator_no_app_to_open">Nenhum app encontrado para abrir este arquivo</string>
+    <!-- document alignment -->
+    <string name="docalign_decode_failed">Não foi possível decodificar a imagem.</string>
+    <string name="docalign_detecting">Detectando cantos…</string>
+    <string name="docalign_redetecting">Detectando novamente…</string>
+    <string name="docalign_help">Um perímetro preciso ao redor do documento melhora a qualidade do reconhecimento. É importante que as linhas fiquem paralelas ao texto.\n\nDar zoom ou mover geralmente faz o algoritmo reconhecer o documento automaticamente, mas você ainda pode ajustar manualmente se ele não for encontrado.</string>
+    <!-- how to use -->
+    <string name="howto_section_other_apps">A partir de outros apps</string>
+    <string name="howto_share_title">Compartilhar para traduzir</string>
+    <string name="howto_share_body">Compartilhe texto, links ou imagens de qualquer app para traduzi-los.</string>
+    <string name="howto_copy_title">Traduzir sem sair de outros apps</string>
+    <string name="howto_copy_body">Selecione um texto em qualquer lugar e toque em \"Traduzir\" na barra de cópia para ver a tradução em um popup compacto.</string>
+    <string name="howto_section_in_app">Dentro do app</string>
+    <string name="howto_docs_title">Traduzir documentos</string>
+    <string name="howto_docs_body">Abra a aba Documentos para traduzir arquivos EPUB, PDF e TXT.</string>
+    <string name="howto_dict_title">Consulta no dicionário</string>
+    <string name="howto_dict_body">Pressione e segure qualquer palavra de uma tradução para ver sua definição. Dados obtidos do Wiktionary.</string>
+    <string name="howto_voice_title">Alterar voz ou velocidade</string>
+    <string name="howto_voice_body">Pressione e segure o botão de reprodução para escolher outra voz ou ajustar a velocidade de reprodução.</string>
+    <!-- feature row labels -->
+    <string name="feature_translation">Tradução</string>
+    <string name="feature_dictionary">Dicionário</string>
+    <string name="feature_tts">Voz</string>
+    <!-- misc -->
+    <string name="main_input_placeholder">Digite o texto</string>
+    <string name="aidl_target_unavailable">Idioma de destino indisponível</string>
+    <string name="voice_section_downloaded">BAIXADO</string>
+    <string name="voice_section_available">DISPONÍVEL</string>
+    <string name="detected_translate_from">Traduzir de</string>
+    <string name="detected_missing_language">Idioma ausente</string>
+    <string name="langmgr_ocr_upgrade_available">Há um modelo de detecção de texto aprimorado disponível.</string>
+</resources>

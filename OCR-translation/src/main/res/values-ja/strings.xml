@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="stop">停止</string>
+    <string name="pause">一時停止</string>
+    <string name="resume">再開</string>
+    <string name="region_select_menu">翻訳する範囲を指定</string>
+    <string name="screen_translate_needs_source">翻訳元の言語を指定してください</string>
+    <string name="live_tile_label">画面をリアルタイム翻訳</string>
+    <string name="translate_text">翻訳</string>
+    <string name="translate_link">リンクを翻訳</string>
+    <string name="accessibility_service_description">画面上の文字を翻訳するには、このサービスを有効にしてください。フローティングの翻訳ボタンをタップすると現在の画面を翻訳でき、画面のリアルタイム翻訳を開始することもできます。</string>
+    <string name="tap_to_translate_title">クイック翻訳がオンです</string>
+    <string name="tap_to_translate_body">タップして翻訳ポップアップを開きます</string>
+    <string name="tap_to_translate_channel">クイック翻訳</string>
+    <string name="tap_to_translate_channel_description">翻訳ポップアップにすぐアクセスするための常駐通知です</string>
+    <string name="quick_tile_label">翻訳</string>
+    <!-- common -->
+    <string name="common_ok">OK</string>
+    <string name="common_cancel">キャンセル</string>
+    <string name="common_done">完了</string>
+    <string name="common_grant">許可</string>
+    <string name="common_manage">管理</string>
+    <!-- settings -->
+    <string name="settings_title">設定</string>
+    <string name="settings_languages">言語</string>
+    <string name="settings_language_packs">言語パック</string>
+    <string name="settings_general">一般</string>
+    <string name="settings_font_size">文字サイズ</string>
+    <string name="settings_font_sample">これはサンプルのテキストです</string>
+    <string name="settings_tap_notification">クイック翻訳の通知</string>
+    <string name="settings_tap_notification_desc">ポップアップを開く常駐通知です。</string>
+    <string name="settings_web_translator">ウェブ翻訳</string>
+    <string name="settings_clear_browsing">終了時に閲覧データを消去</string>
+    <string name="settings_clear_browsing_desc">Cookie、キャッシュ、ローカルストレージを削除します。</string>
+    <string name="settings_tts_section">テキスト読み上げ</string>
+    <string name="settings_tts_read_urls_hashtags">URL とハッシュタグを読み上げる</string>
+    <string name="settings_popup_settings">ポップアップ</string>
+    <string name="settings_popup_desc">テキスト選択メニューで\'翻訳\'を選ぶとポップアップが表示されます</string>
+    <string name="settings_hide_input">入力を非表示</string>
+    <string name="settings_popup_position">ポップアップの位置</string>
+    <string name="settings_popup_size">ポップアップのサイズ: %1$d%%</string>
+    <string name="settings_screen_translation">画面翻訳</string>
+    <string name="settings_screen_translation_desc">他のアプリの上に直接、翻訳した文字を表示します。</string>
+    <string name="settings_floating_button">常時表示ボタン</string>
+    <string name="settings_floating_button_desc">ユーザー補助の権限が必要です</string>
+    <string name="settings_shortcut">ショートカットで画面を翻訳</string>
+    <string name="settings_shortcut_desc">ホームまたは電源ボタンの長押しで起動します</string>
+    <string name="settings_on_shortcut">ショートカット起動時</string>
+    <string name="settings_ocr">画像</string>
+    <string name="settings_background_mode">文字を置き換える背景</string>
+    <string name="settings_min_confidence">最小信頼度: %1$d%%</string>
+    <string name="settings_max_image_size">最大画像サイズ: %1$dpx</string>
+    <string name="settings_advanced">詳細設定</string>
+    <string name="settings_catalog_url">カタログ URL</string>
+    <string name="settings_external_storage">外部ストレージを使う</string>
+    <string name="settings_disable_autodetect">言語の自動検出を無効にする</string>
+    <string name="settings_translit_output">翻訳後の文字に発音表記を表示</string>
+    <string name="settings_translit_input">元の文字に発音表記を表示</string>
+    <string name="settings_translit_japanese_spaces">日本語の発音表記にスペースを追加</string>
+    <string name="settings_translate_pdf_images">PDF 内の画像も翻訳</string>
+    <string name="settings_camera_live_default">カメラを最初からリアルタイム翻訳</string>
+    <string name="settings_register_browser">ブラウザーとして登録</string>
+    <string name="settings_register_browser_desc">他のアプリからのリンクを翻訳できるようにします。</string>
+    <string name="settings_external_storage_perm_title">外部ストレージの権限</string>
+    <string name="settings_about">アプリについて</string>
+    <string name="settings_version">バージョン %1$s</string>
+    <string name="settings_no_languages_available">利用できる言語がありません</string>
+    <string name="settings_default_from">既定の\'翻訳元\'言語</string>
+    <string name="settings_default_to">既定の\'翻訳先\'言語</string>
+    <string name="settings_adblock_support">広告ブロック</string>
+    <string name="settings_about_get_help">ヘルプ / 問題を報告</string>
+    <string name="settings_logs_copied">アプリのログをクリップボードにコピーしました</string>
+    <string name="settings_about_support">開発を支援する</string>
+    <string name="settings_external_storage_perm_body">翻訳ファイルをドキュメントフォルダに保存するには、すべてのファイルを管理する権限が必要です。\n設定画面が開くので、\'すべてのファイルへのアクセスを許可\'を有効にしてください。</string>
+    <!-- language manager / setup / how-to -->
+    <string name="langmgr_voices">音声</string>
+    <string name="langmgr_default">既定</string>
+    <string name="langmgr_filter">言語を絞り込む</string>
+    <string name="langmgr_delete_shared_title">共有辞書を削除しますか？</string>
+    <string name="langmgr_delete_shared_body">この辞書は %1$s と共有されています。\n削除すると、それらすべてから辞書がなくなります。</string>
+    <string name="langmgr_download_size">%1$s をダウンロード</string>
+    <string name="langmgr_repair_needed">一部のダウンロード済み機能はファイルが不足しており、修復するまで動作しません。</string>
+    <string name="langmgr_repair_size">%1$s を修復</string>
+    <string name="nolang_title">言語の設定</string>
+    <string name="nolang_prompt">翻訳を始めるには言語パックをダウンロードしてください</string>
+    <string name="howto_title">使い方</string>
+    <!-- image capture / voice / dictionary / language selector -->
+    <string name="image_no_crop_remote">リモート画像は直接切り抜きできません</string>
+    <string name="image_open_failed">ファイルを開けませんでした</string>
+    <string name="image_source_screen">画面</string>
+    <string name="image_source_document">ドキュメント</string>
+    <string name="image_source_photos">写真</string>
+    <string name="image_source_gallery">ギャラリー</string>
+    <string name="image_source_camera">カメラ</string>
+    <string name="voice_playback_speed">再生速度</string>
+    <string name="voice_label">音声</string>
+    <string name="voice_default">既定の音声</string>
+    <string name="langsel_auto">✨ 自動</string>
+    <string name="dict_also_as">別の表記:</string>
+    <!-- camera / browser / screen translate -->
+    <string name="camera_permission_rationale">リアルタイム翻訳にはカメラの権限が必要です。</string>
+    <string name="camera_need_ocr_models">この言語の文字認識モデルをダウンロードする必要があります</string>
+    <string name="browser_no_source_language">利用できる翻訳元の言語がありません。まずメイン画面でインストールするか、設定で既定の翻訳元の言語を指定してください。</string>
+    <string name="browser_reader_unavailable">このページではリーダーモードを利用できません</string>
+    <string name="browser_translate_image">画像を翻訳</string>
+    <string name="screen_translating_notification">画面を翻訳中</string>
+    <!-- enums -->
+    <string name="align_top">上</string>
+    <string name="align_middle">中央</string>
+    <string name="align_bottom">下</string>
+    <string name="assistant_action_still_image">一度だけ翻訳</string>
+    <string name="assistant_action_live_screen">リアルタイム翻訳を開始</string>
+    <string name="background_mode_white_on_black">黒地に白文字</string>
+    <string name="background_mode_black_on_white">白地に黒文字</string>
+    <string name="background_mode_auto_detect">色を自動検出</string>
+    <!-- tts / speech errors -->
+    <string name="tts_nothing_to_speak">読み上げる内容がありません</string>
+    <string name="tts_catalog_unavailable">カタログを利用できません</string>
+    <string name="tts_no_voice">%1$s の音声がインストールされていません</string>
+    <string name="tts_synthesis_failed">%1$s の音声合成に失敗しました</string>
+    <string name="tts_sample_fallback">これは Offline Translator の音声読み上げのサンプルです。</string>
+    <!-- translation -->
+    <string name="translation_error">翻訳エラー: %1$s</string>
+    <!-- download errors -->
+    <string name="download_failed_core">%1$s のダウンロードに失敗しました</string>
+    <string name="download_failed_ocr">%1$s の文字認識のダウンロードに失敗しました</string>
+    <string name="download_failed_ocr_batch">文字認識の一括ダウンロードに失敗しました</string>
+    <string name="download_failed_dictionary">%1$s の辞書ダウンロードに失敗しました</string>
+    <string name="download_failed_tts">%1$s の音声のダウンロードに失敗しました</string>
+    <string name="download_failed_adblock">Adblock のダウンロードに失敗しました</string>
+    <string name="download_failed_repair">修復のダウンロードに失敗しました</string>
+    <string name="download_catalog_unavailable">カタログを利用できません</string>
+    <string name="download_catalog_save_failed">カタログを保存できませんでした</string>
+    <string name="download_unknown_error">不明なエラー</string>
+    <string name="download_catalog_failed">カタログのダウンロードに失敗しました: %1$s</string>
+    <!-- assistant overlay status -->
+    <string name="assistant_invoke_prompt">翻訳したい文字の上でこのアシスタントを起動してください</string>
+    <string name="assistant_collecting_context">画面の情報を取得中…</string>
+    <string name="assistant_screenshot_disabled">このアシスタントではスクリーンショットの利用が無効になっています。システムのアシスタント設定で有効にしてください。</string>
+    <string name="assistant_no_screen_data">画面のデータを受信できませんでした。このアシスタントで\'スクリーンショットを使用\'を有効にしてください。</string>
+    <string name="assistant_no_screenshot">このアプリはスクリーンショットを提供しませんでした。</string>
+    <string name="assistant_set_source_ocr">文字認識用に既定の翻訳元の言語を指定してください。</string>
+    <string name="assistant_langs_not_ready">翻訳の言語がまだ準備できていません。もう一度お試しください。</string>
+    <string name="assistant_ocr_failed">文字認識に失敗しました</string>
+    <string name="ocr_models_missing">文字認識モデルがありません。アプリの言語管理を開いて修復してください。</string>
+    <string name="assistant_set_source_live">画面のリアルタイム翻訳を使うには、設定で既定の翻訳元の言語を指定してください。</string>
+    <!-- migration gate -->
+    <string name="migration_updating_speech_models">音声モデルを更新中</string>
+    <string name="migration_accept_convert">同意して変換</string>
+    <string name="migration_delete_all">代わりにすべて削除</string>
+    <string name="migration_converting">%2$d 件中 %1$d 件を変換中</string>
+    <string name="migration_optimizing">モデルを最適化中</string>
+    <plurals name="migration_convert_prompt">
+        <item quantity="other">新しい形式に変換する音声読み上げモデルが %1$d 件あります。およそ %2$d 秒かかります。ディスク容量を %3$.0f MB 節約できます。</item>
+    </plurals>
+    <!-- document translation notification + progress -->
+    <string name="doc_notif_translating">ファイルを翻訳中</string>
+    <string name="doc_notif_translated">ファイルを翻訳しました</string>
+    <string name="doc_notif_phase_text">テキスト %1$d%%</string>
+    <string name="doc_notif_phase_images">画像 %1$d/%2$d</string>
+    <string name="doc_notif_phase_raster">ビットマップページ %1$d/%2$d</string>
+    <string name="doc_notif_channel_name">ドキュメント翻訳</string>
+    <string name="doc_notif_channel_desc">ドキュメントの翻訳中に進捗を表示します</string>
+    <string name="doc_progress_preparing">ファイルを準備中</string>
+    <string name="doc_progress_translating">翻訳中</string>
+    <string name="doc_progress_translated">ファイルを翻訳しました</string>
+    <string name="doc_progress_saving">翻訳したファイルを保存中</string>
+    <string name="doc_translation_failed">ドキュメントの翻訳に失敗しました</string>
+    <string name="doc_url_unsupported">ドキュメントをダウンロードして、アプリで開いてください</string>
+    <!-- document configure sheet -->
+    <string name="document_wrap_columns">%1$d 文字で折り返す</string>
+    <string name="document_translate_pdf_images">PDF 内の画像を翻訳</string>
+    <string name="layout_preserve">改行をそのまま残す</string>
+    <string name="layout_reflow">段落にまとめ直す</string>
+    <string name="layout_reflow_wrap">まとめ直して折り返す</string>
+    <!-- common (additional) -->
+    <string name="common_open">開く</string>
+    <string name="common_close">閉じる</string>
+    <string name="common_save">保存</string>
+    <!-- translator app -->
+    <string name="translator_translated_file">翻訳したファイル: %1$s</string>
+    <string name="translator_document_saved">ドキュメントを保存しました</string>
+    <string name="translator_document_save_failed">ドキュメントの保存に失敗しました</string>
+    <string name="translator_audio_playback_failed">音声の再生に失敗しました: %1$s</string>
+    <string name="translator_no_app_to_open">このファイルを開けるアプリが見つかりません</string>
+    <!-- document alignment -->
+    <string name="docalign_decode_failed">画像をデコードできません。</string>
+    <string name="docalign_detecting">角を検出中…</string>
+    <string name="docalign_redetecting">再検出中…</string>
+    <string name="docalign_help">ドキュメントを正確に囲むと認識の精度が上がります。線が文字と平行になっていることが大切です。\n\nズームや移動をすると、たいてい自動でドキュメントを認識しますが、見つからない場合は手動で調整することもできます。</string>
+    <!-- how to use -->
+    <string name="howto_section_other_apps">他のアプリから</string>
+    <string name="howto_share_title">共有して翻訳</string>
+    <string name="howto_share_body">どのアプリからでも、テキスト・リンク・画像を共有して翻訳できます。</string>
+    <string name="howto_copy_title">他のアプリを離れずに翻訳</string>
+    <string name="howto_copy_body">どこでも文字を選択し、コピー用ツールバーの\"翻訳\"をタップすると、コンパクトなポップアップで翻訳が表示されます。</string>
+    <string name="howto_section_in_app">アプリ内で</string>
+    <string name="howto_docs_title">ドキュメントを翻訳</string>
+    <string name="howto_docs_body">ドキュメントタブを開くと、EPUB・PDF・TXT ファイルを翻訳できます。</string>
+    <string name="howto_dict_title">辞書で調べる</string>
+    <string name="howto_dict_body">翻訳内の単語を長押しすると意味が表示されます。データは Wiktionary を使用しています。</string>
+    <string name="howto_voice_title">音声や速度を変える</string>
+    <string name="howto_voice_body">再生ボタンを長押しすると、別の音声を選んだり再生速度を調整したりできます。</string>
+    <!-- feature row labels -->
+    <string name="feature_translation">翻訳</string>
+    <string name="feature_dictionary">辞書</string>
+    <string name="feature_tts">音声</string>
+    <!-- misc -->
+    <string name="main_input_placeholder">テキストを入力</string>
+    <string name="aidl_target_unavailable">翻訳先の言語を利用できません</string>
+    <string name="voice_section_downloaded">ダウンロード済み</string>
+    <string name="voice_section_available">利用可能</string>
+    <string name="detected_translate_from">翻訳元</string>
+    <string name="detected_missing_language">言語がありません</string>
+    <string name="langmgr_ocr_upgrade_available">改良されたテキスト検出モデルが利用できます。</string>
+</resources>

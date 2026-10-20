@@ -1,0 +1,51 @@
+# GPU marian trainer. CUDA 11.8 = first toolkit with Ada/sm_89 (RTX 4090) support
+# AND compatible with marian @ e8a1a25 (CUDA 12 breaks that commit).
+# nvcc compiles fine without a physical GPU, so this image can be built anywhere.
+# Vast pulls the image at instance creation, so image size is rental wall-time.
+FROM nvidia/cuda:11.8.0-devel-ubuntu22.04 AS build
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y \
+    build-essential cmake git ca-certificates \
+    libboost-all-dev libprotobuf-dev protobuf-compiler libopenblas-dev \
+    zlib1g-dev libbz2-dev liblzma-dev libicu-dev pkg-config \
+ && apt-get clean && rm -rf /var/lib/apt/lists/*
+WORKDIR /opt
+RUN git clone https://github.com/marian-nmt/marian-dev.git \
+ && cd marian-dev \
+ && git checkout e8a1a2530fb84cbff7383302ebca393e5875c441 \
+ && git submodule update --init --recursive
+# SASS is binary-compatible across minor versions of one major arch, so sm_86 runs
+# on Ada/sm_89: AMPERE+AMPERE_RTX covers 4090/3090/A100. There is no ADA option at
+# this commit. Flip VOLTA/TURING back on to accept a V100/2080Ti offer.
+RUN cd marian-dev && mkdir build && cd build \
+ && cmake .. -DUSE_SENTENCEPIECE=on -DUSE_FBGEMM=on -DCOMPILE_CPU=on -DCOMPILE_CUDA=on \
+    -DCOMPILE_KEPLER=off -DCOMPILE_MAXWELL=off -DCOMPILE_PASCAL=off \
+    -DCOMPILE_VOLTA=off -DCOMPILE_TURING=off \
+    -DCOMPILE_AMPERE=on -DCOMPILE_AMPERE_RTX=on \
+    -DCUDA_TOOLKIT_ROOT_DIR=/usr/local/cuda -DCMAKE_BUILD_TYPE=Release
+# Build the EXECUTABLE targets (underscored). Target `marian` is the static lib
+# libmarian.a, NOT the trainer — `make marian` produces no binary.
+# marian-conv is absent on purpose: upstream's emits an intgemm tensor type slimt
+# rejects, so conversion is browsermt's job (Dockerfile.marian-cpu-bmt).
+RUN cd marian-dev/build && make -j"$(nproc)" marian_train marian_decoder marian_scorer \
+ && strip marian marian-decoder marian-scorer
+
+# ldd wants only cublas/cublasLt/curand/cusparse + openblas; boost/protobuf/icu/zlib
+# are static and cudart is linked in. cuda:11.8-runtime would add cufft/npp/nvjpeg.
+FROM nvidia/cuda:11.8.0-base-ubuntu22.04
+LABEL org.opencontainers.image.source=https://github.com/DavidVentura/offline-translator
+ENV DEBIAN_FRONTEND=noninteractive
+# openssh-server: vast only *attempts* to inject ssh into a custom image, and its
+# fallback advice is to set ssh up yourself. Cheaper than finding out on a rental.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libcublas-11-8 libcurand-11-8 libcusparse-11-8 libopenblas0 \
+    openssh-server rsync ca-certificates \
+    python3 python3-pip \
+ && pip3 install --no-cache-dir opustrainer==0.5 \
+ && apt-get clean && rm -rf /var/lib/apt/lists/*
+COPY --from=build /opt/marian-dev/build/marian /usr/local/bin/marian
+COPY --from=build /opt/marian-dev/build/marian-decoder /usr/local/bin/marian-decoder
+COPY --from=build /opt/marian-dev/build/marian-scorer /usr/local/bin/marian-scorer
+# A missing .so surfaces as a bare exit 127, and finding that out costs a box-hour.
+# libcuda/libnvidia-ml are injected by the container runtime, so they are absent here.
+RUN ! (ldd /usr/local/bin/marian* 2>&1 | grep "not found" | grep -v "libcuda\|libnvidia-ml")

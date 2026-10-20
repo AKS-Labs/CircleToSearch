@@ -102,4 +102,57 @@ object ImageUtils {
             return false
         }
     }
+
+    /**
+     * Decodes [uri] for use as the Circle to Search canvas: downsampled only when it would
+     * exceed [maxPixels] (huge camera photos must not OOM) and EXIF-rotated. The bitmap
+     * keeps its original dimensions and proportions — the display fits it to the screen
+     * (ContentScale.Fit) instead of cropping or stretching it.
+     */
+    fun loadImageUri(context: Context, uri: android.net.Uri, maxPixels: Int): Bitmap? =
+        try {
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            context.contentResolver.openInputStream(uri)?.use {
+                BitmapFactory.decodeStream(it, null, bounds)
+            }
+            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
+                null
+            } else {
+                var sampleSize = 1
+                while (
+                    (bounds.outWidth.toLong() / sampleSize) * (bounds.outHeight.toLong() / sampleSize)
+                        > maxPixels
+                ) sampleSize *= 2
+                val decoded = context.contentResolver.openInputStream(uri)?.use {
+                    BitmapFactory.decodeStream(
+                        it, null, BitmapFactory.Options().apply { inSampleSize = sampleSize }
+                    )
+                }
+                decoded?.let { applyExifOrientation(context, uri, it) }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("ImageUtils", "Failed to load image uri", e)
+            null
+        }
+
+    private fun applyExifOrientation(context: Context, uri: android.net.Uri, bitmap: Bitmap): Bitmap {
+        val orientation = try {
+            context.contentResolver.openInputStream(uri)?.use {
+                android.media.ExifInterface(it).getAttributeInt(
+                    android.media.ExifInterface.TAG_ORIENTATION,
+                    android.media.ExifInterface.ORIENTATION_NORMAL,
+                )
+            } ?: android.media.ExifInterface.ORIENTATION_NORMAL
+        } catch (e: Exception) {
+            android.media.ExifInterface.ORIENTATION_NORMAL
+        }
+        val matrix = android.graphics.Matrix()
+        when (orientation) {
+            android.media.ExifInterface.ORIENTATION_ROTATE_90 -> matrix.postRotate(90f)
+            android.media.ExifInterface.ORIENTATION_ROTATE_180 -> matrix.postRotate(180f)
+            android.media.ExifInterface.ORIENTATION_ROTATE_270 -> matrix.postRotate(270f)
+            else -> return bitmap
+        }
+        return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+    }
 }

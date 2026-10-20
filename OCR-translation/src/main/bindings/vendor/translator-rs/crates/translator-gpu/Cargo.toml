@@ -1,0 +1,21 @@
+[package]
+name = "translator-gpu"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+
+[lib]
+name = "translator_gpu"
+path = "src/lib.rs"
+
+[dependencies]
+translator-core = { path = "../translator-core" }
+translator-raster = { path = "../translator-raster" }
+translator-render = { path = "../translator-render" }
+translator-live = { path = "../translator-live" }
+glow = { version = "0.17", default-features = false }
+log = "0.4"
+
+[dev-dependencies]
+translator-tracker = { path = "../translator-tracker" }
+khronos-egl = { version = "6", features = ["dynamic"] }

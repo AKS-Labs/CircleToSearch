@@ -1,0 +1,18 @@
+FROM ubuntu:22.04
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y \
+    build-essential cmake git ca-certificates \
+    libboost-all-dev \
+    libprotobuf-dev protobuf-compiler \
+    libopenblas-dev \
+    zlib1g-dev libbz2-dev liblzma-dev \
+    libicu-dev pkg-config \
+ && apt-get clean && rm -rf /var/lib/apt/lists/*
+WORKDIR /opt
+RUN git clone https://github.com/marian-nmt/marian-dev.git \
+ && cd marian-dev \
+ && git checkout e8a1a2530fb84cbff7383302ebca393e5875c441 \
+ && git submodule update --init --recursive
+RUN cd marian-dev && mkdir build && cd build \
+ && cmake .. -DCOMPILE_CUDA=off -DCOMPILE_CPU=on -DUSE_SENTENCEPIECE=on -DCMAKE_BUILD_TYPE=Release
+RUN cd marian-dev/build && make -j"$(nproc)"

@@ -1,0 +1,41 @@
+# OpusTrainer input-augmentation config for the base-memory student, flattened
+# from mozilla/translations pipeline/train/configs/opustrainer/student.yml.
+#
+# Mozilla groups modifiers as common / bicameral_src / phonemic_src and applies a
+# group only if the source script qualifies. Our pairs (en<->tl) are both Latin =
+# bicameral AND phonemic, so all three groups apply; the list below is the union,
+# ordered per mozilla's modifier_order (UpperCase, TitleCase, RemoveEndPunct,
+# Typos, Noise). These teach the student to survive messy/casual/OOD input
+# (wrong case, typos, dropped end punctuation) — the "brittle on hard text"
+# failure that clean training data alone doesn't fix.
+#
+# The "Tags" modifier is intentionally dropped: it is inline-tag/terminology
+# passthrough (needs PyICU + an SPM-level alignment remap), orthogonal to input
+# robustness. Add it back if we want terminology copying.
+#
+# __TSV__ is substituted with the 3-col train TSV path by train_student.sh.
+datasets:
+  original: __TSV__
+
+stages:
+  - train
+
+train:
+  - original 1.0
+  - until original inf   # stream forever; marian stops on early-stopping
+
+seed: 1111
+
+# src \t trg \t pharaoh-alignments (guided-alignment). Modifiers keep the
+# alignment column consistent as they perturb src/trg.
+num_fields: 3
+
+modifiers:
+  - UpperCase: 0.07
+  - TitleCase: 0.05
+  - RemoveEndPunct: 0.2
+  - Typos: 0.05
+  - Noise: 0.0005
+    min_word_length: 2
+    max_word_length: 5
+    max_words: 6
