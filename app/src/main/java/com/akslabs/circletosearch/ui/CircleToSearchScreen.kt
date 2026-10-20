@@ -36,8 +36,12 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -335,6 +339,117 @@ private fun buildSmoothPath(points: List<Offset>): Path {
         path.cubicTo(c1x, c1y, c2x, c2y, p2.x, p2.y)
     }
     return path
+}
+
+/**
+ * Cyclic interpolation over the Google palette for a flowing border gradient:
+ * t wraps at 1.0 and the palette starts/ends on blue, so the loop is seamless.
+ */
+private fun flowingGoogleColor(t: Float): Color {
+    val p = OverlayGradientColors
+    val x = (((t % 1f) + 1f) % 1f) * (p.size - 1)
+    val i = x.toInt().coerceAtMost(p.size - 2)
+    val f = x - i
+    val a = p[i]
+    val b = p[i + 1]
+    return Color(
+        red = a.red + (b.red - a.red) * f,
+        green = a.green + (b.green - a.green) * f,
+        blue = a.blue + (b.blue - a.blue) * f,
+        alpha = a.alpha + (b.alpha - a.alpha) * f
+    )
+}
+
+/**
+ * Screen-edge border: the classic thin 2dp Google-gradient line over a thin
+ * blurred neon glow whose colors FLOW around the border and breathe in
+ * brightness. Isolated composable so the per-frame animation only
+ * recomputes itself, not the whole overlay screen.
+ */
+@Composable
+private fun AnimatedNeonBorder(
+    visible: Boolean,
+    shape: androidx.compose.ui.graphics.Shape,
+) {
+    androidx.compose.animation.AnimatedVisibility(
+        visible = visible,
+        enter = androidx.compose.animation.fadeIn(animationSpec = tween(700))
+    ) {
+        val transition = rememberInfiniteTransition(label = "BorderGlow")
+        // Colors travel around the border — one full loop every 7s.
+        val flowPhase by transition.animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(7000, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart
+            ),
+            label = "BorderFlow"
+        )
+        // White light-chase racing around the edge, one lap every 2.6s.
+        val chasePhase by transition.animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(2600, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart
+            ),
+            label = "BorderChase"
+        )
+        // Glow brightness breathes. Read inside graphicsLayer = draw phase
+        // only, so the pulse never triggers recomposition by itself.
+        val glowAlpha by transition.animateFloat(
+            initialValue = 0.6f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(1500, easing = androidx.compose.animation.core.EaseInOut),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "BorderPulse"
+        )
+        // 33 stops for smooth angular interpolation (17 banded visibly); each
+        // stop blends its flowing Google color toward white under the chase, so
+        // the light reads on BOTH the crisp line and the blurred glow.
+        val borderBrush = Brush.sweepGradient(
+            *Array(33) { i ->
+                val t = i / 32f
+                val base = flowingGoogleColor(t + flowPhase)
+                val raw = kotlin.math.abs(t - chasePhase)
+                val d = minOf(raw, 1f - raw)
+                val c = (1f - d / 0.09f).coerceIn(0f, 1f)
+                val smooth = c * c
+                t to (if (smooth <= 0.001f) base else Color(
+                    red = base.red + (1f - base.red) * smooth,
+                    green = base.green + (1f - base.green) * smooth,
+                    blue = base.blue + (1f - base.blue) * smooth,
+                    alpha = base.alpha + (1f - base.alpha) * smooth
+                ))
+            }
+        )
+        Box(modifier = Modifier.fillMaxSize()) {
+            // Blurred thin glow (API 31+): light emitting from the border line
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            alpha = glowAlpha
+                            renderEffect = android.graphics.RenderEffect
+                                .createBlurEffect(12f, 12f, android.graphics.Shader.TileMode.CLAMP)
+                                .asComposeRenderEffect()
+                            compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen
+                        }
+                        .border(width = 3.dp, brush = borderBrush, shape = shape)
+                )
+            }
+            // Same old thin crisp line on top, flowing with the same colors
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .border(width = 2.dp, brush = borderBrush, shape = shape)
+            )
+        }
+    }
 }
 
 /**
@@ -1601,23 +1716,7 @@ fun CircleToSearchScreen(
             // Sibling drawn AFTER the dim/tint layer, so overlay dimness can never
             // wash the border out — it stays at its own alpha regardless of dimAlpha.
             if (showGradientBorder && !isTranslatorMode) {
-                androidx.compose.animation.AnimatedVisibility(
-                    visible = isUIVisible,
-                    enter = androidx.compose.animation.fadeIn(animationSpec = tween(700))
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .border(
-                                width = 2.dp,
-                                brush = Brush.verticalGradient(
-                                    colors = OverlayGradientColors.map { it.copy(alpha = 0.9f) }
-                                ),
-                                shape = deviceCornerShape
-                            )
-                            .clip(deviceCornerShape)
-                    )
-                }
+                AnimatedNeonBorder(visible = isUIVisible, shape = deviceCornerShape)
             }
 
             // 3. Drawing Canvas (Interactive Layer)
