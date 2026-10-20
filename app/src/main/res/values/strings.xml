@@ -223,7 +223,8 @@
     <string name="donate_upi">UPI (India) akslabs@upi</string>
     <string name="donate_upi_subtitle">Instant \u2022 No fees \u2022 Pay via UPI</string>
     <string name="donate_paypal">PayPal</string>
-    <string name="donate_paypal_subtitle" formatted="false">Fixed fee up to 5% \u2022 Conversion loss \u2248 5% per dollar</string>
+    <string name="donate_paypal_subtitle">Works, but not recommended</string>
+    <string name="donate_paypal_note" formatted="false">PayPal cuts heavy fees on small donations — e.g. $1 sent arrives as about ₹53 ($0.60); roughly 40% is lost to fees &amp; conversion</string>
     <string name="label_foss">FOSS</string>
 
     <!-- Privacy Dialog -->
