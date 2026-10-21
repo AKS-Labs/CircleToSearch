@@ -229,9 +229,14 @@
     <!-- Circle to Search OCR language picker -->
     <string name="ocr_lang_button_cd">OCR language</string>
     <string name="ocr_lang_title">OCR languages</string>
-    <string name="ocr_lang_hint">Circle to Search will only try to detect the languages you check here. Leave Auto-detect checked to try all bundled languages.</string>
+    <string name="ocr_lang_hint">Circle to Search will only try to detect the languages you check here. Leave Auto-detect checked to try all bundled languages — but note that auto-detect can sometimes fail to identify the language, so check a language manually if detection is unreliable.</string>
     <string name="ocr_lang_auto">Auto-detect (all languages)</string>
     <string name="ocr_lang_search">Search languages</string>
+    <string name="ocr_lang_section">LANGUAGES</string>
+    <string name="ocr_lang_auto_subtitle">Detects the script automatically using every bundled pack</string>
+    <string name="ocr_lang_no_results">No languages match \"%1$s\"</string>
+    <string name="ocr_lang_reset">Reset</string>
+    <string name="ocr_lang_done">Done</string>
 
     <!-- Privacy Dialog -->
     <string name="title_privacy">Privacy &amp; Data Usage Transparency</string>

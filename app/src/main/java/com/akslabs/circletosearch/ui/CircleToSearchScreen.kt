@@ -26,6 +26,7 @@ import com.akslabs.circletosearch.CircleToSearchAccessibilityService
 import android.util.Base64
 import android.view.Display
 import android.view.ViewGroup
+import android.view.WindowManager
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -79,6 +80,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -89,6 +91,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BorderOuter
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.automirrored.filled.FormatTextdirectionRToL
@@ -109,11 +112,11 @@ import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.TextFields
-import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Email
+import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -143,6 +146,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
@@ -169,10 +173,13 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
 import com.akslabs.circletosearch.R
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -577,7 +584,7 @@ fun CircleToSearchScreen(
     // Circle to Search's OCR language whitelist (empty = auto-detect all).
     // Read once per overlay open; writes from the sheet land in the pref store
     // and this state, so the next screenshot OCR picks them up immediately.
-    var showOcrLangSheet by remember { mutableStateOf(false) }
+    var showOcrLangDialog by remember { mutableStateOf(false) }
     var ocrCheckedLanguages by remember { mutableStateOf(OcrLanguagePreferences.getChecked(context)) }
 
     // Material You logic for colors
@@ -2034,14 +2041,17 @@ fun CircleToSearchScreen(
                 ),
                 modifier = Modifier.align(Alignment.TopCenter).zIndex(2000f)
             ) {
-                Row(
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .statusBarsPadding()
                         .padding(top = 4.dp, start = 16.dp, end = 16.dp)
                         .align(Alignment.TopCenter),
-                    verticalAlignment = Alignment.CenterVertically
                 ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                     IconButton(
                         onClick =
                             {
@@ -2055,25 +2065,6 @@ fun CircleToSearchScreen(
                         Icon(Icons.Default.Close, contentDescription = stringResource(R.string.cd_close), tint = Color.White)
                     }
                     Spacer(modifier = Modifier.weight(1f))
-                    if (selectedEngine.name == "Google") {
-                        // Si c'est Google, on affiche ta belle typo officielle
-                        Image(
-                            painter = painterResource(id = com.akslabs.circletosearch.R.drawable.googletypo),
-                            contentDescription = stringResource(R.string.cd_google_search),
-                            modifier = Modifier.height(50.dp), // Hauteur ajustable selon ton PNG
-                            colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(Color.White)
-                        )
-                    } else {
-                        // Si c'est Bing, Yandex, etc., on garde le texte stylé d'origine
-                        Text(
-                            text = selectedEngine.getDisplayName(context),
-                            style = MaterialTheme.typography.headlineMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                        )
-                    }
-                    Spacer(modifier = Modifier.weight(1f))
 
                     // OCR language whitelist button — shows at a glance whether
                     // detection is restricted (dot badge) or fully automatic.
@@ -2085,10 +2076,10 @@ fun CircleToSearchScreen(
                     ) {
                         IconButton(onClick = {
                             haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                            showOcrLangSheet = true
+                            showOcrLangDialog = true
                         }) {
                             Icon(
-                                Icons.Default.Translate,
+                                painter = painterResource(id = com.akslabs.circletosearch.R.drawable.ocr),
                                 contentDescription = stringResource(R.string.ocr_lang_button_cd),
                                 tint = Color.White
                             )
@@ -2103,6 +2094,8 @@ fun CircleToSearchScreen(
                             )
                         }
                     }
+
+                    Spacer(modifier = Modifier.width(8.dp))
 
                     // Action Button (Menu)
                     Box(
@@ -2234,6 +2227,33 @@ fun CircleToSearchScreen(
                                     showSettingsScreen = true
                                     showMenu = false
                                 }
+                            )
+                        }
+                    }
+                    }
+
+                    // Branding is centered on its own layer so the button
+                    // cluster on either side never shifts it off-center.
+                    Box(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (selectedEngine.name == "Google") {
+                            // Si c'est Google, on affiche ta belle typo officielle
+                            Image(
+                                painter = painterResource(id = com.akslabs.circletosearch.R.drawable.googletypo),
+                                contentDescription = stringResource(R.string.cd_google_search),
+                                modifier = Modifier.height(50.dp), // Hauteur ajustable selon ton PNG
+                                colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(Color.White)
+                            )
+                        } else {
+                            // Si c'est Bing, Yandex, etc., on garde le texte stylé d'origine
+                            Text(
+                                text = selectedEngine.getDisplayName(context),
+                                style = MaterialTheme.typography.headlineMedium.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
                             )
                         }
                     }
@@ -3064,9 +3084,9 @@ fun CircleToSearchScreen(
             )
         }
 
-        if (showOcrLangSheet) {
-            OcrLanguageBottomSheet(
-                onDismiss = { showOcrLangSheet = false },
+        if (showOcrLangDialog) {
+            OcrLanguageDialog(
+                onDismiss = { showOcrLangDialog = false },
                 onCheckedChange = { codes ->
                     ocrCheckedLanguages = codes
                     OcrLanguagePreferences.setChecked(context, codes)
@@ -3093,13 +3113,14 @@ fun CircleToSearchScreen(
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun OcrLanguageBottomSheet(
+private fun OcrLanguageDialog(
     onDismiss: () -> Unit,
     onCheckedChange: (Set<String>) -> Unit,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val checked = remember { mutableStateListOf(*OcrLanguagePreferences.getChecked(context).toTypedArray()) }
     var query by remember { mutableStateOf("") }
+    val isAuto = checked.isEmpty()
 
     // Bundled/installed OCR languages only: a checked language whose recognizer
     // pack is missing on this device would be unusable, so it never appears.
@@ -3125,98 +3146,204 @@ private fun OcrLanguageBottomSheet(
         }
     }
 
-    ModalBottomSheet(
+    Dialog(
         onDismissRequest = onDismiss,
-        containerColor = MaterialTheme.colorScheme.surface,
+        // Escape the ~280dp platform default so the picker can use real width.
+        properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Text(
-                text = stringResource(R.string.ocr_lang_title),
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-            )
-            Text(
-                text = stringResource(R.string.ocr_lang_hint),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 16.dp),
-            )
-            OutlinedTextField(
-                value = query,
-                onValueChange = { query = it },
-                placeholder = { Text(stringResource(R.string.ocr_lang_search)) },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                singleLine = true,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-            )
-
-            // Auto-detect: checked exactly when no language is checked.
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable {
-                        checked.clear()
-                        onCheckedChange(emptySet())
-                    }
-                    .padding(horizontal = 16.dp, vertical = 6.dp),
-            ) {
-                Text(
-                    text = stringResource(R.string.ocr_lang_auto),
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.weight(1f),
-                )
-                Checkbox(
-                    checked = checked.isEmpty(),
-                    onCheckedChange = {
-                        checked.clear()
-                        onCheckedChange(emptySet())
-                    },
-                )
+        val dialogView = LocalView.current
+        SideEffect {
+            val dialogWindow = (dialogView.parent as? DialogWindowProvider)?.window
+            if (dialogWindow != null) {
+                dialogWindow.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+                dialogWindow.attributes = dialogWindow.attributes.apply { dimAmount = 0.32f }
             }
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp))
+        }
+        Surface(
+            shape = RoundedCornerShape(28.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp,
+            modifier = Modifier
+                .padding(horizontal = 24.dp, vertical = 32.dp)
+                .widthIn(max = 560.dp)
+                .fillMaxWidth(),
+        ) {
+            Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 20.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        painter = painterResource(id = com.akslabs.circletosearch.R.drawable.ocr),
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp),
+                    )
+                    Spacer(modifier = Modifier.size(12.dp))
+                    Text(
+                        text = stringResource(R.string.ocr_lang_title),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+                Text(
+                    text = stringResource(R.string.ocr_lang_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
 
-            LazyColumn(modifier = Modifier.heightIn(max = 420.dp)) {
-                items(filtered, key = { it.code }) { language ->
-                    val isChecked = language.code in checked
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    placeholder = { Text(stringResource(R.string.ocr_lang_search)) },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                    trailingIcon = {
+                        if (query.isNotEmpty()) {
+                            IconButton(onClick = { query = "" }) {
+                                Icon(Icons.Default.Close, contentDescription = null)
+                            }
+                        }
+                    },
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 16.dp),
+                )
+
+                // Auto-detect: checked exactly when no language is checked.
+                val selectAuto: () -> Unit = {
+                    checked.clear()
+                    onCheckedChange(emptySet())
+                }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 12.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable(onClick = selectAuto)
+                        .padding(vertical = 6.dp),
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.ocr_lang_auto),
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Medium,
+                        )
+                        Text(
+                            text = stringResource(R.string.ocr_lang_auto_subtitle),
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(top = 2.dp),
+                        )
+                    }
+                    Checkbox(
+                        checked = isAuto,
+                        onCheckedChange = { selectAuto() },
+                    )
+                }
+
+                Text(
+                    text = stringResource(R.string.ocr_lang_section),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = 1.5.sp,
+                    modifier = Modifier.padding(top = 16.dp, bottom = 4.dp),
+                )
+
+                // Checked languages sort to the top of the list.
+                val displayed = filtered.sortedWith(
+                    compareBy { if (checked.contains(it.code)) 0 else 1 },
+                )
+                if (filtered.isEmpty()) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable {
+                            .height(120.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = null,
+                            modifier = Modifier.size(32.dp),
+                        )
+                        Spacer(modifier = Modifier.size(12.dp))
+                        Text(
+                            text = stringResource(R.string.ocr_lang_no_results, query),
+                            style = MaterialTheme.typography.bodyMedium,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(horizontal = 24.dp),
+                        )
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .weight(1f, fill = false)
+                            .heightIn(max = minOf(displayed.size * 48 + 8, 200).dp),
+                    ) {
+                        items(displayed, key = { it.code }) { language ->
+                            val isChecked = language.code in checked
+                            val toggle: () -> Unit = {
                                 if (isChecked) checked.remove(language.code)
                                 else checked.add(language.code)
                                 onCheckedChange(checked.toSet())
                             }
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = language.localizedName(),
-                                style = MaterialTheme.typography.bodyLarge,
-                            )
-                            Text(
-                                text = language.code,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable(onClick = toggle)
+                                    .padding(vertical = 6.dp)
+                                    .animateItem(),
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = language.localizedName(),
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        fontWeight = FontWeight.Medium,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    Text(
+                                        text = language.code.uppercase(),
+                                        style = MaterialTheme.typography.labelSmall,
+                                    )
+                                }
+                                Checkbox(
+                                    checked = isChecked,
+                                    onCheckedChange = { toggle() },
+                                )
+                            }
                         }
-                        Checkbox(
-                            checked = isChecked,
-                            onCheckedChange = {
-                                if (isChecked) checked.remove(language.code)
-                                else checked.add(language.code)
-                                onCheckedChange(checked.toSet())
-                            },
+                    }
+                }
+
+                // Footer: Reset (only when restricted) + standard Done button.
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                ) {
+                    if (isAuto) {
+                        Spacer(modifier = Modifier.weight(1f))
+                    } else {
+                        TextButton(onClick = selectAuto) {
+                            Text(stringResource(R.string.ocr_lang_reset))
+                        }
+                    }
+                    Button(onClick = onDismiss) {
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(modifier = Modifier.size(8.dp))
+                        Text(
+                            text = stringResource(R.string.ocr_lang_done),
+                            fontWeight = FontWeight.SemiBold,
                         )
                     }
                 }
             }
-            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }
