@@ -84,7 +84,20 @@ class OverlayActivity : ComponentActivity() {
                         searchModeOverride = searchModeOverride.value,
                         onClose = { 
                             BitmapRepository.clear()
-                            finish() 
+                            // Kill only the overlay: park this task behind the
+                            // app in use (instant reveal, no launch animation),
+                            // then verify what surfaced and repair to the seeded
+                            // app if the stack beneath was wrong (see
+                            // closeOverlay). Never finish — the parked task is
+                            // reused via onNewIntent on the next trigger.
+                            val svc = com.akslabs.circletosearch.CircleToSearchAccessibilityService.instance
+                            if (svc != null) {
+                                svc.closeOverlay(this@OverlayActivity)
+                            } else {
+                                // Accessibility service not running: we have no
+                                // seeded target — park only, never finish.
+                                moveTaskToBack(true)
+                            }
                         }
                     )
                 }
@@ -133,6 +146,24 @@ class OverlayActivity : ComponentActivity() {
         }
     }
     
+    override fun onStart() {
+        super.onStart()
+        // While Circle to Search is in front, park the bottom-edge long-press
+        // triggers: they are TYPE_ACCESSIBILITY_OVERLAY windows that float above
+        // this activity and their corner arcs overlap the bottom bar's outer
+        // buttons, swallowing taps (the trigger is pointless while CTS is open).
+        com.akslabs.circletosearch.CircleToSearchAccessibilityService.instance
+            ?.setBottomEdgeHidden(true)
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // Overlay left the foreground (closed or backgrounded): bring the triggers
+        // back so they work again over regular apps.
+        com.akslabs.circletosearch.CircleToSearchAccessibilityService.instance
+            ?.setBottomEdgeHidden(false)
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         translateBridge?.let {

@@ -50,8 +50,9 @@ private const val BASE_ALPHA = 0.14f
 /**
  * Progress indicator for the detect→recognize→translate pass: transparent-white pills over each
  * detected region. A wave sweeps top-to-bottom *once* (brightening the pills it passes), then the
- * pills settle into a gentle synchronized pulse — a determinate-looking pass into an
- * indeterminate "work still happening, unknown how long" state, instead of a confusing re-loop.
+ * pills settle into a clearly visible synchronized pulse — slow recognizers (some languages take
+ * noticeably longer) keep an unmistakable "still working" signal instead of looking finished the
+ * moment the sweep ends.
  */
 @Composable
 fun ScanAnimationOverlay(
@@ -86,7 +87,10 @@ fun ScanAnimationOverlay(
         drawOrientedPill(box, t, Color(1f, 1f, 1f, BASE_ALPHA + 0.30f * falloff))
       }
     } else {
-      val alpha = BASE_ALPHA + 0.12f * breathe.value
+      // Post-sweep state must read as "working": a subtle alpha drift looked idle
+      // while slow languages were still being recognized, so the pulse now swings
+      // as bright as the sweep's own peak.
+      val alpha = BASE_ALPHA + 0.30f * breathe.value
       for (box in regions.boxes) {
         drawOrientedPill(box, t, Color(1f, 1f, 1f, alpha))
       }

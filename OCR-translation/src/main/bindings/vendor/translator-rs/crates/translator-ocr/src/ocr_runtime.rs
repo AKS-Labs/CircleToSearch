@@ -95,8 +95,9 @@ pub fn translate_image_rgba_ppocr_in_snapshot(
     };
     // Per-strip recognizer scripts plus the contest candidates: scripts that
     // failed strips may be re-read with. `Specific` is trusted (no contest);
-    // `Auto` only ever contests the Indic blind spot (PULC cannot name bn/gu/ml);
-    // `Restricted` contests within the user's checked languages.
+    // `Auto` contests the two script blind spots (PULC cannot name bn/gu/ml,
+    // and misroutes Devanagari strips to Latin); `Restricted` contests within
+    // the user's checked languages.
     let (mut scripts, contest_candidates) = match source_selection {
         OcrSourceSelection::Specific { language_code } => {
             let script = recognizer_script_for_language(snapshot, language_code)?;
@@ -105,11 +106,13 @@ pub fn translate_image_rgba_ppocr_in_snapshot(
         OcrSourceSelection::Auto => {
             let routed =
                 route_ppocr_predictions(ppocr, predictions.as_deref().unwrap_or_default(), &det_boxes)?;
-            let candidates = ppocr
-                .installed_scripts()
-                .any(|s| s == PpocrScript::Indic)
-                .then_some(PpocrScript::Indic)
+            // Both directions of the script blind spot: the Indic pack rescues
+            // bn/gu/ml strips PULC sent to Latin/Devanagari, and the Devanagari
+            // pack rescues Hindi strips PULC sent to Latin (the Indic pack would
+            // render Devanagari glyphs as confident Bengali garbage).
+            let candidates: Vec<PpocrScript> = [PpocrScript::Indic, PpocrScript::Devanagari]
                 .into_iter()
+                .filter(|s| ppocr.installed_scripts().any(|i| i == *s))
                 .collect();
             (routed, candidates)
         }
@@ -886,8 +889,9 @@ fn candidate_content_scripts(script: PpocrScript) -> &'static [Script] {
 /// fired its own script's characters and the routed line was empty or the
 /// candidate's confidence is strictly higher.
 ///
-/// `candidates` comes from the source selection: `[Indic]` for `Auto` (PULC
-/// cannot name bn/gu/ml — the historic blind spot), the user's checked
+/// `candidates` comes from the source selection: `[Indic, Devanagari]` for
+/// `Auto` (PULC cannot name bn/gu/ml — the historic blind spot — and misroutes
+/// Devanagari to Latin), the user's checked
 /// languages' recognizers for `Restricted`, empty for `Specific`. Strips PULC
 /// placed confidently and that recognized cleanly are never touched, so
 /// screens in PULC's named languages pay nothing; the extra passes run only

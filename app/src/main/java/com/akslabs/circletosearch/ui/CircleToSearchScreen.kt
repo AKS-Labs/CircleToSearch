@@ -1477,7 +1477,10 @@ fun CircleToSearchScreen(
                             val result = searchWithGoogleLens(uri, context)
                             when (result) {
                                 com.akslabs.circletosearch.ui.components.LensLaunchResult.LAUNCHED_DIRECTLY -> {
-                                    // Lens launched directly — safe to dismiss the overlay
+                                    // Lens launched directly — safe to dismiss the overlay.
+                                    // Lens is launching on top: stop close from reordering
+                                    // the previous app back over it.
+                                    CircleToSearchAccessibilityService.instance?.suppressNextReturnToApp()
                                     onClose()
                                     return@LaunchedEffect
                                 }
@@ -2066,37 +2069,6 @@ fun CircleToSearchScreen(
                     }
                     Spacer(modifier = Modifier.weight(1f))
 
-                    // OCR language whitelist button — shows at a glance whether
-                    // detection is restricted (dot badge) or fully automatic.
-                    Box(
-                        modifier = Modifier
-                            .background(Color.Black.copy(alpha = 0.35f), CircleShape)
-                            .size(40.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        IconButton(onClick = {
-                            haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-                            showOcrLangDialog = true
-                        }) {
-                            Icon(
-                                painter = painterResource(id = com.akslabs.circletosearch.R.drawable.ocr),
-                                contentDescription = stringResource(R.string.ocr_lang_button_cd),
-                                tint = Color.White
-                            )
-                        }
-                        if (ocrCheckedLanguages.isNotEmpty()) {
-                            Box(
-                                modifier = Modifier
-                                    .align(Alignment.BottomEnd)
-                                    .padding(end = 5.dp, bottom = 5.dp)
-                                    .size(8.dp)
-                                    .background(Color(0xFF8AB4F8), CircleShape)
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.width(8.dp))
-
                     // Action Button (Menu)
                     Box(
                         modifier = Modifier
@@ -2162,6 +2134,23 @@ fun CircleToSearchScreen(
                                 },
                                 onClick = {
                                     showGradientBorder = !showGradientBorder
+                                    showMenu = false
+                                }
+                            )
+                            // OCR language whitelist — mid-list so the bar-adjacent
+                            // toggles stay grouped; the dialog itself shows whether
+                            // detection is restricted or fully automatic.
+                            androidx.compose.material3.DropdownMenuItem(
+                                text = { Text(stringResource(R.string.ocr_lang_title)) },
+                                leadingIcon = {
+                                    Icon(
+                                        painter = painterResource(id = com.akslabs.circletosearch.R.drawable.ocr),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                },
+                                onClick = {
+                                    showOcrLangDialog = true
                                     showMenu = false
                                 }
                             )
@@ -2374,6 +2363,9 @@ fun CircleToSearchScreen(
                                                 val path = ImageUtils.saveBitmap(context, screenshot)
                                                 val uri = android.net.Uri.fromFile(java.io.File(path))
                                                 searchWithGoogleLens(uri, context)
+                                                // Lens is launching on top: stop close from
+                                                // reordering the previous app back over it.
+                                                CircleToSearchAccessibilityService.instance?.suppressNextReturnToApp()
                                                 onClose()
                                             }
                                         },

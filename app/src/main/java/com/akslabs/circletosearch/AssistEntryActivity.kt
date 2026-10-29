@@ -107,6 +107,9 @@ class AssistEntryActivity : Activity() {
         if (shot != null) {
             BitmapRepository.setScreenshot(shot)
             try {
+                // The active window right now is the app the overlay will cover —
+                // snapshot it so close can bring that exact app back.
+                CircleToSearchAccessibilityService.instance?.seedForegroundPackageFromActiveWindow()
                 startActivity(Intent(this, OverlayActivity::class.java).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION)

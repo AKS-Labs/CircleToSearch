@@ -237,6 +237,15 @@ fun LiveCameraScreen(
           onRequest = { requestPermission.launch(Manifest.permission.CAMERA) },
           onCancel = onClose,
         )
+      else ->
+        // Permission dialog in flight (or its launch failed): show a spinner
+        // instead of a dead black frame so the screen never looks frozen.
+        Box(
+          modifier = Modifier.fillMaxSize(),
+          contentAlignment = Alignment.Center,
+        ) {
+          androidx.compose.material3.CircularProgressIndicator(color = Color.White)
+        }
     }
   }
 }

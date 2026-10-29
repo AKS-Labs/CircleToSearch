@@ -563,19 +563,19 @@ fun TranslatorApp(
   val openLiveCameraRequest by viewModel.openLiveCameraRequest.collectAsState()
 
   // Map navigation state to route. A pending camera deep link (set by MainActivity
-  // before the first frame) becomes the start destination so the home screen is
-  // never composed — navigating main → live_camera would flash it first. Even
-  // while the language check is still LOADING go straight to the camera: it
-  // renders a black placeholder until the languages arrive, which beats the
-  // loading spinner screen for a launch that never wanted the home screen.
+  // before the first frame) does NOT change the start destination: it rides the
+  // normal loading/main flow — the exact same initialization as opening the app
+  // and tapping the home screen's camera button — and the effect below folds the
+  // request into a navigate("live_camera") the moment languages are READY.
+  // Starting on live_camera while the language check was still LOADING landed on
+  // a black frame that never resolved (nothing else finishes that check for a
+  // launch that skips the normal screens).
   val startDestination =
     remember {
       when (navigationState) {
         TranslatorViewModel.NavigationState.NO_LANGUAGES -> "no_languages"
-        TranslatorViewModel.NavigationState.LOADING ->
-          if (openLiveCameraRequest) "live_camera" else "loading"
-        TranslatorViewModel.NavigationState.READY ->
-          if (openLiveCameraRequest) "live_camera" else "main"
+        TranslatorViewModel.NavigationState.LOADING -> "loading"
+        TranslatorViewModel.NavigationState.READY -> "main"
       }
     }
 
@@ -586,6 +586,10 @@ fun TranslatorApp(
 
   LaunchedEffect(navigationState, currentBackStackEntry, openLiveCameraRequest) {
     val currentRoute = currentBackStackEntry?.destination?.route
+    android.util.Log.d(
+      "CamDeepLink",
+      "nav effect: state=$navigationState route=$currentRoute request=$openLiveCameraRequest",
+    )
     if (openLiveCameraRequest) {
       if (navigationState == TranslatorViewModel.NavigationState.READY) {
         // Same as the home screen's camera entry: tear down any lingering
@@ -1036,12 +1040,16 @@ fun TranslatorApp(
               // Deep-linked in while the language check is still running: the
               // camera screen needs from/to, so hold a black frame (the camera
               // screen's own background) until they arrive instead of flashing
-              // the loading spinner or an empty white frame.
+              // the loading spinner or an empty white frame — with a spinner so
+              // the wait never reads as a dead/black screen.
               Box(
                 modifier = Modifier
                   .fillMaxSize()
-                  .background(Color.Black)
-              )
+                  .background(Color.Black),
+                contentAlignment = Alignment.Center,
+              ) {
+                androidx.compose.material3.CircularProgressIndicator(color = Color.White)
+              }
             }
           }
         }

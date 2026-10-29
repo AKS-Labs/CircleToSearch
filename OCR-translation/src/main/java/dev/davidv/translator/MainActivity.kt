@@ -93,9 +93,12 @@ class MainActivity : ComponentActivity() {
       viewModel.requestLanguageManager()
       openLanguageManager = false
     }
-    // Captured before it is consumed so MigrationGate can skip its blocking
-    // screen: the camera deep link must show the camera on the first frame.
-    val openedForLiveCamera = openLiveCamera
+    // The camera deep link only sets the request; it rides the SAME initialization
+    // as a normal launch (MigrationGate blocking screen and all). Skipping the gate
+    // to show the camera on the first frame composed the app while migration was
+    // still converting models — that mid-migration catalog check resolved
+    // NO_LANGUAGES and stranded the user on the download screen. TranslatorApp
+    // folds the request into live_camera as soon as languages are READY.
     if (openLiveCamera) {
       viewModel.requestLiveCamera()
       openLiveCamera = false
@@ -105,7 +108,6 @@ class MainActivity : ComponentActivity() {
       TranslatorTheme {
         MigrationGate(
           filePathManager = app.filePathManager,
-          showContentImmediately = openedForLiveCamera,
           onMigrated = {
             TranslatorTtsEngine.notifyVoiceDataChanged(applicationContext)
             // The Application holds its own catalog instance (used by e.g. the

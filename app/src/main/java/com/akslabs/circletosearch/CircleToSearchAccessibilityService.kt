@@ -119,6 +119,7 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
     private val overlayViews = mutableListOf<View>() // Track all added segment views
     private var statusBarView: View? = null // Dedicated status-bar double-tap strip (independent of segments)
     private val bottomEdgeViews = mutableListOf<BottomEdgeOverlayView>() // Track bottom-edge corner/mid overlays
+    private var bottomEdgeHidden = false // Suppressed while Circle to Search is in front
     private val executor: Executor = Executors.newSingleThreadExecutor()
     private lateinit var configManager: OverlayConfigurationManager
 
@@ -575,6 +576,18 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
     }
 
     /**
+     * Suppress or restore the bottom-edge long-press triggers. Circle to Search calls
+     * this from its overlay activity's onStart/onStop: while the overlay is in front
+     * the corner arcs would sit on top of its own bottom-bar buttons and eat their
+     * taps, and the trigger itself is pointless when Circle to Search is already open.
+     */
+    fun setBottomEdgeHidden(hidden: Boolean) {
+        if (bottomEdgeHidden == hidden) return
+        bottomEdgeHidden = hidden
+        updateBottomEdgeOverlays()
+    }
+
+    /**
      * Bottom-edge long-press triggers (two corner arcs + optional bottom-centre semicircle).
      * Deliberately kept in their own list and NOT gated by [OverlayConfig.isEnabled], so
      * toggling the status-bar overlay can never add/remove them (previously they shared the
@@ -589,6 +602,11 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
             try { wm.removeView(view) } catch (_: Exception) {}
         }
         bottomEdgeViews.clear()
+
+        // Hidden while Circle to Search is in front (its bottom bar sits where the
+        // corner arcs are, and the arcs' synthetic tap forwarding is unreliable
+        // against the overlay's own windows — taps must go through natively).
+        if (bottomEdgeHidden) return
 
         val dm = resources.displayMetrics
         val density = dm.density
@@ -1050,6 +1068,9 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
 
     fun launchOverlay(searchModeOverride: Boolean? = null) {
         android.util.Log.d("CircleToSearchAccess", "AccessibilityService launching OverlayActivity")
+        // The active window right now is the app the overlay will cover —
+        // snapshot it so close can bring that exact app back.
+        seedForegroundPackageFromActiveWindow()
         val intent = Intent(this, OverlayActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION) // Disable animation for faster feel
@@ -1760,8 +1781,99 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         }
     }
 
+    /**
+     * Last app (other than our own package or SystemUI) whose window came to the
+     * foreground, tracked from window-state events. The assist pipeline parks the
+     * launcher task directly beneath the overlay's own task, so "back the task out"
+     * alone always lands on the home screen — close instead reorders this app's
+     * existing task back to the front (see [closeOverlay]).
+     */
+    var lastForegroundPackage: String? = null
+        private set
+
+    /**
+     * Last foreground activity of OUR OWN package (e.g. the translator module
+     * screens, which ship inside this APK), tracked from activity lifecycle
+     * callbacks. Window events can't be used here: both the tracking and the
+     * seeding skip our own package so the overlay itself never pollutes them —
+     * but that also meant triggering CTS from the module left a stale cross-app
+     * value, and close then reordered that other app over the module, "closing"
+     * it. The overlay activity itself is excluded so this always names the
+     * screen the user was actually on.
+     */
+    var lastForegroundComponent: android.content.ComponentName? = null
+        private set
+
+    /**
+     * Sees ONLY this package's activities (the process-local lifecycle): records
+     * the exact screen to return to on close. The overlay activity itself is
+     * excluded so this always names the screen the user was actually on.
+     */
+    private val ownActivityTracker = object : android.app.Application.ActivityLifecycleCallbacks {
+        override fun onActivityResumed(activity: android.app.Activity) {
+            if (activity !is OverlayActivity) {
+                lastForegroundComponent = android.content.ComponentName(activity as android.content.Context, activity::class.java)
+            }
+        }
+        override fun onActivityCreated(activity: android.app.Activity, savedInstanceState: android.os.Bundle?) {}
+        override fun onActivityStarted(activity: android.app.Activity) {}
+        override fun onActivityPaused(activity: android.app.Activity) {}
+        override fun onActivityStopped(activity: android.app.Activity) {}
+        override fun onActivitySaveInstanceState(activity: android.app.Activity, outState: android.os.Bundle) {}
+        override fun onActivityDestroyed(activity: android.app.Activity) {}
+    }
+
+    /**
+     * True while an overlay session is open (set at trigger, cleared at close).
+     * Window events are ignored for the duration: launcher/task-transition
+     * flashes fired WHILE THE OVERLAY IS OPEN were overwriting the
+     * trigger-time seed mid-session, so close refused the correct reorder and
+     * fell back to landing on the home screen. The seed captured at trigger is
+     * the source of truth for that whole session.
+     */
+    private var sessionActive = false
+
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         translatorBridge?.onHostAccessibilityEvent(event)
+        if (event != null &&
+            event.eventType == android.view.accessibility.AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
+        ) {
+            val pkg = event.packageName?.toString()
+            if (pkg != null && pkg != packageName && pkg != "com.android.systemui" && !sessionActive) {
+                lastForegroundPackage = pkg
+            }
+        }
+    }
+
+    /**
+     * Snapshots the app the user is currently using into the close-return
+     * tracking, called right before the overlay is launched. Event tracking
+     * alone is racy: a freshly (re)started service has no event history, and
+     * launcher flashes during task transitions can overwrite a real app — both
+     * made close fall back to moveTaskToBack and land on the home screen. At
+     * trigger time the active window IS the app being used, so seed from it;
+     * the event-tracked value only remains as fallback when there is no active
+     * window. Our own overlay window is ignored (pkg == packageName) so a
+     * re-trigger over the open overlay keeps the previous seed.
+     */
+    fun seedForegroundPackageFromActiveWindow() {
+        sessionActive = true
+        val pkg = rootInActiveWindow?.packageName?.toString() ?: return
+        if (pkg == packageName) {
+            // Own package (e.g. the translator module screens which ship inside
+            // this APK): a package-level value can't name which of our activities
+            // the user is on, so rely on the lifecycle-tracked component (never
+            // the overlay itself) and clear the stale cross-app value — keeping
+            // it made close reorder that other app over the module, "closing" it.
+            android.util.Log.d("CircleToSearch", "seedForeground: own $lastForegroundComponent (was pkg=$lastForegroundPackage)")
+            lastForegroundPackage = null
+            return
+        }
+        if (pkg != "com.android.systemui") {
+            android.util.Log.d("CircleToSearch", "seedForeground: $pkg (was $lastForegroundPackage)")
+            lastForegroundPackage = pkg
+            lastForegroundComponent = null
+        }
     }
 
     override fun onInterrupt() {}
@@ -2064,6 +2176,102 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         translatorBridge?.deactivate()
     }
 
+    private var returnToAppSuppressed = false
+
+    /**
+     * Set by flows that deliberately launch another app right before closing the
+     * overlay (the Lens buttons): the close must not reorder the previous app
+     * back over the app that was just launched. Consumed by the next close.
+     */
+    fun suppressNextReturnToApp() {
+        returnToAppSuppressed = true
+    }
+
+    /**
+     * Closes the overlay by bringing the app in use to the front — never by
+     * parking first: on this device moveTaskToBack revealed the LAUNCHER in
+     * 5/5 observed closes (whatever the stack, home ends up directly beneath
+     * the parked overlay), forcing a home flash plus a repair slide that felt
+     * like an app relaunch. Reordering the app's existing task (state intact)
+     * with the open animation suppressed makes the app's last frame replace
+     * the overlay instantly — "kill the overlay only". The overlay task simply
+     * ends up beneath the app, reused via onNewIntent on the next trigger.
+     */
+    fun closeOverlay(overlay: android.app.Activity) {
+        sessionActive = false
+        val own = lastForegroundComponent
+        val pkg = own?.packageName ?: lastForegroundPackage
+        if (returnToAppSuppressed) {
+            // A deliberate external launch (Lens) is coming up: never pull the
+            // previous app back over it.
+            returnToAppSuppressed = false
+            overlay.moveTaskToBack(true)
+            android.util.Log.d("CircleToSearch", "close: parked (external launch takes precedence)")
+            return
+        }
+        android.util.Log.d("CircleToSearch", "close: target=$pkg own=$own")
+        val homePkg = overlay.packageManager
+            .resolveActivity(
+                android.content.Intent(android.content.Intent.ACTION_MAIN)
+                    .addCategory(android.content.Intent.CATEGORY_HOME),
+                android.content.pm.PackageManager.MATCH_DEFAULT_ONLY,
+            )?.activityInfo?.packageName
+        if (pkg == null || pkg == homePkg) {
+            // Opened from the home screen (or nothing tracked): home is the
+            // correct destination — just get out of the way.
+            overlay.moveTaskToBack(true)
+            android.util.Log.d("CircleToSearch", "close: no target, parked")
+            return
+        }
+        // From the overlay's own activity context (proven working for both our
+        // own screens and other apps); reorder alone finds the EXISTING task.
+        val launch = if (own != null) {
+            android.content.Intent().setComponent(own)
+        } else {
+            overlay.packageManager.getLaunchIntentForPackage(pkg)
+        }
+        if (launch == null) {
+            android.util.Log.w("CircleToSearch", "close: no launch intent for $pkg, parked")
+            overlay.moveTaskToBack(true)
+            return
+        }
+        launch.addFlags(
+            android.content.Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or
+                android.content.Intent.FLAG_ACTIVITY_NO_ANIMATION,
+        )
+        try {
+            // Three layers to kill the task-swap transition (the system plays an
+            // app-opening animation on reorder by default, which reads as the
+            // app "relaunching" even though the very same instance resumes):
+            //  1. FLAG_ACTIVITY_NO_ANIMATION on the intent,
+            //  2. ActivityOptions (handled above),
+            //  3. transition overrides (API 34+ replacement + classic fallback),
+            //     set both before and after the start since OEMs differ on the
+            //     honoured call timing.
+            if (android.os.Build.VERSION.SDK_INT >= 34) {
+                overlay.overrideActivityTransition(
+                    android.app.Activity.OVERRIDE_TRANSITION_OPEN, 0, 0,
+                )
+            }
+            overlay.startActivity(
+                launch,
+                android.app.ActivityOptions.makeCustomAnimation(overlay, 0, 0).toBundle(),
+            )
+            if (android.os.Build.VERSION.SDK_INT >= 34) {
+                overlay.overrideActivityTransition(
+                    android.app.Activity.OVERRIDE_TRANSITION_OPEN, 0, 0,
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                overlay.overridePendingTransition(0, 0)
+            }
+            android.util.Log.d("CircleToSearch", "close: brought $pkg to front (no-anim)")
+        } catch (e: Exception) {
+            android.util.Log.e("CircleToSearch", "close: failed to return to $pkg", e)
+            overlay.moveTaskToBack(true)
+        }
+    }
+
     /** Fades translator overlay windows during the system back gesture so the
      *  predictive back arrow (drawn below accessibility overlays) stays visible. */
     fun setTranslatorGestureAlpha(alpha: Float) {
@@ -2096,6 +2304,7 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
     override fun onCreate() {
         super.onCreate()
         instance = this
+        application.registerActivityLifecycleCallbacks(ownActivityTracker)
         // configManager init moved to onServiceConnected or safe lazy? 
         // WindowManager is needed for views which happens in onServiceConnected mostly.
     }
@@ -2103,6 +2312,7 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
     override fun onDestroy() {
         super.onDestroy()
         instance = null
+        runCatching { application.unregisterActivityLifecycleCallbacks(ownActivityTracker) }
         triggerHandler.removeCallbacksAndMessages(null)
         runCatching { translatorBridge?.destroy() }
         translatorBridge = null
@@ -2199,10 +2409,13 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
 
         private val handler = android.os.Handler(android.os.Looper.getMainLooper())
         private val touchSlop = android.view.ViewConfiguration.get(context).scaledTouchSlop
-        // Long-press stays alive while the finger drifts a little (more tolerant than
-        // the system tap slop) so slight jitter doesn't kill the gesture.
-        private val longPressSlop = touchSlop * 1.5f
-        private val longPressTimeoutMs = 400L
+        // Long-press stays alive while the finger drifts a little, and lasts a bit
+        // longer than the system default: at 400ms + 1.5x slop, quick or slightly
+        // shaky corner presses regularly failed to register (the tap got forwarded
+        // to the app underneath with no haptic and no trigger), which made the
+        // gesture feel unreliable.
+        private val longPressSlop = touchSlop * 2.5f
+        private val longPressTimeoutMs = 500L
         // Minimum gap between forwarded scroll segments (each one briefly makes the
         // window untouchable and dispatches a synthetic gesture).
         private val scrollForwardIntervalMs = 180L

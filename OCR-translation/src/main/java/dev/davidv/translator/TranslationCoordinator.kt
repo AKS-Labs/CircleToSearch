@@ -348,12 +348,12 @@ class TranslationCoordinator(
           onDetectedRegions(boxes.map { it.orientedBox }, bitmap.width, bitmap.height)
         }
 
-        val planCall = { sel: OcrSourceSelection ->
+        val planCall = { sel: OcrSourceSelection, target: Language ->
           catalog.ocrImagePlan(
             ocrImage,
             maxImageSize,
             sel,
-            to,
+            target,
             minConfidence,
             readingOrder,
             backgroundMode,
@@ -362,7 +362,7 @@ class TranslationCoordinator(
         }
         val plan =
           try {
-            planCall(sourceSelection)
+            planCall(sourceSelection, to)
           } catch (e: uniffi.bindings.CatalogException) {
             // Auto's CLD pass declines on short/ambiguous text or an uninstalled
             // detected->target pair, both reported as the same error. Callers that only
@@ -373,21 +373,44 @@ class TranslationCoordinator(
             val detectedSourceFailed =
               sourceSelection is OcrSourceSelection.Auto &&
                 e.message.orEmpty().contains("could not detect image source language")
-            if (!detectedSourceFailed) {
+            // A MissingAsset naming a `from->to` pair means the *translation* pack is
+            // missing (only OCR packs are bundled), not the OCR models: recognition
+            // already succeeded, and this words-only caller discards the translation
+            // result. Retry with the missing pair's source as the target — source ==
+            // target makes the translation stage an identity pass over the same
+            // correctly recognized words.
+            val identityTarget =
+              if (e is uniffi.bindings.CatalogException.MissingAsset) {
+                detectedLanguageCodeFromMissingAsset(e.message)?.let(catalog::languageByCode)
+              } else {
+                null
+              }
+            if (!detectedSourceFailed && identityTarget != null) {
+              Log.d("OCR", "missing translation pair to ${to.code}; retrying identity source=${identityTarget.code}: ${e.message}")
+              try {
+                planCall(sourceSelection, identityTarget)
+              } catch (identityRetry: uniffi.bindings.CatalogException) {
+                Log.d("OCR", "ocr plan failed: ${identityRetry.message}")
+                if (identityRetry is uniffi.bindings.CatalogException.MissingAsset) onOcrUnavailable()
+                ocrImage.close()
+                return@withContext null
+              }
+            } else if (!detectedSourceFailed) {
               Log.d("OCR", "ocr plan failed: ${e.message}")
               if (e is uniffi.bindings.CatalogException.MissingAsset) onOcrUnavailable()
               ocrImage.close()
               return@withContext null
-            }
-            Log.d("OCR", "auto source detect failed, retrying as source=${to.code}: ${e.message}")
-            try {
-              planCall(OcrSourceSelection.Specific(uniffi.translator_core.LanguageCode(to.code)))
-            } catch (retry: uniffi.bindings.CatalogException) {
-              Log.d("OCR", "ocr plan failed: ${retry.message}")
-              if (retry is uniffi.bindings.CatalogException.MissingAsset) onOcrUnavailable()
-              onAutoSourceFailed()
-              ocrImage.close()
-              return@withContext null
+            } else {
+              Log.d("OCR", "auto source detect failed, retrying as source=${to.code}: ${e.message}")
+              try {
+                planCall(OcrSourceSelection.Specific(uniffi.translator_core.LanguageCode(to.code)), to)
+              } catch (retry: uniffi.bindings.CatalogException) {
+                Log.d("OCR", "ocr plan failed: ${retry.message}")
+                if (retry is uniffi.bindings.CatalogException.MissingAsset) onOcrUnavailable()
+                onAutoSourceFailed()
+                ocrImage.close()
+                return@withContext null
+              }
             }
           }
         Log.i("TranslationCoordinator", "ocrWordsOnly: ${System.currentTimeMillis() - ocrStart}ms")

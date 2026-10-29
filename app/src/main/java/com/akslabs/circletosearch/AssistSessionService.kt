@@ -242,6 +242,9 @@ class AssistSessionService : VoiceInteractionSessionService() {
 
         private fun launchOverlayDirectly() {
             android.util.Log.d("AssistSessionService", "Launching OverlayActivity")
+            // The active window right now is the app the overlay will cover —
+            // snapshot it so close can bring that exact app back.
+            CircleToSearchAccessibilityService.instance?.seedForegroundPackageFromActiveWindow()
             val intent = Intent(context, OverlayActivity::class.java).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION)
