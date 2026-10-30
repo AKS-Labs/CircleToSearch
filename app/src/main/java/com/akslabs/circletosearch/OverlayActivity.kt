@@ -82,7 +82,7 @@ class OverlayActivity : ComponentActivity() {
                     CircleToSearchScreen(
                         capturedScreenshot = screenshotBitmap.value,
                         searchModeOverride = searchModeOverride.value,
-                        onClose = { 
+                        onClose = {
                             BitmapRepository.clear()
                             // Kill only the overlay: park this task behind the
                             // app in use (instant reveal, no launch animation),
