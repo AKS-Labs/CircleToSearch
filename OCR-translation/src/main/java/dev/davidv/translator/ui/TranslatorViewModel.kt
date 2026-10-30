@@ -279,9 +279,16 @@ class TranslatorViewModel(
     viewModelScope.launch {
       languageStateManager.catalog.collect { catalog ->
         if (catalog == null) return@collect
-        if (_targets.value != null) return@collect
-        val settings = settingsManager.settings.value
-        _targets.value = TargetTabs.of(catalog.languageByCode(settings.defaultTargetLanguageCode) ?: catalog.english)
+        if (_targets.value == null) {
+          val settings = settingsManager.settings.value
+          _targets.value = TargetTabs.of(catalog.languageByCode(settings.defaultTargetLanguageCode) ?: catalog.english)
+        }
+        // A pending camera deep link needs a source even with zero downloaded
+        // packs: the camera works on bundled OCR/detection alone and its own
+        // language picker handles the rest.
+        if (_openLiveCameraRequest.value) {
+          ensureLiveCameraSourceLanguage()
+        }
       }
     }
 
@@ -598,6 +605,23 @@ class TranslatorViewModel(
 
   fun requestLiveCamera() {
     _openLiveCameraRequest.value = true
+    // The generic source resolution only runs once packs exist, so on a
+    // zero-pack install the deep-linked camera would wait on a null `from`
+    // forever. Seed a default from the (bundled) catalog right away; if the
+    // catalog hasn't loaded yet, the catalog collector retries.
+    ensureLiveCameraSourceLanguage()
+  }
+
+  /** Seeds a source language for the deep-linked camera when none is set:
+   *  the settings' preferred source if it resolves in the catalog, else
+   *  English. The camera screen's own picker overrides it. */
+  private fun ensureLiveCameraSourceLanguage() {
+    if (_from.value != null) return
+    val catalog = languageStateManager.catalog.value ?: return
+    val settings = settingsManager.settings.value
+    _from.value =
+      settings.defaultSourceLanguageCode?.let { catalog.languageByCode(it) }
+        ?: catalog.english
   }
 
   fun clearLiveCameraRequest() {

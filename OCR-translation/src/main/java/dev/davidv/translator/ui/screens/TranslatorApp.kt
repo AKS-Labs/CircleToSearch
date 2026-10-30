@@ -563,19 +563,24 @@ fun TranslatorApp(
   val openLiveCameraRequest by viewModel.openLiveCameraRequest.collectAsState()
 
   // Map navigation state to route. A pending camera deep link (set by MainActivity
-  // before the first frame) does NOT change the start destination: it rides the
-  // normal loading/main flow — the exact same initialization as opening the app
-  // and tapping the home screen's camera button — and the effect below folds the
-  // request into a navigate("live_camera") the moment languages are READY.
-  // Starting on live_camera while the language check was still LOADING landed on
-  // a black frame that never resolved (nothing else finishes that check for a
-  // launch that skips the normal screens).
+  // before the first frame) starts DIRECTLY on the camera: no loading gate and no
+  // home screen — riding the normal loading flow first is what made the CTS camera
+  // button flash the module before opening the camera. from/to resolve from the
+  // bundled catalog within a frame or two — with zero downloaded packs too
+  // (requestLiveCamera seeds a default source, since the generic resolution only
+  // runs once packs exist) — and the camera composable holds its own spinner until
+  // then. The nav effect below keeps the request alive until the first entry
+  // appears.
   val startDestination =
     remember {
-      when (navigationState) {
-        TranslatorViewModel.NavigationState.NO_LANGUAGES -> "no_languages"
-        TranslatorViewModel.NavigationState.LOADING -> "loading"
-        TranslatorViewModel.NavigationState.READY -> "main"
+      if (viewModel.openLiveCameraRequest.value) {
+        "live_camera"
+      } else {
+        when (navigationState) {
+          TranslatorViewModel.NavigationState.NO_LANGUAGES -> "no_languages"
+          TranslatorViewModel.NavigationState.LOADING -> "loading"
+          TranslatorViewModel.NavigationState.READY -> "main"
+        }
       }
     }
 
@@ -591,26 +596,26 @@ fun TranslatorApp(
       "nav effect: state=$navigationState route=$currentRoute request=$openLiveCameraRequest",
     )
     if (openLiveCameraRequest) {
-      if (navigationState == TranslatorViewModel.NavigationState.READY) {
-        // Same as the home screen's camera entry: tear down any lingering
-        // overlay session (floating bubble / screen-translate chrome) — its
-        // touchable result or selection window would sit over the camera and
-        // swallow taps (including the language pills').
-        (dev.davidv.translator.OverlayWindowHosts.primary as? dev.davidv.translator.accessibilityOverlay.TranslatorOverlayHost)
-          ?.deactivate()
-      }
-      // Fold the camera deep link into this one transition so the home screen
-      // is never composed. While the NavHost has no back stack yet
-      // (currentRoute == null) the request must be KEPT — clearing it here
-      // dropped the deep link and left the user on the home screen; this
-      // effect re-runs when the first entry appears.
+      // Tear down any lingering overlay session (floating bubble /
+      // screen-translate chrome) — its touchable result or selection window
+      // would sit over the camera and swallow taps (including the language
+      // pills'). Done for every state: the camera is reachable with zero
+      // downloaded packs as well.
+      (dev.davidv.translator.OverlayWindowHosts.primary as? dev.davidv.translator.accessibilityOverlay.TranslatorOverlayHost)
+        ?.deactivate()
+      // Fold the camera deep link into this one transition so the module's
+      // home/loading/download screens are never composed. While the NavHost
+      // has no back stack yet (currentRoute == null) the request must be KEPT
+      // — clearing it here dropped the deep link and left the user on the
+      // home screen; this effect re-runs when the first entry appears.
       when {
         currentRoute == null -> Unit
-        // Already on the camera (e.g. a repeated deep link) — just consume it.
+        // Already on the camera (start destination or repeated deep link).
         currentRoute == "live_camera" -> viewModel.clearLiveCameraRequest()
-        navigationState == TranslatorViewModel.NavigationState.READY -> {
-          // From the loading gate go straight to the camera so the home screen
-          // is never composed; from anywhere else stack the camera on top.
+        // Navigate from ANY state — including no_languages: the camera works
+        // without downloaded packs (OCR and detection ship in the APK) and its
+        // own language picker handles picking/downloading languages there.
+        else -> {
           if (currentRoute == "loading") {
             navController.navigate("live_camera") {
               popUpTo("loading") { inclusive = true }
@@ -620,20 +625,6 @@ fun TranslatorApp(
           }
           viewModel.clearLiveCameraRequest()
         }
-        navigationState != TranslatorViewModel.NavigationState.LOADING -> {
-          // no_languages (or another terminal state): packs must be downloaded
-          // before the live camera works — drop the request. If the camera
-          // route was the start destination (deep link while still LOADING),
-          // leave it for the download screen.
-          viewModel.clearLiveCameraRequest()
-          if (currentRoute == "live_camera") {
-            navController.navigate("no_languages") {
-              popUpTo("live_camera") { inclusive = true }
-            }
-          }
-        }
-        // else: still loading — keep the request; this effect re-runs when the
-        // navigation state or back stack changes.
       }
       return@LaunchedEffect
     }
@@ -1034,7 +1025,18 @@ fun TranslatorApp(
                     (context as? android.app.Activity)?.finish()
                   }
                 },
-                onImageCaptured = viewModel::setSharedImageUri,
+                onImageCaptured = { uri ->
+                  viewModel.setSharedImageUri(uri)
+                  // A capture shows the image on the module's main screen (the
+                  // in-app camera flow pops back to it). When the camera was
+                  // deep-linked from Circle to Search there is no main beneath
+                  // — create it instead of finishing back to the overlay.
+                  if (!navController.popBackStack("main", inclusive = false)) {
+                    navController.navigate("main") {
+                      popUpTo("live_camera") { inclusive = true }
+                    }
+                  }
+                },
               )
             } else {
               // Deep-linked in while the language check is still running: the

@@ -13,6 +13,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /**
@@ -121,6 +122,10 @@ class ActivityLanguagePicker(
         onToggleFavorite = { language, favorite -> helper.setFavorite(language, favorite) },
         onDelete = { language -> languageStateManager.deleteLanguage(language) },
         onPick = onPick,
+        // Availability refreshes (show()'s own rescan, download completions)
+        // land in languageState after the initial rows were built — rebuild
+        // so downloaded languages flip to installed without a reopen.
+        rowsRefresh = languageStateManager.languageState.map { },
       )
     }
   }

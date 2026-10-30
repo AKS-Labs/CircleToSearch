@@ -11,6 +11,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 
 interface OverlayMenuHost {
@@ -77,6 +78,7 @@ class OverlayMenuManager(
     onToggleFavorite: (Language, Boolean) -> Unit,
     onDelete: (Language) -> Unit,
     onPick: (Language?) -> Unit,
+    rowsRefresh: Flow<Unit>? = null,
   ) {
     dismiss()
 
@@ -196,6 +198,19 @@ class OverlayMenuManager(
               }
 
               else -> Unit
+            }
+          }
+        }
+        // Rebuild rows whenever language availability changes. The completion
+        // event above fires before LanguageStateManager's own rescan finishes,
+        // so the row built from it can still say "not installed" — without
+        // this the open picker never picked up the refreshed state, and a
+        // downloaded language kept its download button until the picker was
+        // reopened.
+        rowsRefresh?.let { refresh ->
+          launch {
+            refresh.collect {
+              handle.setRows(liveRowsProvider())
             }
           }
         }

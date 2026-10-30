@@ -96,10 +96,18 @@ class MainActivity : ComponentActivity() {
     // The camera deep link only sets the request; it rides the SAME initialization
     // as a normal launch (MigrationGate blocking screen and all). Skipping the gate
     // to show the camera on the first frame composed the app while migration was
-    // still converting models — that mid-migration catalog check resolved
-    // NO_LANGUAGES and stranded the user on the download screen. TranslatorApp
-    // folds the request into live_camera as soon as languages are READY.
-    if (openLiveCamera) {
+    // still converting models. TranslatorApp starts directly on live_camera for a
+    // pending request — from/to resolve from the bundled catalog even with no
+    // packs downloaded, and the camera's own language picker handles downloads.
+    // Deep-linked camera launch: keep the window background dark (the camera
+    // screen is black — a white first frame flashes otherwise) and let the
+    // migration gate compose the app right away instead of flashing its
+    // blocking screen for the plan check's IO roundtrip.
+    val deepLinkCamera = openLiveCamera
+    if (deepLinkCamera) {
+      window.setBackgroundDrawable(
+        android.graphics.drawable.ColorDrawable(android.graphics.Color.BLACK),
+      )
       viewModel.requestLiveCamera()
       openLiveCamera = false
     }
@@ -108,6 +116,7 @@ class MainActivity : ComponentActivity() {
       TranslatorTheme {
         MigrationGate(
           filePathManager = app.filePathManager,
+          showContentImmediately = deepLinkCamera,
           onMigrated = {
             TranslatorTtsEngine.notifyVoiceDataChanged(applicationContext)
             // The Application holds its own catalog instance (used by e.g. the

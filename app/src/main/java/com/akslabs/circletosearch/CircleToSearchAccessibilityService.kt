@@ -1811,7 +1811,16 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
      */
     private val ownActivityTracker = object : android.app.Application.ActivityLifecycleCallbacks {
         override fun onActivityResumed(activity: android.app.Activity) {
-            if (activity !is OverlayActivity) {
+            if (activity is OverlayActivity) return
+            // Mid-session own-activity launches (the camera deep link into the
+            // translator module) must not repoint the close target: the seed
+            // captured at trigger is the source of truth for the whole session
+            // — the same reason window events are gated on sessionActive below.
+            // Recording the module screen here made close reorder the module's
+            // (already finished) task back over the overlay after a camera
+            // detour — relaunching the module or its download screen instead of
+            // the app the user started from.
+            if (!sessionActive) {
                 lastForegroundComponent = android.content.ComponentName(activity as android.content.Context, activity::class.java)
             }
         }
