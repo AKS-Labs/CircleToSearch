@@ -425,6 +425,11 @@ class TranslatorViewModel(
         val carriedTarget = previousSourceAsTarget(newFrom, message.change)
         if (carriedTarget != null) _targets.update { it?.select(carriedTarget) }
         _from.value = newFrom
+        // Persist the pick so the camera (and a fresh process) reopen with it
+        // — the in-app screens previously forgot it on every relaunch.
+        settingsManager.updateSettings(
+          settingsManager.settings.value.copy(defaultSourceLanguageCode = newFrom.code),
+        )
         _output.value = null
         triggerTranslation()
       }
@@ -437,6 +442,10 @@ class TranslatorViewModel(
 
       is TranslatorMessage.ToLang -> {
         _targets.update { it?.select(message.language) }
+        // Persist the pick so the camera (and a fresh process) reopen with it.
+        settingsManager.updateSettings(
+          settingsManager.settings.value.copy(defaultTargetLanguageCode = message.language.code),
+        )
         _output.value = null
         triggerTranslation()
       }
