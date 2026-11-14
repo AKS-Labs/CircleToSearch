@@ -64,6 +64,8 @@ import com.akslabs.circletosearch.data.GestureType
 import com.akslabs.circletosearch.data.OverlayConfigurationManager
 import com.akslabs.circletosearch.data.OverlaySegment
 import com.akslabs.circletosearch.utils.ImageUtils
+import com.akslabs.circletosearch.utils.InstantOcrScanner
+import com.akslabs.circletosearch.utils.InstantOcrStore
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
 import androidx.compose.animation.core.animate
@@ -1049,6 +1051,21 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
                             
                             // Store in Repository (In-Memory)
                             BitmapRepository.setScreenshot(copy)
+
+                            // Pre-scan: start the instant OCR NOW, in parallel
+                            // with the overlay launch — the overlay adopts it
+                            // through InstantOcrStore when it composes.
+                            val ocrScanState = InstantOcrStore.beginScan(copy)
+                            instantScanJob?.cancel()
+                            instantScanJob = instantOcrScope.launch {
+                                val output = InstantOcrScanner.scan(
+                                    applicationContext,
+                                    copy,
+                                ) { ocrScanState.regions = it }
+                                ocrScanState.words = output?.words
+                                ocrScanState.detection = output?.detection ?: emptyList()
+                                ocrScanState.done = true
+                            }
                             
                             // Launch Overlay Immediately
                             launchOverlay(searchModeOverride)
@@ -1143,6 +1160,13 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
     }
 
     private val stickerAnimScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+
+    // Capture-time instant-OCR scan: started the moment the screenshot lands so
+    // it overlaps the overlay's launch animation instead of starting from zero
+    // after the overlay composes. Results flow through InstantOcrStore into the
+    // screen; cancelled on the next capture and at overlay close.
+    private val instantOcrScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var instantScanJob: Job? = null
 
     private val stickerFrameClock = object : MonotonicFrameClock {
         override suspend fun <R> withFrameNanos(onFrame: (Long) -> R): R =
@@ -2208,6 +2232,8 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
      */
     fun closeOverlay(overlay: android.app.Activity) {
         sessionActive = false
+        // The overlay is going away: stop an in-flight capture-time OCR scan.
+        instantScanJob?.cancel()
         val own = lastForegroundComponent
         val pkg = own?.packageName ?: lastForegroundPackage
         if (returnToAppSuppressed) {

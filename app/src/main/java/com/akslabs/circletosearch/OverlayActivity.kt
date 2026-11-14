@@ -95,6 +95,7 @@ class OverlayActivity : ComponentActivity() {
                         searchModeOverride = searchModeOverride.value,
                         onClose = {
                             BitmapRepository.clear()
+                            com.akslabs.circletosearch.utils.InstantOcrStore.clear()
                             killWhenHidden = true
                             // Kill only the overlay: park this task behind the
                             // app in use (instant reveal, no launch animation),
@@ -208,6 +209,7 @@ class OverlayActivity : ComponentActivity() {
         translateBridge = null
         if (isFinishing) {
              com.akslabs.circletosearch.data.BitmapRepository.clear()
+             com.akslabs.circletosearch.utils.InstantOcrStore.clear()
              com.akslabs.circletosearch.utils.StorageUtils.clearAppCache(this)
         }
     }

@@ -200,6 +200,8 @@ import com.akslabs.circletosearch.utils.QrResultWithBounds
 import dev.davidv.translator.localizedName
 import com.akslabs.circletosearch.utils.QrScanner
 import com.akslabs.circletosearch.ui.qrResultShortLabel
+import com.akslabs.circletosearch.utils.InstantOcrScanner
+import com.akslabs.circletosearch.utils.InstantOcrStore
 import com.akslabs.circletosearch.utils.OcrLanguagePreferences
 import com.akslabs.circletosearch.utils.UIPreferences
 import com.akslabs.circletosearch.ui.components.MoreAppsBottomSheet
@@ -233,75 +235,6 @@ private const val TRANSLATE_TRIGGER_DELAY_MS = 400L
 
 /** Lets the Circle to Search chrome hide before the translator overlay draws. */
 private const val TRANSLATE_HIDE_DELAY_MS = 150L
-
-/**
- * Runs the translator module's OCR over [bmp] and returns its recognized source words —
- * no translation, no overlay bitmap. [onRegions] fires as soon as detection boxes arrive
- * (for the scan animation). Returns null on failure: missing OCR models and no-text both
- * show a toast.
- */
-private suspend fun runInstantScreenshotOcr(
-    context: android.content.Context,
-    bmp: Bitmap,
-    onRegions: (DetectedRegions) -> Unit,
-): ImageWordSelection? {
-    val app = context.applicationContext as? TranslatorApplication ?: return null
-    val coordinator = runCatching { app.translationCoordinator }.getOrNull() ?: return null
-    // The accessibility service exposes the configured target language when it is
-    // running, but the assistant launch path must also work with accessibility
-    // disabled — resolve the same setting from the translator application directly.
-    val target = CircleToSearchAccessibilityService.instance?.defaultTargetLanguage()
-        ?: runCatching {
-            app.languageCatalog?.languageByCode(
-                app.settingsManager.settings.value.defaultTargetLanguageCode
-            )
-        }.getOrNull()
-        ?: return null
-    var ocrMissing = false
-    var sourceDetectFailed = false
-    // User's OCR language whitelist: empty = auto, one = forced source (PULC and
-    // CLD skipped), many = detection narrowed to the checked languages.
-    val checkedLanguages = OcrLanguagePreferences.getChecked(context)
-    val sourceSelection = when (checkedLanguages.size) {
-        0 -> uniffi.translator_core.OcrSourceSelection.Auto
-        1 -> uniffi.translator_core.OcrSourceSelection.Specific(
-            uniffi.translator_core.LanguageCode(checkedLanguages.first()),
-        )
-        else -> uniffi.translator_core.OcrSourceSelection.Restricted(
-            checkedLanguages.map { uniffi.translator_core.LanguageCode(it) },
-        )
-    }
-    val result = coordinator.ocrWordsOnly(
-        bitmap = bmp,
-        to = target,
-        sourceSelection = sourceSelection,
-        onDetectedRegions = { boxes, w, h -> onRegions(DetectedRegions(w, h, boxes)) },
-        onOcrUnavailable = { ocrMissing = true },
-        onAutoSourceFailed = { sourceDetectFailed = true },
-    )
-    if (result == null) {
-        val messageId =
-            when {
-                ocrMissing -> dev.davidv.translator.R.string.ocr_models_missing
-                sourceDetectFailed -> R.string.label_language_detect_failed
-                else -> R.string.label_no_text_found
-            }
-        withContext(Dispatchers.Main) {
-            android.widget.Toast.makeText(
-                context,
-                context.getString(messageId),
-                android.widget.Toast.LENGTH_SHORT,
-            ).show()
-        }
-        return null
-    }
-    return ImageWordSelection(
-        imageWidth = result.imageWidth,
-        imageHeight = result.imageHeight,
-        sourceWords = result.sourceWords,
-        translatedWords = result.sourceWords,
-    )
-}
 
 /**
  * Fit (contain) mapping for a bitmap centered in a view — the app-side mirror of the
@@ -1042,8 +975,35 @@ fun CircleToSearchScreen(
         instantOcrDone = false
         wordSelected = false
         val bmp = screenshot ?: return@LaunchedEffect
-        instantWords = runInstantScreenshotOcr(context, bmp) { instantRegions = it }
-        instantOcrDone = true
+        val preScan = InstantOcrStore.stateFor(bmp)
+        if (preScan == null) {
+            // No capture-time scan runs for this image (gallery pick, assistant
+            // capture): scan here, exactly as before.
+            val output = InstantOcrScanner.scan(context, bmp) { instantRegions = it }
+            instantWords = output?.words
+            instantOcrDone = true
+        } else {
+            // Adopt the capture-time scan: it is already running (started when
+            // the screenshot landed, overlapping the overlay launch) — regions
+            // stream in for the scan animation, words land at completion. Never
+            // start a second scan over the same image.
+            while (true) {
+                if (instantRegions == null) {
+                    preScan.regions?.let { instantRegions = it }
+                }
+                val words = preScan.words
+                if (words != null) {
+                    instantWords = words
+                    instantOcrDone = true
+                    break
+                }
+                if (preScan.done) {
+                    instantOcrDone = true
+                    break
+                }
+                delay(32)
+            }
+        }
     }
 
     // The word overlay unmounts in these modes (dropping its selection) - drop ours too so
@@ -2535,7 +2495,7 @@ fun CircleToSearchScreen(
                                     val scanGeneration = entityScanGeneration
                                     scope.launch(kotlinx.coroutines.Dispatchers.IO) {
                                         val bmp = screenshot ?: return@launch
-                                        val sourceWords = cachedWords ?: runInstantScreenshotOcr(context, bmp) { }?.sourceWords
+                                        val sourceWords = cachedWords ?: InstantOcrScanner.scan(context, bmp) { }?.words?.sourceWords
                                         if (sourceWords == null) {
                                             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                                                 isExtractingEntities = false

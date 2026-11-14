@@ -164,6 +164,10 @@ class TranslationCoordinator(
     onMissingDetectedLanguage: (Language) -> Unit = {},
     onOcrUnavailable: () -> Unit = {},
     onDetectedRegions: (List<uniffi.translator_core.OrientedRect>, Int, Int) -> Unit = { _, _, _ -> },
+    /** Boxes already detected for THIS bitmap (e.g. reused from the Circle to
+     *  Search capture-time scan, remapped into its coordinates) — skips the
+     *  detector run. Null re-detects, as before. */
+    precomputedDetection: List<uniffi.translator_core.DetectedTextBox>? = null,
   ): ProcessedImageResult? =
     withContext(Dispatchers.IO) {
       _isTranslating.value = true
@@ -199,12 +203,13 @@ class TranslationCoordinator(
         NativeBitmap.unlockPixels(finalBitmap)
 
         val detection =
-          try {
-            catalog.ocrImageDetect(ocrImage, maxImageSize)
-          } catch (e: uniffi.bindings.CatalogException) {
-            Log.d("OCR", "detect failed: ${e.message}")
-            null
-          }
+          precomputedDetection
+            ?: try {
+              catalog.ocrImageDetect(ocrImage, maxImageSize)
+            } catch (e: uniffi.bindings.CatalogException) {
+              Log.d("OCR", "detect failed: ${e.message}")
+              null
+            }
         detection?.let { boxes ->
           onDetectedRegions(boxes.map { it.orientedBox }, finalBitmap.width, finalBitmap.height)
         }
@@ -420,6 +425,7 @@ class TranslationCoordinator(
             extractedText = plan.extractedText,
             imageWidth = bitmap.width,
             imageHeight = bitmap.height,
+            detection = detection ?: emptyList(),
           )
         ocrImage.close()
         result
@@ -583,4 +589,7 @@ data class OcrWordsResult(
   val extractedText: String,
   val imageWidth: Int,
   val imageHeight: Int,
+  /** Full-resolution detection boxes from the same scan — lets callers skip a
+   *  redundant detector run when translating the exact same image later. */
+  val detection: List<uniffi.translator_core.DetectedTextBox> = emptyList(),
 )
