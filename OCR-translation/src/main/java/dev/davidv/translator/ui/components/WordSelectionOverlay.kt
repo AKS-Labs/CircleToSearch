@@ -47,7 +47,9 @@ import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
@@ -167,7 +169,9 @@ private enum class DragMode { START, END }
  * starts the selection); tapping another word moves the selection; tapping empty space clears it.
  * The selection stays with draggable end handles, and a floating action bar (Copy / Share / Web
  * search) tracks it. A plain drag is left for the container to pan/zoom; only a drag that grabs a
- * handle edits the selection. Nothing is auto-copied.
+ * handle edits the selection. With [longPressDrag], a long-press on a word anchors the selection
+ * and dragging extends it word-by-word (with loupe) — enabled where the container's plain drag
+ * isn't more valuable, e.g. Circle to Search. Nothing is auto-copied.
  *
  * `words` are in image-pixel space; mapped with the image's ContentScale.Fit transform, so this
  * stays aligned inside the image's transformed (zoom/pan) container. `scale` is the container's
@@ -182,9 +186,16 @@ fun WordSelectionOverlay(
   modifier: Modifier = Modifier,
   onSelectionChanged: (Boolean) -> Unit = {},
   clearSelectionSignal: Int = 0,
+  /** Opt-in native-style selection: holding still on a word past the long-press
+   *  timeout anchors a selection and dragging extends it word-by-word (events are
+   *  consumed from the anchor on, so the container's own drag gesture never fires).
+   *  Off by default — the translator overlays deliberately leave plain drags to
+   *  their containers (pan/zoom). */
+  longPressDrag: Boolean = false,
 ) {
   val context = LocalContext.current
   val view = LocalView.current
+  val haptic = LocalHapticFeedback.current
   val handlePainter = painterResource(R.drawable.selection_handle)
   // Loupe under the dragging finger so the text/handle isn't obscured. Native Magnifier is API
   // 28+; older devices simply get no loupe.
@@ -259,7 +270,7 @@ fun WordSelectionOverlay(
     modifier =
       modifier
         .onGloballyPositioned { layoutCoords = it }
-        .pointerInput(words, imageWidth, imageHeight) {
+        .pointerInput(words, imageWidth, imageHeight, longPressDrag) {
           val slop = viewConfiguration.touchSlop
 
           fun transform() = fitTransform(size.width.toFloat(), size.height.toFloat(), imageWidth, imageHeight)
@@ -353,14 +364,55 @@ fun WordSelectionOverlay(
             } else {
               // Not a handle: observe without consuming so the container can pan/zoom; a tap (no
               // drag) selects the word under the finger, or clears when it's on empty space.
+              // With [longPressDrag], holding still on a word past the long-press timeout
+              // anchors a selection and dragging then extends it word-by-word — events are
+              // consumed from the anchor on, so the container's own drag gesture (pan/zoom or
+              // circle drawing) never fires, exactly like the handle drags above.
               var moved = false
+              var anchored = false
+              val downWord = wordAt(down.position)
               while (true) {
                 val event = awaitPointerEvent()
                 val change = event.changes.firstOrNull { it.id == down.id } ?: break
                 if (!change.pressed) break
                 if (!moved && (change.position - down.position).getDistance() > slop) moved = true
+                if (!anchored && longPressDrag && !moved &&
+                  downWord != null &&
+                  change.uptimeMillis - down.uptimeMillis >=
+                    android.view.ViewConfiguration.getLongPressTimeout()
+                ) {
+                  // Long-press anchor: select the word under the finger, take over the
+                  // gesture, and let the drag extend the selection.
+                  anchored = true
+                  dragging = true
+                  haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                  selStart = downWord
+                  selEnd = downWord
+                  recomputeRect()
+                }
+                if (!anchored) continue
+                change.consume()
+                val anchor = selStart
+                if (anchor != null) {
+                  val tt = transform()
+                  val axis = selectionWordAxis(words, anchor.toUInt())
+                  selectionNearestWord(
+                    words,
+                    tt.unmapX(change.position.x),
+                    tt.unmapY(change.position.y),
+                    axis,
+                  )?.let { nw ->
+                    selStart = min(anchor, nw.toInt())
+                    selEnd = max(anchor, nw.toInt())
+                    recomputeRect()
+                  }
+                }
+                showMagnifier(change.position)
               }
-              if (!moved) {
+              if (anchored) {
+                dragging = false
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) magnifier?.dismiss()
+              } else if (!moved) {
                 val w = wordAt(down.position)
                 selStart = w
                 selEnd = w

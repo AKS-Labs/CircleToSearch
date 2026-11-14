@@ -1982,6 +1982,9 @@ fun CircleToSearchScreen(
                                     }
                                 },
                                 clearSelectionSignal = wordSelectionClearSignal,
+                                // Long-press a word to anchor, drag to extend — the circle
+                                // drag must not fire for the same touch once anchored.
+                                longPressDrag = true,
                             )
                         } else if (!instantOcrDone) {
                             instantRegions?.let { regions ->
