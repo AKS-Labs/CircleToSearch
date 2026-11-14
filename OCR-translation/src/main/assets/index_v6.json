@@ -1,6 +1,6 @@
 {
   "formatVersion": 6,
-  "generatedAt": 1794645218,
+  "generatedAt": 1794646849,
   "dictionaryVersion": 1,
   "sources": {
     "languageIndexVersion": 1,
@@ -12409,22 +12409,6 @@
       "engine": "ppocr",
       "role": "detector",
       "files": [
-        {
-          "name": "PP-OCRv5_mobile_det_int8.mnn",
-          "sizeBytes": 1324660,
-          "installPath": "ppocr/PP-OCRv5/PP-OCRv5_mobile_det_int8.mnn",
-          "url": "https://offline-translator.davidv.dev/ocr/1/PP-OCRv5/PP-OCRv5_mobile_det_int8.mnn",
-          "role": "detector",
-          "priority": 0
-        },
-        {
-          "name": "PP-OCRv6_tiny_det_half_int8.mnn",
-          "sizeBytes": 543128,
-          "installPath": "ppocr/PP-OCRv6/PP-OCRv6_tiny_det_half_int8.mnn",
-          "url": "https://offline-translator.davidv.dev/ocr/1/PP-OCRv6/PP-OCRv6_tiny_det_half_int8.mnn",
-          "role": "detector",
-          "priority": 1
-        },
         {
           "name": "PP-OCRv6_tiny_det_int8.mnn",
           "sizeBytes": 543176,
