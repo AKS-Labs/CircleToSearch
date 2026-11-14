@@ -192,6 +192,11 @@ fun WordSelectionOverlay(
    *  Off by default — the translator overlays deliberately leave plain drags to
    *  their containers (pan/zoom). */
   longPressDrag: Boolean = false,
+  /** Image-space rect handed over by the host to select the words intersecting it
+   *  (Circle to Search turns a degenerate stroke — long-press drift, a flat line —
+   *  into "select the words under it"). Consumed via [onSelectRegionHandled]. */
+  pendingSelectRegion: android.graphics.Rect? = null,
+  onSelectRegionHandled: () -> Unit = {},
 ) {
   val context = LocalContext.current
   val view = LocalView.current
@@ -239,6 +244,55 @@ fun WordSelectionOverlay(
   val selectedText = rememberUpdatedState(selection?.text ?: "")
   val rectState = rememberUpdatedState(contentRect)
 
+  // Content rect for the action bar. Lives at composable scope (not inside the gesture
+  // pointerInput) so programmatic selections — the host-driven region below — can
+  // position it too; layoutCoords.size is the same node as the gesture's `size`.
+  fun recomputeRect() {
+    val s = selStart ?: return
+    val e = selEnd ?: return
+    val coords = layoutCoords ?: return
+    val size = coords.size
+    val t = fitTransform(size.width.toFloat(), size.height.toFloat(), imageWidth, imageHeight)
+    val box = selectionResolve(words, s.toUInt(), e.toUInt())?.bounds ?: return
+    val l = t.mapX(box.left.toFloat())
+    val top = t.mapY(box.top.toFloat())
+    val r = t.mapX(box.right.toFloat())
+    val b = t.mapY(box.bottom.toFloat())
+    // Map the local bounds through the container's zoom/pan to root-view coords.
+    val topLeft = coords.localToRoot(Offset(l, top))
+    val bottomRight = coords.localToRoot(Offset(r, b))
+    contentRect =
+      android.graphics.Rect(
+        topLeft.x.toInt(),
+        topLeft.y.toInt(),
+        bottomRight.x.toInt(),
+        bottomRight.y.toInt(),
+      )
+  }
+
+  // Host-driven region selection: the words whose boxes intersect the region become
+  // the selection (empty region → clears). The host maps the stroke into image space.
+  LaunchedEffect(pendingSelectRegion) {
+    val region = pendingSelectRegion ?: return@LaunchedEffect
+    var first: Int? = null
+    var last: Int? = null
+    words.forEachIndexed { i, w ->
+      val b = w.bounds
+      val l = b.cx - b.width / 2f
+      val r = b.cx + b.width / 2f
+      val tp = b.cy - b.height / 2f
+      val btm = b.cy + b.height / 2f
+      if (r >= region.left && l <= region.right && btm >= region.top && tp <= region.bottom) {
+        if (first == null) first = i
+        last = i
+      }
+    }
+    selStart = first
+    selEnd = last
+    if (first != null) recomputeRect()
+    onSelectRegionHandled()
+  }
+
   // Drive the floating action bar: present while there's a selection and no active drag.
   var actionMode by remember { mutableStateOf<ActionMode?>(null) }
   LaunchedEffect(hasSelection, dragging, selStart, selEnd) {
@@ -274,28 +328,6 @@ fun WordSelectionOverlay(
           val slop = viewConfiguration.touchSlop
 
           fun transform() = fitTransform(size.width.toFloat(), size.height.toFloat(), imageWidth, imageHeight)
-
-          fun recomputeRect() {
-            val s = selStart ?: return
-            val e = selEnd ?: return
-            val coords = layoutCoords ?: return
-            val t = transform()
-            val box = selectionResolve(words, s.toUInt(), e.toUInt())?.bounds ?: return
-            val l = t.mapX(box.left.toFloat())
-            val top = t.mapY(box.top.toFloat())
-            val r = t.mapX(box.right.toFloat())
-            val b = t.mapY(box.bottom.toFloat())
-            // Map the local bounds through the container's zoom/pan to root-view coords.
-            val topLeft = coords.localToRoot(Offset(l, top))
-            val bottomRight = coords.localToRoot(Offset(r, b))
-            contentRect =
-              android.graphics.Rect(
-                topLeft.x.toInt(),
-                topLeft.y.toInt(),
-                bottomRight.x.toInt(),
-                bottomRight.y.toInt(),
-              )
-          }
 
           // Loupe raised a full bubble-height above the finger so it isn't occluded. The finger's
           // root-view position comes through the container transform, so it tracks under zoom.

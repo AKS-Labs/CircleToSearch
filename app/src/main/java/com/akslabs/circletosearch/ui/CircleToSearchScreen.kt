@@ -807,6 +807,9 @@ fun CircleToSearchScreen(
     // Bumped to force the word overlay to drop its selection — text selection and a drawn
     // circle are mutually exclusive, so completing a circle clears any active selection.
     var wordSelectionClearSignal by remember { mutableStateOf(0) }
+    // A degenerate stroke (long-press drift, flat line) mapped into image space: handed to
+    // the word overlay to select the words under it instead of cropping a useless image.
+    var pendingWordSelectRegion by remember { mutableStateOf<android.graphics.Rect?>(null) }
 
     // Circle-draw gesture handlers, shared by the drag-detector wrapper above the drawing
     // layer (see "Circle-draw gestures" below). Plain drags draw; handle grabs and taps are
@@ -897,24 +900,45 @@ fun CircleToSearchScreen(
                 maxY = kotlin.math.max(maxY, p.y)
             }
 
-            val border = 20
-            val rect = android.graphics.Rect(
-                (minX - border).toInt().coerceAtLeast(0),
-                (minY - border).toInt().coerceAtLeast(0),
-                (maxX + border).toInt().coerceAtMost(viewW),
-                (maxY + border).toInt().coerceAtMost(viewH)
-            )
+            // Degenerate strokes — a long-press that drifted past slop, or a flat
+            // horizontal line — crop into a uselessly thin image. Select the words under
+            // the stroke instead of searching. Checked on the RAW bounds (the +border
+            // rect below inflates a hairline stroke into something word-sized).
+            val rawW = maxX - minX
+            val rawH = maxY - minY
+            val minDim = with(density) { 16.dp.toPx() }
+            val degenerate =
+                bmp != null && instantWords != null && (rawH < minDim || rawW < minDim)
+            if (degenerate) {
+                currentPathPoints.clear() // Hide the drawn stroke
+                val t = fitMapping(viewW.toFloat(), viewH.toFloat(), bmp.width.toFloat(), bmp.height.toFloat())
+                val pad = with(density) { 8.dp.toPx() }
+                pendingWordSelectRegion = android.graphics.Rect(
+                    t.unmapX(minX - pad).toInt().coerceIn(0, bmp.width),
+                    t.unmapY(minY - pad).toInt().coerceIn(0, bmp.height),
+                    t.unmapX(maxX + pad).toInt().coerceIn(0, bmp.width),
+                    t.unmapY(maxY + pad).toInt().coerceIn(0, bmp.height),
+                )
+            } else {
+                val border = 20
+                val rect = android.graphics.Rect(
+                    (minX - border).toInt().coerceAtLeast(0),
+                    (minY - border).toInt().coerceAtLeast(0),
+                    (maxX + border).toInt().coerceAtMost(viewW),
+                    (maxY + border).toInt().coerceAtMost(viewH)
+                )
 
-            if (rect.width() > 10 && rect.height() > 10) {
-                selectionRect = rect
-                currentPathPoints.clear() // Hide the drawn circle
-                if (bmp != null) {
-                    val t = fitMapping(viewW.toFloat(), viewH.toFloat(), bmp.width.toFloat(), bmp.height.toFloat())
-                    selectedBitmap = ImageUtils.cropBitmap(bmp, fitCrop(rect, t, bmp.width, bmp.height))
-                }
-                scope.launch {
-                    selectionAnim.animateTo(1f, tween(600))
-                    isSearching = true
+                if (rect.width() > 10 && rect.height() > 10) {
+                    selectionRect = rect
+                    currentPathPoints.clear() // Hide the drawn circle
+                    if (bmp != null) {
+                        val t = fitMapping(viewW.toFloat(), viewH.toFloat(), bmp.width.toFloat(), bmp.height.toFloat())
+                        selectedBitmap = ImageUtils.cropBitmap(bmp, fitCrop(rect, t, bmp.width, bmp.height))
+                    }
+                    scope.launch {
+                        selectionAnim.animateTo(1f, tween(600))
+                        isSearching = true
+                    }
                 }
             }
         }
@@ -927,6 +951,7 @@ fun CircleToSearchScreen(
             selectedBitmap = null
             isSearching = false
             currentPathPoints.clear()
+            pendingWordSelectRegion = null
             selectionAnim.snapTo(0f)
             // The canvas image changed: drop entities extracted for the previous image and
             // invalidate any extraction still in flight.
@@ -1985,6 +2010,8 @@ fun CircleToSearchScreen(
                                 // Long-press a word to anchor, drag to extend — the circle
                                 // drag must not fire for the same touch once anchored.
                                 longPressDrag = true,
+                                pendingSelectRegion = pendingWordSelectRegion,
+                                onSelectRegionHandled = { pendingWordSelectRegion = null },
                             )
                         } else if (!instantOcrDone) {
                             instantRegions?.let { regions ->
