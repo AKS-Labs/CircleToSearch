@@ -91,18 +91,22 @@ private fun copyToClipboard(
 }
 
 private const val MENU_COPY = 1
-private const val MENU_SHARE = 2
-private const val MENU_SEARCH = 3
+private const val MENU_SELECT_ALL = 2
+private const val MENU_SHARE = 3
+private const val MENU_SEARCH = 4
 
 /**
- * A floating text-selection action bar (Copy / Share / Web search) over the image, mirroring the
- * system text toolbar. `textProvider`/`rectProvider` are read live so the bar follows the
- * selection. Returns a callback; the caller drives `startActionMode`.
+ * A floating text-selection action bar (Copy / Select all / Share / Web search) over the image,
+ * mirroring the system text toolbar. `textProvider`/`rectProvider` are read live so the bar
+ * follows the selection; Select all hides itself once everything is selected. Returns a
+ * callback; the caller drives `startActionMode`.
  */
 private class SelectionActionModeCallback(
   private val context: Context,
   private val textProvider: () -> String,
   private val rectProvider: () -> android.graphics.Rect,
+  private val onSelectAll: () -> Unit,
+  private val canSelectAll: () -> Boolean,
   private val onFinished: () -> Unit,
 ) : ActionMode.Callback2() {
   override fun onCreateActionMode(
@@ -110,15 +114,20 @@ private class SelectionActionModeCallback(
     menu: Menu,
   ): Boolean {
     menu.add(0, MENU_COPY, 0, android.R.string.copy)
-    menu.add(0, MENU_SHARE, 1, "Share")
-    menu.add(0, MENU_SEARCH, 2, "Web search")
+    menu.add(0, MENU_SELECT_ALL, 1, R.string.select_all)
+    menu.add(0, MENU_SHARE, 2, "Share")
+    menu.add(0, MENU_SEARCH, 3, "Web search")
     return true
   }
 
   override fun onPrepareActionMode(
     mode: ActionMode,
     menu: Menu,
-  ): Boolean = false
+  ): Boolean {
+    // Recomputed on every invalidateContentRect() — i.e. whenever the selection changes.
+    menu.findItem(MENU_SELECT_ALL)?.isVisible = canSelectAll()
+    return true
+  }
 
   override fun onActionItemClicked(
     mode: ActionMode,
@@ -127,6 +136,12 @@ private class SelectionActionModeCallback(
     val text = textProvider()
     when (item.itemId) {
       MENU_COPY -> copyToClipboard(context, text)
+      MENU_SELECT_ALL -> {
+        onSelectAll()
+        // Keep the mode: the selection just grew; the invalidation from the state
+        // change hides the item and re-anchors the bar over the full selection.
+        return true
+      }
       MENU_SHARE -> {
         val intent =
           Intent(Intent.ACTION_SEND).apply {
@@ -304,12 +319,25 @@ fun WordSelectionOverlay(
               context = context,
               textProvider = { selectedText.value },
               rectProvider = { rectState.value },
+              onSelectAll = {
+                if (words.isNotEmpty()) {
+                  selStart = 0
+                  selEnd = words.size - 1
+                  recomputeRect()
+                }
+              },
+              canSelectAll = {
+                words.isNotEmpty() && !(selStart == 0 && selEnd == words.size - 1)
+              },
               onFinished = { actionMode = null },
             ),
             ActionMode.TYPE_FLOATING,
           )
       } else {
-        actionMode?.invalidateContentRect()
+        // invalidate() (not invalidateContentRect(), which only re-queries the position)
+        // so onPrepareActionMode re-runs too and Select all hides once everything is
+        // selected — while onGetContentRect still repositions the bar.
+        actionMode?.invalidate()
       }
     } else {
       actionMode?.finish()

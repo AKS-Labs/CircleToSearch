@@ -119,6 +119,7 @@
     <string name="camera_permission_rationale">Camera permission is needed for live translate.</string>
     <string name="camera_need_ocr_models">You need to download the text-recognition models for this language</string>
     <string name="camera_translation_pack_missing">Download the %1$s translation pack to see translated text</string>
+    <string name="select_all">Select all</string>
     <string name="browser_no_source_language">No source language available. Install one from the main screen first, or set a default source language in settings.</string>
     <string name="browser_reader_unavailable">Reader mode unavailable for this page</string>
     <string name="browser_translate_image">Translate image</string>
