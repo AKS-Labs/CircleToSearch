@@ -40,11 +40,14 @@ sealed class PrivacySearchEngine(
     object Mojeek : PrivacySearchEngine(R.string.engine_mojeek, R.drawable.ic_engine_mojeek)
 
     /** DuckDuckGo's AI chat. Duck.ai blocks programmatic prompting (abuse prevention), so the
-     *  query is placed on the clipboard for the user to paste and send explicitly. */
+     *  query is pre-filled via the ?q= deep link and the user sends it themselves. */
     object DuckAI : PrivacySearchEngine(R.string.engine_duckai, R.drawable.ic_engine_duckai)
 
+    /** Brave's AI mode ("Ask Brave" at search.brave.com/ai). */
+    object BraveAI : PrivacySearchEngine(R.string.engine_braveai, R.drawable.ic_engine_brave)
+
     companion object {
-        fun values(): List<PrivacySearchEngine> = listOf(DuckDuckGo, Brave, Startpage, Mojeek, DuckAI)
+        fun values(): List<PrivacySearchEngine> = listOf(DuckDuckGo, Brave, Startpage, Mojeek, DuckAI, BraveAI)
     }
 
     val name: String
@@ -54,6 +57,7 @@ sealed class PrivacySearchEngine(
             is Startpage -> "Startpage"
             is Mojeek -> "Mojeek"
             is DuckAI -> "Duck.ai"
+            is BraveAI -> "Brave AI"
         }
 
     fun getDisplayName(context: Context): String = context.getString(displayNameRes)
@@ -69,6 +73,7 @@ sealed class PrivacySearchEngine(
             is Startpage -> "https://www.startpage.com/sp/search?query=$q"
             is Mojeek -> "https://www.mojeek.com/search?q=$q"
             is DuckAI -> "https://duck.ai/?q=$q"
+            is BraveAI -> "https://search.brave.com/ai?q=$q"
         }
     }
 }

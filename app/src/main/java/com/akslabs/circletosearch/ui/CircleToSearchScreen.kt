@@ -1113,6 +1113,157 @@ fun CircleToSearchScreen(
                     "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
             }
             isVerticalScrollBarEnabled = false
+            // Browser-style long-press menu on links and images, positioned at the pressed
+            // point. The focused node (anchor URL, link text, image source) resolves
+            // asynchronously via requestFocusNodeHref. Plain text falls through so the page's
+            // own text selection keeps working.
+            var touchX = 0f
+            var touchY = 0f
+            setOnTouchListener { _, event ->
+                touchX = event.x
+                touchY = event.y
+                false
+            }
+
+            fun copyText(text: String) {
+                val cm = ctx.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager ?: return
+                cm.setPrimaryClip(android.content.ClipData.newPlainText("url", text))
+            }
+
+            /** Opens inside the results WebView — the default for menu opens. Only the
+             *  explicit "Open in browser" item leaves the app. */
+            fun openInWebView(url: String) {
+                loadUrl(url)
+            }
+
+            fun openExternally(url: String) {
+                runCatching {
+                    ctx.startActivity(
+                        android.content.Intent(android.content.Intent.ACTION_VIEW, Uri.parse(url))
+                            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                    )
+                }
+            }
+
+            fun shareUrl(url: String) {
+                val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(android.content.Intent.EXTRA_TEXT, url)
+                }
+                runCatching {
+                    ctx.startActivity(android.content.Intent.createChooser(intent, null).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+                }
+            }
+
+            fun downloadImage(url: String) {
+                val name = url.substringAfterLast('/').substringBefore('?')
+                    .ifBlank { "image.jpg" }
+                    .let { if ('.' in it) it else "$it.jpg" }
+                val request = android.app.DownloadManager.Request(Uri.parse(url))
+                    .setTitle(name)
+                    .setDescription("Circle to Search")
+                    .setNotificationVisibility(
+                        android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED,
+                    )
+                    .setDestinationInExternalPublicDir(
+                        android.os.Environment.DIRECTORY_PICTURES,
+                        "CircleToSearch/$name",
+                    )
+                android.webkit.CookieManager.getInstance().getCookie(url)?.let { request.addRequestHeader("Cookie", it) }
+                request.addRequestHeader("User-Agent", settings.userAgentString)
+                (ctx.getSystemService(android.content.Context.DOWNLOAD_SERVICE) as? android.app.DownloadManager)
+                    ?.enqueue(request)
+                android.widget.Toast.makeText(
+                    ctx,
+                    ctx.getString(R.string.web_menu_image_saved),
+                    android.widget.Toast.LENGTH_SHORT,
+                ).show()
+            }
+
+            // Content-sized menu anchored at the long-pressed point. The width comes from
+            // measuring the REAL list item layout (its text size + padding) inflated with
+            // the longest label — measuring raw paint text undercuts the item's own
+            // paddings and truncates labels.
+            fun showMenu(actions: List<Pair<String, () -> Unit>>) {
+                val popup = android.widget.ListPopupWindow(ctx)
+                popup.anchorView = this
+                popup.horizontalOffset = touchX.toInt()
+                popup.verticalOffset = touchY.toInt()
+                val longest = actions.maxOfOrNull { it.first } ?: ""
+                val item = android.view.LayoutInflater.from(ctx)
+                    .inflate(android.R.layout.simple_list_item_1, null)
+                (item as? android.widget.TextView)?.text = longest
+                item.measure(
+                    android.view.View.MeasureSpec.makeMeasureSpec(0, android.view.View.MeasureSpec.UNSPECIFIED),
+                    android.view.View.MeasureSpec.makeMeasureSpec(0, android.view.View.MeasureSpec.UNSPECIFIED),
+                )
+                val density = ctx.resources.displayMetrics.density
+                // Deliberately wider than the longest label (+50% + 48dp): the popup's own
+                // background insets eat into the measured width, and users prefer generous
+                // over truncated.
+                val width = item.measuredWidth +
+                    (item.measuredWidth * 0.5f).toInt() +
+                    (48 * density).toInt()
+                popup.setContentWidth(width)
+                // Clamp near the right screen edge so the menu never clips off-screen.
+                popup.horizontalOffset =
+                    (touchX.toInt() + width)
+                        .coerceAtMost(ctx.resources.displayMetrics.widthPixels - width - 8)
+                        .coerceAtLeast(0)
+                popup.setAdapter(
+                    android.widget.ArrayAdapter(
+                        ctx,
+                        android.R.layout.simple_list_item_1,
+                        actions.map { it.first },
+                    )
+                )
+                popup.setOnItemClickListener { _, _, position, _ ->
+                    popup.dismiss()
+                    actions[position].second()
+                }
+                runCatching { popup.show() }
+            }
+
+            setOnLongClickListener {
+                val hit = hitTestResult
+                if (hit.type == android.webkit.WebView.HitTestResult.UNKNOWN_TYPE ||
+                    hit.type == android.webkit.WebView.HitTestResult.EDIT_TEXT_TYPE
+                ) {
+                    // Plain text / input: leave it to the page's own selection handling.
+                    return@setOnLongClickListener false
+                }
+                // Resolve the focused node asynchronously — the reply carries the anchor URL,
+                // the link's text and the image source when one is under the finger.
+                val msg = android.os.Message()
+                msg.target = android.os.Handler(android.os.Looper.getMainLooper()) { m ->
+                    val b = m.data
+                    val linkUrl = b?.getString("url")
+                    val imageUrl = b?.getString("src") ?: hit.extra
+                    val linkText = b?.getString("title")
+                    val actions = mutableListOf<Pair<String, () -> Unit>>()
+                    if (!imageUrl.isNullOrBlank() && imageUrl != linkUrl) {
+                        // In-webview opens: only the explicit "Open in browser" item
+                        // (links) ever leaves the app.
+                        actions += ctx.getString(R.string.web_menu_open_image) to { openInWebView(imageUrl) }
+                        actions += ctx.getString(R.string.web_menu_copy_image) to { copyText(imageUrl) }
+                        actions += ctx.getString(R.string.web_menu_save_image) to { downloadImage(imageUrl) }
+                    }
+                    if (!linkUrl.isNullOrBlank()) {
+                        actions += ctx.getString(R.string.web_menu_open_link) to { openInWebView(linkUrl) }
+                        actions += ctx.getString(R.string.web_menu_copy_link) to { copyText(linkUrl) }
+                        if (!linkText.isNullOrBlank()) {
+                            actions += ctx.getString(R.string.web_menu_copy_link_text) to { copyText(linkText) }
+                        }
+                        actions += ctx.getString(R.string.web_menu_share) to { shareUrl(linkUrl) }
+                        // The only item that leaves the app — explicit user choice.
+                        actions += ctx.getString(R.string.web_menu_open_browser) to { openExternally(linkUrl) }
+                    }
+                    if (actions.isNotEmpty()) showMenu(actions)
+                    true
+                }
+                requestFocusNodeHref(msg)
+                true
+            }
             // The tab strip tints itself to the loaded page's background.
             webViewClient = object : android.webkit.WebViewClient() {
                 override fun onPageFinished(view: WebView?, url: String?) {
@@ -3226,7 +3377,16 @@ fun CircleToSearchScreen(
             // In-screen sheet instead of ModalBottomSheet: a modal sheet's drag gesture
             // scrolls the sheet instead of the results WebView. This sheet has no drag of
             // its own — the WebView always owns vertical drags. Close via back, scrim tap.
-            BackHandler { webSearchEngine = null }
+            // Back mirrors the visual search: webview history first, sheet close only
+            // when there is nothing left to go back to.
+            BackHandler {
+                val currentWebView = webSearchEngine?.let { webSearchViews[it] }
+                if (currentWebView != null && currentWebView.canGoBack()) {
+                    currentWebView.goBack()
+                } else {
+                    webSearchEngine = null
+                }
+            }
             Box(
                 modifier = Modifier
                     .fillMaxSize()

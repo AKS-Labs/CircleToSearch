@@ -365,6 +365,17 @@
     <string name="engine_startpage">Startpage</string>
     <string name="engine_mojeek">Mojeek</string>
     <string name="engine_duckai">Duck.ai</string>
+    <!-- Web results long-press menu -->
+    <string name="web_menu_copy_link">Copy link URL</string>
+    <string name="web_menu_open_browser">Open in browser</string>
+    <string name="web_menu_share">Share</string>
+    <string name="web_menu_copy_image">Copy image URL</string>
+    <string name="web_menu_save_image">Save image</string>
+    <string name="web_menu_image_saved">Image saved to Pictures/CircleToSearch</string>
+    <string name="web_menu_copy_link_text">Copy link text</string>
+    <string name="web_menu_open_link">Open link</string>
+    <string name="web_menu_open_image">Open image</string>
+    <string name="engine_braveai">Brave AI</string>
 
     <!-- Quick Settings Tile -->
     <string name="qs_tile_label">CTS</string>
