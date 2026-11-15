@@ -278,6 +278,13 @@
     <string name="section_search_method">SEARCH METHOD</string>
     <string name="search_method_multi">Multi-Search</string>
     <string name="search_method_lens">Google Lens</string>
+    <string name="search_method_ask">Ask every time</string>
+    <string name="search_method_off">Off</string>
+    <string name="ask_visual_search_prompt">Are you sure you want to search the circled area?</string>
+    <string name="ask_confirm_yes">Yes</string>
+    <string name="ask_confirm_no">No</string>
+    <string name="search_method_ask_desc">Ask before uploading a capture</string>
+    <string name="search_method_off_desc">Visual search disabled — nothing leaves your device</string>
 
     <!-- Google Lens Helper -->
     <string name="chooser_google_lens">Search with Google Lens</string>

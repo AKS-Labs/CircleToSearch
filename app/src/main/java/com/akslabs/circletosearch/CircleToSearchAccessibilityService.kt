@@ -1959,6 +1959,19 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
 
     override fun onKeyEvent(event: android.view.KeyEvent): Boolean {
         val code = event.keyCode
+        // Diagnostic: proves whether key events reach the service at all. Only the
+        // trigger-relevant keys are logged to keep logcat readable (tag: CTS-HW).
+        if (code == android.view.KeyEvent.KEYCODE_VOLUME_UP ||
+            code == android.view.KeyEvent.KEYCODE_VOLUME_DOWN ||
+            code == android.view.KeyEvent.KEYCODE_HOME
+        ) {
+            android.util.Log.d(
+                "CTS-HW",
+                "onKeyEvent code=$code action=${event.action} repeat=${event.repeatCount} " +
+                    "hasTriggers=${keyHasTriggers(code)} long=${longTriggerFor(code)} " +
+                    "double=${doubleTapTriggerFor(code)} combo=${prefs.getBoolean(KEY_TRIGGER_VOL_UP_DOWN, false)}",
+            )
+        }
         when (event.action) {
             android.view.KeyEvent.ACTION_DOWN -> {
                 val now = android.os.SystemClock.uptimeMillis()

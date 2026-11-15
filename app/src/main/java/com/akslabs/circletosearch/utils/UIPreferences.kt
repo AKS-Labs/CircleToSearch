@@ -35,6 +35,9 @@ class UIPreferences(context: Context) {
         private const val KEY_SHOW_FRIENDLY_MESSAGES = "show_friendly_messages"
         private const val KEY_SEARCH_ENGINE_ORDER = "search_engine_order"
         private const val KEY_USE_GOOGLE_LENS_ONLY = "use_google_lens_only"
+        private const val KEY_SEARCH_METHOD = "search_method"
+        private const val KEY_ASK_EVERY_TIME = "ask_every_time"
+        private const val KEY_VISUAL_SEARCH_OFF = "visual_search_off"
     }
 
     fun observeUseGoogleLensOnly(): Flow<Boolean> = callbackFlow {
@@ -57,6 +60,82 @@ class UIPreferences(context: Context) {
 
     fun setUseGoogleLensOnly(isEnabled: Boolean) {
         prefs.edit().putBoolean(KEY_USE_GOOGLE_LENS_ONLY, isEnabled).commit()
+    }
+
+    // Visual search method for the segmented chooser: "multi" | "lens". Legacy installs
+    // that only had the lens-only boolean map to "lens" until the user picks one.
+    fun observeSearchMethod(): Flow<String> = callbackFlow {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { prefs, key ->
+            if (key == KEY_SEARCH_METHOD || key == KEY_USE_GOOGLE_LENS_ONLY) {
+                trySend(getSearchMethod())
+            }
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        trySend(getSearchMethod())
+        awaitClose {
+            prefs.unregisterOnSharedPreferenceChangeListener(listener)
+        }
+    }
+
+    fun getSearchMethod(): String {
+        val stored = prefs.getString(KEY_SEARCH_METHOD, null)
+        // Values from the retired "ask"/"off" experiment map back to the plain chooser.
+        if (stored == "multi" || stored == "lens") return stored
+        return if (prefs.getBoolean(KEY_USE_GOOGLE_LENS_ONLY, false)) "lens" else "multi"
+    }
+
+    fun setSearchMethod(method: String) {
+        prefs.edit().putString(KEY_SEARCH_METHOD, method)
+            // Keep the legacy boolean in sync for existing readers.
+            .putBoolean(KEY_USE_GOOGLE_LENS_ONLY, method == "lens")
+            .commit()
+    }
+
+    // "Ask every time": confirm before anything is uploaded.
+    fun isAskEveryTime(): Boolean = prefs.getBoolean(KEY_ASK_EVERY_TIME, false)
+
+    fun observeAskEveryTime(): Flow<Boolean> = callbackFlow {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { prefs, key ->
+            if (key == KEY_ASK_EVERY_TIME || key == KEY_VISUAL_SEARCH_OFF) {
+                trySend(isAskEveryTime())
+            }
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        trySend(isAskEveryTime())
+        awaitClose {
+            prefs.unregisterOnSharedPreferenceChangeListener(listener)
+        }
+    }
+
+    fun setAskEveryTime(enabled: Boolean) {
+        prefs.edit()
+            .putBoolean(KEY_ASK_EVERY_TIME, enabled)
+            // Mutually exclusive with Off.
+            .putBoolean(KEY_VISUAL_SEARCH_OFF, false)
+            .commit()
+    }
+
+    // "Off": visual search disabled — the crop stays on-device, nothing uploads.
+    fun isVisualSearchOff(): Boolean = prefs.getBoolean(KEY_VISUAL_SEARCH_OFF, false)
+
+    fun observeVisualSearchOff(): Flow<Boolean> = callbackFlow {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { prefs, key ->
+            if (key == KEY_VISUAL_SEARCH_OFF || key == KEY_ASK_EVERY_TIME) {
+                trySend(isVisualSearchOff())
+            }
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        trySend(isVisualSearchOff())
+        awaitClose {
+            prefs.unregisterOnSharedPreferenceChangeListener(listener)
+        }
+    }
+
+    fun setVisualSearchOff(enabled: Boolean) {
+        prefs.edit()
+            .putBoolean(KEY_VISUAL_SEARCH_OFF, enabled)
+            .putBoolean(KEY_ASK_EVERY_TIME, false)
+            .commit()
     }
     
     fun isDesktopMode(): Boolean {

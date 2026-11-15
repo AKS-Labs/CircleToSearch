@@ -94,6 +94,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BorderOuter
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.AutoFixHigh
+import androidx.compose.material.icons.filled.ManageSearch
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.automirrored.filled.FormatTextdirectionRToL
@@ -118,6 +120,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Email
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -236,7 +239,6 @@ import androidx.compose.material3.dynamicLightColorScheme
 import android.os.Build
 import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.PushPin
-import androidx.compose.material3.Surface
 
 /** Lets the Circle to Search UI finish closing before the translator overlay draws. */
 private const val TRANSLATE_TRIGGER_DELAY_MS = 400L
@@ -513,11 +515,16 @@ fun CircleToSearchScreen(
     // that occurs when a write comes from a different activity instance.
     val isGoogleLensOnly by uiPreferences.observeUseGoogleLensOnly()
         .collectAsState(initial = uiPreferences.isUseGoogleLensOnly())
-    
-    // Effective state: use override if provided by trigger, else use global preference
-    val effectiveLensOnly = searchModeOverride ?: isGoogleLensOnly
-    
-    
+
+    // Visual search method: "multi" | "lens" | "ask" | "off" (see UIPreferences).
+    val searchMethodPref by uiPreferences.observeSearchMethod()
+        .collectAsState(initial = uiPreferences.getSearchMethod())
+    val askEveryTime by uiPreferences.observeAskEveryTime()
+        .collectAsState(initial = uiPreferences.isAskEveryTime())
+    val visualSearchOff by uiPreferences.observeVisualSearchOff()
+        .collectAsState(initial = uiPreferences.isVisualSearchOff())
+
+
     // New Sheet States
     var showMoreAppsSheet by remember { mutableStateOf(false) }
     var showDonateSheet by remember { mutableStateOf(false) }
@@ -809,6 +816,11 @@ fun CircleToSearchScreen(
     val webSearchInitialized = remember { mutableStateListOf<PrivacySearchEngine>() }
     val webSearchViews = remember { mutableMapOf<PrivacySearchEngine, WebView>() }
     val webSearchLoadedQuery = remember { mutableMapOf<PrivacySearchEngine, String>() }
+
+    // "Ask every time" state: the dock waits for the user's method pick.
+    var askConfirmVisible by remember { mutableStateOf(false) }
+    var lastRanBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var lastRanMethod by remember { mutableStateOf<String?>(null) }
 
     // Clears the pull-to-refresh spinner once the refreshed tab finishes loading.
     fun clearRefreshIfDone(view: WebView?) {
@@ -1188,6 +1200,102 @@ fun CircleToSearchScreen(
             }, 800L)
         } catch (_: Exception) {}
     }
+
+            // Runs the visual search with the resolved method ("lens" or "multi").
+            suspend fun runVisualSearchNow(method: String) {
+                val bmp = selectedBitmap ?: return
+                isLoading = true
+
+                if (method == "lens") {
+                    // Save to cache and launch Lens
+                    val path = ImageUtils.saveBitmap(context, bmp)
+                    val uri = android.net.Uri.fromFile(java.io.File(path))
+
+                    val result = searchWithGoogleLens(uri, context)
+                    when (result) {
+                        com.akslabs.circletosearch.ui.components.LensLaunchResult.LAUNCHED_DIRECTLY -> {
+                            // Lens launched directly — safe to dismiss the overlay.
+                            // Lens is launching on top: stop close from reordering
+                            // the previous app back over it.
+                            CircleToSearchAccessibilityService.instance?.suppressNextReturnToApp()
+                            onClose()
+                            return
+                        }
+                        com.akslabs.circletosearch.ui.components.LensLaunchResult.LAUNCHED_VIA_CHOOSER -> {
+                            // Chooser shown — overlay must stay open, user picks the app
+                            isLoading = false
+                            return
+                        }
+                        com.akslabs.circletosearch.ui.components.LensLaunchResult.FAILED -> {
+                            // Fallback to multi-search
+                            android.util.Log.e("CircleToSearch", "Google Lens launch failed, falling back to multi-search")
+                        }
+                    }
+                }
+
+                // Multi-Search Mode: reveal at the half (peek) height, not
+                // fully expanded — the user can swipe up for more.
+                scope.launch { scaffoldState.bottomSheetState.partialExpand() }
+
+                // Upload to host if needed (Multi-Search Mode)
+                if (hostedImageUrl == null) {
+                    val url = ImageSearchUploader.uploadToImageHost(bmp)
+                    if (url != null) {
+                        hostedImageUrl = url
+                    } else {
+                        isLoading = false
+                        return
+                    }
+                }
+
+                // Generate URLs for ALL engines (lightweight string op)
+                searchEngines.forEach { engine ->
+                    if (!preloadedUrls.containsKey(engine)) {
+                        val url = when (engine) {
+                            SearchEngine.Google -> ImageSearchUploader.getGoogleLensUrl(hostedImageUrl!!)
+                            SearchEngine.Bing -> ImageSearchUploader.getBingUrl(hostedImageUrl!!)
+                            SearchEngine.Yandex -> ImageSearchUploader.getYandexUrl(hostedImageUrl!!)
+                            SearchEngine.TinEye -> ImageSearchUploader.getTinEyeUrl(hostedImageUrl!!)
+                            else -> null
+                        }
+                        if (url != null) preloadedUrls[engine] = url
+                    }
+                }
+
+                // Set initial URL
+                if (preloadedUrls.containsKey(selectedEngine)) {
+                     searchUrl = preloadedUrls[selectedEngine]
+                }
+                    
+                // SMART LOADING SEQUENCE
+                // First, ensure selected engine is initialized
+                if (!initializedEngines.contains(selectedEngine)) {
+                    initializedEngines.add(selectedEngine)
+                }
+                    
+                isLoading = false
+                    
+                // Then, load others sequentially
+                scope.launch {
+                    searchEngines.forEach { engine ->
+                        if (engine != selectedEngine) {
+                            delay(300) // Reduced from 800ms for faster loading
+                            if (!initializedEngines.contains(engine)) {
+                                initializedEngines.add(engine)
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Skip when this capture+method already ran (the multi flow sets
+            // hostedImageUrl, which re-triggers this effect).
+            fun shouldRunVisualSearch(method: String): Boolean {
+                if (lastRanBitmap === selectedBitmap && lastRanMethod == method) return false
+                lastRanBitmap = selectedBitmap
+                lastRanMethod = method
+                return true
+            }
 
     // Privacy web-search WebView: lean settings, and third-party cookies refused so ad
     // networks riding on result pages can't track across engines.
@@ -1735,97 +1843,33 @@ fun CircleToSearchScreen(
                 }
 
                 LaunchedEffect(selectedBitmap, hostedImageUrl) {
-                    if (selectedBitmap != null) {
-                        isLoading = true
-                        
-                        val effectiveLensOnly = searchModeOverride ?: isGoogleLensOnly
-                        
-                        // 1. Google Lens Only Mode Check
-                        // Use the reactive state (not a direct pref read) so we always
-                        // get the value that was last committed, even from another activity.
-                        if (effectiveLensOnly) {
-                            // Save to cache and launch Lens
-                            val path = ImageUtils.saveBitmap(context, selectedBitmap!!)
-                            val uri = android.net.Uri.fromFile(java.io.File(path))
-                            
-                            val result = searchWithGoogleLens(uri, context)
-                            when (result) {
-                                com.akslabs.circletosearch.ui.components.LensLaunchResult.LAUNCHED_DIRECTLY -> {
-                                    // Lens launched directly — safe to dismiss the overlay.
-                                    // Lens is launching on top: stop close from reordering
-                                    // the previous app back over it.
-                                    CircleToSearchAccessibilityService.instance?.suppressNextReturnToApp()
-                                    onClose()
-                                    return@LaunchedEffect
-                                }
-                                com.akslabs.circletosearch.ui.components.LensLaunchResult.LAUNCHED_VIA_CHOOSER -> {
-                                    // Chooser shown — overlay must stay open, user picks the app
-                                    isLoading = false
-                                    return@LaunchedEffect
-                                }
-                                com.akslabs.circletosearch.ui.components.LensLaunchResult.FAILED -> {
-                                    // Fallback to multi-search
-                                    android.util.Log.e("CircleToSearch", "Google Lens launch failed, falling back to multi-search")
-                                }
-                            }
-                        }
-
-                        // 2. Multi-Search Mode: reveal at the half (peek) height, not
-                        // fully expanded — the user can swipe up for more.
-                        scope.launch { scaffoldState.bottomSheetState.partialExpand() }
-
-                        // 3. Upload to host if needed (Multi-Search Mode)
-                        if (hostedImageUrl == null) {
-                            val url = ImageSearchUploader.uploadToImageHost(selectedBitmap!!)
-                            if (url != null) {
-                                hostedImageUrl = url
-                            } else {
-                                isLoading = false
-                                return@LaunchedEffect
-                            }
-                        }
-
-                        // 2. Generate URLs for ALL engines (lightweight string op)
-                        searchEngines.forEach { engine ->
-                            if (!preloadedUrls.containsKey(engine)) {
-                                val url = when (engine) {
-                                    SearchEngine.Google -> ImageSearchUploader.getGoogleLensUrl(hostedImageUrl!!)
-                                    SearchEngine.Bing -> ImageSearchUploader.getBingUrl(hostedImageUrl!!)
-                                    SearchEngine.Yandex -> ImageSearchUploader.getYandexUrl(hostedImageUrl!!)
-                                    SearchEngine.TinEye -> ImageSearchUploader.getTinEyeUrl(hostedImageUrl!!)
-                                    else -> null
-                                }
-                                if (url != null) preloadedUrls[engine] = url
-                            }
-                        }
-
-                        // 3. Set initial URL
-                        if (preloadedUrls.containsKey(selectedEngine)) {
-                             searchUrl = preloadedUrls[selectedEngine]
-                        }
-                        
-                        // 4. SMART LOADING SEQUENCE
-                        // First, ensure selected engine is initialized
-                        if (!initializedEngines.contains(selectedEngine)) {
-                            initializedEngines.add(selectedEngine)
-                        }
-                        
+                    if (selectedBitmap == null) return@LaunchedEffect
+                    // Privacy: "Off" — the crop stays on-device; nothing uploads and
+                    // nothing ever leaves the device.
+                    if (visualSearchOff) {
                         isLoading = false
-                        
-                        // Then, load others sequentially
-                        scope.launch {
-                            searchEngines.forEach { engine ->
-                                if (engine != selectedEngine) {
-                                    delay(300) // Reduced from 800ms for faster loading
-                                    if (!initializedEngines.contains(engine)) {
-                                        initializedEngines.add(engine)
-                                    }
-                                }
-                            }
+                        isSearching = false
+                        return@LaunchedEffect
+                    }
+                    val overrideMethod = searchModeOverride?.let { if (it) "lens" else "multi" }
+                    val method = overrideMethod ?: searchMethodPref
+                    val alreadyRan = lastRanBitmap === selectedBitmap && lastRanMethod == method
+                    if (askEveryTime && overrideMethod == null) {
+                        // "Ask every time": confirm before uploading — until the user
+                        // confirms, nothing leaves the device.
+                        if (!alreadyRan) {
+                            askConfirmVisible = true
+                            isLoading = false
                         }
+                        return@LaunchedEffect
+                    }
+                    if (!alreadyRan) {
+                        lastRanBitmap = selectedBitmap
+                        lastRanMethod = method
+                        runVisualSearchNow(method)
                     }
                 }
-                
+
                 // Update searchUrl when engine changes
                 LaunchedEffect(selectedEngine, preloadedUrls) {
                     if (preloadedUrls.containsKey(selectedEngine)) {
@@ -3562,6 +3606,67 @@ fun CircleToSearchScreen(
                                             },
                                     )
                                 }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // "Ask every time": a small confirmation dialog with a dimmed background —
+        // the crop stays on-device until the user confirms.
+        if (askConfirmVisible) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .zIndex(3000f)
+                    .background(Color.Black.copy(alpha = 0.5f))
+                    .pointerInput(Unit) { detectTapGestures { askConfirmVisible = false } },
+                contentAlignment = Alignment.Center,
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    tonalElevation = 6.dp,
+                    shadowElevation = 8.dp,
+                    modifier = Modifier
+                        .padding(horizontal = 40.dp)
+                        .widthIn(max = 320.dp)
+                        // Swallow taps inside the dialog so they don't dismiss it.
+                        .pointerInput(Unit) { detectTapGestures {} },
+                ) {
+                    Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 20.dp)) {
+                        Text(
+                            text = stringResource(R.string.ask_visual_search_prompt),
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.SemiBold
+                            ),
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Spacer(modifier = Modifier.height(20.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            TextButton(onClick = { askConfirmVisible = false }) {
+                                Text(stringResource(R.string.ask_confirm_no))
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            TextButton(onClick = {
+                                askConfirmVisible = false
+                                val overrideMethod = searchModeOverride?.let { if (it) "lens" else "multi" }
+                                val method = overrideMethod ?: searchMethodPref
+                                if (lastRanBitmap !== selectedBitmap || lastRanMethod != method) {
+                                    lastRanBitmap = selectedBitmap
+                                    lastRanMethod = method
+                                    scope.launch { runVisualSearchNow(method) }
+                                }
+                            }) {
+                                Text(
+                                    text = stringResource(R.string.ask_confirm_yes),
+                                    fontWeight = FontWeight.SemiBold,
+                                )
                             }
                         }
                     }
