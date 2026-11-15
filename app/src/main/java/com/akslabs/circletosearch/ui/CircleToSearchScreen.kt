@@ -56,6 +56,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -69,6 +70,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -132,7 +134,9 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.VerticalDivider
@@ -142,6 +146,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -188,6 +193,9 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.webkit.WebSettingsCompat
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.runtime.key
+import com.akslabs.circletosearch.data.PrivacySearchEngine
 import com.akslabs.circletosearch.data.SearchEngine
 import com.akslabs.circletosearch.ui.components.FriendlyMessageBubble
 import com.akslabs.circletosearch.ui.components.searchWithGoogleLens
@@ -690,6 +698,20 @@ fun CircleToSearchScreen(
     // WebView Cache
     val webViews = remember { mutableMapOf<SearchEngine, WebView>() }
 
+    // Privacy web search ("Web search" in the text-selection bar): a compact engine picker,
+    // then an in-app results sheet with one tab per privacy engine — same tabular UI as the
+    // visual-search sheet. Tabs are NOT preloaded: a tab's WebView is created and loaded only
+    // when the user opens that tab, then kept alive; each reloads only when the query changes
+    // (never on navigation inside the results).
+    var showWebSearchPicker by remember { mutableStateOf(false) }
+    var webSearchQuery by remember { mutableStateOf<String?>(null) }
+    var webSearchEngine by remember { mutableStateOf<PrivacySearchEngine?>(null) }
+    var webSearchPageBg by remember { mutableStateOf(Color.White) }
+    val webSearchEngines = remember { PrivacySearchEngine.values() }
+    val webSearchInitialized = remember { mutableStateListOf<PrivacySearchEngine>() }
+    val webSearchViews = remember { mutableMapOf<PrivacySearchEngine, WebView>() }
+    val webSearchLoadedQuery = remember { mutableMapOf<PrivacySearchEngine, String>() }
+
     // Clears the pull-to-refresh spinner once the refreshed tab finishes loading.
     fun clearRefreshIfDone(view: WebView?) {
         val re = refreshingEngine
@@ -1035,6 +1057,71 @@ fun CircleToSearchScreen(
     // the bottom bar doesn't stay hidden after leaving them.
     LaunchedEffect(isEntityExtractMode, isTranslatorMode) {
         if (isEntityExtractMode || isTranslatorMode) wordSelected = false
+    }
+
+    // Same page-background sampling as the visual search sheet, but scoped to the
+    // web-search sheet's tab strip so the two sheets never fight over the tint.
+    fun sampleWebSearchPageBg(view: WebView?) {
+        if (view == null) return
+        val js = "(function(){var b=getComputedStyle(document.body).backgroundColor;" +
+            "if(b==='rgba(0, 0, 0, 0)'||b==='transparent'){b=getComputedStyle(document.documentElement).backgroundColor;}" +
+            "return b;})()"
+        val parse: (String) -> Unit = { raw ->
+            val m = Regex("""rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([\d.]+))?\s*\)""").find(raw.trim('"'))
+            if (m != null) {
+                val a = m.groupValues[4].toFloatOrNull() ?: 1f
+                if (a > 0f) {
+                    val r = m.groupValues[1].toInt() / 255f
+                    val g = m.groupValues[2].toInt() / 255f
+                    val b = m.groupValues[3].toInt() / 255f
+                    val luminance = 0.2126f * r + 0.7152f * g + 0.0722f * b
+                    webSearchPageBg = if (luminance > 0.88f || luminance < 0.18f) {
+                        Color(red = r, green = g, blue = b)
+                    } else {
+                        Color.White
+                    }
+                }
+            }
+        }
+        try {
+            view.evaluateJavascript(js) { raw -> parse(raw ?: "") }
+            view.postDelayed({
+                try { view.evaluateJavascript(js) { raw -> parse(raw ?: "") } } catch (_: Exception) {}
+            }, 800L)
+        } catch (_: Exception) {}
+    }
+
+    // Privacy web-search WebView: lean settings, and third-party cookies refused so ad
+    // networks riding on result pages can't track across engines.
+    fun createPrivacyWebView(ctx: android.content.Context): WebView {
+        return WebView(ctx).apply {
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+            setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
+            settings.apply {
+                javaScriptEnabled = true
+                domStorageEnabled = true
+                cacheMode = WebSettings.LOAD_DEFAULT
+                setSupportZoom(true)
+                builtInZoomControls = true
+                displayZoomControls = false
+                useWideViewPort = true
+                loadWithOverviewMode = true
+                userAgentString =
+                    "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+            }
+            isVerticalScrollBarEnabled = false
+            // The tab strip tints itself to the loaded page's background.
+            webViewClient = object : android.webkit.WebViewClient() {
+                override fun onPageFinished(view: WebView?, url: String?) {
+                    super.onPageFinished(view, url)
+                    sampleWebSearchPageBg(view)
+                }
+            }
+            android.webkit.CookieManager.getInstance().setAcceptThirdPartyCookies(this, false)
+        }
     }
 
     // Helper to create and configure WebView
@@ -2012,6 +2099,14 @@ fun CircleToSearchScreen(
                                 longPressDrag = true,
                                 pendingSelectRegion = pendingWordSelectRegion,
                                 onSelectRegionHandled = { pendingWordSelectRegion = null },
+                                // In-app privacy web search instead of the system chooser:
+                                // the query first, then the compact engine dock. Any open
+                                // results sheet closes — the dock sits above the screen.
+                                onWebSearch = { query ->
+                                    webSearchQuery = query
+                                    webSearchEngine = null
+                                    showWebSearchPicker = true
+                                },
                             )
                         } else if (!instantOcrDone) {
                             instantRegions?.let { regions ->
@@ -3039,6 +3134,227 @@ fun CircleToSearchScreen(
                     initialResults = detectedQrCodes,
                     initialPage = if (selectedQrResult != null) detectedQrCodes.indexOf(selectedQrResult!!) else 0
                 )
+            }
+        }
+
+        // Privacy web search: a compact floating dock appears centered on screen when the
+        // user taps Web search; picking an engine opens the results sheet. Tabs are lazily
+        // created on first open and reloaded only when the query changes.
+        if (showWebSearchPicker) {
+            // Scrim: tap anywhere outside the dock to dismiss.
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .zIndex(3000f)
+                    .background(Color.Black.copy(alpha = 0.4f))
+                    .pointerInput(Unit) {
+                        detectTapGestures { showWebSearchPicker = false }
+                    },
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .zIndex(3001f)
+                    .pointerInput(Unit) { detectTapGestures { showWebSearchPicker = false } },
+                contentAlignment = Alignment.Center,
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(24.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    shadowElevation = 8.dp,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp)
+                        // Swallow taps inside the dock so they don't dismiss it.
+                        .pointerInput(Unit) { detectTapGestures {} },
+                ) {
+                    Column(modifier = Modifier.padding(vertical = 12.dp)) {
+                        Text(
+                            text = "\"${webSearchQuery}\"",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(20.dp),
+                            contentPadding = PaddingValues(horizontal = 20.dp),
+                        ) {
+                            items(webSearchEngines.size) { index ->
+                                val engine = webSearchEngines[index]
+                                // Launcher-style dock entry: the engine's favicon over its name.
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(16.dp))
+                                        .clickable {
+                                            // Lazy open: the tab's WebView is created on first
+                                            // selection, never before.
+                                            if (!webSearchInitialized.contains(engine)) {
+                                                webSearchInitialized.add(engine)
+                                            }
+                                            webSearchEngine = engine
+                                            showWebSearchPicker = false
+                                        }
+                                        .padding(horizontal = 4.dp, vertical = 6.dp),
+                                ) {
+                                    Image(
+                                        painter = painterResource(engine.iconRes),
+                                        contentDescription = engine.getDisplayName(context),
+                                        modifier = Modifier
+                                            .size(44.dp)
+                                            .clip(RoundedCornerShape(12.dp)),
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = engine.name,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (webSearchEngine != null && webSearchQuery != null) {
+            // In-screen sheet instead of ModalBottomSheet: a modal sheet's drag gesture
+            // scrolls the sheet instead of the results WebView. This sheet has no drag of
+            // its own — the WebView always owns vertical drags. Close via back, scrim tap.
+            BackHandler { webSearchEngine = null }
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .zIndex(2900f)
+                    .background(Color.Black.copy(alpha = 0.4f))
+                    .pointerInput(Unit) { detectTapGestures { webSearchEngine = null } },
+            ) {
+                // The tab strip matches the loaded page's own background, so its text and
+                // borders derive from the page's luminance, NOT the app theme — a dark
+                // results page in a light app theme (or vice versa) would hide the labels.
+                val bgIsDark =
+                    (0.2126f * webSearchPageBg.red +
+                        0.7152f * webSearchPageBg.green +
+                        0.0722f * webSearchPageBg.blue) <= 0.5f
+                val tabTextSelected = if (bgIsDark) Color.White else Color(0xFF1B1B1F)
+                val tabTextUnselected = if (bgIsDark) Color.White.copy(alpha = 0.65f) else Color.Black.copy(alpha = 0.6f)
+                val tabBorderSelected = if (bgIsDark) Color.White.copy(alpha = 0.45f) else Color.Black.copy(alpha = 0.3f)
+
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .fillMaxHeight(0.92f)
+                        .background(webSearchPageBg, RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
+                        // Swallow taps on the chrome so they never reach the scrim.
+                        .pointerInput(Unit) { detectTapGestures {} },
+                ) {
+                    // Drag pill — same visual affordance as the visual-search sheet
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.CenterHorizontally)
+                            .padding(top = 12.dp)
+                            .width(36.dp)
+                            .height(4.dp)
+                            .background(
+                                color = if (bgIsDark) Color.White.copy(alpha = 0.5f) else Color.Black.copy(alpha = 0.25f),
+                                shape = RoundedCornerShape(2.dp)
+                            )
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Tabs — same pill-style strip as the visual search (no default indicator)
+                    ScrollableTabRow(
+                        selectedTabIndex = webSearchEngine?.let { webSearchEngines.indexOf(it) } ?: -1,
+                        edgePadding = 16.dp,
+                        containerColor = Color.Transparent,
+                        contentColor = if (bgIsDark) Color.White else Color.Black,
+                        divider = {},
+                        indicator = {},
+                    ) {
+                        webSearchEngines.forEach { engine ->
+                            val selected = webSearchEngine == engine
+                            val transition = androidx.compose.animation.core.updateTransition(targetState = selected, label = "WebTab")
+                            val scale by transition.animateFloat(label = "Scale") { if (it) 1.05f else 1f }
+                            val alpha by transition.animateFloat(label = "Alpha") { if (it) 1f else 0.7f }
+
+                            Tab(
+                                selected = selected,
+                                onClick = {
+                                    webSearchEngine = engine
+                                    // Lazy open: the tab's WebView is created on first
+                                    // selection, never before.
+                                    if (!webSearchInitialized.contains(engine)) {
+                                        webSearchInitialized.add(engine)
+                                    }
+                                },
+                                modifier = Modifier.graphicsLayer {
+                                    scaleX = scale
+                                    scaleY = scale
+                                    this.alpha = alpha
+                                },
+                                text = {
+                                    Text(
+                                        engine.getDisplayName(context),
+                                        style = MaterialTheme.typography.labelLarge.copy(
+                                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
+                                        ),
+                                        modifier = Modifier
+                                            .background(
+                                                webSearchPageBg,
+                                                RoundedCornerShape(16.dp)
+                                            )
+                                            .border(
+                                                width = 1.dp,
+                                                color = if (selected) tabBorderSelected else Color.Transparent,
+                                                shape = RoundedCornerShape(16.dp)
+                                            )
+                                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                                        color = if (selected) tabTextSelected else tabTextUnselected
+                                    )
+                                }
+                            )
+                        }
+                    }
+
+                    // Results: one (lazily created) WebView per opened tab; reload only when
+                    // the query changes — never on navigation inside the results page.
+                    Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                        val currentQuery = webSearchQuery
+                        webSearchEngines.forEach { engine ->
+                            if (webSearchInitialized.contains(engine) && currentQuery != null) {
+                                key(engine) {
+                                    AndroidView(
+                                        factory = { ctx ->
+                                            val webView = createPrivacyWebView(ctx)
+                                            webSearchViews[engine] = webView
+                                            webSearchLoadedQuery[engine] = currentQuery
+                                            webView.loadUrl(engine.searchUrl(currentQuery))
+                                            webView
+                                        },
+                                        update = { webView ->
+                                            if (webSearchLoadedQuery[engine] != currentQuery) {
+                                                webSearchLoadedQuery[engine] = currentQuery
+                                                webView.loadUrl(engine.searchUrl(currentQuery))
+                                            }
+                                        },
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .zIndex(if (engine == webSearchEngine) 1f else 0f)
+                                            .graphicsLayer {
+                                                alpha = if (engine == webSearchEngine) 1f else 0f
+                                            },
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
 

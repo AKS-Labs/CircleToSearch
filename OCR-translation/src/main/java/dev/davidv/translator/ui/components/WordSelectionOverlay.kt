@@ -107,6 +107,7 @@ private class SelectionActionModeCallback(
   private val rectProvider: () -> android.graphics.Rect,
   private val onSelectAll: () -> Unit,
   private val canSelectAll: () -> Boolean,
+  private val onWebSearch: ((String) -> Unit)?,
   private val onFinished: () -> Unit,
 ) : ActionMode.Callback2() {
   override fun onCreateActionMode(
@@ -151,12 +152,18 @@ private class SelectionActionModeCallback(
         context.startActivity(Intent.createChooser(intent, null).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
       }
       MENU_SEARCH -> {
-        val intent =
-          Intent(Intent.ACTION_WEB_SEARCH).apply {
-            putExtra(SearchManager.QUERY, text)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-          }
-        runCatching { context.startActivity(intent) }
+        val inAppSearch = onWebSearch
+        if (inAppSearch != null) {
+          // Host takes it (e.g. the in-app privacy-engine results sheet).
+          inAppSearch(text)
+        } else {
+          val intent =
+            Intent(Intent.ACTION_WEB_SEARCH).apply {
+              putExtra(SearchManager.QUERY, text)
+              addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+          runCatching { context.startActivity(intent) }
+        }
       }
       else -> return false
     }
@@ -212,6 +219,9 @@ fun WordSelectionOverlay(
    *  into "select the words under it"). Consumed via [onSelectRegionHandled]. */
   pendingSelectRegion: android.graphics.Rect? = null,
   onSelectRegionHandled: () -> Unit = {},
+  /** Host-provided handler for the Web-search action (e.g. an in-app results sheet).
+   *  When null, the action falls back to the system ACTION_WEB_SEARCH chooser. */
+  onWebSearch: ((String) -> Unit)? = null,
 ) {
   val context = LocalContext.current
   val view = LocalView.current
@@ -329,6 +339,7 @@ fun WordSelectionOverlay(
               canSelectAll = {
                 words.isNotEmpty() && !(selStart == 0 && selEnd == words.size - 1)
               },
+              onWebSearch = onWebSearch,
               onFinished = { actionMode = null },
             ),
             ActionMode.TYPE_FLOATING,

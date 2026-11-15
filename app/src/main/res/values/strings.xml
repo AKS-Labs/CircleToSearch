@@ -359,6 +359,13 @@
     <string name="engine_yandex">Yandex</string>
     <string name="engine_tineye">TinEye</string>
 
+    <!-- Privacy web-search engines (text-selection "Web search" sheet) -->
+    <string name="engine_duckduckgo">DuckDuckGo</string>
+    <string name="engine_brave">Brave Search</string>
+    <string name="engine_startpage">Startpage</string>
+    <string name="engine_mojeek">Mojeek</string>
+    <string name="engine_duckai">Duck.ai</string>
+
     <!-- Quick Settings Tile -->
     <string name="qs_tile_label">CTS</string>
 
