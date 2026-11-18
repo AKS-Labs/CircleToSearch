@@ -205,7 +205,7 @@ class TranslationCoordinator(
         val detection =
           precomputedDetection
             ?: try {
-              catalog.ocrImageDetect(ocrImage, maxImageSize)
+              catalog.ocrImageDetect(ocrImage, maxImageSize, sourceSelection)
             } catch (e: uniffi.bindings.CatalogException) {
               Log.d("OCR", "detect failed: ${e.message}")
               null
@@ -344,7 +344,7 @@ class TranslationCoordinator(
 
         val detection =
           try {
-            catalog.ocrImageDetect(ocrImage, maxImageSize)
+            catalog.ocrImageDetect(ocrImage, maxImageSize, sourceSelection)
           } catch (e: uniffi.bindings.CatalogException) {
             Log.d("OCR", "detect failed: ${e.message}")
             null

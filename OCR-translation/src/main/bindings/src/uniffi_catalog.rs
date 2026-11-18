@@ -323,11 +323,14 @@ impl OcrImage {
         &self,
         catalog: Arc<CatalogHandle>,
         max_image_size: u32,
+        source_selection: translator::OcrSourceSelection,
     ) -> Result<Vec<translator::DetectedTextBox>, CatalogError> {
         let still = self.ensure_still(&catalog, max_image_size)?;
+        let snap = catalog.session.snapshot();
+        let allowed_scripts = catalog.session.allowed_scripts_for(&source_selection, &snap);
         catalog
             .session
-            .detect_boxes_from_still(&still, self.width, self.height)
+            .detect_boxes_from_still(&still, self.width, self.height, &source_selection)
             .map_err(CatalogError::from)
     }
 

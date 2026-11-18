@@ -66,6 +66,7 @@ import com.akslabs.circletosearch.data.OverlaySegment
 import com.akslabs.circletosearch.utils.ImageUtils
 import com.akslabs.circletosearch.utils.InstantOcrScanner
 import com.akslabs.circletosearch.utils.InstantOcrStore
+import com.akslabs.circletosearch.utils.UIPreferences
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
 import androidx.compose.animation.core.animate
@@ -1063,10 +1064,8 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
                                     copy,
                                 ) { ocrScanState.regions = it }
                                 ocrScanState.words = output?.words
-                                ocrScanState.detection = output?.detection ?: emptyList()
                                 ocrScanState.done = true
                             }
-                            
                             // Launch Overlay Immediately
                             launchOverlay(searchModeOverride)
                             
@@ -1167,7 +1166,6 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
     // screen; cancelled on the next capture and at overlay close.
     private val instantOcrScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var instantScanJob: Job? = null
-
     private val stickerFrameClock = object : MonotonicFrameClock {
         override suspend fun <R> withFrameNanos(onFrame: (Long) -> R): R =
             suspendCoroutine { cont ->
@@ -1910,6 +1908,19 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
     }
 
     override fun onInterrupt() {}
+
+    /**
+     * The a11y service keeps this process alive in the background, so anything the
+     * overlay used stays resident unless we release it. React to system pressure:
+     * drop the retained capture and the instant-OCR state.
+     */
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        if (level >= TRIM_MEMORY_BACKGROUND) {
+            BitmapRepository.clear()
+            InstantOcrStore.clear()
+        }
+    }
 
     // --- Hardware button triggers ---
     // Volume-key triggers consume ONLY the events that belong to a trigger

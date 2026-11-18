@@ -38,6 +38,19 @@ impl OcrEngine {
     }
 
     pub fn engine(&self, snap: &CatalogSnapshot) -> Result<Arc<PpocrEngine>, TranslatorError> {
+        self.engine_for_scripts(snap, None)
+    }
+
+    /// Builds the engine with only the recognizers whose script is in `allowed`
+    /// (`None` = every installed recognizer). The filtered set is part of the
+    /// cache key, so a whitelist swap replaces the warm engine instead of
+    /// accumulating recognizers — the resident set stays at the languages the
+    /// user actually searches.
+    pub fn engine_for_scripts(
+        &self,
+        snap: &CatalogSnapshot,
+        allowed: Option<&[PpocrScript]>,
+    ) -> Result<Arc<PpocrEngine>, TranslatorError> {
         let catalog = &snap.catalog;
         let pack_installed = |pack_id: &str| {
             snap.pack_statuses
@@ -84,6 +97,11 @@ impl OcrEngine {
             let PackKind::Ocr(OcrPack::PpocrRecognizer { script }) = &pack.kind else {
                 continue;
             };
+            if let Some(allowed) = allowed {
+                if !allowed.contains(script) {
+                    continue;
+                }
+            }
             // A recognizer's charset must match its model, so alternates are
             // paired by priority: take the best recognizer whose same-priority
             // keys file is also on disk. A half-downloaded upgrade then falls
@@ -146,6 +164,7 @@ impl OcrEngine {
                 return Ok(Arc::clone(engine));
             }
         }
+        let loaded_scripts: Vec<_> = specs.iter().map(|s| s.script.as_slug()).collect();
         let engine = PpocrEngine::load(
             &det_path,
             classifier_path.as_deref(),
@@ -155,6 +174,12 @@ impl OcrEngine {
             ink_path.as_deref(),
         )?;
         let engine = Arc::new(engine);
+        log::info!(
+            "ppocr engine built: recognizer_count={} loaded_scripts={:?} allowed={:?}",
+            loaded_scripts.len(),
+            loaded_scripts,
+            allowed.map(|a| a.iter().map(|s| s.as_slug()).collect::<Vec<_>>()),
+        );
         *cache = Some((key, Arc::clone(&engine)));
         Ok(engine)
     }

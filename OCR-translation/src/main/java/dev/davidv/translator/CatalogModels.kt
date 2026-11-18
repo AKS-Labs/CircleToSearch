@@ -334,7 +334,8 @@ class LanguageCatalog private constructor(
   fun ocrImageDetect(
     img: uniffi.bindings.OcrImage,
     maxImageSize: Int,
-  ): List<uniffi.translator_core.DetectedTextBox> = img.detect(handle, maxImageSize.toUInt())
+    sourceSelection: uniffi.translator_core.OcrSourceSelection,
+  ): List<uniffi.translator_core.DetectedTextBox> = img.detect(handle, maxImageSize.toUInt(), sourceSelection)
 
   @Throws(CatalogException::class)
   fun ocrImagePlan(
