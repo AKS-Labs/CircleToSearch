@@ -831,7 +831,15 @@ fun CircleToSearchScreen(
     var webSearchQuery by remember { mutableStateOf<String?>(null) }
     var webSearchEngine by remember { mutableStateOf<PrivacySearchEngine?>(null) }
     var webSearchPageBg by remember { mutableStateOf(Color.White) }
-    val webSearchEngines = remember { PrivacySearchEngine.values() }
+    // Privacy web-search tab order: user-arranged via Additional settings → "Rearrange
+    // web search tabs"; engines missing from the pref keep their default order at the end.
+    val webSearchEngines = remember {
+        val all = PrivacySearchEngine.values()
+        val preferred = uiPreferences.getWebEngineOrder()?.split(",")?.mapNotNull { name ->
+            all.find { it.name == name }
+        } ?: emptyList()
+        preferred + all.filter { !preferred.contains(it) }
+    }
     val webSearchInitialized = remember { mutableStateListOf<PrivacySearchEngine>() }
     val webSearchViews = remember { mutableMapOf<PrivacySearchEngine, WebView>() }
     val webSearchLoadedQuery = remember { mutableMapOf<PrivacySearchEngine, String>() }

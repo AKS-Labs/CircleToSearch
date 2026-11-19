@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+ system splash: branding line ("by AKS Labs") pinned at the bottom,
+     Meta-style. Ignored below API 31, where the plain launch shows instead. -->
+<resources>
+    <style name="Theme.CircleToSearch" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowSplashScreenBrandingImage">@drawable/splash_branding</item>
+    </style>
+</resources>

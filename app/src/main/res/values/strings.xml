@@ -153,7 +153,16 @@
     <string name="setting_friendly_messages_subtitle">Show random greeting messages on trigger</string>
     <string name="info_lens_mode_note">Lens mode needs the Google App to work its magic! &#x1FA84; Degoogled? Multi-Search mode has your back! &#x1F680;</string>
     <string name="section_search_engines">Search Engines</string>
-    <string name="hint_tab_sequence">Tap arrows to change tab sequence</string>
+    <string name="hint_tab_sequence">Long-press a search engine and drag to reorder</string>
+    <string name="settings_rearrange_tabs_title">Rearrange tabs</string>
+    <string name="settings_rearrange_tabs_subtitle">Long-press a chip and drag to change tab order</string>
+    <string name="settings_tabs_section_multi">Multi-search</string>
+    <string name="settings_tabs_section_web">Web search</string>
+    <string name="settings_dev_title">AKS Labs</string>
+    <string name="settings_dev_subtitle">Maker of Circle to Search</string>
+    <string name="label_github">GitHub</string>
+    <string name="label_telegram">Telegram</string>
+    <string name="label_more_apps">More apps</string>
 
     <!-- Overlay Settings Screen -->
     <string name="title_overlay_settings">Overlay Settings</string>

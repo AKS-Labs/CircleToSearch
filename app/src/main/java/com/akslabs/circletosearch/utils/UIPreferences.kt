@@ -35,6 +35,7 @@ class UIPreferences(context: Context) {
         private const val KEY_SHOW_GRADIENT_BORDER = "show_gradient_border"
         private const val KEY_SHOW_FRIENDLY_MESSAGES = "show_friendly_messages"
         private const val KEY_SEARCH_ENGINE_ORDER = "search_engine_order"
+        private const val KEY_WEB_ENGINE_ORDER = "web_engine_order"
         private const val KEY_USE_GOOGLE_LENS_ONLY = "use_google_lens_only"
         private const val KEY_SEARCH_METHOD = "search_method"
         private const val KEY_ASK_EVERY_TIME = "ask_every_time"
@@ -177,6 +178,13 @@ class UIPreferences(context: Context) {
 
     fun setSearchEngineOrder(order: String) {
         prefs.edit().putString(KEY_SEARCH_ENGINE_ORDER, order).apply()
+    }
+
+    // Web-search (privacy engines) tab order, same comma-joined name format.
+    fun getWebEngineOrder(): String? = prefs.getString(KEY_WEB_ENGINE_ORDER, null)
+
+    fun setWebEngineOrder(order: String) {
+        prefs.edit().putString(KEY_WEB_ENGINE_ORDER, order).apply()
     }
 
     // Multi-search preloading: which image-search engines load their tabs

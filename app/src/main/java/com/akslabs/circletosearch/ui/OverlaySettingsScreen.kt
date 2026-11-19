@@ -9,6 +9,7 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -33,6 +34,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
@@ -63,6 +65,10 @@ import dev.davidv.translator.MainActivity as TranslatorMainActivity
 
 private const val NAV_TRANSITION_MS = 320
 private val NavEasing = CubicBezierEasing(0.2f, 0f, 0f, 1f)
+
+private const val DEV_GITHUB_URL = "https://github.com/AKS-Labs/CircleToSearch"
+private const val DEV_TELEGRAM_URL = "https://t.me/akslabs"
+private const val DEV_MORE_APPS_URL = "https://play.google.com/store/apps/dev?id=5379443231912092235"
 
 private sealed class SettingsPage {
     object Root : SettingsPage()
@@ -250,11 +256,120 @@ private fun SettingsRootScreen(
     onBack: () -> Unit,
     onNavigate: (SettingsPage) -> Unit
 ) {
+    val context = LocalContext.current
+    var showDonateSheet by remember { mutableStateOf(false) }
     SettingsDetailScaffold(
         title = stringResource(R.string.title_settings),
         onBack = onBack
     ) {
         Spacer(modifier = Modifier.height(8.dp))
+        DevCard(onOpenDonate = { showDonateSheet = true })
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Multi-search preloading lives directly on this screen: which engines
+        // load their result tabs automatically and which wait for a manual load.
+        PreloadEnginesCard(uiPreferences = state.uiPreferences)
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Rearrange tabs — M3 expressive expandable card: the header toggles it and the
+        // arrow flips; expanded shows BOTH tab strips (multi-search engines + Web-search
+        // engines). The card is drawn with a background shape instead of a clipping
+        // Surface so dragged chips stay visible outside its bounds.
+        var tabReorderExpanded by remember { mutableStateOf(false) }
+        val arrowRotation by animateFloatAsState(if (tabReorderExpanded) 180f else 0f, label = "rearrangeArrow")
+        val imageOrder = remember {
+            val all = SearchEngine.values()
+            val preferred = state.uiPreferences.getSearchEngineOrder()?.split(",")?.mapNotNull { name ->
+                all.find { it.name == name }
+            } ?: emptyList()
+            (preferred + all.filter { !preferred.contains(it) }).toMutableStateList()
+        }
+        val webOrder = remember {
+            val all = PrivacySearchEngine.values()
+            val preferred = state.uiPreferences.getWebEngineOrder()?.split(",")?.mapNotNull { name ->
+                all.find { it.name == name }
+            } ?: emptyList()
+            (preferred + all.filter { !preferred.contains(it) }).toMutableStateList()
+        }
+        LaunchedEffect(imageOrder.toList()) {
+            state.uiPreferences.setSearchEngineOrder(imageOrder.joinToString(",") { it.name })
+        }
+        LaunchedEffect(webOrder.toList()) {
+            state.uiPreferences.setWebEngineOrder(webOrder.joinToString(",") { it.name })
+        }
+
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surfaceContainerLow, RoundedCornerShape(28.dp)),
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { tabReorderExpanded = !tabReorderExpanded }
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = Icons.Default.SwapVert,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(22.dp),
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.settings_rearrange_tabs_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = stringResource(R.string.settings_rearrange_tabs_subtitle),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Icon(
+                    imageVector = Icons.Default.KeyboardArrowDown,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.rotate(arrowRotation),
+                )
+            }
+            AnimatedVisibility(visible = tabReorderExpanded) {
+                Column {
+                    Text(
+                        text = stringResource(R.string.settings_tabs_section_multi),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+                    )
+                    EngineOrderChipsRow(
+                        imageOrder,
+                        { it.getDisplayName(context) },
+                        { it.iconRes },
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = stringResource(R.string.settings_tabs_section_web),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+                    )
+                    EngineOrderChipsRow(
+                        webOrder,
+                        { it.getDisplayName(context) },
+                        { it.iconRes },
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
         SettingsGroup {
             SettingsCategoryRow(
                 icon = Icons.Default.Info,
@@ -265,12 +380,131 @@ private fun SettingsRootScreen(
         }
 
         Spacer(modifier = Modifier.height(24.dp))
+    }
 
-        // Multi-search preloading lives directly on this screen: which engines
-        // load their result tabs automatically and which wait for a manual load.
-        PreloadEnginesCard(uiPreferences = state.uiPreferences)
+    if (showDonateSheet) {
+        DonateBottomSheet(
+            onDismiss = { showDonateSheet = false },
+            onDonateOptionSelected = { url ->
+                try {
+                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                } catch (_: Exception) {
+                }
+            },
+        )
+    }
+}
 
-        Spacer(modifier = Modifier.height(24.dp))
+/** M3 expressive developer card at the top of Additional settings: brand header and
+ *  the social links (GitHub, Telegram, More apps) plus the donate sheet trigger. */
+@Composable
+private fun DevCard(onOpenDonate: () -> Unit) {
+    val context = LocalContext.current
+    Card(
+        shape = RoundedCornerShape(28.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.RocketLaunch,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp),
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text(
+                        text = stringResource(R.string.settings_dev_title),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.ExtraBold,
+                    )
+                    Text(
+                        text = stringResource(R.string.settings_dev_subtitle),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(14.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+            ) {
+                DevLink(label = stringResource(R.string.label_github), onClick = {
+                    try {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(DEV_GITHUB_URL)))
+                    } catch (_: Exception) {
+                    }
+                }) {
+                    Image(
+                        painter = painterResource(R.drawable.ic_github),
+                        contentDescription = null,
+                        modifier = Modifier.size(26.dp),
+                        colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.onSurface),
+                    )
+                }
+                DevLink(label = stringResource(R.string.label_telegram), onClick = {
+                    try {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(DEV_TELEGRAM_URL)))
+                    } catch (_: Exception) {
+                    }
+                }) {
+                    Image(
+                        painter = painterResource(R.drawable.ic_telegram),
+                        contentDescription = null,
+                        modifier = Modifier.size(26.dp),
+                        colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.onSurface),
+                    )
+                }
+                DevLink(label = stringResource(R.string.label_more_apps), onClick = {
+                    try {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(DEV_MORE_APPS_URL)))
+                    } catch (_: Exception) {
+                    }
+                }) {
+                    Icon(
+                        imageVector = Icons.Default.Apps,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(26.dp),
+                    )
+                }
+                DevLink(label = stringResource(R.string.btn_donate), onClick = onOpenDonate) {
+                    Icon(
+                        imageVector = Icons.Default.FavoriteBorder,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(26.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** One social entry of the dev card: icon over a small label, whole thing tappable. */
+@Composable
+private fun DevLink(
+    label: String,
+    onClick: () -> Unit,
+    icon: @Composable () -> Unit,
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .clip(RoundedCornerShape(16.dp))
+            .clickable { onClick() }
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+    ) {
+        icon()
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
