@@ -603,6 +603,11 @@ fun CircleToSearchScreen(
     var selectedQrResult by remember { mutableStateOf<QrResultWithBounds?>(null) }
     
     // Phase 44: Smart Entity Extractor
+    // SmartScan runs automatically: when the instant OCR for a capture finishes, its
+    // words are handed to the entity extractor (see LaunchedEffect below) and chips
+    // appear over the capture. isEntityExtractMode itself stays the MANUAL focused
+    // mode (bottom-bar button, currently commented out) that hides the other UI and
+    // exits on tap — the automatic chips do not need it.
     var isEntityExtractMode by remember { mutableStateOf(false) }
     var detectedEntities by remember { mutableStateOf<List<SmartEntity>>(emptyList()) }
     var isExtractingEntities by remember { mutableStateOf(false) }
@@ -956,6 +961,71 @@ fun CircleToSearchScreen(
     // A degenerate stroke (long-press drift, flat line) mapped into image space: handed to
     // the word overlay to select the words under it instead of cropping a useless image.
     var pendingWordSelectRegion by remember { mutableStateOf<android.graphics.Rect?>(null) }
+
+    // Live "already extracted this capture" marker so the SmartScan pass below runs
+    // once per canvas image, not on every recomposition.
+    var lastScanGeneration by remember { mutableStateOf(-1) }
+
+    // SmartScan auto-pass: when the instant OCR for the current capture completes, run
+    // the entity extraction over the ALREADY-recognized words — no second OCR pass and
+    // no extra scan animation; the chips simply appear when the OCR animation finishes.
+    // Pure regex over the word text, fast enough to run inline on the main thread.
+    LaunchedEffect(instantWords, entityScanGeneration) {
+        val sourceWords = instantWords?.sourceWords ?: return@LaunchedEffect
+        if (lastScanGeneration == entityScanGeneration) return@LaunchedEffect
+        lastScanGeneration = entityScanGeneration
+        val entities = mutableListOf<SmartEntity>()
+
+        val urlRegex = android.util.Patterns.WEB_URL.toRegex()
+        val emailRegex = android.util.Patterns.EMAIL_ADDRESS.toRegex()
+        val phoneRegexLine = Regex("""(\+?[\d\s\-\(\).]{9,20})""")
+        val upiRegex = Regex("""[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z]{2,64}""")
+
+        // Group recognized words into lines; phone matches map into
+        // the line's union bounds by character ratio, like before.
+        sourceWords.groupBy { it.lineIndex }.forEach { (_, lineWords) ->
+            val lineText = lineWords.joinToString(" ") { it.text }
+            var left = Float.MAX_VALUE
+            var top = Float.MAX_VALUE
+            var right = -Float.MAX_VALUE
+            var bottom = -Float.MAX_VALUE
+            lineWords.forEach { w ->
+                left = min(left, w.bounds.cx - w.bounds.width / 2f)
+                top = min(top, w.bounds.cy - w.bounds.height / 2f)
+                right = max(right, w.bounds.cx + w.bounds.width / 2f)
+                bottom = max(bottom, w.bounds.cy + w.bounds.height / 2f)
+            }
+            phoneRegexLine.findAll(lineText).forEach { match ->
+                val phoneCandidate = match.value.trim()
+                if (phoneCandidate.count { it.isDigit() } >= 10) {
+                    val startIdx = match.range.first
+                    val endIdx = match.range.last + 1
+                    val ratioStart = startIdx.toFloat() / lineText.length.coerceAtLeast(1)
+                    val ratioEnd = endIdx.toFloat() / lineText.length.coerceAtLeast(1)
+                    val entityBounds = android.graphics.RectF(
+                        left + (ratioStart * (right - left)),
+                        top,
+                        left + (ratioEnd * (right - left)),
+                        bottom
+                    )
+                    entities.add(SmartEntity.Phone(phoneCandidate, entityBounds, context.getString(R.string.entity_type_phone)))
+                }
+            }
+        }
+        sourceWords.forEach { word ->
+            val txt = word.text.trim()
+            val wordBounds = android.graphics.RectF(
+                word.bounds.cx - word.bounds.width / 2f,
+                word.bounds.cy - word.bounds.height / 2f,
+                word.bounds.cx + word.bounds.width / 2f,
+                word.bounds.cy + word.bounds.height / 2f
+            )
+            if (emailRegex.matches(txt)) entities.add(SmartEntity.Email(txt, wordBounds, context.getString(R.string.entity_type_email)))
+            else if (upiRegex.matches(txt)) entities.add(SmartEntity.Upi(txt, wordBounds, context.getString(R.string.entity_type_upi)))
+            else if (urlRegex.matches(txt)) entities.add(SmartEntity.Url(txt, wordBounds, context.getString(R.string.entity_type_link)))
+        }
+        detectedEntities = entities
+    }
 
     // Circle-draw gesture handlers, shared by the drag-detector wrapper above the drawing
     // layer (see "Circle-draw gestures" below). Plain drags draw; handle grabs and taps are
@@ -2960,6 +3030,10 @@ fun CircleToSearchScreen(
 
                             // Smart Entity Extractor — instant OCR over the screenshot using
                             // the translator module's recognition (no Tesseract, no re-OCR).
+                            // COMMENTED OUT: SmartScan now runs automatically (default on) —
+                            // extraction now runs automatically when the OCR completes. Restore this
+                            // button to bring back manual triggering:
+                            /*
                             BottomBarButton(stringResource(R.string.label_smartscan), { Icon(Icons.Default.Search, null, modifier = Modifier.size(22.dp)) }) {
                                 isEntityExtractMode = true
                                 if (detectedEntities.isEmpty() && !isExtractingEntities) {
@@ -3035,6 +3109,7 @@ fun CircleToSearchScreen(
                                     }
                                 }
                             }
+                            */
 
                             // Donate
 //                            BottomBarButton("Donate", { Icon(painterResource(id = com.akslabs.circletosearch.R.drawable.donation), null, modifier = Modifier.size(22.dp)) }) {
@@ -3329,7 +3404,7 @@ fun CircleToSearchScreen(
         }
 
         // --- Phase 44: Smart Entity Extractor Overlay Chips ---
-        if (isEntityExtractMode && screenshot != null) {
+        if (detectedEntities.isNotEmpty() && screenshot != null) {
             BoxWithConstraints(modifier = Modifier.fillMaxSize().zIndex(2600f)) {
                 val screenWidth = maxWidth
                 val screenHeight = maxHeight
@@ -3375,6 +3450,7 @@ fun CircleToSearchScreen(
                                     }
                                     intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
                                     context.startActivity(intent)
+                                    detectedEntities = emptyList()
                                     isEntityExtractMode = false
                                 } catch (e: Exception) {}
                             },
@@ -3397,6 +3473,7 @@ fun CircleToSearchScreen(
                                     }
                                     intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
                                     context.startActivity(intent)
+                                    detectedEntities = emptyList()
                                     isEntityExtractMode = false
                                 } catch (e: Exception) {}
                             },
