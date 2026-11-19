@@ -7,6 +7,8 @@ import dev.davidv.translator.DownloadEvent
 import dev.davidv.translator.DownloadService
 import dev.davidv.translator.Language
 import dev.davidv.translator.OverlayLanguagePickerRow
+import dev.davidv.translator.languageNameComparator
+import dev.davidv.translator.localizedName
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -114,6 +116,15 @@ class OverlayMenuManager(
             }
           favoriteOverrides[base.language.code]?.let { base.copy(favorite = it) } ?: base
         }.let { rows ->
+          // The override above can flip a favorite after rowsProvider already
+          // sorted with the persisted state — re-sort with the same keys so a
+          // newly pinned language jumps to the top the instant it's pinned.
+          rows.sortedWith(
+            compareByDescending<OverlayLanguagePickerRow> { it.favorite }
+              .thenByDescending { it.installed }
+              .thenBy(languageNameComparator()) { it.language.localizedName() },
+          )
+        }.let { rows ->
           pinnedDownloadCode?.let { pin ->
             rows.sortedBy { it.language.code != pin }
           } ?: rows
@@ -166,6 +177,9 @@ class OverlayMenuManager(
         },
         onToggleFavorite = { language, favorite ->
           favoriteOverrides[language.code] = favorite
+          // Re-sort immediately: favorites sort first, so the pinned language
+          // moves without waiting for the picker to reopen.
+          handle?.setRows(liveRowsProvider())
           onToggleFavorite(language, favorite)
         },
       )

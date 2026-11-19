@@ -2474,11 +2474,18 @@ fun CircleToSearchScreen(
                             androidx.compose.material3.DropdownMenuItem(
                                 text = { Text(stringResource(R.string.ocr_lang_title)) },
                                 leadingIcon = {
-                                    Icon(
-                                        painter = painterResource(id = com.akslabs.circletosearch.R.drawable.ocr),
-                                        contentDescription = null,
-                                        modifier = Modifier.size(18.dp)
-                                    )
+                                    // Keep the standard 24dp slot so the text aligns
+                                    // with the other items; center the smaller glyph.
+                                    Box(
+                                        modifier = Modifier.size(24.dp),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        Icon(
+                                            painter = painterResource(id = com.akslabs.circletosearch.R.drawable.ocr),
+                                            contentDescription = null,
+                                            modifier = Modifier.size(18.dp),
+                                        )
+                                    }
                                 },
                                 onClick = {
                                     showOcrLangDialog = true
