@@ -21,6 +21,7 @@ package com.akslabs.circletosearch.utils
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.akslabs.circletosearch.data.SearchEngine
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.channels.awaitClose
@@ -176,5 +177,14 @@ class UIPreferences(context: Context) {
 
     fun setSearchEngineOrder(order: String) {
         prefs.edit().putString(KEY_SEARCH_ENGINE_ORDER, order).apply()
+    }
+
+    // Multi-search preloading: which image-search engines load their tabs
+    // automatically. Disabled engines show a manual-load placeholder instead.
+    fun isPreloadEnabled(engine: SearchEngine): Boolean =
+        prefs.getBoolean("preload_${engine.name}", true)
+
+    fun setPreloadEnabled(engine: SearchEngine, enabled: Boolean) {
+        prefs.edit().putBoolean("preload_${engine.name}", enabled).apply()
     }
 }

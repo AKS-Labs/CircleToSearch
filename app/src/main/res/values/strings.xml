@@ -366,6 +366,16 @@
     <string name="engine_yandex">Yandex</string>
     <string name="engine_tineye">TinEye</string>
 
+    <!-- Multi-search preloading -->
+    <string name="settings_preload_title">Preload search engines</string>
+    <string name="preload_sub_on">Preloads automatically in multi-search</string>
+    <string name="preload_sub_off">Loads only when you open its tab</string>
+    <string name="preload_off_title">Preloading is off for %1$s</string>
+    <string name="preload_off_note">This tab stays empty until you load it.</string>
+    <string name="preload_on_note">This tab will preload from your next search.</string>
+    <string name="preload_load_now">Load now</string>
+    <string name="preload_turn_on">Turn on preloading</string>
+
     <!-- Privacy web-search engines (text-selection "Web search" sheet) -->
     <string name="engine_duckduckgo">DuckDuckGo</string>
     <string name="engine_brave">Brave Search</string>

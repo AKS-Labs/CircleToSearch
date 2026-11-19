@@ -10,12 +10,14 @@ import android.net.Uri
 import android.provider.Settings
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -30,7 +32,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
@@ -43,6 +49,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import com.akslabs.circletosearch.R
 import com.akslabs.circletosearch.CircleToSearchAccessibilityService
@@ -183,6 +190,7 @@ fun OverlaySettingsScreen(
         ) { page ->
             when (page) {
                 SettingsPage.Root -> SettingsRootScreen(
+                    state = state,
                     onBack = onBack,
                     onNavigate = { backStack.add(it) }
                 )
@@ -238,10 +246,10 @@ private fun SettingsDetailScaffold(
 
 @Composable
 private fun SettingsRootScreen(
+    state: OverlaySettingsState,
     onBack: () -> Unit,
     onNavigate: (SettingsPage) -> Unit
 ) {
-    val context = LocalContext.current
     SettingsDetailScaffold(
         title = stringResource(R.string.title_settings),
         onBack = onBack
@@ -257,6 +265,104 @@ private fun SettingsRootScreen(
         }
 
         Spacer(modifier = Modifier.height(24.dp))
+
+        // Multi-search preloading lives directly on this screen: which engines
+        // load their result tabs automatically and which wait for a manual load.
+        PreloadEnginesCard(uiPreferences = state.uiPreferences)
+
+        Spacer(modifier = Modifier.height(24.dp))
+    }
+}
+
+/** Per-engine preloading for multi-search as a compact M3 expressive card: the
+ *  engines' favicons in one row, each acting as a switch — desaturated and
+ *  dimmed when preloading is off for that engine. */
+@Composable
+private fun PreloadEnginesCard(uiPreferences: UIPreferences) {
+    var preloadMap by remember {
+        mutableStateOf(SearchEngine.values().associateWith { uiPreferences.isPreloadEnabled(it) })
+    }
+    Card(
+        shape = RoundedCornerShape(28.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Default.Refresh,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp),
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    text = stringResource(R.string.settings_preload_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+            Spacer(modifier = Modifier.height(14.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+            ) {
+                SearchEngine.values().forEach { engine ->
+                    EnginePreloadChip(
+                        engine = engine,
+                        enabled = preloadMap[engine] ?: true,
+                        onToggle = { on ->
+                            uiPreferences.setPreloadEnabled(engine, on)
+                            preloadMap = preloadMap + (engine to on)
+                        },
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** One engine favicon acting as a switch: tap toggles preloading. On chips
+ *  show the full-color favicon; off chips desaturate, dim and shrink it. */
+@Composable
+private fun EnginePreloadChip(
+    engine: SearchEngine,
+    enabled: Boolean,
+    onToggle: (Boolean) -> Unit,
+) {
+    val context = LocalContext.current
+    val chipScale by animateFloatAsState(if (enabled) 1f else 0.78f, label = "preloadChipScale")
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .clip(RoundedCornerShape(16.dp))
+            .clickable { onToggle(!enabled) }
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+    ) {
+        Image(
+            painter = painterResource(engine.iconRes),
+            contentDescription =
+                "${engine.getDisplayName(context)} — " +
+                stringResource(if (enabled) R.string.preload_sub_on else R.string.preload_sub_off),
+            modifier = Modifier
+                .size(44.dp)
+                .graphicsLayer {
+                    scaleX = chipScale
+                    scaleY = chipScale
+                    alpha = if (enabled) 1f else 0.45f
+                },
+            colorFilter = if (enabled) null else ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(0f) }),
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = engine.getDisplayName(context),
+            style = MaterialTheme.typography.labelSmall,
+            color = if (enabled) {
+                MaterialTheme.colorScheme.onSurface
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
+            },
+        )
     }
 }
 

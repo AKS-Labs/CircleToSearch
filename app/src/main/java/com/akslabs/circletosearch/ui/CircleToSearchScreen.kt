@@ -125,11 +125,13 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -644,6 +646,18 @@ fun CircleToSearchScreen(
 
     // Track initialized engines for Smart Loading
     val initializedEngines = remember { mutableStateListOf<SearchEngine>() }
+
+    // Multi-search preloading: engines the user turned off don't auto-load —
+    // their tab shows a manual-load placeholder instead. Mirrored in state so
+    // toggling from the placeholder updates the sheet immediately.
+    var preloadEnabled by remember(searchEngines) {
+        mutableStateOf(searchEngines.associateWith { uiPreferences.isPreloadEnabled(it) })
+    }
+
+    // Search-time snapshot of which engines auto-load this session, so a
+    // mid-session preference flip can't leave a pending tab hanging on the
+    // loader with nothing ever initializing it.
+    var autoLoadEngines by remember { mutableStateOf(emptySet<SearchEngine>()) }
 
     // Keep the tab strip background equal to the webpage's own background so
     // the sheet never shows a Material color that clashes with the page.
@@ -1268,17 +1282,22 @@ fun CircleToSearchScreen(
                 }
                     
                 // SMART LOADING SEQUENCE
+                // Snapshot which engines auto-load this session — engines with
+                // preloading off stay on the manual placeholder until the user
+                // loads them, even if the preference flips mid-session.
+                autoLoadEngines = searchEngines.filter { preloadEnabled[it] ?: true }.toSet()
+
                 // First, ensure selected engine is initialized
-                if (!initializedEngines.contains(selectedEngine)) {
+                if (selectedEngine in autoLoadEngines && !initializedEngines.contains(selectedEngine)) {
                     initializedEngines.add(selectedEngine)
                 }
-                    
+
                 isLoading = false
-                    
+
                 // Then, load others sequentially
                 scope.launch {
                     searchEngines.forEach { engine ->
-                        if (engine != selectedEngine) {
+                        if (engine != selectedEngine && engine in autoLoadEngines) {
                             delay(300) // Reduced from 800ms for faster loading
                             if (!initializedEngines.contains(engine)) {
                                 initializedEngines.add(engine)
@@ -1787,14 +1806,16 @@ fun CircleToSearchScreen(
                         val transition = androidx.compose.animation.core.updateTransition(targetState = selected, label = "TabSelect")
                         val scale by transition.animateFloat(label = "Scale") { if (it) 1.05f else 1f }
                         val alpha by transition.animateFloat(label = "Alpha") { if (it) 1f else 0.7f }
+                        // Quiet cue: tabs of engines with preloading off sit dimmer.
+                        val preloadDim = if (preloadEnabled[engine] == false) 0.55f else 1f
 
                         Tab(
                             selected = selected,
                             onClick = { selectedEngine = engine },
-                            modifier = Modifier.graphicsLayer { 
+                            modifier = Modifier.graphicsLayer {
                                 scaleX = scale
                                 scaleY = scale
-                                this.alpha = alpha
+                                this.alpha = alpha * preloadDim
                             },
                             text = {
                                 Text(
@@ -1827,6 +1848,7 @@ fun CircleToSearchScreen(
                     searchUrl = null
                     preloadedUrls.clear()
                     initializedEngines.clear() // Reset smart loading
+                    autoLoadEngines = emptySet()
                     // Never carry the previous page's sampled tint into a new
                     // search — start clean (white) until this page is sampled.
                     pageBackgroundColor = Color.White
@@ -1897,19 +1919,92 @@ fun CircleToSearchScreen(
                     },
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    // Show loading only if the SELECTED engine isn't ready or just starting
-                    if (isLoading || (preloadedUrls.containsKey(selectedEngine) && !webViews.containsKey(selectedEngine))) {
+                    // Show loading only if the SELECTED engine isn't ready or just starting.
+                    // Engines with preloading off show the manual-load placeholder instead.
+                    val selectedInitialized = initializedEngines.contains(selectedEngine)
+                    val selectedPendingAuto = selectedEngine in autoLoadEngines
+                    val selectedPreloadOn = preloadEnabled[selectedEngine] ?: true
+                    if (isLoading || ((selectedInitialized || selectedPendingAuto) && preloadedUrls.containsKey(selectedEngine) && !webViews.containsKey(selectedEngine))) {
                          // We delay showing the loader slightly to avoid flicker if WebView attaches instantly
                         var showLoader by remember { mutableStateOf(false) }
                         LaunchedEffect(Unit) {
                             kotlinx.coroutines.delay(100)
                             showLoader = true
                         }
-                        
+
                         if (showLoader || isLoading) {
                              Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                 ContainedLoadingIndicatorSample()
                              }
+                        }
+                    } else if (!selectedInitialized && !selectedPendingAuto && preloadedUrls.containsKey(selectedEngine)) {
+                        // Preloading off for this engine: nothing loads until the user acts.
+                        // The sheet column is 800dp tall but peek height shows only its
+                        // upper half — a centered placeholder falls below the fold. Lift
+                        // it into view while not expanded; it eases back to center as
+                        // the sheet expands.
+                        val sheetExpanded = scaffoldState.bottomSheetState.targetValue == SheetValue.Expanded
+                        val placeholderLift by animateFloatAsState(if (sheetExpanded) 0f else 1f, label = "preloadPlaceholderLift")
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                // Other engines' background WebViews stack above this Box
+                                // (alpha 0 but still hit-testable) and swallow every tap —
+                                // draw above them and shield empty areas from touches.
+                                .zIndex(2f)
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null,
+                                ) {}
+                                .padding(32.dp)
+                                .graphicsLayer { translationY = -placeholderLift * 220.dp.toPx() },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Image(
+                                    painter = painterResource(id = selectedEngine.iconRes),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(56.dp),
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Text(
+                                    text = stringResource(R.string.preload_off_title, selectedEngine.getDisplayName(context)),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    textAlign = TextAlign.Center,
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = stringResource(
+                                        if (selectedPreloadOn) R.string.preload_on_note else R.string.preload_off_note
+                                    ),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    textAlign = TextAlign.Center,
+                                )
+                                Spacer(modifier = Modifier.height(20.dp))
+                                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    FilledTonalButton(onClick = {
+                                        if (!initializedEngines.contains(selectedEngine)) {
+                                            initializedEngines.add(selectedEngine)
+                                        }
+                                    }) {
+                                        Text(stringResource(R.string.preload_load_now))
+                                    }
+                                    if (!selectedPreloadOn) {
+                                        OutlinedButton(onClick = {
+                                            uiPreferences.setPreloadEnabled(selectedEngine, true)
+                                            preloadEnabled = preloadEnabled + (selectedEngine to true)
+                                            // Turning it on also loads the tab now — the
+                                            // placeholder's job is done either way.
+                                            if (!initializedEngines.contains(selectedEngine)) {
+                                                initializedEngines.add(selectedEngine)
+                                            }
+                                        }) {
+                                            Text(stringResource(R.string.preload_turn_on))
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
 
