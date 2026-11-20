@@ -677,6 +677,7 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         // (notification shade / quick settings on the status bar, the app under a strip).
         var lastScrollForwardAt = 0L
         var scrollForwardedThisGesture = false
+        var shadeOpenedThisGesture = false
         val gestureDetector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
             override fun onDoubleTap(e: MotionEvent): Boolean {
                 val action = segment.gestures[GestureType.DOUBLE_TAP] ?: ActionType.NONE
@@ -686,7 +687,22 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
             
             override fun onLongPress(e: MotionEvent) {
                 val action = segment.gestures[GestureType.LONG_PRESS] ?: ActionType.NONE
-                if (action != ActionType.NONE) performAction(action, segment)
+                if (action != ActionType.NONE) {
+                    performAction(action, segment)
+                } else {
+                    // No long-press action configured on this strip: forward the hold to the
+                    // system below so native status-bar long-presses still work (recorder
+                    // controls, media chip options, etc.). A held synthetic stroke at the
+                    // point reads as a long-press to the element underneath.
+                    forwardPassthroughGesture(
+                        view,
+                        android.graphics.Path().apply {
+                            moveTo(e.rawX, e.rawY)
+                            lineTo(e.rawX + 1f, e.rawY)
+                        },
+                        550,
+                    )
+                }
             }
 
             override fun onScroll(e1: MotionEvent?, e2: MotionEvent, distanceX: Float, distanceY: Float): Boolean {
@@ -708,6 +724,23 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
                 // A configured custom action wins: don't forward, let the fling handler trigger it.
                 val custom = segment.gestures[direction]
                 if (custom != null && custom != ActionType.NONE) return false
+                // Status-bar strip: a drag here IS the shade pull. Forwarding only replays a
+                // short synthetic stroke — the flag flip cancels the real touch stream, so slow
+                // pulls died mid-way and the shade felt blocked. Open the shade directly
+                // instead (same split as the Smart Swipe fling), once per gesture.
+                val screenWidth = resources.displayMetrics.widthPixels
+                if (direction == GestureType.SWIPE_DOWN && segmentIndex == 0 && segment.width >= screenWidth) {
+                    if (!shadeOpenedThisGesture) {
+                        shadeOpenedThisGesture = true
+                        scrollForwardedThisGesture = true
+                        if (e1.rawX < screenWidth / 2) {
+                            performGlobalAction(GLOBAL_ACTION_NOTIFICATIONS)
+                        } else {
+                            performGlobalAction(GLOBAL_ACTION_QUICK_SETTINGS)
+                        }
+                    }
+                    return true
+                }
                 // Otherwise forward the drag so the system below still tracks it
                 // (e.g. pulling down the notification shade / quick settings on the status bar).
                 val now = android.os.SystemClock.uptimeMillis()
@@ -817,6 +850,7 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         view.setOnTouchListener { _, event ->
              if (event.action == MotionEvent.ACTION_DOWN) {
                 scrollForwardedThisGesture = false
+                shadeOpenedThisGesture = false
                 val currentTime = System.currentTimeMillis()
                 if (currentTime - lastTapTime < 400) {
                     tapCount++
@@ -2445,15 +2479,17 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
             // service can't dispatch): restore immediately instead of waiting forever.
             if (!dispatched) restore()
             // Safety net: never leave the window untouchable for more than a moment.
-            handler.postDelayed({ restore() }, durationMs + 1000L)
-        }, 100)
+            handler.postDelayed({ restore() }, durationMs + 600L)
+        }, 40)
     }
 
     /**
-     * A transparent, click-through overlay that sits at a bottom corner (arc) or bottom-centre
-     * (semicircle). It only reacts to a LONG-PRESS (which triggers Circle to Search); taps and
-     * swipes are forwarded to the app underneath so it never blocks normal interaction.
-     * When [isPreview] is true it draws a translucent filled shape so the user can see/size it.
+     * A transparent trigger zone that sits at a bottom corner (arc) or bottom-centre
+     * (semicircle). It is a PURE long-press trigger: every touch inside its box is
+     * consumed and nothing is forwarded to the app underneath — forwarding made the
+     * window briefly untouchable, which transferred long-presses to whatever was
+     * beneath and made the trigger unreliable. When [isPreview] is true it draws a
+     * translucent filled shape so the user can see/size it.
      */
     private inner class BottomEdgeOverlayView(
         context: android.content.Context,
@@ -2470,25 +2506,17 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         private val touchSlop = android.view.ViewConfiguration.get(context).scaledTouchSlop
         // Long-press stays alive while the finger drifts a little, and lasts a bit
         // longer than the system default: at 400ms + 1.5x slop, quick or slightly
-        // shaky corner presses regularly failed to register (the tap got forwarded
-        // to the app underneath with no haptic and no trigger), which made the
+        // shaky corner presses regularly failed to register, which made the
         // gesture feel unreliable.
         private val longPressSlop = touchSlop * 2.5f
         private val longPressTimeoutMs = 500L
-        // Minimum gap between forwarded scroll segments (each one briefly makes the
-        // window untouchable and dispatches a synthetic gesture).
-        private val scrollForwardIntervalMs = 180L
 
         private var downX = 0f
         private var downY = 0f
-        private var lastScrollRawX = 0f
-        private var lastScrollRawY = 0f
-        private var lastScrollForwardAt = 0L
         private var longPressConsumed = false
-        private var scrollForwarded = false
 
         private val longPressRunnable = Runnable {
-            if (longPressConsumed || scrollForwarded) return@Runnable
+            if (longPressConsumed) return@Runnable
             longPressConsumed = true
             hapticClick()
             performCapture(null)
@@ -2503,35 +2531,9 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
             }
         }
 
-        private fun forwardPath(path: android.graphics.Path, durationMs: Long) {
-            forwardPassthroughGesture(this@BottomEdgeOverlayView, path, durationMs)
-        }
-
         override fun onDetachedFromWindow() {
             handler.removeCallbacksAndMessages(null)
             super.onDetachedFromWindow()
-        }
-
-        /** Hit test: only the shaped region consumes touches; the bounding-box corners pass through. */
-        private fun hitTest(x: Float, y: Float): Boolean {
-            val w = width.toFloat()
-            val h = height.toFloat()
-            return when (shape) {
-                BottomEdgeShape.ARC_LEFT -> {
-                    // Quarter disc centred at bottom-left corner (0, h), radius = w.
-                    val dx = x; val dy = h - y
-                    dx * dx + dy * dy <= w * w
-                }
-                BottomEdgeShape.ARC_RIGHT -> {
-                    val dx = w - x; val dy = h - y
-                    dx * dx + dy * dy <= w * w
-                }
-                BottomEdgeShape.SEMICIRCLE -> {
-                    // Half disc centred at (w/2, h), radius = h, upper half only.
-                    val dx = x - w / 2f; val dy = h - y
-                    dy >= 0f && dx * dx + dy * dy <= h * h
-                }
-            }
         }
 
         override fun onDraw(canvas: android.graphics.Canvas) {
@@ -2589,16 +2591,11 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         override fun onTouchEvent(event: MotionEvent): Boolean {
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
-                    // Only the shaped region consumes touches; the bounding-box
-                    // corners pass straight through to the app underneath.
-                    if (!hitTest(event.x, event.y)) return false
+                    // Consume the WHOLE bounding box — the box is the trigger zone and
+                    // nothing here is click-through.
                     downX = event.x
                     downY = event.y
-                    lastScrollRawX = event.rawX
-                    lastScrollRawY = event.rawY
-                    lastScrollForwardAt = 0L
                     longPressConsumed = false
-                    scrollForwarded = false
                     handler.removeCallbacks(longPressRunnable)
                     handler.postDelayed(longPressRunnable, longPressTimeoutMs)
                     return true
@@ -2609,34 +2606,15 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
                     val dy = event.y - downY
                     val dist = Math.sqrt((dx * dx + dy * dy).toDouble()).toFloat()
                     if (dist > longPressSlop) {
-                        // Moved like a swipe: cancel the pending long-press and keep
-                        // forwarding the drag so the app underneath still scrolls.
-                        if (!scrollForwarded) {
-                            scrollForwarded = true
-                            handler.removeCallbacks(longPressRunnable)
-                        }
-                        val now = android.os.SystemClock.uptimeMillis()
-                        if (now - lastScrollForwardAt >= scrollForwardIntervalMs) {
-                            lastScrollForwardAt = now
-                            val path = android.graphics.Path().apply {
-                                moveTo(lastScrollRawX, lastScrollRawY)
-                                lineTo(event.rawX, event.rawY)
-                            }
-                            lastScrollRawX = event.rawX
-                            lastScrollRawY = event.rawY
-                            forwardPath(path, 120)
-                        }
+                        // Finger drift on a held long-press: re-anchor and keep waiting —
+                        // the trigger wins over anything beneath.
+                        downX = event.x
+                        downY = event.y
                     }
-                    // Small drift keeps the long-press timer running (jitter tolerant).
                     return true
                 }
                 MotionEvent.ACTION_UP -> {
                     handler.removeCallbacks(longPressRunnable)
-                    if (!longPressConsumed && !scrollForwarded) {
-                        // Stationary release = tap: forward immediately so taps behave
-                        // exactly like they do without the overlay.
-                        forwardPath(android.graphics.Path().apply { moveTo(event.rawX, event.rawY) }, 50)
-                    }
                     return true
                 }
                 MotionEvent.ACTION_CANCEL -> {
