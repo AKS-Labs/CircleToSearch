@@ -40,6 +40,7 @@ import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Assistant
 import androidx.compose.material.icons.filled.Layers
+import androidx.compose.material.icons.filled.FilterCenterFocus
 import androidx.compose.material.icons.filled.TouchApp
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Widgets
@@ -59,6 +60,8 @@ import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.ShapeDefaults
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleButton
@@ -125,6 +128,7 @@ private val HW_TRIGGER_KEYS = listOf(
     "trigger_long_vol_up",
     "trigger_long_vol_down",
     "trigger_vol_up_down",
+    "trigger_double_tap_notch",
 )
 
 private val HW_TRIGGER_TITLES = listOf(
@@ -208,6 +212,24 @@ fun WobbleHomeScreen(
     var assistantGranted by remember { mutableStateOf(isAssistantGranted(context)) }
     var statusBarCfg by remember { mutableStateOf(configManager.getStatusBarConfig()) }
     var bubbleEnabled by remember { mutableStateOf(appPrefs.getBoolean("bubble_enabled", false)) }
+    var notchTriggerEnabled by remember { mutableStateOf(appPrefs.getBoolean("trigger_double_tap_notch", false)) }
+    var notchGesture by remember { mutableStateOf(appPrefs.getString("notch_gesture", "double_tap") ?: "double_tap") }
+    var notchExpanded by remember { mutableStateOf(false) }
+    val setNotchTrigger: (Boolean) -> Unit = { on ->
+        appPrefs.edit().putBoolean("trigger_double_tap_notch", on).apply()
+        notchTriggerEnabled = on
+        // Only one top-of-screen trigger can be active: enabling the notch turns the
+        // status-bar strip off (their overlays would fight over the same touches).
+        if (on && statusBarCfg.isEnabled) {
+            val cfg = statusBarCfg.copy(isEnabled = false)
+            configManager.saveStatusBarConfig(cfg)
+            statusBarCfg = cfg
+        }
+    }
+    val setNotchGesture: (String) -> Unit = { gesture ->
+        appPrefs.edit().putString("notch_gesture", gesture).apply()
+        notchGesture = gesture
+    }
     var hwTriggers by remember {
         mutableStateOf(HW_TRIGGER_KEYS.associateWith { appPrefs.getBoolean(it, false) })
     }
@@ -560,7 +582,28 @@ fun WobbleHomeScreen(
                                 a11yGranted = a11yGranted,
                                 expanded = statusBarExpanded,
                                 onExpandedChange = { statusBarExpanded = it },
-                                onChange = saveStatusBar,
+                                onChange = { cfg ->
+                                    saveStatusBar(cfg)
+                                    // Interlock: enabling the status-bar strip turns the
+                                    // notch trigger off — only one top trigger stays active.
+                                    if (cfg.isEnabled && notchTriggerEnabled) {
+                                        appPrefs.edit().putBoolean("trigger_double_tap_notch", false).apply()
+                                        notchTriggerEnabled = false
+                                    }
+                                },
+                            )
+                            HomeRowDivider()
+                            HomeNotchSection(
+                                enabled = notchTriggerEnabled,
+                                gesture = notchGesture,
+                                a11yGranted = a11yGranted,
+                                expanded = notchExpanded,
+                                onExpandedChange = { notchExpanded = it },
+                                onEnabledChange = { setNotchTrigger(it) },
+                                onGestureChange = { setNotchGesture(it) },
+                                onPreviewChange = { preview ->
+                                    appPrefs.edit().putBoolean("notch_preview", preview).apply()
+                                },
                             )
                             HomeRowDivider()
                             HomeToggleItem(
@@ -867,6 +910,159 @@ private fun HomeHwSheet(
                     enabled = a11yGranted,
                     onCheckedChange = { onToggle(key, it) },
                 )
+            }
+        }
+    }
+}
+
+/**
+ * Expandable block for the notch double-tap trigger, mirroring [HomeStatusBarSection]:
+ * header row with a master switch and rotating arrow; the dropdown lets the user pick
+ * the gesture (double tap / long press / pull down) and, while open, the notch overlay
+ * is tinted via [onPreviewChange] so the cutout zone is visible on-device.
+ */
+@Composable
+private fun HomeNotchSection(
+    enabled: Boolean,
+    gesture: String,
+    a11yGranted: Boolean,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    onEnabledChange: (Boolean) -> Unit,
+    onGestureChange: (String) -> Unit,
+    onPreviewChange: (Boolean) -> Unit,
+) {
+    val expandProgress by animateFloatAsState(
+        targetValue = if (expanded) 1f else 0f,
+        animationSpec = tween(durationMillis = 240),
+        label = "notchExpand",
+    )
+    val rowAlpha = if (a11yGranted) 1f else 0.38f
+    val hintRes = when (gesture) {
+        "long_press" -> R.string.notch_hint_long_press
+        "triple_tap" -> R.string.notch_hint_triple_tap
+        else -> R.string.notch_hint_double_tap
+    }
+
+    // Tint the notch overlay while the dropdown is open so the cutout zone is visible.
+    LaunchedEffect(expanded) {
+        onPreviewChange(expanded)
+    }
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(enabled = a11yGranted) { onExpandedChange(!expanded) }
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Rounded.KeyboardArrowDown,
+                contentDescription = null,
+                modifier = Modifier
+                    .size(24.dp)
+                    .graphicsLayer {
+                        alpha = rowAlpha
+                        rotationZ = expandProgress * 180f
+                    },
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.trigger_notch_title),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = rowAlpha),
+                )
+                Text(
+                    text = stringResource(hintRes),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = rowAlpha),
+                )
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Switch(
+                checked = enabled,
+                enabled = a11yGranted,
+                onCheckedChange = { on ->
+                    onEnabledChange(on)
+                    if (on) onExpandedChange(true)
+                },
+            )
+        }
+
+        AnimatedVisibility(
+            visible = expanded && a11yGranted,
+            enter = expandVertically(tween(240)) + fadeIn(tween(240)),
+            exit = shrinkVertically(tween(200)) + fadeOut(tween(160)),
+        ) {
+            Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 12.dp)) {
+                // Gesture selector: one row titled "Gesture" opening a dropdown anchored
+                // to its trailing edge (under the arrow), with rounded menu corners.
+                var gestureMenuOpen by remember { mutableStateOf(false) }
+                val gestureLabel = when (gesture) {
+                    "long_press" -> stringResource(R.string.notch_gesture_long_press)
+                    "triple_tap" -> stringResource(R.string.notch_gesture_triple_tap)
+                    else -> stringResource(R.string.notch_gesture_double_tap)
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { gestureMenuOpen = true }
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = stringResource(R.string.notch_gesture_label),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Box {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = gestureLabel,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface,
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Icon(
+                                imageVector = Icons.Rounded.KeyboardArrowDown,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = gestureMenuOpen,
+                            onDismissRequest = { gestureMenuOpen = false },
+                            shape = RoundedCornerShape(16.dp),
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.notch_gesture_double_tap)) },
+                                onClick = {
+                                    onGestureChange("double_tap")
+                                    gestureMenuOpen = false
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.notch_gesture_long_press)) },
+                                onClick = {
+                                    onGestureChange("long_press")
+                                    gestureMenuOpen = false
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.notch_gesture_triple_tap)) },
+                                onClick = {
+                                    onGestureChange("triple_tap")
+                                    gestureMenuOpen = false
+                                },
+                            )
+                        }
+                    }
+                }
             }
         }
     }

@@ -122,6 +122,7 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
     private val overlayViews = mutableListOf<View>() // Track all added segment views
     private var statusBarView: View? = null // Dedicated status-bar double-tap strip (independent of segments)
     private val bottomEdgeViews = mutableListOf<BottomEdgeOverlayView>() // Track bottom-edge corner/mid overlays
+    private val notchViews = mutableListOf<View>() // One overlay per display-cutout rect (notch double-tap, off by default)
     private var bottomEdgeHidden = false // Suppressed while Circle to Search is in front
     private val executor: Executor = Executors.newSingleThreadExecutor()
     private lateinit var configManager: OverlayConfigurationManager
@@ -139,6 +140,9 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
     private val prefsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         if (key == "bubble_enabled") {
             updateBubbleState()
+        }
+        if (key == "trigger_double_tap_notch" || key == "notch_gesture" || key == "notch_preview") {
+            updateNotchOverlay()
         }
     }
     
@@ -185,13 +189,15 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         updateOverlay()
         updateBottomEdgeOverlays()
         updateStatusBarOverlay()
+        updateNotchOverlay()
     }
-    
+
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
         updateOverlay()
         updateBottomEdgeOverlays()
         updateStatusBarOverlay()
+        updateNotchOverlay()
     }
 
     private fun updateBubbleState() {
@@ -343,6 +349,7 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         updateOverlay()
         updateBottomEdgeOverlays()
         updateStatusBarOverlay()
+        updateNotchOverlay()
     }
 
     private fun statusBarPrimaryColor(): Int =
@@ -443,6 +450,111 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         } else {
             view.background = null
             view.setBackgroundColor(Color.TRANSPARENT)
+        }
+    }
+
+    /**
+     * Double-tap-the-notch trigger (off by default). The OS reports every display
+     * cutout with a screen-space bounding rect (DisplayCutout.getBoundingRects), which
+     * gives the notch's exact position and side — no guessing. One small touchable
+     * overlay per cutout rect reuses the status-strip touch contract: double-tap
+     * launches Circle to Search, while single taps / long-presses / drags on the
+     * strip are forwarded to the system UI beneath. Devices without a cutout simply
+     * have nothing to attach (the system returns no rects).
+     */
+    private fun notchTriggerEnabled(): Boolean =
+        prefs.getBoolean("trigger_double_tap_notch", false)
+
+    /** Display cutout rects + side classification, reported by the OS. */
+    private fun notchCutoutRects(): List<Pair<android.graphics.Rect, String>> {
+        val wm = windowManager ?: return emptyList()
+        val screenBounds = android.graphics.Rect()
+        val cutout: android.view.DisplayCutout?
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val metrics = wm.maximumWindowMetrics
+            screenBounds.set(metrics.bounds)
+            cutout = metrics.windowInsets.displayCutout
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            val display = wm.defaultDisplay ?: return emptyList()
+            val real = android.util.DisplayMetrics()
+            display.getRealMetrics(real)
+            screenBounds.set(0, 0, real.widthPixels, real.heightPixels)
+            cutout = display.cutout
+        } else {
+            return emptyList()
+        }
+        val rects = cutout?.boundingRects ?: return emptyList()
+        val half = screenBounds.width() / 2f
+        return rects.map { rect ->
+            val side = when {
+                rect.top <= 0 && rect.width() >= screenBounds.width() -> "top-wide"
+                rect.top <= 0 && rect.left <= 0 && rect.centerX() < half -> "top-left"
+                rect.top <= 0 && rect.right >= screenBounds.width() && rect.centerX() > half -> "top-right"
+                rect.top <= 0 -> "top-center"
+                rect.left <= 0 -> "left"
+                rect.right >= screenBounds.width() -> "right"
+                rect.bottom >= screenBounds.height() -> "bottom"
+                else -> "floating"
+            }
+            android.graphics.Rect(rect) to side
+        }
+    }
+
+    private fun updateNotchOverlay() {
+        val wm = windowManager ?: return
+        notchViews.forEach { view ->
+            try { wm.removeView(view) } catch (_: Exception) {}
+        }
+        notchViews.clear()
+        val preview = prefs.getBoolean("notch_preview", false)
+        if (!notchTriggerEnabled() && !preview) return
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return
+
+        val expand = (6 * resources.displayMetrics.density).toInt()
+        val cutouts = notchCutoutRects()
+        if (cutouts.isEmpty()) {
+            android.util.Log.d("CTS_Notch", "no display cutouts reported — notch trigger idle")
+            return
+        }
+        // Selected gesture → action mapping (double tap default; long press fires via
+        // onLongPress, triple tap via the tap counter in the strip's touch listener).
+        val gestures = when (prefs.getString("notch_gesture", "double_tap")) {
+            "long_press" -> mutableMapOf(GestureType.LONG_PRESS to ActionType.CTS_AUTO)
+            "triple_tap" -> mutableMapOf(GestureType.TRIPLE_TAP to ActionType.CTS_AUTO)
+            else -> mutableMapOf(GestureType.DOUBLE_TAP to ActionType.CTS_AUTO)
+        }
+        cutouts.forEach { (rect, side) ->
+            android.util.Log.d("CTS_Notch", "notch $side at $rect")
+            val view = View(this)
+            val params = WindowManager.LayoutParams(
+                rect.width() + expand * 2,
+                rect.height() + expand * 2,
+                WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                        WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                        WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                        WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                PixelFormat.TRANSLUCENT,
+            )
+            params.gravity = Gravity.TOP or Gravity.START
+            params.x = rect.left - expand
+            params.y = rect.top - expand
+            val segment = OverlaySegment(
+                width = params.width,
+                height = params.height,
+                xOffset = params.x,
+                yOffset = params.y,
+                gestures = gestures,
+            )
+            try {
+                wm.addView(view, params)
+                notchViews.add(view)
+                attachTouchListener(view, segment, -1)
+                applyStatusBarTint(view, preview)
+            } catch (e: Exception) {
+                e.printStackTrace()
+                notchViews.remove(view)
+            }
         }
     }
 
