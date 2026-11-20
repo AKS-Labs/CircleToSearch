@@ -1042,16 +1042,9 @@ private fun BottomControls(
       )
     }
 
-    Box(
-      modifier =
-        Modifier
-          .size(72.dp)
-          .clip(CircleShape)
-          .border(4.dp, Color.White, CircleShape)
-          .padding(6.dp)
-          .clip(CircleShape)
-          .background(if (isCapturing) Color.White.copy(alpha = 0.5f) else Color.White)
-          .clickable(enabled = !isCapturing, onClick = onCapture),
+    ScallopedCaptureButton(
+      isCapturing = isCapturing,
+      onClick = onCapture,
     )
 
     IconButton(onClick = onLiveOverlayToggle) {

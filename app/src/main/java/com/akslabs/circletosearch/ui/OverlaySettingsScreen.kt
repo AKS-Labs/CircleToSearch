@@ -219,7 +219,7 @@ private fun SettingsDetailScaffold(
     content: @Composable ColumnScope.() -> Unit
 ) {
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
         topBar = {
             TopAppBar(
                 title = { Text(title, fontWeight = FontWeight.Bold) },
@@ -233,8 +233,8 @@ private fun SettingsDetailScaffold(
                 },
                 actions = actions,
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    titleContentColor = MaterialTheme.colorScheme.onBackground
+                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                    titleContentColor = MaterialTheme.colorScheme.onSurface
                 )
             )
         }
@@ -979,7 +979,7 @@ private fun SettingsGroup(
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(28.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow
     ) {
         Column(content = content)
@@ -988,7 +988,10 @@ private fun SettingsGroup(
 
 @Composable
 private fun SettingsGroupDivider() {
-    HorizontalDivider(modifier = Modifier.padding(start = 56.dp))
+    HorizontalDivider(
+        modifier = Modifier.padding(start = 56.dp),
+        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.1f),
+    )
 }
 
 @Composable
@@ -997,7 +1000,7 @@ private fun SettingsCategoryRow(
     title: String,
     subtitle: String,
     onClick: () -> Unit,
-    iconTint: Color = MaterialTheme.colorScheme.primary
+    iconTint: Color = MaterialTheme.colorScheme.onSurfaceVariant
 ) {
     Row(
         modifier = Modifier
