@@ -56,11 +56,11 @@
     <string name="label_accessibility_active">Accessibility Service Active</string>
     <string name="label_accessibility_active_subtitle">Unlocks every trigger: status bar, bubble &amp; hardware buttons</string>
     <string name="label_enable_accessibility">Enable Accessibility</string>
-    <string name="label_enable_accessibility_subtitle">To do its job properly, the app needs this permission.\nTap allow and we\'re good to go! &#x1F44D;</string>
+    <string name="label_enable_accessibility_subtitle">To do its job properly, the app needs this permission.</string>
     <string name="label_optional_assistant">OPTIONAL: For Home Button Trigger</string>
     <string name="label_default_assistant_set">Default Assistant Set</string>
     <string name="label_set_default_assistant">Set as Default Assistant</string>
-    <string name="label_set_default_assistant_subtitle">Tap to set it up and see how your device launches assistants.</string>
+    <string name="label_set_default_assistant_subtitle">Set app as your default assistant to trigger Circle to Search.</string>
     <string name="section_customization">CUSTOMIZATION</string>
     <string name="info_lens_needs_google">Lens needs Google App Installed. But Degoogled friends can stick with the versatile Multi-Search Engine mode.</string>
     <string name="toast_could_not_open_link">Could not open link</string>
