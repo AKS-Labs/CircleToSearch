@@ -2504,19 +2504,27 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
 
         private val handler = android.os.Handler(android.os.Looper.getMainLooper())
         private val touchSlop = android.view.ViewConfiguration.get(context).scaledTouchSlop
-        // Long-press stays alive while the finger drifts a little, and lasts a bit
-        // longer than the system default: at 400ms + 1.5x slop, quick or slightly
-        // shaky corner presses regularly failed to register, which made the
-        // gesture feel unreliable.
+        // Long-press is the FIRST priority of the arcs: a stationary 500ms hold always
+        // triggers, and drift within tolerance keeps it alive. Only a decisive drag
+        // (beyond swipeHandoffThreshold) hands the gesture to the app beneath — swipes
+        // deliberately lose to the long-press.
         private val longPressSlop = touchSlop * 2.5f
+        private val swipeHandoffThreshold = touchSlop * 7f
         private val longPressTimeoutMs = 500L
+        // Minimum gap between forwarded scroll segments (each one briefly makes the
+        // window untouchable and dispatches a synthetic gesture).
+        private val scrollForwardIntervalMs = 180L
 
         private var downX = 0f
         private var downY = 0f
+        private var lastScrollRawX = 0f
+        private var lastScrollRawY = 0f
+        private var lastScrollForwardAt = 0L
         private var longPressConsumed = false
+        private var scrollForwarded = false
 
         private val longPressRunnable = Runnable {
-            if (longPressConsumed) return@Runnable
+            if (longPressConsumed || scrollForwarded) return@Runnable
             longPressConsumed = true
             hapticClick()
             performCapture(null)
@@ -2529,6 +2537,10 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
             } else {
                 @Suppress("DEPRECATION") vibrator.vibrate(20)
             }
+        }
+
+        private fun forwardPath(path: android.graphics.Path, durationMs: Long) {
+            forwardPassthroughGesture(this@BottomEdgeOverlayView, path, durationMs)
         }
 
         override fun onDetachedFromWindow() {
@@ -2591,11 +2603,15 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         override fun onTouchEvent(event: MotionEvent): Boolean {
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
-                    // Consume the WHOLE bounding box — the box is the trigger zone and
-                    // nothing here is click-through.
+                    // Consume the WHOLE bounding box and arm the long-press — it has
+                    // first priority: a stationary 500ms hold always triggers.
                     downX = event.x
                     downY = event.y
+                    lastScrollRawX = event.rawX
+                    lastScrollRawY = event.rawY
+                    lastScrollForwardAt = 0L
                     longPressConsumed = false
+                    scrollForwarded = false
                     handler.removeCallbacks(longPressRunnable)
                     handler.postDelayed(longPressRunnable, longPressTimeoutMs)
                     return true
@@ -2605,16 +2621,41 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
                     val dx = event.x - downX
                     val dy = event.y - downY
                     val dist = Math.sqrt((dx * dx + dy * dy).toDouble()).toFloat()
+                    if (dist > swipeHandoffThreshold && !scrollForwarded) {
+                        // Decisive drag (faster/wider than any long-press wobble): cancel
+                        // the trigger and hand the gesture to the app beneath so it scrolls.
+                        scrollForwarded = true
+                        handler.removeCallbacks(longPressRunnable)
+                    }
+                    if (scrollForwarded) {
+                        val now = android.os.SystemClock.uptimeMillis()
+                        if (now - lastScrollForwardAt >= scrollForwardIntervalMs) {
+                            lastScrollForwardAt = now
+                            val path = android.graphics.Path().apply {
+                                moveTo(lastScrollRawX, lastScrollRawY)
+                                lineTo(event.rawX, event.rawY)
+                            }
+                            lastScrollRawX = event.rawX
+                            lastScrollRawY = event.rawY
+                            forwardPath(path, 120)
+                        }
+                        return true
+                    }
                     if (dist > longPressSlop) {
-                        // Finger drift on a held long-press: re-anchor and keep waiting —
-                        // the trigger wins over anything beneath.
+                        // Drift while holding: re-anchor and keep waiting — long-press wins.
                         downX = event.x
                         downY = event.y
+                        lastScrollRawX = event.rawX
+                        lastScrollRawY = event.rawY
                     }
                     return true
                 }
                 MotionEvent.ACTION_UP -> {
                     handler.removeCallbacks(longPressRunnable)
+                    if (!longPressConsumed && !scrollForwarded) {
+                        // Tap: forward so buttons beneath stay clickable.
+                        forwardPath(android.graphics.Path().apply { moveTo(event.rawX, event.rawY) }, 50)
+                    }
                     return true
                 }
                 MotionEvent.ACTION_CANCEL -> {
