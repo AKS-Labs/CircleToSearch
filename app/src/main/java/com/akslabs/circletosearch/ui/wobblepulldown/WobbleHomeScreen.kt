@@ -573,7 +573,7 @@ fun WobbleHomeScreen(
                     }
                     Surface(
                         shape = RoundedCornerShape(28.dp),
-                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        color = MaterialTheme.colorScheme.surfaceContainerLowest,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Column {
@@ -658,7 +658,7 @@ fun WobbleHomeScreen(
             item {
                 Surface(
                     shape = RoundedCornerShape(28.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    color = MaterialTheme.colorScheme.surfaceContainerLowest,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     UnifiedSearchMethodSelector(
@@ -673,7 +673,7 @@ fun WobbleHomeScreen(
                     SettingsSectionHeader(title = stringResource(R.string.home_section_more))
                     Surface(
                         shape = RoundedCornerShape(28.dp),
-                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        color = MaterialTheme.colorScheme.surfaceContainerLowest,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Column {

@@ -11,6 +11,11 @@ import android.provider.Settings
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -18,10 +23,12 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -38,14 +45,28 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.PlatformTextStyle
 import androidx.core.content.ContextCompat
 import android.os.Build
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.Lifecycle
@@ -58,6 +79,7 @@ import com.akslabs.circletosearch.CircleToSearchAccessibilityService
 import com.akslabs.circletosearch.data.*
 import com.akslabs.circletosearch.isAccessibilityServiceEnabled
 import com.akslabs.circletosearch.ui.components.DonateBottomSheet
+import com.akslabs.circletosearch.ui.components.MoreAppsBottomSheet
 import com.akslabs.circletosearch.ui.components.UnifiedSearchMethodSelector
 import com.akslabs.circletosearch.utils.UIPreferences
 import androidx.core.app.ActivityOptionsCompat
@@ -69,6 +91,7 @@ private val NavEasing = CubicBezierEasing(0.2f, 0f, 0f, 1f)
 private const val DEV_GITHUB_URL = "https://github.com/AKS-Labs/CircleToSearch"
 private const val DEV_TELEGRAM_URL = "https://t.me/akslabs"
 private const val DEV_MORE_APPS_URL = "https://play.google.com/store/apps/dev?id=5379443231912092235"
+private const val DEV_EMAIL_URL = "mailto:hello@akslabs.dev" // TODO: swap in the real support address
 
 private sealed class SettingsPage {
     object Root : SettingsPage()
@@ -76,7 +99,6 @@ private sealed class SettingsPage {
     object Zones : SettingsPage()
     object Search : SettingsPage()
     object General : SettingsPage()
-    object About : SettingsPage()
 }
 
 private fun SettingsPage.order(): Int = when (this) {
@@ -85,7 +107,6 @@ private fun SettingsPage.order(): Int = when (this) {
     SettingsPage.Zones -> 2
     SettingsPage.Search -> 3
     SettingsPage.General -> 4
-    SettingsPage.About -> 5
 }
 
 private fun settingsPageFromName(name: String?): SettingsPage? = when (name) {
@@ -93,7 +114,6 @@ private fun settingsPageFromName(name: String?): SettingsPage? = when (name) {
     "zones" -> SettingsPage.Zones
     "search" -> SettingsPage.Search
     "general" -> SettingsPage.General
-    "about" -> SettingsPage.About
     else -> null
 }
 
@@ -204,7 +224,6 @@ fun OverlaySettingsScreen(
                 SettingsPage.Zones -> ZonesSettingsScreen(state = state, onBack = pop)
                 SettingsPage.Search -> SearchSettingsScreen(state = state, onBack = pop)
                 SettingsPage.General -> GeneralSettingsScreen(onBack = pop)
-                SettingsPage.About -> AboutSettingsScreen(onBack = pop)
             }
         }
     }
@@ -258,14 +277,27 @@ private fun SettingsRootScreen(
 ) {
     val context = LocalContext.current
     var showDonateSheet by remember { mutableStateOf(false) }
+    var showMoreAppsSheet by remember { mutableStateOf(false) }
     SettingsDetailScaffold(
         title = stringResource(R.string.title_settings),
         onBack = onBack
     ) {
         Spacer(modifier = Modifier.height(8.dp))
-        DevCard(onOpenDonate = { showDonateSheet = true })
+        DevCard(
+            onOpenDonate = { showDonateSheet = true },
+            onOpenMoreApps = { showMoreAppsSheet = true },
+        )
 
         Spacer(modifier = Modifier.height(24.dp))
+
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = stringResource(R.string.settings_section_behavior).uppercase(),
+            style = MaterialTheme.typography.labelLarge,
+            letterSpacing = 1.2.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(modifier = Modifier.height(10.dp))
 
         // Multi-search preloading lives directly on this screen: which engines
         // load their result tabs automatically and which wait for a manual load.
@@ -303,7 +335,7 @@ private fun SettingsRootScreen(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surfaceContainerLow, RoundedCornerShape(28.dp)),
+                .background(MaterialTheme.colorScheme.surfaceContainerLowest, RoundedCornerShape(28.dp)),
         ) {
             Row(
                 modifier = Modifier
@@ -313,7 +345,7 @@ private fun SettingsRootScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Icon(
-                    imageVector = Icons.Default.SwapVert,
+                    imageVector = Icons.Default.DragHandle,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(22.dp),
@@ -370,16 +402,27 @@ private fun SettingsRootScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        SettingsGroup {
-            SettingsCategoryRow(
-                icon = Icons.Default.Info,
-                title = stringResource(R.string.settings_cat_about),
-                subtitle = stringResource(R.string.settings_cat_about_subtitle),
-                onClick = { onNavigate(SettingsPage.About) }
-            )
+        // Version footer: read live from PackageManager, so it always reflects the
+        // installed build — no manual updates needed.
+        val versionName = remember(context) {
+            runCatching {
+                context.packageManager.getPackageInfo(context.packageName, 0).versionName
+            }.getOrNull().orEmpty()
         }
-
-        Spacer(modifier = Modifier.height(24.dp))
+        val versionCode = remember(context) {
+            runCatching {
+                androidx.core.content.pm.PackageInfoCompat.getLongVersionCode(
+                    context.packageManager.getPackageInfo(context.packageName, 0),
+                )
+            }.getOrNull() ?: 0L
+        }
+        Text(
+            text = "Circle to Search v$versionName ($versionCode)",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 
     if (showDonateSheet) {
@@ -393,120 +436,246 @@ private fun SettingsRootScreen(
             },
         )
     }
+
+    if (showMoreAppsSheet) {
+        MoreAppsBottomSheet(
+            onDismiss = { showMoreAppsSheet = false },
+            onAppSelected = { url ->
+                try {
+                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                } catch (_: Exception) {
+                }
+                showMoreAppsSheet = false
+            },
+        )
+    }
 }
 
-/** M3 expressive developer card at the top of Additional settings: brand header and
- *  the social links (GitHub, Telegram, More apps) plus the donate sheet trigger. */
-@Composable
-private fun DevCard(onOpenDonate: () -> Unit) {
-    val context = LocalContext.current
-    Card(
-        shape = RoundedCornerShape(28.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Default.RocketLaunch,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(24.dp),
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Column {
-                    Text(
-                        text = stringResource(R.string.settings_dev_title),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.ExtraBold,
+    /**
+     * M3 expressive bento dev card: ONE container card (surfaceContainerLowest) with
+     * the hero row and a pill action dock — Source code, Telegram, More apps, Donate.
+     */
+    @Composable
+    private fun DevCard(onOpenDonate: () -> Unit, onOpenMoreApps: () -> Unit) {
+        val context = LocalContext.current
+        Card(
+            shape = RoundedCornerShape(28.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                    // Hero: rotating scalloped monogram + name + Donate pill.
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    val monoBg = MaterialTheme.colorScheme.primaryContainer
+                    val monoText = MaterialTheme.colorScheme.onPrimaryContainer
+                    // Ambient ultra-slow rotation: 360 degrees over 25 seconds.
+                    val badgeSpin = rememberInfiniteTransition(label = "badgeSpin")
+                    val badgeRotation by badgeSpin.animateFloat(
+                        initialValue = 0f,
+                        targetValue = 360f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(durationMillis = 25000, easing = LinearEasing),
+                            repeatMode = RepeatMode.Restart,
+                        ),
+                        label = "badgeRotation",
                     )
-                    Text(
-                        text = stringResource(R.string.settings_dev_subtitle),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.height(14.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-            ) {
-                DevLink(label = stringResource(R.string.label_github), onClick = {
-                    try {
-                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(DEV_GITHUB_URL)))
-                    } catch (_: Exception) {
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(56.dp)) {
+                        Canvas(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .graphicsLayer { rotationZ = badgeRotation },
+                        ) {
+                            val lobes = 10
+                            val r = size.minDimension / 2f
+                            val amp = r * 0.07f
+                            val steps = 120
+                            val path = Path()
+                            for (i in 0..steps) {
+                                val t = (i * 2.0 * PI) / steps
+                                val rr = r - amp + amp * cos(lobes * t).toFloat()
+                                val px = size.width / 2f + rr * cos(t).toFloat()
+                                val py = size.height / 2f + rr * sin(t).toFloat()
+                                if (i == 0) path.moveTo(px, py) else path.lineTo(px, py)
+                            }
+                            path.close()
+                            drawPath(path, monoBg)
+                        }
+                        Text(
+                            text = "A",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = monoText,
+                            modifier = Modifier.offset(y = (-1).dp),
+                        )
                     }
-                }) {
-                    Image(
-                        painter = painterResource(R.drawable.ic_github),
-                        contentDescription = null,
-                        modifier = Modifier.size(26.dp),
-                        colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.onSurface),
-                    )
-                }
-                DevLink(label = stringResource(R.string.label_telegram), onClick = {
-                    try {
-                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(DEV_TELEGRAM_URL)))
-                    } catch (_: Exception) {
+                    Spacer(modifier = Modifier.width(14.dp))
+                    Column {
+                        Text(
+                            text = stringResource(R.string.settings_made_by),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            text = stringResource(R.string.settings_dev_title),
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.ExtraBold,
+                        )
                     }
-                }) {
-                    Image(
-                        painter = painterResource(R.drawable.ic_telegram),
-                        contentDescription = null,
-                        modifier = Modifier.size(26.dp),
-                        colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.onSurface),
+                    Spacer(modifier = Modifier.weight(1f))
+                    // Donate: tertiary pill with spring squish, opens the donate sheet.
+                    val donateInteraction = remember { MutableInteractionSource() }
+                    val donatePressed by donateInteraction.collectIsPressedAsState()
+                    val donateScale by animateFloatAsState(
+                        targetValue = if (donatePressed) 0.95f else 1f,
+                        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+                        label = "donateSquish",
                     )
-                }
-                DevLink(label = stringResource(R.string.label_more_apps), onClick = {
-                    try {
-                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(DEV_MORE_APPS_URL)))
-                    } catch (_: Exception) {
+                    Surface(
+                        shape = RoundedCornerShape(50),
+                        color = MaterialTheme.colorScheme.tertiaryContainer,
+                        modifier = Modifier
+                            .scale(donateScale)
+                            .clickable(interactionSource = donateInteraction, indication = null) { onOpenDonate() },
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Favorite,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                                modifier = Modifier.size(16.dp),
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = stringResource(R.string.btn_donate),
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer,
+                            )
+                        }
                     }
-                }) {
-                    Icon(
-                        imageVector = Icons.Default.Apps,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.size(26.dp),
-                    )
                 }
-                DevLink(label = stringResource(R.string.btn_donate), onClick = onOpenDonate) {
-                    Icon(
-                        imageVector = Icons.Default.FavoriteBorder,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.size(26.dp),
+                Spacer(modifier = Modifier.height(16.dp))
+                // Action dock: GitHub source-code pill + Telegram / More apps / Donate.
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        val sourceInteraction = remember { MutableInteractionSource() }
+                        val sourcePressed by sourceInteraction.collectIsPressedAsState()
+                        val sourceScale by animateFloatAsState(
+                            targetValue = if (sourcePressed) 0.95f else 1f,
+                            animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+                            label = "sourceSquish",
+                        )
+                        FilledTonalButton(
+                            onClick = {
+                                try {
+                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(DEV_GITHUB_URL)))
+                                } catch (_: Exception) {
+                                }
+                            },
+                            interactionSource = sourceInteraction,
+                            shape = RoundedCornerShape(50),
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .scale(sourceScale),
+                        ) {
+                            Image(
+                                painter = painterResource(R.drawable.ic_github),
+                                contentDescription = null,
+                                modifier = Modifier.size(20.dp),
+                                colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary),
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(text = stringResource(R.string.label_source_code), style = MaterialTheme.typography.labelLarge)
+                        }
+                        val tgInteraction = remember { MutableInteractionSource() }
+                        val tgPressed by tgInteraction.collectIsPressedAsState()
+                        val tgScale by animateFloatAsState(
+                            targetValue = if (tgPressed) 0.95f else 1f,
+                            animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+                            label = "tgSquish",
+                        )
+                        FilledTonalIconButton(
+                            onClick = {
+                                try {
+                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(DEV_TELEGRAM_URL)))
+                                } catch (_: Exception) {
+                                }
+                            },
+                            interactionSource = tgInteraction,
+                            modifier = Modifier.size(48.dp).scale(tgScale),
+                        ) {
+                            Image(
+                                painter = painterResource(R.drawable.ic_telegram),
+                                contentDescription = stringResource(R.string.label_telegram),
+                                modifier = Modifier.size(22.dp),
+                                colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary),
+                            )
+                        }
+                        val mailInteraction = remember { MutableInteractionSource() }
+                    val mailPressed by mailInteraction.collectIsPressedAsState()
+                    val mailScale by animateFloatAsState(
+                        targetValue = if (mailPressed) 0.9f else 1f,
+                        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+                        label = "mailSquish",
                     )
+                    FilledTonalIconButton(
+                        onClick = {
+                            try {
+                                context.startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse(DEV_EMAIL_URL)))
+                            } catch (_: Exception) {
+                            }
+                        },
+                        interactionSource = mailInteraction,
+                        modifier = Modifier.size(48.dp).scale(mailScale),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Email,
+                            contentDescription = stringResource(R.string.label_email),
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(22.dp),
+                        )
+                    }
+                    val appsInteraction = remember { MutableInteractionSource() }
+                        val appsPressed by appsInteraction.collectIsPressedAsState()
+                        val appsScale by animateFloatAsState(
+                            targetValue = if (appsPressed) 0.95f else 1f,
+                            animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+                            label = "appsSquish",
+                        )
+                        FilledTonalIconButton(
+                            onClick = onOpenMoreApps,
+                            interactionSource = appsInteraction,
+                            modifier = Modifier.size(48.dp).scale(appsScale),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Apps,
+                                contentDescription = stringResource(R.string.label_more_apps),
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(22.dp),
+                            )
+                        }
+                    }
                 }
             }
         }
     }
-}
 
-/** One social entry of the dev card: icon over a small label, whole thing tappable. */
-@Composable
-private fun DevLink(
-    label: String,
-    onClick: () -> Unit,
-    icon: @Composable () -> Unit,
-) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier
-            .clip(RoundedCornerShape(16.dp))
-            .clickable { onClick() }
-            .padding(horizontal = 10.dp, vertical = 6.dp),
-    ) {
-        icon()
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
 
 /** Per-engine preloading for multi-search as a compact M3 expressive card: the
  *  engines' favicons in one row, each acting as a switch — desaturated and
@@ -518,7 +687,7 @@ private fun PreloadEnginesCard(uiPreferences: UIPreferences) {
     }
     Card(
         shape = RoundedCornerShape(28.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp)) {
@@ -913,66 +1082,6 @@ private fun GeneralSettingsScreen(onBack: () -> Unit) {
 }
 
 @Composable
-private fun AboutSettingsScreen(onBack: () -> Unit) {
-    val context = LocalContext.current
-    var showDonateSheet by remember { mutableStateOf(false) }
-    val versionName = remember(context) {
-        runCatching {
-            context.packageManager.getPackageInfo(context.packageName, 0).versionName
-        }.getOrNull().orEmpty()
-    }
-
-    SettingsDetailScaffold(
-        title = stringResource(R.string.settings_cat_about),
-        onBack = onBack
-    ) {
-        Spacer(modifier = Modifier.height(8.dp))
-        SettingsGroup {
-            SettingsValueRow(
-                icon = Icons.Default.Android,
-                title = stringResource(R.string.about_version),
-                value = versionName
-            )
-            SettingsGroupDivider()
-            SettingsLinkRow(
-                icon = Icons.Default.Code,
-                title = stringResource(R.string.about_source_code),
-                subtitle = stringResource(R.string.about_source_subtitle),
-                onClick = {
-                    try {
-                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/aks-labs")))
-                    } catch (e: Exception) {
-                        android.widget.Toast.makeText(context, context.getString(R.string.toast_could_not_open_link), android.widget.Toast.LENGTH_SHORT).show()
-                    }
-                }
-            )
-            SettingsGroupDivider()
-            SettingsLinkRow(
-                icon = Icons.Default.FavoriteBorder,
-                title = stringResource(R.string.btn_donate),
-                subtitle = stringResource(R.string.about_donate_subtitle),
-                onClick = { showDonateSheet = true }
-            )
-        }
-        Spacer(modifier = Modifier.height(24.dp))
-    }
-
-    if (showDonateSheet) {
-        DonateBottomSheet(
-            onDismiss = { showDonateSheet = false },
-            onDonateOptionSelected = { url ->
-                try {
-                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-                } catch (e: Exception) {
-                    android.widget.Toast.makeText(context, context.getString(R.string.toast_could_not_open_link), android.widget.Toast.LENGTH_SHORT).show()
-                }
-                showDonateSheet = false
-            }
-        )
-    }
-}
-
-@Composable
 private fun SettingsGroup(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit
@@ -980,7 +1089,7 @@ private fun SettingsGroup(
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow
+        color = MaterialTheme.colorScheme.surfaceContainerLowest
     ) {
         Column(content = content)
     }

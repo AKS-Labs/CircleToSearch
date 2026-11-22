@@ -424,7 +424,7 @@
     <string name="settings_cat_search_subtitle">Lens or Multi-Search launch mode</string>
     <string name="settings_cat_general_subtitle">Offline translator &amp; app options</string>
     <string name="settings_cat_about">About</string>
-    <string name="settings_cat_about_subtitle">Version, source code &amp; credits</string>
+    <string name="settings_cat_about_subtitle">Version, licenses &amp; credits</string>
     <string name="section_launch_methods">LAUNCH METHODS</string>
     <string name="section_behavior">BEHAVIOR</string>
     <string name="about_version">Version</string>
@@ -479,6 +479,10 @@
     <string name="trigger_statusbar_title">Status bar double-tap</string>
     <string name="trigger_statusbar_subtitle">Double-tap the status bar area to start</string>
     <string name="trigger_notch_title">Double-tap Notch</string>
+    <string name="label_email">Email</string>
+    <string name="settings_made_by">Made by</string>
+    <string name="label_source_code">Source code</string>
+    <string name="settings_section_behavior">Behavior</string>
     <string name="notch_gesture_label">Gesture</string>
     <string name="notch_gesture_double_tap">Double tap</string>
     <string name="notch_gesture_long_press">Long press</string>
