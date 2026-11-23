@@ -1,22 +1,44 @@
 *.iml
 .gradle
 /local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
 .DS_Store
 /build
 /captures
 .externalNativeBuild
 .cxx
 local.properties
-C:\Users\ashin\AndroidStudioProjects\CircleToSearch\builderors.md
-C:\Users\ashin\AndroidStudioProjects\CircleToSearch\logs.md
 # Android build outputs
 *.apk
 *.aab
 *.dm
 /app/release/
+
+# IDE / editor state
+.idea/
+.kotlin/
+
+# AI agent tooling (machine-local, never part of the app)
+.opencode/
+.zcode/
+.claude/
+.cursor/
+.aider/
+graphify-out/
+
+# Scratch notes and generated guides
+guide.md
+logs.md
+builderors.md
+*.local.md
+docs/PORT_WORD_SELECTION_GUIDE.md
+docs/image_search.md
+
+# OS / tooling cruft
+Thumbs.db
+desktop.ini
+*.log
+*.tmp
+*.bak
+*.orig
+*.rej
+*~
