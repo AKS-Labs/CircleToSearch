@@ -66,9 +66,9 @@
     "semantic_hash": ""
   },
   "OCR-translation/src/main/assets/index_v6.json": {
-    "mtime": 1788975462.0,
-    "seen": 1793342353.8275454,
-    "ast_hash": "79bea7ab52e41c5117daa2fdb5e7acde",
+    "mtime": 1794646849.1930304,
+    "seen": 1795458572.4752018,
+    "ast_hash": "0926159be0fe2e3bf088bf7e86e94a0a",
     "semantic_hash": ""
   },
   "OCR-translation/src/main/assets/reader-mode.js": {
@@ -144,9 +144,9 @@
     "semantic_hash": ""
   },
   "OCR-translation/src/main/bindings/src/uniffi_catalog.rs": {
-    "mtime": 1789250762.0040703,
-    "seen": 1793342353.827618,
-    "ast_hash": "016a648e7d727b2ebf49136e10b8e415",
+    "mtime": 1795015323.895107,
+    "seen": 1795458572.4756505,
+    "ast_hash": "7bc246c6092709ef0e8ff33b906180f0",
     "semantic_hash": ""
   },
   "OCR-translation/src/main/bindings/vendor/translator-rs/Cargo.toml": {
@@ -480,9 +480,9 @@
     "semantic_hash": ""
   },
   "OCR-translation/src/main/bindings/vendor/translator-rs/crates/translator-ocr/src/engine.rs": {
-    "mtime": 1793278666.2829125,
-    "seen": 1793342353.8279424,
-    "ast_hash": "ed08ec920f85cc7396b3719d7903141c",
+    "mtime": 1795030610.2800553,
+    "seen": 1795458572.48038,
+    "ast_hash": "8a230489cb97d2e62b2d309f71f7678f",
     "semantic_hash": ""
   },
   "OCR-translation/src/main/bindings/vendor/translator-rs/crates/translator-ocr/src/lib.rs": {
@@ -768,9 +768,9 @@
     "semantic_hash": ""
   },
   "OCR-translation/src/main/bindings/vendor/translator-rs/crates/translator-translate/src/routing.rs": {
-    "mtime": 1793278668.752153,
-    "seen": 1793342353.8282037,
-    "ast_hash": "ea8b465277ebd7911f4c80809e483476",
+    "mtime": 1793400496.8953252,
+    "seen": 1795458572.4816914,
+    "ast_hash": "6645f2ef766b489455e75ba43d64db84",
     "semantic_hash": ""
   },
   "OCR-translation/src/main/bindings/vendor/translator-rs/crates/translator-translate/src/sentence_split.rs": {
@@ -2478,9 +2478,9 @@
     "semantic_hash": ""
   },
   "OCR-translation/src/main/bindings/vendor/translator-rs/src/session.rs": {
-    "mtime": 1793278676.0885415,
-    "seen": 1793342353.8297486,
-    "ast_hash": "29a1c2062f8fcfef99df64a6e7989507",
+    "mtime": 1795015305.6752486,
+    "seen": 1795458572.4877648,
+    "ast_hash": "f422d459bba1715b410b512c92be65d5",
     "semantic_hash": ""
   },
   "OCR-translation/src/main/bindings/vendor/translator-rs/tests/color_matting_erase.rs": {
@@ -2622,9 +2622,9 @@
     "semantic_hash": ""
   },
   "OCR-translation/src/main/java/dev/davidv/translator/CatalogModels.kt": {
-    "mtime": 1788975462.0,
-    "seen": 1793342353.8298874,
-    "ast_hash": "f7d98ec88aa9ba6740e06f26d8116684",
+    "mtime": 1795014497.3459027,
+    "seen": 1795458572.4881737,
+    "ast_hash": "487ab116883887510dbbacba78b330ab",
     "semantic_hash": ""
   },
   "OCR-translation/src/main/java/dev/davidv/translator/DictionaryIndex.kt": {
@@ -2760,9 +2760,9 @@
     "semantic_hash": ""
   },
   "OCR-translation/src/main/java/dev/davidv/translator/MainActivity.kt": {
-    "mtime": 1793278678.8710926,
-    "seen": 1793342353.8300104,
-    "ast_hash": "b570fb7990ff877d35770ce283e76c81",
+    "mtime": 1795394716.3819983,
+    "seen": 1795458572.4885979,
+    "ast_hash": "89e943aec41d16f6a6d5806b645b7f23",
     "semantic_hash": ""
   },
   "OCR-translation/src/main/java/dev/davidv/translator/MigrationGate.kt": {
@@ -2784,9 +2784,9 @@
     "semantic_hash": ""
   },
   "OCR-translation/src/main/java/dev/davidv/translator/OverlayTextTranslationHelper.kt": {
-    "mtime": 1793278679.054966,
-    "seen": 1793342353.8300312,
-    "ast_hash": "293a776b45755ca665ba6c63724d5ebd",
+    "mtime": 1793394934.2773669,
+    "seen": 1795458572.4886642,
+    "ast_hash": "9742a2f096dd702679a732d520db67e7",
     "semantic_hash": ""
   },
   "OCR-translation/src/main/java/dev/davidv/translator/OverlayWindowHosts.kt": {
@@ -2880,9 +2880,9 @@
     "semantic_hash": ""
   },
   "OCR-translation/src/main/java/dev/davidv/translator/TranslationCoordinator.kt": {
-    "mtime": 1793278679.156626,
-    "seen": 1793342353.830118,
-    "ast_hash": "3c8816d48cb9171555f3ac0cfe93121d",
+    "mtime": 1795014497.3590572,
+    "seen": 1795458572.4889321,
+    "ast_hash": "abe6d7a4ab821885708486c95c492272",
     "semantic_hash": ""
   },
   "OCR-translation/src/main/java/dev/davidv/translator/TranslationRuntime.kt": {
@@ -2898,9 +2898,9 @@
     "semantic_hash": ""
   },
   "OCR-translation/src/main/java/dev/davidv/translator/TranslatorApplication.kt": {
-    "mtime": 1793278679.4493928,
-    "seen": 1793342353.830134,
-    "ast_hash": "5136f9bd701921ee425afc13f326da58",
+    "mtime": 1794860676.566376,
+    "seen": 1795458572.4889855,
+    "ast_hash": "e98639adeac6bc1bfc80b85e1e63df74",
     "semantic_hash": ""
   },
   "OCR-translation/src/main/java/dev/davidv/translator/TranslatorMessage.kt": {
@@ -2982,9 +2982,9 @@
     "semantic_hash": ""
   },
   "OCR-translation/src/main/java/dev/davidv/translator/assistantOverlay/TranslatorVoiceInteractionSession.kt": {
-    "mtime": 1793278680.371365,
-    "seen": 1793342353.830208,
-    "ast_hash": "21f06d02ff0025d4446ebccdfaf1d611",
+    "mtime": 1793395252.7777743,
+    "seen": 1795458572.4908476,
+    "ast_hash": "a4bbfbea3d7f79182d91eeea6acd9996",
     "semantic_hash": ""
   },
   "OCR-translation/src/main/java/dev/davidv/translator/assistantOverlay/TranslatorVoiceInteractionSessionService.kt": {
@@ -3024,9 +3024,9 @@
     "semantic_hash": ""
   },
   "OCR-translation/src/main/java/dev/davidv/translator/overlayChrome/ActivityLanguagePicker.kt": {
-    "mtime": 1793278680.3736484,
-    "seen": 1793342353.830246,
-    "ast_hash": "6da39f2eb989389e9744b72a93ea9350",
+    "mtime": 1793394964.7124777,
+    "seen": 1795458572.4909678,
+    "ast_hash": "7a7bf52906d4978164b51be3094682c2",
     "semantic_hash": ""
   },
   "OCR-translation/src/main/java/dev/davidv/translator/overlayChrome/FloatingBubble.kt": {
@@ -3036,9 +3036,9 @@
     "semantic_hash": ""
   },
   "OCR-translation/src/main/java/dev/davidv/translator/overlayChrome/OverlayChromeFactory.kt": {
-    "mtime": 1793278680.377646,
-    "seen": 1793342353.8302567,
-    "ast_hash": "5c4b3e6a051d7a585317d461e18b90fc",
+    "mtime": 1795041433.5224211,
+    "seen": 1795458572.4910011,
+    "ast_hash": "e56e49bad07f977798f97b42d583da91",
     "semantic_hash": ""
   },
   "OCR-translation/src/main/java/dev/davidv/translator/overlayChrome/OverlayInsets.kt": {
@@ -3048,9 +3048,9 @@
     "semantic_hash": ""
   },
   "OCR-translation/src/main/java/dev/davidv/translator/overlayChrome/OverlayMenuManager.kt": {
-    "mtime": 1793278680.3833957,
-    "seen": 1793342353.8302672,
-    "ast_hash": "bb40bf2494d0f2f28783f09828895b0a",
+    "mtime": 1795042928.8325038,
+    "seen": 1795458572.4910343,
+    "ast_hash": "1e402b86b6552933e6c7072cf7ade231",
     "semantic_hash": ""
   },
   "OCR-translation/src/main/java/dev/davidv/translator/overlayChrome/RegionSelectView.kt": {
@@ -3084,21 +3084,21 @@
     "semantic_hash": ""
   },
   "OCR-translation/src/main/java/dev/davidv/translator/screenTranslate/ScreenTranslateService.kt": {
-    "mtime": 1793278680.3891711,
-    "seen": 1793342353.8302996,
-    "ast_hash": "d17921e2cfa04c30160b472b1cc0ec93",
+    "mtime": 1793395252.8640065,
+    "seen": 1795458572.4913423,
+    "ast_hash": "cb326ee8332e777cf3530b282ed713c5",
     "semantic_hash": ""
   },
   "OCR-translation/src/main/java/dev/davidv/translator/ui/TranslatorViewModel.kt": {
-    "mtime": 1793278680.394336,
-    "seen": 1793342353.8303053,
-    "ast_hash": "d6c71a88f5789fffe03f0d654b4124ae",
+    "mtime": 1793400518.2594192,
+    "seen": 1795458572.4913578,
+    "ast_hash": "da25f953125b0298f410c9fdfe2523c5",
     "semantic_hash": ""
   },
   "OCR-translation/src/main/java/dev/davidv/translator/ui/components/ActionButtons.kt": {
-    "mtime": 1788975462.0,
-    "seen": 1793342353.8303106,
-    "ast_hash": "162723fa1f92620cabcc7c713a196d5c",
+    "mtime": 1795391524.5091777,
+    "seen": 1795458572.4913723,
+    "ast_hash": "43fcc168218a565d442173113bd32ca7",
     "semantic_hash": ""
   },
   "OCR-translation/src/main/java/dev/davidv/translator/ui/components/AlternativesDrawer.kt": {
@@ -3180,9 +3180,9 @@
     "semantic_hash": ""
   },
   "OCR-translation/src/main/java/dev/davidv/translator/ui/components/ImageDisplaySection.kt": {
-    "mtime": 1788975462.0,
-    "seen": 1793342353.8303852,
-    "ast_hash": "52c59354ce4d8045de164f46f986dd21",
+    "mtime": 1795393036.531906,
+    "seen": 1795458572.4918551,
+    "ast_hash": "23d02239b9d8a0d251475485112c595d",
     "semantic_hash": ""
   },
   "OCR-translation/src/main/java/dev/davidv/translator/ui/components/InputSection.kt": {
@@ -3210,15 +3210,15 @@
     "semantic_hash": ""
   },
   "OCR-translation/src/main/java/dev/davidv/translator/ui/components/LanguageSelectionRow.kt": {
-    "mtime": 1788975462.0,
-    "seen": 1793342353.8304114,
-    "ast_hash": "4ba6ec955abcf0d8ee9c5d60d3d62229",
+    "mtime": 1795392949.2093594,
+    "seen": 1795458572.4924526,
+    "ast_hash": "7acb0dbf7fb760dcedbdf223ce0c7707",
     "semantic_hash": ""
   },
   "OCR-translation/src/main/java/dev/davidv/translator/ui/components/LanguageSelector.kt": {
-    "mtime": 1788975462.0,
-    "seen": 1793342353.830417,
-    "ast_hash": "964f68b8ed552a0df03891b63a176ad8",
+    "mtime": 1795392927.6576636,
+    "seen": 1795458572.5026119,
+    "ast_hash": "17b152e3817ad71a8e946506222973d0",
     "semantic_hash": ""
   },
   "OCR-translation/src/main/java/dev/davidv/translator/ui/components/LiveGlSurfaceView.kt": {
@@ -3312,15 +3312,15 @@
     "semantic_hash": ""
   },
   "OCR-translation/src/main/java/dev/davidv/translator/ui/components/WordSelectionOverlay.kt": {
-    "mtime": 1790968691.1340556,
-    "seen": 1793342353.8305051,
-    "ast_hash": "13960a4814fa2dc83b34900f371b5a1c",
+    "mtime": 1794695432.2296414,
+    "seen": 1795458572.5035036,
+    "ast_hash": "83a79a2b68049bfab5962dd169142558",
     "semantic_hash": ""
   },
   "OCR-translation/src/main/java/dev/davidv/translator/ui/components/ZoomableImageViewer.kt": {
-    "mtime": 1788975462.0,
-    "seen": 1793342353.830511,
-    "ast_hash": "c1e25bc32afd90913b2c9c7798c648a9",
+    "mtime": 1795391345.7449012,
+    "seen": 1795458572.5035217,
+    "ast_hash": "2f0af879d0982844f6933f99587bae8b",
     "semantic_hash": ""
   },
   "OCR-translation/src/main/java/dev/davidv/translator/ui/screens/HowToUseScreen.kt": {
@@ -3336,15 +3336,15 @@
     "semantic_hash": ""
   },
   "OCR-translation/src/main/java/dev/davidv/translator/ui/screens/LiveCameraScreen.kt": {
-    "mtime": 1793278680.403646,
-    "seen": 1793342353.8305278,
-    "ast_hash": "a9e363e858b30ccf30149cc81f4281d2",
+    "mtime": 1795203469.6839373,
+    "seen": 1795458572.5035727,
+    "ast_hash": "ccb5fad64ed31fd10ed4e59d29f1590d",
     "semantic_hash": ""
   },
   "OCR-translation/src/main/java/dev/davidv/translator/ui/screens/MainScreen.kt": {
-    "mtime": 1788975462.0,
-    "seen": 1793342353.830533,
-    "ast_hash": "4c134d77b1ea1c8f391072710cd85f45",
+    "mtime": 1795394760.6030598,
+    "seen": 1795458572.5035892,
+    "ast_hash": "d4b3d3ebab76ea8abce71a73b03226da",
     "semantic_hash": ""
   },
   "OCR-translation/src/main/java/dev/davidv/translator/ui/screens/NoLanguagesScreen.kt": {
@@ -3360,9 +3360,9 @@
     "semantic_hash": ""
   },
   "OCR-translation/src/main/java/dev/davidv/translator/ui/screens/TranslatorApp.kt": {
-    "mtime": 1793278680.410566,
-    "seen": 1793342353.8305492,
-    "ast_hash": "7405995bf521c53ad192c3fd1626e969",
+    "mtime": 1795394772.230317,
+    "seen": 1795458572.5036528,
+    "ast_hash": "d3b524c4e65a8bb5e7fcf40a5955e333",
     "semantic_hash": ""
   },
   "OCR-translation/src/main/java/dev/davidv/translator/ui/theme/Color.kt": {
@@ -3408,8 +3408,8 @@
     "semantic_hash": ""
   },
   "app/release/output-metadata.json": {
-    "mtime": 1792492264.5240705,
-    "seen": 1793342353.8305938,
+    "mtime": 1795175927.2970867,
+    "seen": 1795458572.504329,
     "ast_hash": "314a1df20e9ea5629da63472489b3d85",
     "semantic_hash": ""
   },
@@ -3438,15 +3438,15 @@
     "semantic_hash": ""
   },
   "app/src/main/java/com/akslabs/circletosearch/AssistantTranslateOverlayBridge.kt": {
-    "mtime": 1793278681.2813327,
-    "seen": 1793342353.8306212,
-    "ast_hash": "f354bd26349cdb1ee7c1ae765d714ff4",
+    "mtime": 1793459106.1626618,
+    "seen": 1795458572.5045707,
+    "ast_hash": "e51442b4fbcd563a927198c2663217a9",
     "semantic_hash": ""
   },
   "app/src/main/java/com/akslabs/circletosearch/CircleToSearchAccessibilityService.kt": {
-    "mtime": 1793278681.2868645,
-    "seen": 1793342353.8306265,
-    "ast_hash": "4e070077c305d0b85cc75c6e53696ec5",
+    "mtime": 1795367356.4647775,
+    "seen": 1795458572.5046082,
+    "ast_hash": "9e4815b3c31d096260bba116113abc16",
     "semantic_hash": ""
   },
   "app/src/main/java/com/akslabs/circletosearch/CircleToSearchRecognitionService.kt": {
@@ -3468,15 +3468,15 @@
     "semantic_hash": ""
   },
   "app/src/main/java/com/akslabs/circletosearch/MainActivity.kt": {
-    "mtime": 1793278681.2979777,
-    "seen": 1793342353.830647,
-    "ast_hash": "148aeab20f06c8503c18f83d3d94d6c9",
+    "mtime": 1795126095.9009624,
+    "seen": 1795458572.5049458,
+    "ast_hash": "c5424e1c6b760eda754a1f0d78b62f1c",
     "semantic_hash": ""
   },
   "app/src/main/java/com/akslabs/circletosearch/OverlayActivity.kt": {
-    "mtime": 1793280202.7503643,
-    "seen": 1793342353.8306525,
-    "ast_hash": "4aa910a59c9b37d0a2697fb65a070082",
+    "mtime": 1793457955.2511742,
+    "seen": 1795458572.5049784,
+    "ast_hash": "48573ae10f1aec1ca31121d9c1e2bd68",
     "semantic_hash": ""
   },
   "app/src/main/java/com/akslabs/circletosearch/TileTriggerActivity.kt": {
@@ -3486,9 +3486,9 @@
     "semantic_hash": ""
   },
   "app/src/main/java/com/akslabs/circletosearch/TranslatorOverlayBridge.kt": {
-    "mtime": 1793278681.4048972,
-    "seen": 1793342353.8306632,
-    "ast_hash": "3108411ce63fd63675b0e5ded81aad89",
+    "mtime": 1793459095.9946897,
+    "seen": 1795458572.5050473,
+    "ast_hash": "7a59b757b050ce4091618ee813534e13",
     "semantic_hash": ""
   },
   "app/src/main/java/com/akslabs/circletosearch/WebViewActivity.kt": {
@@ -3510,9 +3510,9 @@
     "semantic_hash": ""
   },
   "app/src/main/java/com/akslabs/circletosearch/data/SearchEngine.kt": {
-    "mtime": 1788615011.697914,
-    "seen": 1793342353.8306842,
-    "ast_hash": "c32063db0451774a1988d0fab1c0daaf",
+    "mtime": 1795112156.1579227,
+    "seen": 1795458572.5052335,
+    "ast_hash": "33adbd855e9e656582de51f342455936",
     "semantic_hash": ""
   },
   "app/src/main/java/com/akslabs/circletosearch/onboarding/PixelCircleSearchOnboardingScreen.kt": {
@@ -3522,15 +3522,15 @@
     "semantic_hash": ""
   },
   "app/src/main/java/com/akslabs/circletosearch/ui/CircleToSearchScreen.kt": {
-    "mtime": 1793278681.5876648,
-    "seen": 1793342353.830695,
-    "ast_hash": "84580ee24d8cf2106a9fa644bcfbb461",
+    "mtime": 1795394725.8319943,
+    "seen": 1795458572.5053058,
+    "ast_hash": "7733e56cad70a09acf0fd3538bdcca3c",
     "semantic_hash": ""
   },
   "app/src/main/java/com/akslabs/circletosearch/ui/OverlaySettingsScreen.kt": {
-    "mtime": 1793278681.8244517,
-    "seen": 1793342353.8307,
-    "ast_hash": "1713870d98b8ffde74cce8084e09c567",
+    "mtime": 1795460523.4403555,
+    "seen": 1795460884.8911383,
+    "ast_hash": "59072aad43346e5e1af2e6c0377a0871",
     "semantic_hash": ""
   },
   "app/src/main/java/com/akslabs/circletosearch/ui/QrCodeResultSheet.kt": {
@@ -3540,9 +3540,9 @@
     "semantic_hash": ""
   },
   "app/src/main/java/com/akslabs/circletosearch/ui/SettingsScreen.kt": {
-    "mtime": 1791353991.2752755,
-    "seen": 1793342353.830711,
-    "ast_hash": "9c5b87c9b85928ff2dfb6deedfb5e860",
+    "mtime": 1795125463.4205182,
+    "seen": 1795458572.505406,
+    "ast_hash": "e8e8a69e3eebd895a3667b211abde778",
     "semantic_hash": ""
   },
   "app/src/main/java/com/akslabs/circletosearch/ui/components/AccessibilityDisclosureDialog.kt": {
@@ -3588,9 +3588,9 @@
     "semantic_hash": ""
   },
   "app/src/main/java/com/akslabs/circletosearch/ui/components/SearchMethodSelector.kt": {
-    "mtime": 1791099362.253625,
-    "seen": 1793342353.830753,
-    "ast_hash": "39a322ae765e039517ec353a39bebef8",
+    "mtime": 1794756831.1638336,
+    "seen": 1795458572.505712,
+    "ast_hash": "f804594a756f92407026029765274194",
     "semantic_hash": ""
   },
   "app/src/main/java/com/akslabs/circletosearch/ui/components/TextNode.kt": {
@@ -3642,9 +3642,9 @@
     "semantic_hash": ""
   },
   "app/src/main/java/com/akslabs/circletosearch/ui/wobblepulldown/WobbleAppInfoScreen.kt": {
-    "mtime": 1793278682.5335665,
-    "seen": 1793342353.8308015,
-    "ast_hash": "37b979c7002771dbd217b21867f9e803",
+    "mtime": 1795207104.8051326,
+    "seen": 1795458572.506054,
+    "ast_hash": "8a9d624b3d5141572e1217e9c9d21728",
     "semantic_hash": ""
   },
   "app/src/main/java/com/akslabs/circletosearch/ui/wobblepulldown/WobbleDeviceImageMapper.kt": {
@@ -3678,9 +3678,9 @@
     "semantic_hash": ""
   },
   "app/src/main/java/com/akslabs/circletosearch/ui/wobblepulldown/WobbleHomeScreen.kt": {
-    "mtime": 1793278682.7624009,
-    "seen": 1793342353.8308334,
-    "ast_hash": "1a606a5966950aab0e49bfe97e98248c",
+    "mtime": 1795389912.7065325,
+    "seen": 1795458572.5066066,
+    "ast_hash": "9aba894ab498aef082c1bccbf6587e8d",
     "semantic_hash": ""
   },
   "app/src/main/java/com/akslabs/circletosearch/ui/wobblepulldown/WobblePermissions.kt": {
@@ -3738,9 +3738,9 @@
     "semantic_hash": ""
   },
   "app/src/main/java/com/akslabs/circletosearch/utils/UIPreferences.kt": {
-    "mtime": 1791099362.2636251,
-    "seen": 1793342353.8308868,
-    "ast_hash": "b913d8e9804d585872be7c48b1136ff8",
+    "mtime": 1795123296.1823304,
+    "seen": 1795458572.5069246,
+    "ast_hash": "44846ec41b2134115d33d2e684de53f5",
     "semantic_hash": ""
   },
   "app/src/test/java/com/akslabs/circletosearch/ExampleUnitTest.kt": {
@@ -3855,12 +3855,6 @@
     "mtime": 1793278657.7057672,
     "seen": 1793342353.83099,
     "ast_hash": "50f1b94dd94455d6737a67dfc08a6538",
-    "semantic_hash": ""
-  },
-  "OCR-translation/src/main/assets/ppocr/PP-OCRv6/PP-OCRv6_tiny_keys.txt": {
-    "mtime": 1793278659.0135987,
-    "seen": 1793342353.8309956,
-    "ast_hash": "b3a9e622b36248d128c758f23cfd85f7",
     "semantic_hash": ""
   },
   "OCR-translation/src/main/assets/ppocr/PP-OCRv6/georgian_keys.txt": {
@@ -4038,9 +4032,9 @@
     "semantic_hash": ""
   },
   "logs.md": {
-    "mtime": 1793278682.8918855,
-    "seen": 1793342353.8311574,
-    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "mtime": 1795203335.445,
+    "seen": 1795458572.517765,
+    "ast_hash": "a187d6106da585a3e9af0baba4142ed5",
     "semantic_hash": ""
   },
   "OCR-translation/src/main/res/drawable-hdpi/add.webp": {
@@ -4377,6 +4371,102 @@
     "mtime": 1765109446.2538621,
     "seen": 1793342353.831511,
     "ast_hash": "597c8d35625eede4d6ad9ac95da2fcb3",
+    "semantic_hash": ""
+  },
+  "OCR-translation/src/main/java/dev/davidv/translator/ui/screens/ScallopedCaptureButton.kt": {
+    "mtime": 1795203536.3652432,
+    "seen": 1795458572.503621,
+    "ast_hash": "f88c6358f22ebb6703149aabe5343eff",
+    "semantic_hash": ""
+  },
+  "app/src/main/java/com/akslabs/circletosearch/data/PrivacySearchEngine.kt": {
+    "mtime": 1794703486.7165709,
+    "seen": 1795458572.5051966,
+    "ast_hash": "d4bbc740344060dad986800cc90efdcf",
+    "semantic_hash": ""
+  },
+  "app/src/main/java/com/akslabs/circletosearch/utils/InstantOcr.kt": {
+    "mtime": 1793459692.5114355,
+    "seen": 1795458572.5067077,
+    "ast_hash": "b6c79e038ef3492ab8522b99a7b33e9d",
+    "semantic_hash": ""
+  },
+  ".zcode/plans/plan-sess_a953078c-00f6-4801-9c0e-6667dd3e93f2.md": {
+    "mtime": 1795118305.4648128,
+    "seen": 1795458572.507361,
+    "ast_hash": "1ccfedcd0e060a0b3c10588a20a05ed5",
+    "semantic_hash": ""
+  },
+  "docs/PORT_WORD_SELECTION_GUIDE.md": {
+    "mtime": 1794663094.4556587,
+    "seen": 1795458572.5176156,
+    "ast_hash": "8f5d70f308f97a4719e9127534cc29ca",
+    "semantic_hash": ""
+  },
+  "app/src/main/res/drawable-nodpi/ic_engine_bing.png": {
+    "mtime": 1795118549.8812006,
+    "seen": 1795458572.5183818,
+    "ast_hash": "a7e20a434d8877f55a8f95e2db8891e1",
+    "semantic_hash": ""
+  },
+  "app/src/main/res/drawable-nodpi/ic_engine_brave.png": {
+    "mtime": 1794699733.4862669,
+    "seen": 1795458572.5184221,
+    "ast_hash": "80a423ddf80a4c017475b5f173bfb848",
+    "semantic_hash": ""
+  },
+  "app/src/main/res/drawable-nodpi/ic_engine_ddg.png": {
+    "mtime": 1794699733.504272,
+    "seen": 1795458572.5184445,
+    "ast_hash": "a507cba1c09f7ee0b164ba58d577f837",
+    "semantic_hash": ""
+  },
+  "app/src/main/res/drawable-nodpi/ic_engine_duckai.png": {
+    "mtime": 1794699697.1385894,
+    "seen": 1795458572.5184646,
+    "ast_hash": "22e68defc149499660591fc9567482ba",
+    "semantic_hash": ""
+  },
+  "app/src/main/res/drawable-nodpi/ic_engine_google.png": {
+    "mtime": 1795112032.9098814,
+    "seen": 1795458572.5184796,
+    "ast_hash": "fae21da4352c113f587fa4e96388a8e7",
+    "semantic_hash": ""
+  },
+  "app/src/main/res/drawable-nodpi/ic_engine_mojeek.png": {
+    "mtime": 1794699697.129585,
+    "seen": 1795458572.5184944,
+    "ast_hash": "ad9b31a8d328d824d617b91e2ec03264",
+    "semantic_hash": ""
+  },
+  "app/src/main/res/drawable-nodpi/ic_engine_startpage.png": {
+    "mtime": 1794699733.4952767,
+    "seen": 1795458572.5185099,
+    "ast_hash": "23b1b44586b00ad2605d873fb3e15f85",
+    "semantic_hash": ""
+  },
+  "app/src/main/res/drawable-nodpi/ic_engine_tineye.png": {
+    "mtime": 1795112033.3007545,
+    "seen": 1795458572.5185244,
+    "ast_hash": "9e20da85094e45f4b3229fd450a707a4",
+    "semantic_hash": ""
+  },
+  "app/src/main/res/drawable-nodpi/ic_engine_yandex.png": {
+    "mtime": 1795112033.165864,
+    "seen": 1795458572.5185382,
+    "ast_hash": "3d06aa4c8ad63959c029294a4b7a2cdd",
+    "semantic_hash": ""
+  },
+  "app/src/main/res/drawable/dp.jpg": {
+    "mtime": 1795455141.9038787,
+    "seen": 1795458572.5187318,
+    "ast_hash": "f44c7bd5c2b883578d83e1d5f20fc900",
+    "semantic_hash": ""
+  },
+  "fa_telegram.svg": {
+    "mtime": 1795370652.1644146,
+    "seen": 1795458572.5191948,
+    "ast_hash": "d84cf86ba57d81f74627fe97ebf5737f",
     "semantic_hash": ""
   }
 }

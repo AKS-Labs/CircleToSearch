@@ -23,14 +23,12 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -42,16 +40,27 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
+import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.core.content.ContextCompat
 import android.os.Build
 import androidx.compose.animation.core.Spring
@@ -81,6 +90,8 @@ import com.akslabs.circletosearch.isAccessibilityServiceEnabled
 import com.akslabs.circletosearch.ui.components.DonateBottomSheet
 import com.akslabs.circletosearch.ui.components.MoreAppsBottomSheet
 import com.akslabs.circletosearch.ui.components.UnifiedSearchMethodSelector
+import com.akslabs.circletosearch.ui.wobblepulldown.WobbleHaptics
+import com.akslabs.circletosearch.ui.wobblepulldown.liquidRipple
 import com.akslabs.circletosearch.utils.UIPreferences
 import androidx.core.app.ActivityOptionsCompat
 import dev.davidv.translator.MainActivity as TranslatorMainActivity
@@ -88,10 +99,39 @@ import dev.davidv.translator.MainActivity as TranslatorMainActivity
 private const val NAV_TRANSITION_MS = 320
 private val NavEasing = CubicBezierEasing(0.2f, 0f, 0f, 1f)
 
+/** Scalloped (10-lobe) badge shape used by the dev-card monogram, mirroring the
+ *  original Canvas geometry so the avatar keeps the same silhouette. The optional
+ *  [rotationDegrees] lets the silhouette spin without rotating the photo inside. */
+private class ScallopedBadgeShape(private val rotationDegrees: Float = 0f) : Shape {
+    override fun createOutline(
+        size: Size,
+        layoutDirection: LayoutDirection,
+        density: Density,
+    ): Outline {
+        val lobes = 10
+        val ampFraction = 0.07f
+        val samples = 240
+        val r = size.minDimension / 2f
+        val amp = r * ampFraction
+        val spin = Math.toRadians(rotationDegrees.toDouble())
+        val path = Path()
+        for (i in 0 until samples) {
+            val t = (i * 2.0 * PI) / samples
+            val rr = r - amp + amp * cos(lobes * t).toFloat()
+            val angle = t + spin
+            val px = size.width / 2f + rr * cos(angle).toFloat()
+            val py = size.height / 2f + rr * sin(angle).toFloat()
+            if (i == 0) path.moveTo(px, py) else path.lineTo(px, py)
+        }
+        path.close()
+        return Outline.Generic(path)
+    }
+}
+
 private const val DEV_GITHUB_URL = "https://github.com/AKS-Labs/CircleToSearch"
-private const val DEV_TELEGRAM_URL = "https://t.me/akslabs"
+private const val DEV_TELEGRAM_URL = "https://t.me/AKSLabsx"
 private const val DEV_MORE_APPS_URL = "https://play.google.com/store/apps/dev?id=5379443231912092235"
-private const val DEV_EMAIL_URL = "mailto:hello@akslabs.dev" // TODO: swap in the real support address
+private const val DEV_EMAIL_URL = "mailto:akslabs.tech@gmail.com"
 
 private sealed class SettingsPage {
     object Root : SettingsPage()
@@ -458,71 +498,108 @@ private fun SettingsRootScreen(
     @Composable
     private fun DevCard(onOpenDonate: () -> Unit, onOpenMoreApps: () -> Unit) {
         val context = LocalContext.current
+        val view = LocalView.current
+        val density = LocalDensity.current
+        // Same liquid-ripple wobble the home screen fires on pull-down, fired here
+        // from the badge/title tap. The shader samples in the layer's own pixel space,
+        // so the origin is expressed relative to the card (see the origin note below).
+        var wobbleTrigger by remember { mutableIntStateOf(0) }
+        var cardSize by remember { mutableStateOf(IntSize.Zero) }
+        val fireWobble: () -> Unit = {
+            WobbleHaptics.performUIHaptic(view)
+            wobbleTrigger++
+        }
         Card(
             shape = RoundedCornerShape(28.dp),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .onGloballyPositioned { coords -> cardSize = coords.size }
+                .liquidRipple(
+                    trigger = wobbleTrigger,
+                    // Origin sits in the empty space BELOW the card, not on it. The
+                    // shader displaces pixels radially, so any origin inside the layer
+                    // warps what's under it (a centred origin made the photo balloon);
+                    // sourcing from outside the card lets the wavefront sweep upward
+                    // through the card as a travelling wave.
+                    origin = Offset(
+                        x = cardSize.width / 2f,
+                        y = cardSize.height + with(density) { 120.dp.toPx() },
+                    ),
+                    enabled = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU,
+                    durationMillis = 2800,
+                    amplitudeDp = 34f,
+                    frequency = 12f,
+                    decay = 4.5f,
+                    speedDp = 1400f,
+                ),
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                    // Hero: rotating scalloped monogram + name + Donate pill.
+                // Hero: rotating scalloped monogram + name + Donate pill.
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    val monoBg = MaterialTheme.colorScheme.primaryContainer
-                    val monoText = MaterialTheme.colorScheme.onPrimaryContainer
-                    // Ambient ultra-slow rotation: 360 degrees over 25 seconds.
-                    val badgeSpin = rememberInfiniteTransition(label = "badgeSpin")
-                    val badgeRotation by badgeSpin.animateFloat(
-                        initialValue = 0f,
-                        targetValue = 360f,
-                        animationSpec = infiniteRepeatable(
-                            animation = tween(durationMillis = 25000, easing = LinearEasing),
-                            repeatMode = RepeatMode.Restart,
-                        ),
-                        label = "badgeRotation",
+                    // Badge + wordmark are one tap target: both replay the wobble.
+                    val headerInteraction = remember { MutableInteractionSource() }
+                    val headerPressed by headerInteraction.collectIsPressedAsState()
+                    val headerScale by animateFloatAsState(
+                        targetValue = if (headerPressed) 0.96f else 1f,
+                        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+                        label = "headerSquish",
                     )
-                    Box(contentAlignment = Alignment.Center, modifier = Modifier.size(56.dp)) {
-                        Canvas(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .graphicsLayer { rotationZ = badgeRotation },
+                    Row(
+                        modifier = Modifier
+                            .scale(headerScale)
+                            .clickable(
+                                interactionSource = headerInteraction,
+                                indication = null,
+                            ) { fireWobble() },
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        // Ambient ultra-slow rotation: 360 degrees over 25 seconds. The
+                        // silhouette spins via the clip shape only, so the photo stays upright.
+                        val badgeSpin = rememberInfiniteTransition(label = "badgeSpin")
+                        val badgeRotation by badgeSpin.animateFloat(
+                            initialValue = 0f,
+                            targetValue = 360f,
+                            animationSpec = infiniteRepeatable(
+                                animation = tween(durationMillis = 25000, easing = LinearEasing),
+                                repeatMode = RepeatMode.Restart,
+                            ),
+                            label = "badgeRotation",
+                        )
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.size(56.dp),
                         ) {
-                            val lobes = 10
-                            val r = size.minDimension / 2f
-                            val amp = r * 0.07f
-                            val steps = 120
-                            val path = Path()
-                            for (i in 0..steps) {
-                                val t = (i * 2.0 * PI) / steps
-                                val rr = r - amp + amp * cos(lobes * t).toFloat()
-                                val px = size.width / 2f + rr * cos(t).toFloat()
-                                val py = size.height / 2f + rr * sin(t).toFloat()
-                                if (i == 0) path.moveTo(px, py) else path.lineTo(px, py)
-                            }
-                            path.close()
-                            drawPath(path, monoBg)
+                            Image(
+                                painter = painterResource(R.drawable.dp),
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    // Shape is read in the draw phase: the scallop rotates
+                                    // without recomposing per frame or spinning the image.
+                                    .graphicsLayer {
+                                        shape = ScallopedBadgeShape(badgeRotation)
+                                        clip = true
+                                    },
+                            )
                         }
-                        Text(
-                            text = "A",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = monoText,
-                            modifier = Modifier.offset(y = (-1).dp),
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(14.dp))
-                    Column {
-                        Text(
-                            text = stringResource(R.string.settings_made_by),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Text(
-                            text = stringResource(R.string.settings_dev_title),
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.ExtraBold,
-                        )
+                        Spacer(modifier = Modifier.width(14.dp))
+                        Column {
+                            Text(
+                                text = stringResource(R.string.settings_made_by),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Text(
+                                text = stringResource(R.string.settings_dev_title),
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.ExtraBold,
+                            )
+                        }
                     }
                     Spacer(modifier = Modifier.weight(1f))
                     // Donate: tertiary pill with spring squish, opens the donate sheet.
