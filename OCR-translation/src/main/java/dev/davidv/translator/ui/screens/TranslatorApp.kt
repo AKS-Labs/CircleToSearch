@@ -88,7 +88,10 @@ import dev.davidv.translator.Language
 import dev.davidv.translator.LaunchMode
 import dev.davidv.translator.PcmAudioPlayer
 import dev.davidv.translator.R
+import dev.davidv.translator.LanguageMetadataManager
+import dev.davidv.translator.MainActivity
 import dev.davidv.translator.TranslatorMessage
+import dev.davidv.translator.overlayChrome.ActivityLanguagePicker
 import dev.davidv.translator.encodeVoiceOverride
 import dev.davidv.translator.parseVoiceOverride
 import dev.davidv.translator.ui.DocumentTranslationUiState
@@ -791,6 +794,37 @@ fun TranslatorApp(
             val currentFrom = from
             val currentTo = to
             if (currentFrom != null && currentTo != null) {
+              // The same language picker dialog the camera screen uses, hosted
+              // in this activity. Image mode wires its language chips to it so
+              // a pick downloads missing packs and re-translates the image.
+              val app = context.applicationContext as dev.davidv.translator.TranslatorApplication
+              val activity = context as? Activity
+              val languagePicker =
+                remember(viewModel.languageStateManager, activity) {
+                  activity?.let {
+                    ActivityLanguagePicker(it, viewModel.languageStateManager, LanguageMetadataManager(it, app.languagesFlow))
+                  }
+                }
+              DisposableEffect(languagePicker) {
+                onDispose { languagePicker?.destroy() }
+              }
+              val openLanguagePicker: (Boolean) -> Unit = { isSource ->
+                languagePicker?.show(
+                  isSource = isSource,
+                  allowAuto = isSource && !settings.disableCLD,
+                ) { lang ->
+                  when {
+                    lang != null && isSource -> viewModel.handleMessage(TranslatorMessage.FromLang(lang))
+                    lang != null -> viewModel.handleMessage(TranslatorMessage.ToLang(lang))
+                    isSource -> viewModel.handleMessage(TranslatorMessage.EnableAutoSource)
+                    else -> Unit
+                  }
+                }
+              }
+              // Deep-linked from Circle to Search: the image screen's close
+              // returns to the caller's overlay instead of the module home.
+              val exitToCallerAction =
+                (context as? MainActivity)?.takeIf { it.hasReturnTarget }?.let { m -> { m.exitToCaller() } }
               val availableSourceTtsVoices = ttsVoicesByLanguage[currentFrom.code].orEmpty()
               val selectedSourceTtsVoiceName =
                 parseVoiceOverride(settings.ttsVoiceOverrides[currentFrom.code])
@@ -915,6 +949,8 @@ fun TranslatorApp(
                 launchMode = currentLaunchMode,
                 pendingSharedImage = viewModel.pendingSharedImage,
                 isAutoSource = isAutoSource,
+                onOpenLanguagePicker = { isSource -> openLanguagePicker(isSource) },
+                onExitToCaller = exitToCallerAction,
               )
             }
           }

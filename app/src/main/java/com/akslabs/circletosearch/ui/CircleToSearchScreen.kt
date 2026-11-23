@@ -3008,8 +3008,15 @@ fun CircleToSearchScreen(
                                 // stale touchable result/select window can't intercept
                                 // taps inside the camera screen.
                                 CircleToSearchAccessibilityService.instance?.closeTranslateOverlay()
+                                // Return target: closing the image result re-launches this
+                                // overlay (the original capture stays in BitmapRepository —
+                                // CLEAR_TASK destroys the old instance without finishing it).
                                 val cameraIntent = android.content.Intent(context, dev.davidv.translator.MainActivity::class.java)
                                     .putExtra(dev.davidv.translator.MainActivity.EXTRA_OPEN_LIVE_CAMERA, true)
+                                    .putExtra(
+                                        dev.davidv.translator.MainActivity.EXTRA_CALLER_COMPONENT,
+                                        android.content.ComponentName(context, com.akslabs.circletosearch.OverlayActivity::class.java),
+                                    )
                                     .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK)
                                 runCatching {
                                     context.startActivity(cameraIntent)

@@ -272,6 +272,9 @@
     <string name="a11y_retry_download">Retry Download</string>
     <string name="a11y_download">Download</string>
     <string name="a11y_share_image">Share image</string>
+    <string name="a11y_save_image">Save image to gallery</string>
+    <string name="image_saved_to_gallery">Saved to gallery</string>
+    <string name="image_save_failed">Couldn\'t save to gallery</string>
     <string name="a11y_close_fullscreen">Close full screen view</string>
     <string name="a11y_translation_output">Translation output</string>
     <string name="a11y_output_textview">Output textview</string>

@@ -20,9 +20,13 @@ package dev.davidv.translator.ui.components
 import android.app.Activity
 import android.content.ClipDescription
 import android.content.ClipboardManager
+import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.provider.MediaStore
 import android.speech.RecognizerIntent
+import android.util.Log
 import android.view.ViewTreeObserver
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -42,6 +46,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -60,6 +65,12 @@ import dev.davidv.translator.TranslatorMessage
 import dev.davidv.translator.browser.BrowserActivity
 import dev.davidv.translator.isSupportedDocumentUrl
 import dev.davidv.translator.isWebUrl
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun ShareImage(onMessage: (TranslatorMessage) -> Unit) {
@@ -68,6 +79,57 @@ fun ShareImage(onMessage: (TranslatorMessage) -> Unit) {
     contentDescription = stringResource(R.string.a11y_share_image),
     showBackdrop = true,
     onClick = { onMessage(TranslatorMessage.ShareTranslatedImage) },
+  )
+}
+
+// Writes the bitmap into the device gallery (Pictures/CircleToSearch) via
+// MediaStore — no storage permission needed on API 29+, which is our floor.
+fun saveBitmapToGallery(
+  context: Context,
+  bitmap: Bitmap,
+): Boolean {
+  return try {
+    val name = "CircleToSearch_%s.jpg".format(SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date()))
+    val values =
+      ContentValues().apply {
+        put(MediaStore.Images.Media.DISPLAY_NAME, name)
+        put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+        put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/CircleToSearch")
+      }
+    val uri = context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) ?: return false
+    context.contentResolver.openOutputStream(uri)?.use { out ->
+      bitmap.compress(Bitmap.CompressFormat.JPEG, 95, out)
+    } ?: return false
+    Log.d("SaveImage", "Saved $name to gallery")
+    true
+  } catch (e: Exception) {
+    Log.w("SaveImage", "Failed to save bitmap to gallery", e)
+    false
+  }
+}
+
+// Saves whatever image is currently on screen — translated by default, the
+// original capture when the flip toggle is active.
+@Composable
+fun SaveImage(bitmap: Bitmap) {
+  val context = LocalContext.current
+  val scope = rememberCoroutineScope()
+  ActionPillButton(
+    iconRes = R.drawable.download,
+    contentDescription = stringResource(R.string.a11y_save_image),
+    showBackdrop = true,
+    onClick = {
+      scope.launch {
+        val saved = withContext(Dispatchers.IO) { saveBitmapToGallery(context, bitmap) }
+        val message =
+          if (saved) {
+            R.string.image_saved_to_gallery
+          } else {
+            R.string.image_save_failed
+          }
+        Toast.makeText(context, context.getString(message), Toast.LENGTH_SHORT).show()
+      }
+    },
   )
 }
 

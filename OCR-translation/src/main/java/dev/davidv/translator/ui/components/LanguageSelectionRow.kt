@@ -60,6 +60,13 @@ fun LanguageSelectionRow(
   isAutoSource: Boolean = false,
   detectedInstalled: Language? = null,
   showAutoOption: Boolean = false,
+  // Image mode: center the from/swap/to group and drop the trailing settings
+  // action entirely (the image screen has no per-screen settings entry).
+  centered: Boolean = false,
+  // When set, tapping a chip opens the full-screen language picker dialog
+  // instead of the inline dropdown (camera-screen behavior).
+  onPickFrom: (() -> Unit)? = null,
+  onPickTo: (() -> Unit)? = null,
 ) {
   val titleStyle =
     MaterialTheme.typography.titleMedium.copy(
@@ -69,7 +76,12 @@ fun LanguageSelectionRow(
 
   Row(
     modifier = Modifier.fillMaxWidth(),
-    horizontalArrangement = Arrangement.spacedBy(2.dp),
+    horizontalArrangement =
+      if (centered) {
+        Arrangement.spacedBy(2.dp, Alignment.CenterHorizontally)
+      } else {
+        Arrangement.spacedBy(2.dp)
+      },
     verticalAlignment = Alignment.CenterVertically,
   ) {
     val fromLanguages =
@@ -95,6 +107,7 @@ fun LanguageSelectionRow(
       onAutoSelected = { onMessage(TranslatorMessage.EnableAutoSource) },
       centered = false,
       textStyle = titleStyle,
+      onOverrideClick = onPickFrom,
     )
     LanguageSwapButton(
       onClick = { onMessage(TranslatorMessage.SwapLanguages) },
@@ -111,19 +124,22 @@ fun LanguageSelectionRow(
       modifier = Modifier.widthIn(max = 150.dp),
       centered = false,
       textStyle = titleStyle,
+      onOverrideClick = onPickTo,
     )
 
-    Spacer(modifier = Modifier.weight(1f))
+    if (!centered) {
+      Spacer(modifier = Modifier.weight(1f))
 
-    if (onSettings != null) {
-      IconButton(onClick = onSettings, modifier = Modifier.size(36.dp)) {
-        Icon(
-          painterResource(id = drawable.second),
-          contentDescription = drawable.first,
-        )
+      if (onSettings != null) {
+        IconButton(onClick = onSettings, modifier = Modifier.size(36.dp)) {
+          Icon(
+            painterResource(id = drawable.second),
+            contentDescription = drawable.first,
+          )
+        }
+      } else {
+        Spacer(modifier = Modifier.size(48.dp))
       }
-    } else {
-      Spacer(modifier = Modifier.size(48.dp))
     }
   }
 }

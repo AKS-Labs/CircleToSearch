@@ -62,6 +62,7 @@ fun ZoomableImageViewer(
   wordSelection: ImageWordSelection?,
   onDismiss: () -> Unit,
   onShare: () -> Unit,
+  onSaveBitmap: (Bitmap) -> Unit = {},
 ) {
   var showOriginal by remember { mutableStateOf(false) }
   val displayed = if (showOriginal) originalBitmap else bitmap
@@ -199,6 +200,17 @@ fun ZoomableImageViewer(
           Icon(
             painterResource(id = R.drawable.share),
             contentDescription = stringResource(R.string.a11y_share_image),
+            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
+          )
+        }
+
+        IconButton(
+          onClick = { onSaveBitmap(displayed) },
+          modifier = Modifier.size(48.dp),
+        ) {
+          Icon(
+            painterResource(id = R.drawable.download),
+            contentDescription = stringResource(R.string.a11y_save_image),
             tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
           )
         }

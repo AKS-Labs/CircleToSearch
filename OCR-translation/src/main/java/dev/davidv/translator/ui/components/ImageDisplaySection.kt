@@ -36,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
@@ -44,6 +45,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.dp
 import dev.davidv.translator.R
 import kotlin.math.roundToInt
 
@@ -96,9 +98,9 @@ fun ImageDisplaySection(
     Box(
       modifier =
         Modifier
-          .align(Alignment.TopCenter)
+          .align(Alignment.Center)
           .size(dispW, dispH)
-          .clip(RectangleShape)
+          .clip(RoundedCornerShape(16.dp))
           .absoluteOffset { IntOffset(offset.x.roundToInt(), offset.y.roundToInt()) }
           .graphicsLayer(scaleX = scale, scaleY = scale)
           .transformable(transformState),

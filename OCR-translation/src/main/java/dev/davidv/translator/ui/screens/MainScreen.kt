@@ -23,17 +23,20 @@ import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
@@ -48,6 +51,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -98,7 +102,9 @@ import dev.davidv.translator.ui.components.JapaneseOcrModeToggle
 import dev.davidv.translator.ui.components.LanguageEvent
 import dev.davidv.translator.ui.components.LanguageSelectionRow
 import dev.davidv.translator.ui.components.OutputTapMode
+import dev.davidv.translator.ui.components.SaveImage
 import dev.davidv.translator.ui.components.ShareImage
+import dev.davidv.translator.ui.components.saveBitmapToGallery
 import dev.davidv.translator.ui.components.SplitHandle
 import dev.davidv.translator.ui.components.StyledTextFieldFocusController
 import dev.davidv.translator.ui.components.TargetTabsHeader
@@ -108,10 +114,13 @@ import dev.davidv.translator.ui.components.rememberImageSourceActions
 import dev.davidv.translator.ui.components.wordAt
 import dev.davidv.translator.ui.components.wordRangeAt
 import dev.davidv.translator.ui.theme.TranslatorTheme
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
 @Composable
@@ -168,6 +177,13 @@ fun MainScreen(
   launchMode: LaunchMode,
   pendingSharedImage: SharedFlow<android.net.Uri>? = null,
   isAutoSource: Boolean = false,
+  // Image mode: opens the camera-screen language picker dialog for the
+  // from/to chips. Null (previews, text mode) keeps the inline dropdown.
+  onOpenLanguagePicker: ((isSource: Boolean) -> Unit)? = null,
+  // Image mode close: when set (deep-linked session, e.g. from Circle to
+  // Search), the close segment returns to the caller instead of clearing to
+  // this module's home screen.
+  onExitToCaller: (() -> Unit)? = null,
 ) {
   var showFullScreenImage by remember { mutableStateOf(false) }
   var alternativesTarget by remember { mutableStateOf<AlternativesTarget?>(null) }
@@ -271,9 +287,24 @@ fun MainScreen(
             languageState = languageState,
             languageMetadata = languageMetadata,
             onMessage = onMessage,
+            // Image mode: the from/swap/to group centers and the settings
+            // entry disappears — that screen has no per-image settings.
+            centered = displayImage != null,
+            onSettings =
+              if (displayImage == null) {
+                if (launchMode == LaunchMode.Normal) {
+                  onSettings
+                } else {
+                  { onMessage(TranslatorMessage.ChangeLaunchMode(LaunchMode.Normal)) }
+                }
+              } else {
+                null
+              },
             isAutoSource = isAutoSource,
             detectedInstalled = detectedInstalled,
             showAutoOption = !settings.disableCLD,
+            onPickFrom = onOpenLanguagePicker?.let { open -> { open(true) } },
+            onPickTo = onOpenLanguagePicker?.let { open -> { open(false) } },
             drawable =
               if (launchMode == LaunchMode.Normal) {
                 Pair("Settings", R.drawable.settings)
@@ -282,12 +313,6 @@ fun MainScreen(
                   "Expand",
                   R.drawable.open_in_full,
                 )
-              },
-            onSettings =
-              if (launchMode == LaunchMode.Normal) {
-                onSettings
-              } else {
-                { onMessage(TranslatorMessage.ChangeLaunchMode(LaunchMode.Normal)) }
               },
           )
         }
@@ -331,53 +356,40 @@ fun MainScreen(
             }
 
             if (displayImage != null) {
-              Box(modifier = Modifier.fillMaxWidth()) {
-                ImageDisplaySection(
-                  displayImage = displayImage,
-                  originalImage = originalImage,
-                  showOriginal = showOriginal,
-                  isProcessing = isImageProcessing,
-                  detectedRegions = detectedRegions,
-                  wordSelection = imageWordSelection,
-                  maxHeight = parentHeight * 0.85f,
-                  modifier = Modifier.fillMaxWidth().testTag("export-section:Image"),
-                )
-                Row(
-                  modifier =
-                    Modifier
-                      .align(Alignment.TopEnd)
-                      .padding(8.dp),
-                  horizontalArrangement = Arrangement.spacedBy(8.dp),
+              Column(modifier = Modifier.fillMaxWidth().fillMaxHeight()) {
+                // The image centers itself in the leftover height between the
+                // language row above and the action row below.
+                Box(
+                  modifier = Modifier.fillMaxWidth().weight(1f),
+                  contentAlignment = Alignment.Center,
                 ) {
-                  if (from.code == "ja") {
-                    JapaneseOcrModeToggle(
-                      readingOrder = ocrReadingOrder,
-                      onMessage = onMessage,
-                    )
-                  }
-                  if (originalImage != null) {
-                    ActionPillButton(
-                      iconRes = R.drawable.flip,
-                      contentDescription =
-                        if (showOriginal) {
-                          stringResource(
-                            R.string.a11y_show_translated_image,
-                          )
-                        } else {
-                          stringResource(R.string.a11y_show_original_image)
-                        },
-                      showBackdrop = true,
-                      onClick = { showOriginal = !showOriginal },
-                    )
-                  }
-                  ShareImage(onMessage)
-                  ClearInput(
-                    onMessage = onMessage,
-                    showBackdrop = true,
+                  ImageDisplaySection(
+                    displayImage = displayImage,
+                    originalImage = originalImage,
+                    showOriginal = showOriginal,
+                    isProcessing = isImageProcessing,
+                    detectedRegions = detectedRegions,
+                    wordSelection = imageWordSelection,
+                    maxHeight = parentHeight * 0.85f,
+                    modifier = Modifier.fillMaxWidth().testTag("export-section:Image"),
                   )
                 }
+                detectedLanguageSection()
+                ImageActionSegmentedRow(
+                  showJapaneseToggle = from.code == "ja",
+                  ocrReadingOrder = ocrReadingOrder,
+                  canFlip = originalImage != null,
+                  showOriginal = showOriginal,
+                  onToggleOriginal = { showOriginal = !showOriginal },
+                  bitmapToSave = if (showOriginal && originalImage != null) originalImage else displayImage,
+                  onMessage = onMessage,
+                  onExitToCaller = onExitToCaller,
+                  modifier =
+                    Modifier
+                      .align(Alignment.CenterHorizontally)
+                      .padding(vertical = 10.dp),
+                )
               }
-              detectedLanguageSection()
             }
 
             if (!showOnlyOutputInReadonlyModal && displayImage == null) {
@@ -596,6 +608,7 @@ fun MainScreen(
 
   // Full screen image viewer
   if (showFullScreenImage && displayImage != null && originalImage != null) {
+    val scope = rememberCoroutineScope()
     ZoomableImageViewer(
       bitmap = displayImage,
       originalBitmap = originalImage,
@@ -603,6 +616,18 @@ fun MainScreen(
       onDismiss = { showFullScreenImage = false },
       onShare = {
         onMessage(TranslatorMessage.ShareTranslatedImage)
+      },
+      onSaveBitmap = { bitmapToSave ->
+        scope.launch {
+          val saved = withContext(Dispatchers.IO) { saveBitmapToGallery(context, bitmapToSave) }
+          val message =
+            if (saved) {
+              R.string.image_saved_to_gallery
+            } else {
+              R.string.image_save_failed
+            }
+          Toast.makeText(context, context.getString(message), Toast.LENGTH_SHORT).show()
+        }
       },
     )
   }
@@ -902,5 +927,132 @@ fun PreviewVeryLongTextImage() {
       dictionaryLookupLanguage = null,
       inputTransliteration = null,
     )
+  }
+}
+
+// One action in the image result's segmented row.
+private data class ImageSegmentSpec(
+  val iconRes: Int,
+  val contentDescription: String,
+  val onClick: () -> Unit,
+)
+
+// Image actions as joined segmented buttons in a single pill container with
+// thin dividers between the segments (was a floating pill row over the image).
+@Composable
+private fun ImageActionSegmentedRow(
+  showJapaneseToggle: Boolean,
+  ocrReadingOrder: ReadingOrder?,
+  canFlip: Boolean,
+  showOriginal: Boolean,
+  onToggleOriginal: () -> Unit,
+  bitmapToSave: Bitmap,
+  onMessage: (TranslatorMessage) -> Unit,
+  // Set in a deep-linked session: the last segment closes back to the caller
+  // instead of clearing to the module home.
+  onExitToCaller: (() -> Unit)? = null,
+  modifier: Modifier = Modifier,
+) {
+  val context = LocalContext.current
+  val scope = rememberCoroutineScope()
+
+  val segments =
+    buildList {
+      if (showJapaneseToggle) {
+        val (iconRes, description) =
+          when (ocrReadingOrder) {
+            null -> R.drawable.text_rotation_auto to "Japanese OCR auto mode"
+            ReadingOrder.TOP_TO_BOTTOM_RIGHT_TO_LEFT -> R.drawable.text_rotate_vertical to "Japanese OCR vertical mode"
+            ReadingOrder.LEFT_TO_RIGHT -> R.drawable.text_rotation_none to "Japanese OCR horizontal mode"
+          }
+        add(
+          ImageSegmentSpec(iconRes, description) {
+            onMessage(TranslatorMessage.ToggleJapaneseOcrMode)
+          },
+        )
+      }
+      if (canFlip) {
+        add(
+          ImageSegmentSpec(
+            R.drawable.flip,
+            if (showOriginal) {
+              "Show translated image"
+            } else {
+              "Show original image"
+            },
+          ) { onToggleOriginal() },
+        )
+      }
+      add(
+        ImageSegmentSpec(R.drawable.download, "Save image to gallery") {
+          scope.launch {
+            val saved = withContext(Dispatchers.IO) { saveBitmapToGallery(context, bitmapToSave) }
+            val message =
+              if (saved) {
+                R.string.image_saved_to_gallery
+              } else {
+                R.string.image_save_failed
+              }
+            Toast.makeText(context, context.getString(message), Toast.LENGTH_SHORT).show()
+          }
+        },
+      )
+      add(
+        ImageSegmentSpec(R.drawable.share, "Share image") {
+          onMessage(TranslatorMessage.ShareTranslatedImage)
+        },
+      )
+      add(
+        ImageSegmentSpec(
+          R.drawable.cancel,
+          if (onExitToCaller != null) {
+            "Close"
+          } else {
+            "Clear input"
+          },
+        ) {
+          if (onExitToCaller != null) {
+            onExitToCaller()
+          } else {
+            onMessage(TranslatorMessage.ClearInput)
+          }
+        },
+      )
+    }
+
+  Row(
+    modifier =
+      modifier
+        .clip(RoundedCornerShape(50))
+        .background(MaterialTheme.colorScheme.secondaryContainer)
+        .padding(horizontal = 6.dp, vertical = 4.dp),
+    verticalAlignment = Alignment.CenterVertically,
+  ) {
+    segments.forEachIndexed { index, segment ->
+      if (index > 0) {
+        Box(
+          modifier =
+            Modifier
+              .width(1.dp)
+              .height(22.dp)
+              .background(MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.25f)),
+        )
+      }
+      Box(
+        modifier =
+          Modifier
+            .size(42.dp)
+            .clip(RoundedCornerShape(50))
+            .clickable(onClick = segment.onClick),
+        contentAlignment = Alignment.Center,
+      ) {
+        Icon(
+          painterResource(id = segment.iconRes),
+          contentDescription = segment.contentDescription,
+          tint = MaterialTheme.colorScheme.onSecondaryContainer,
+          modifier = Modifier.size(20.dp),
+        )
+      }
+    }
   }
 }
