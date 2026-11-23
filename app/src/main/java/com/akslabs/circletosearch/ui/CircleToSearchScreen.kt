@@ -536,6 +536,10 @@ fun CircleToSearchScreen(
     // and this state, so the next screenshot OCR picks them up immediately.
     var showOcrLangDialog by remember { mutableStateOf(false) }
     var ocrCheckedLanguages by remember { mutableStateOf(OcrLanguagePreferences.getChecked(context)) }
+    // Bumped when the user closes the language picker with a changed selection:
+    // the instant OCR must re-run over the current capture with the new
+    // whitelist instead of keeping words recognized under the old one.
+    var ocrScanGeneration by remember { mutableStateOf(0) }
 
     // Material You logic for colors
     val isDark = isSystemInDarkTheme()
@@ -1218,12 +1222,17 @@ fun CircleToSearchScreen(
 
     // Instant OCR: recognize the screenshot's words as soon as it arrives (module
     // pipeline, no translation) — shown as tappable words over the frozen capture.
-    LaunchedEffect(screenshot) {
+    // Keyed on [ocrScanGeneration] too: picking different OCR languages re-runs the
+    // recognition over the same capture with the new whitelist.
+    LaunchedEffect(screenshot, ocrScanGeneration) {
         instantWords = null
         instantRegions = null
         instantOcrDone = false
         wordSelected = false
         val bmp = screenshot ?: return@LaunchedEffect
+        // A pre-scan that started BEFORE the last language change ran under the
+        // previous whitelist; InstantOcrStore already filters those out in stateFor(),
+        // so a null here means "scan inline with the current languages".
         val preScan = InstantOcrStore.stateFor(bmp)
         if (preScan == null) {
             // No capture-time scan runs for this image (gallery pick, assistant
@@ -3894,9 +3903,25 @@ fun CircleToSearchScreen(
 
         if (showOcrLangDialog) {
             OcrLanguageDialog(
-                onDismiss = { showOcrLangDialog = false },
+                // Selection is applied when the picker closes, not per checkbox:
+                // re-running OCR on every toggle would clear the word overlay
+                // behind the dialog on each tap.
+                onDismiss = {
+                    showOcrLangDialog = false
+                    val applied = OcrLanguagePreferences.getChecked(context)
+                    if (applied != ocrCheckedLanguages) {
+                        ocrCheckedLanguages = applied
+                        // Stale detection boxes from the previous recognition must not
+                        // be reused by a later translate of this same capture.
+                        InstantOcrStore.invalidateScansForLanguageChange()
+                        ocrScanGeneration++
+                        // The entity chips were extracted from the previous
+                        // recognition; drop them and let the re-scan refill them.
+                        detectedEntities = emptyList()
+                        entityScanGeneration++
+                    }
+                },
                 onCheckedChange = { codes ->
-                    ocrCheckedLanguages = codes
                     OcrLanguagePreferences.setChecked(context, codes)
                 }
             )
