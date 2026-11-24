@@ -477,7 +477,8 @@ object OverlayChromeFactory {
     // corners stay rounded while scrolling instead of clipping to a square window.
     val bg =
       GradientDrawable().apply {
-        setColor(p.menuBg)
+        // Same fill as the download-button pill, per user preference.
+        setColor(p.chipColor)
         cornerRadius = dpToPx(20).toFloat()
         setStroke(dpToPx(1), p.barStroke)
       }
@@ -587,28 +588,28 @@ object OverlayChromeFactory {
           )
         }
 
-        val starHolder =
+        val pinHolder =
           FrameLayout(context).apply {
-            val starSize = dpToPx(36)
-            val starPad = dpToPx(9)
-            val star =
+            val pinSize = dpToPx(36)
+            val pinPad = dpToPx(9)
+            val pin =
               ImageView(context).apply {
-                setPadding(starPad, starPad, starPad, starPad)
+                setPadding(pinPad, pinPad, pinPad, pinPad)
               }
-            fun applyStar(favorite: Boolean) {
-              star.setImageResource(if (favorite) R.drawable.star_filled else R.drawable.star)
-              star.setColorFilter(if (favorite) p.activeTint else p.menuTextDisabled)
-              star.contentDescription = if (favorite) "Unstar ${language.displayName}" else "Star ${language.displayName}"
+            fun applyPin(favorite: Boolean) {
+              pin.setImageResource(if (favorite) R.drawable.ic_lang_pin_filled else R.drawable.ic_lang_pin)
+              pin.setColorFilter(if (favorite) p.activeTint else p.menuTextDisabled)
+              pin.contentDescription = if (favorite) "Unpin ${language.displayName}" else "Pin ${language.displayName}"
             }
-            applyStar(row.favorite)
-            addView(star, FrameLayout.LayoutParams(starSize, starSize).apply { gravity = Gravity.CENTER })
+            applyPin(row.favorite)
+            addView(pin, FrameLayout.LayoutParams(pinSize, pinSize).apply { gravity = Gravity.CENTER })
             setOnClickListener {
               val newFavorite = !(currentRows.find { it.language.code == language.code }?.favorite ?: row.favorite)
-              applyStar(newFavorite)
+              applyPin(newFavorite)
               onToggleFavorite(language, newFavorite)
             }
           }
-        trailing.addView(starHolder)
+        trailing.addView(pinHolder)
 
         if (!showAsInstalled) {
           val iconHolder = FrameLayout(context)

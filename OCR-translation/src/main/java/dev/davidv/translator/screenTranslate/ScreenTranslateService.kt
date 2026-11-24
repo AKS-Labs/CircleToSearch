@@ -534,15 +534,16 @@ class ScreenTranslateService : Service() {
         onDelete = { language ->
           lsm.deleteLanguage(language)
         },
-      ) { lang ->
-        if (isSource) {
-          if (lang != null) currentFrom = lang
-        } else if (lang != null) {
-          currentTo = lang
-        }
-        applyLanguages()
-        updateLiveToolbarLabels()
-      }
+        onPick = { lang ->
+          if (isSource) {
+            if (lang != null) currentFrom = lang
+          } else if (lang != null) {
+            currentTo = lang
+          }
+          applyLanguages()
+          updateLiveToolbarLabels()
+        },
+      )
     }
   }
 

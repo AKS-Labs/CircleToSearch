@@ -20,7 +20,9 @@ data class OverlayLanguagePickerRow(
   val pendingDictionaryInfo: DictionaryInfo?,
 )
 
-/** Build the full-catalog picker rows (favorites first, then alphabetical). */
+/** Build the full-catalog picker rows (favorites first, then downloaded
+ *  languages, then alphabetical — so a downloaded language keeps its top
+ *  placement in every picker session, not just the one that downloaded it). */
 fun buildOverlayPickerRows(
   langStateManager: LanguageStateManager,
   metadata: Map<Language, LanguageMetadata> = emptyMap(),
@@ -62,6 +64,7 @@ fun buildOverlayPickerRows(
       )
     }.sortedWith(
       compareByDescending<OverlayLanguagePickerRow> { metadata[it.language]?.favorite ?: false }
+        .thenByDescending { it.installed }
         .thenBy(languageNameComparator()) { it.language.localizedName() },
     )
 }

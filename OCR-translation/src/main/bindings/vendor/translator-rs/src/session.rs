@@ -424,14 +424,38 @@ impl TranslatorSession {
     }
 
     #[cfg(feature = "ppocr")]
+    /// The recognizer scripts the selection can use: `None` = every installed
+    /// recognizer (auto-detect may hit any of them).
+    #[cfg(feature = "ppocr")]
+    pub fn allowed_scripts_for(
+        &self,
+        source_selection: &OcrSourceSelection,
+        snap: &CatalogSnapshot,
+    ) -> Option<Vec<crate::catalog::PpocrScript>> {
+        match source_selection {
+            OcrSourceSelection::Auto => None,
+            OcrSourceSelection::Specific { language_code } => {
+                Some(vec![crate::ocr_runtime::recognizer_script_for_language(snap, language_code).ok()?])
+            }
+            OcrSourceSelection::Restricted { language_codes } => Some(
+                language_codes
+                    .iter()
+                    .filter_map(|code| crate::ocr_runtime::recognizer_script_for_language(snap, code).ok())
+                    .collect(),
+            ),
+        }
+    }
+
     pub fn detect_boxes_from_still(
         &self,
         still: &crate::live_frame::StillImage,
         width: u32,
         height: u32,
+        source_selection: &OcrSourceSelection,
     ) -> Result<Vec<crate::ocr::DetectedTextBox>, TranslatorError> {
         let snap = self.snapshot();
-        let ppocr = self.ocr.engine(&snap)?;
+        let allowed_scripts = self.allowed_scripts_for(source_selection, &snap);
+        let ppocr = self.ocr.engine_for_scripts(&snap, allowed_scripts.as_deref())?;
         crate::ocr_runtime::detect_boxes_from_still(&ppocr, still, width, height)
     }
 
@@ -452,7 +476,23 @@ impl TranslatorSession {
     ) -> Result<PreparedImageOverlay, TranslatorError> {
         let snap = self.snapshot();
         let tgt = LanguageCode::from(target_code);
-        let ppocr = self.ocr.engine(&snap)?;
+        // Load only the recognizers the selection can use: an OCR-language whitelist
+        // (Specific/Restricted) keeps the other recognizers unloaded, trimming the
+        // process footprint to the languages the user actually searches. Auto loads
+        // every installed recognizer.
+        let allowed_scripts: Option<Vec<_>> = match &source_selection {
+            OcrSourceSelection::Specific { language_code } => {
+                Some(vec![crate::ocr_runtime::recognizer_script_for_language(&snap, language_code)?])
+            }
+            OcrSourceSelection::Restricted { language_codes } => Some(
+                language_codes
+                    .iter()
+                    .filter_map(|code| crate::ocr_runtime::recognizer_script_for_language(&snap, code).ok())
+                    .collect(),
+            ),
+            OcrSourceSelection::Auto => None,
+        };
+        let ppocr = self.ocr.engine_for_scripts(&snap, allowed_scripts.as_deref())?;
         log::info!("ocr engine: ppocr ({:?})", source_selection);
         translate_image_rgba_ppocr_in_snapshot(
             self.engine(),
@@ -789,7 +829,9 @@ impl translator_live::live_session::LiveRecognizer for TranslatorSession {
         let snap = self.snapshot();
         let ppocr = self.ocr().engine(&snap).map_err(|e| format!("{e:?}"))?;
         let script = match source_selection {
-            OcrSourceSelection::Auto => None,
+            // Both auto paths let PULC pick per box; the whitelist's recognition
+            // narrowing is applied by the still-image runtime, not here.
+            OcrSourceSelection::Auto | OcrSourceSelection::Restricted { .. } => None,
             OcrSourceSelection::Specific { language_code } => Some(
                 crate::ocr_runtime::recognizer_script_for_language(&snap, language_code)
                     .map_err(|e| format!("{e:?}"))?,
@@ -803,7 +845,7 @@ impl translator_live::live_session::LiveRecognizer for TranslatorSession {
             canonical_quadrant,
         )
         .map_err(|e| format!("{e:?}"))?;
-        if matches!(source_selection, OcrSourceSelection::Auto) {
+        if !matches!(source_selection, OcrSourceSelection::Specific { .. }) {
             if let Some(code) = crate::ocr_runtime::ocr_source_for_lines(&snap, &lines, None) {
                 let code = code.as_str().to_owned();
                 for line in &mut lines {

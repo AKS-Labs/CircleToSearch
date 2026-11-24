@@ -7,10 +7,13 @@ import dev.davidv.translator.DownloadEvent
 import dev.davidv.translator.DownloadService
 import dev.davidv.translator.Language
 import dev.davidv.translator.OverlayLanguagePickerRow
+import dev.davidv.translator.languageNameComparator
+import dev.davidv.translator.localizedName
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 
 interface OverlayMenuHost {
@@ -77,6 +80,7 @@ class OverlayMenuManager(
     onToggleFavorite: (Language, Boolean) -> Unit,
     onDelete: (Language) -> Unit,
     onPick: (Language?) -> Unit,
+    rowsRefresh: Flow<Unit>? = null,
   ) {
     dismiss()
 
@@ -111,6 +115,15 @@ class OverlayMenuManager(
               row
             }
           favoriteOverrides[base.language.code]?.let { base.copy(favorite = it) } ?: base
+        }.let { rows ->
+          // The override above can flip a favorite after rowsProvider already
+          // sorted with the persisted state — re-sort with the same keys so a
+          // newly pinned language jumps to the top the instant it's pinned.
+          rows.sortedWith(
+            compareByDescending<OverlayLanguagePickerRow> { it.favorite }
+              .thenByDescending { it.installed }
+              .thenBy(languageNameComparator()) { it.language.localizedName() },
+          )
         }.let { rows ->
           pinnedDownloadCode?.let { pin ->
             rows.sortedBy { it.language.code != pin }
@@ -164,6 +177,9 @@ class OverlayMenuManager(
         },
         onToggleFavorite = { language, favorite ->
           favoriteOverrides[language.code] = favorite
+          // Re-sort immediately: favorites sort first, so the pinned language
+          // moves without waiting for the picker to reopen.
+          handle?.setRows(liveRowsProvider())
           onToggleFavorite(language, favorite)
         },
       )
@@ -196,6 +212,19 @@ class OverlayMenuManager(
               }
 
               else -> Unit
+            }
+          }
+        }
+        // Rebuild rows whenever language availability changes. The completion
+        // event above fires before LanguageStateManager's own rescan finishes,
+        // so the row built from it can still say "not installed" — without
+        // this the open picker never picked up the refreshed state, and a
+        // downloaded language kept its download button until the picker was
+        // reopened.
+        rowsRefresh?.let { refresh ->
+          launch {
+            refresh.collect {
+              handle.setRows(liveRowsProvider())
             }
           }
         }

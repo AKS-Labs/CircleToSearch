@@ -3,7 +3,8 @@ use std::sync::Mutex;
 use rayon::prelude::*;
 
 use crate::ppocr::{
-    InkChannelOrder, PpocrEngine, PpocrProfile, PpocrScriptClass, PpocrScriptPrediction,
+    DewarpedStrip, InkChannelOrder, PpocrEngine, PpocrProfile, PpocrScriptClass,
+    PpocrScriptPrediction,
 };
 use translator_core::api::{LanguageCode, TranslatorError};
 use translator_core::catalog::CatalogSnapshot;
@@ -12,6 +13,7 @@ use translator_core::ocr::{
     DetectedTextBox, OcrSourceSelection, OrientedRect, RecognizedTextLine, TextLine,
 };
 use translator_core::ocr::{PreparedImageOverlay, ReadingOrder, Rect, TextBlock};
+use translator_core::script::Script;
 use translator_core::settings::BackgroundMode;
 use translator_raster::live_frame::StillImage;
 use translator_raster::overlay::prepare_overlay_image;
@@ -75,9 +77,12 @@ pub fn translate_image_rgba_ppocr_in_snapshot(
     // Passing it explicitly (instead of None) pins the dewarp direction of
     // near-vertical strips — CJK vertical columns — to top-char-first; with
     // None the PCA sign for those strips is per-column noise.
-    let scripts = match source_selection {
-        OcrSourceSelection::Auto => {
-            let predictions = ppocr
+    // PULC classification runs for every non-forced selection. `Specific` pins
+    // the recognizer directly and skips it.
+    let predictions = match source_selection {
+        OcrSourceSelection::Specific { .. } => None,
+        _ => Some(
+            ppocr
                 .classify_text_boxes_image(
                     rgb,
                     &det_boxes,
@@ -85,12 +90,47 @@ pub fn translate_image_rgba_ppocr_in_snapshot(
                 )
                 .map_err(|e| {
                     TranslatorError::ocr(format!("ppocr script classification failed: {e}"))
-                })?;
-            route_ppocr_predictions(ppocr, &predictions, &det_boxes)?
-        }
+                })?,
+        ),
+    };
+    // Per-strip recognizer scripts plus the contest candidates: scripts that
+    // failed strips may be re-read with. `Specific` is trusted (no contest);
+    // `Auto` contests the two script blind spots (PULC cannot name bn/gu/ml,
+    // and misroutes Devanagari strips to Latin); `Restricted` contests within
+    // the user's checked languages.
+    let (mut scripts, contest_candidates) = match source_selection {
         OcrSourceSelection::Specific { language_code } => {
             let script = recognizer_script_for_language(snapshot, language_code)?;
-            vec![script; det_boxes.len()]
+            (vec![script; det_boxes.len()], Vec::new())
+        }
+        OcrSourceSelection::Auto => {
+            let routed =
+                route_ppocr_predictions(ppocr, predictions.as_deref().unwrap_or_default(), &det_boxes)?;
+            // Both directions of the script blind spot: the Indic pack rescues
+            // bn/gu/ml strips PULC sent to Latin/Devanagari, and the Devanagari
+            // pack rescues Hindi strips PULC sent to Latin (the Indic pack would
+            // render Devanagari glyphs as confident Bengali garbage).
+            let candidates: Vec<PpocrScript> = [PpocrScript::Indic, PpocrScript::Devanagari]
+                .into_iter()
+                .filter(|s| ppocr.installed_scripts().any(|i| i == *s))
+                .collect();
+            (routed, candidates)
+        }
+        OcrSourceSelection::Restricted { language_codes } => {
+            let routed =
+                route_ppocr_predictions(ppocr, predictions.as_deref().unwrap_or_default(), &det_boxes)?;
+            let mut candidates: Vec<PpocrScript> = Vec::new();
+            for code in language_codes {
+                match recognizer_script_for_language(snapshot, code) {
+                    Ok(script) if !candidates.contains(&script) => candidates.push(script),
+                    Ok(_) => {}
+                    Err(e) => log::warn!(
+                        "ppocr restricted source: language {} unusable: {e}",
+                        code.as_str()
+                    ),
+                }
+            }
+            (routed, candidates)
         }
     };
 
@@ -121,7 +161,7 @@ pub fn translate_image_rgba_ppocr_in_snapshot(
         ppocr.dewarp_strips(rgb, &det_boxes, Some(translator_core::coords::Quadrant::R0));
     let dewarp_ms = t_dewarp.elapsed().as_secs_f32() * 1000.0;
 
-    let lines = ppocr
+    let mut lines = ppocr
         .recognize_from_strips(
             &strips,
             &det_boxes,
@@ -132,6 +172,23 @@ pub fn translate_image_rgba_ppocr_in_snapshot(
             dewarp_ms,
         )
         .map_err(|e| TranslatorError::ocr(format!("ppocr recognition failed: {e}")))?;
+
+    // PULC's class list cannot name Bengali, Gujarati, or Malayalam, so the
+    // router sends those strips to Latin or Devanagari and the wrong recognizer
+    // emits garbage. Strips whose recognition came out empty or low-confidence
+    // get an extra pass with the contest candidate recognizers.
+    contest_script_recognition(
+        ppocr,
+        &strips,
+        &det_boxes,
+        &mut lines,
+        &mut scripts,
+        &contest_candidates,
+        PpocrProfile::Still,
+        width,
+        height,
+        dewarp_ms,
+    );
 
     // A box recognition rejected (empty / low-score) never reaches the overlay, so its matte is
     // wasted inference — drop it before inking. The dewarp already ran (shared with rec).
@@ -290,15 +347,21 @@ pub fn translate_image_rgba_ppocr_in_snapshot(
          source_words={words_ms:.1}ms blocks+grouping={:.1}ms",
         t_blocks.elapsed().as_secs_f32() * 1000.0,
     );
+    // `Restricted` narrows every CLD candidate list to the user's checked
+    // languages; `Auto` considers everything installed.
+    let cld_restrict: Option<&[LanguageCode]> = match source_selection {
+        OcrSourceSelection::Restricted { language_codes } => Some(language_codes.as_slice()),
+        _ => None,
+    };
     let source_code = match source_selection {
         OcrSourceSelection::Specific { language_code } => language_code.clone(),
-        OcrSourceSelection::Auto => {
+        OcrSourceSelection::Auto | OcrSourceSelection::Restricted { .. } => {
             let blocks_text = blocks
                 .iter()
                 .map(TextBlock::translation_text)
                 .collect::<Vec<_>>()
                 .join("\n");
-            match ocr_source_from_text(snapshot, &blocks_text, Some(target_code)) {
+            match ocr_source_from_text(snapshot, &blocks_text, Some(target_code), cld_restrict) {
                 Some(detected) => detected,
                 None => {
                     // Detection declined (short/ambiguous text, or no installed
@@ -320,22 +383,25 @@ pub fn translate_image_rgba_ppocr_in_snapshot(
         }
     };
 
-    // Per-block source detection for Auto: every block gets its own CLD pass, so a
-    // screen mixing languages translates each block from its true source instead of
-    // forcing the image-level dominant language onto all of them. Explicit Specific
-    // selections keep a single source (the user's choice).
+    // Per-block source detection for Auto/Restricted: every block gets its own
+    // CLD pass (restricted to the checked languages when set), so a screen
+    // mixing languages translates each block from its true source instead of
+    // forcing the image-level dominant language onto all of them. Explicit
+    // Specific selections keep a single source (the user's choice).
     let block_sources: Vec<LanguageCode> = match source_selection {
-        OcrSourceSelection::Auto => blocks
+        OcrSourceSelection::Auto | OcrSourceSelection::Restricted { .. } => blocks
             .iter()
             .map(|block| {
                 let text = block.translation_text();
                 if text.trim().is_empty() {
                     return source_code.clone();
                 }
-                if let Some(detected) = ocr_source_from_text(snapshot, &text, Some(target_code)) {
+                if let Some(detected) =
+                    ocr_source_from_text(snapshot, &text, Some(target_code), cld_restrict)
+                {
                     return detected;
                 }
-                if ocr_source_from_text(snapshot, &text, None).is_some() {
+                if ocr_source_from_text(snapshot, &text, None, cld_restrict).is_some() {
                     // Detected, but the detected->target pair is not installed:
                     // keep the original text (identity) rather than mistranslate
                     // it as another language.
@@ -787,19 +853,185 @@ fn smooth_dominant_routes(
     }
 }
 
+/// Below this routed-script confidence a strip is worth contesting: wrong-script
+/// recognition typically lands far under a clean same-script pass (and anything
+/// under the profile's `rec_drop_score` was already emptied to "" by rec).
+const PPOCR_CONTEST_MIN_CONFIDENCE: f32 = 0.8;
+/// Minimum target-script characters a contest candidate must emit to win its
+/// slot — every candidate charset also covers Latin (or sibling scripts), so a
+/// candidate that only produced foreign-script soup must never beat a fine
+/// routed line.
+const PPOCR_CONTEST_MIN_SCRIPT_CHARS: usize = 3;
+
+/// The scripts whose characters prove a recognizer actually read its own script:
+/// used to veto a contest candidate whose output carries none of them.
+fn candidate_content_scripts(script: PpocrScript) -> &'static [Script] {
+    use Script::*;
+    match script {
+        PpocrScript::Arabic => &[Arabic],
+        PpocrScript::Cj => &[Han, Hiragana, Katakana],
+        PpocrScript::Cyrillic | PpocrScript::Eslav => &[Cyrillic],
+        PpocrScript::Devanagari => &[Devanagari],
+        PpocrScript::El => &[Greek],
+        PpocrScript::Georgian => &[Georgian],
+        PpocrScript::Hebrew => &[Hebrew],
+        PpocrScript::Indic => &[Bengali, Gujarati, Kannada, Malayalam],
+        PpocrScript::Korean => &[Hangul],
+        PpocrScript::Latin => &[Latin],
+        PpocrScript::Ta => &[Tamil],
+        PpocrScript::Te => &[Telugu],
+        PpocrScript::Th => &[Thai],
+    }
+}
+
+/// Re-read strips whose routed recognition failed (empty or low-confidence)
+/// with alternative recognizers, keeping a candidate only when it actually
+/// fired its own script's characters and the routed line was empty or the
+/// candidate's confidence is strictly higher.
+///
+/// `candidates` comes from the source selection: `[Indic, Devanagari]` for
+/// `Auto` (PULC cannot name bn/gu/ml — the historic blind spot — and misroutes
+/// Devanagari to Latin), the user's checked
+/// languages' recognizers for `Restricted`, empty for `Specific`. Strips PULC
+/// placed confidently and that recognized cleanly are never touched, so
+/// screens in PULC's named languages pay nothing; the extra passes run only
+/// on strips that were garbage or dropped anyway.
+fn contest_script_recognition(
+    ppocr: &PpocrEngine,
+    strips: &[Option<DewarpedStrip>],
+    det_boxes: &[DetectedTextBox],
+    lines: &mut [translator_core::ocr::RecognizedTextLine],
+    scripts: &mut [PpocrScript],
+    candidates: &[PpocrScript],
+    profile: PpocrProfile,
+    width: u32,
+    height: u32,
+    dewarp_ms: f32,
+) {
+    if candidates.is_empty() {
+        return;
+    }
+    let installed: std::collections::HashSet<PpocrScript> = ppocr.installed_scripts().collect();
+    let mut needed: std::collections::HashMap<PpocrScript, Vec<usize>> =
+        std::collections::HashMap::new();
+    let mut reads = 0usize;
+    for (i, line) in lines.iter().enumerate() {
+        if !(line.text.trim().is_empty() || line.confidence < PPOCR_CONTEST_MIN_CONFIDENCE) {
+            continue;
+        }
+        if strips.get(i).map_or(true, |s| s.is_none()) {
+            continue;
+        }
+        for &candidate in candidates {
+            if candidate == scripts[i] || !installed.contains(&candidate) {
+                continue;
+            }
+            needed.entry(candidate).or_default().push(i);
+            reads += 1;
+        }
+    }
+    if needed.is_empty() {
+        return;
+    }
+    log::info!(
+        "ppocr script contest: {reads} re-reads across {} candidate script(s)",
+        needed.len(),
+    );
+
+    let mut best: std::collections::HashMap<
+        usize,
+        (translator_core::ocr::RecognizedTextLine, PpocrScript),
+    > = std::collections::HashMap::new();
+    for (candidate, indices) in needed {
+        let contest_strips: Vec<Option<DewarpedStrip>> =
+            indices.iter().map(|&i| strips[i].clone()).collect();
+        let contest_boxes: Vec<DetectedTextBox> =
+            indices.iter().map(|&i| det_boxes[i].clone()).collect();
+        let candidate_scripts = vec![candidate; indices.len()];
+        let alt_lines = match ppocr.recognize_from_strips(
+            &contest_strips,
+            &contest_boxes,
+            &candidate_scripts,
+            profile,
+            width,
+            height,
+            dewarp_ms,
+        ) {
+            Ok(alt_lines) => alt_lines,
+            Err(e) => {
+                log::warn!(
+                    "ppocr contest ({}) recognition failed: {e}",
+                    candidate.as_slug()
+                );
+                continue;
+            }
+        };
+        for (k, alt) in alt_lines.into_iter().enumerate() {
+            let i = indices[k];
+            if alt.text.trim().is_empty() {
+                continue;
+            }
+            let script_chars = alt
+                .text
+                .chars()
+                .filter(|ch| candidate_content_scripts(candidate).contains(&Script::of_char(*ch)))
+                .count();
+            if script_chars < PPOCR_CONTEST_MIN_SCRIPT_CHARS {
+                continue;
+            }
+            let replace = best
+                .get(&i)
+                .map_or(true, |(prev, _)| alt.confidence > prev.confidence);
+            if replace {
+                best.insert(i, (alt, candidate));
+            }
+        }
+    }
+
+    let mut swaps = 0usize;
+    for (i, (alt, candidate)) in best {
+        let routed_empty = lines[i].text.trim().is_empty();
+        let routed_conf = lines[i].confidence;
+        if !routed_empty && alt.confidence <= routed_conf {
+            continue;
+        }
+        log::debug!(
+            "ppocr contest strip={i} swapped: {} conf={routed_conf:.3} (empty={routed_empty}) \
+             -> {} conf={:.3}",
+            scripts[i].as_slug(),
+            candidate.as_slug(),
+            alt.confidence,
+        );
+        lines[i] = alt;
+        scripts[i] = candidate;
+        swaps += 1;
+    }
+    if swaps > 0 {
+        log::info!("ppocr contest: {swaps} strips switched recognizer");
+    }
+}
+
 /// Run CLD over recognized text and pick the best installed source language. When
 /// `target_code` is given, the picked language must also be translatable to that
 /// target (otherwise returns `None`). Used both still-mode (where the caller turns
 /// `None` into a `MissingAsset`) and live-mode (where the caller keeps `None` so the
 /// frame renders as untranslated text).
+/// `restrict` narrows CLD's candidate languages to a user-checked whitelist
+/// (`OcrSourceSelection::Restricted`); `None` considers every installed language.
 fn ocr_source_from_text(
     snapshot: &CatalogSnapshot,
     text: &str,
     target_code: Option<&LanguageCode>,
+    restrict: Option<&[LanguageCode]>,
 ) -> Option<LanguageCode> {
     let available = snapshot
         .availability_by_code
         .keys()
+        .filter(|code| {
+            restrict.map_or(true, |allowed| {
+                allowed.iter().any(|c| c.as_str() == code.as_str())
+            })
+        })
         .filter_map(|code| {
             snapshot
                 .catalog
@@ -826,7 +1058,7 @@ pub fn ocr_source_for_lines(
         .filter(|text| !text.is_empty())
         .collect::<Vec<_>>()
         .join("\n");
-    ocr_source_from_text(snapshot, &text, target_code)
+    ocr_source_from_text(snapshot, &text, target_code, None)
 }
 
 fn finalize_image_overlay(

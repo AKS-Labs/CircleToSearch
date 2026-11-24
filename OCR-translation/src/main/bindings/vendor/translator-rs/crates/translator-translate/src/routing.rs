@@ -139,7 +139,12 @@ pub fn plan_batch_text_translation(
             match source_code {
                 None => undetected_texts += 1,
                 Some(source_code) if source_code.as_str() == target_code => {
-                    detected_same_as_target += 1
+                    // Already in the target language: pass through instead of
+                    // dropping, so callers get identity translations. Dropping
+                    // left the live camera overlay drawing matted boxes with
+                    // no text when the detected language equaled the target.
+                    detected_same_as_target += 1;
+                    passthrough_texts.push(text);
                 }
                 Some(source_code) => {
                     let batch_index = *batch_index_by_source
@@ -207,6 +212,18 @@ pub fn translate_mixed_texts_in_snapshot(
         .collect::<Vec<_>>();
 
     for batch in routing_plan.batches {
+        // Same-language batch (explicit from == to): identity, not an empty
+        // plan — resolve_translation_plan_in_snapshot short-circuits to a
+        // default (empty) plan for from == to, and executing it produced no
+        // translations at all (blank output on the main screen, matted boxes
+        // with no text in the live camera overlay).
+        if batch.source_language_code == target_code {
+            translations.extend(batch.texts.into_iter().map(|text| TextTranslation {
+                source_text: text.clone(),
+                translated_text: text,
+            }));
+            continue;
+        }
         let Some(plan) = resolve_translation_plan_in_snapshot(
             snapshot,
             &batch.source_language_code,
@@ -261,6 +278,19 @@ pub fn translate_mixed_texts_with_alignment_in_snapshot(
         .collect::<Vec<_>>();
 
     for batch in routing_plan.batches {
+        // Same-language batch (explicit from == to, e.g. the camera's default
+        // en→en): identity output, not an empty plan — see the alignment-free
+        // variant above.
+        if batch.source_language_code == target_code {
+            translations.extend(batch.texts.into_iter().map(|text| {
+                TranslationWithAlignment {
+                    alignments: identity_char_alignments(&text),
+                    source_text: text.clone(),
+                    translated_text: text,
+                }
+            }));
+            continue;
+        }
         let Some(plan) = resolve_translation_plan_in_snapshot(
             snapshot,
             &batch.source_language_code,

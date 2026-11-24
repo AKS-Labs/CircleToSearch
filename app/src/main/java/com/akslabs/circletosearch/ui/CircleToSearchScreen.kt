@@ -26,6 +26,7 @@ import com.akslabs.circletosearch.CircleToSearchAccessibilityService
 import android.util.Base64
 import android.view.Display
 import android.view.ViewGroup
+import android.view.WindowManager
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -36,8 +37,12 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -51,6 +56,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -64,6 +70,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -75,6 +82,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -85,6 +93,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BorderOuter
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.AutoFixHigh
+import androidx.compose.material.icons.filled.ManageSearch
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.automirrored.filled.FormatTextdirectionRToL
@@ -105,25 +116,32 @@ import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.TextFields
-import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Email
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.VerticalDivider
@@ -133,10 +151,12 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
@@ -149,6 +169,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.asImageBitmap
@@ -162,10 +183,13 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
 import com.akslabs.circletosearch.R
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -174,6 +198,9 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.webkit.WebSettingsCompat
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.runtime.key
+import com.akslabs.circletosearch.data.PrivacySearchEngine
 import com.akslabs.circletosearch.data.SearchEngine
 import com.akslabs.circletosearch.ui.components.FriendlyMessageBubble
 import com.akslabs.circletosearch.ui.components.searchWithGoogleLens
@@ -186,6 +213,9 @@ import com.akslabs.circletosearch.utils.QrResultWithBounds
 import dev.davidv.translator.localizedName
 import com.akslabs.circletosearch.utils.QrScanner
 import com.akslabs.circletosearch.ui.qrResultShortLabel
+import com.akslabs.circletosearch.utils.InstantOcrScanner
+import com.akslabs.circletosearch.utils.InstantOcrStore
+import com.akslabs.circletosearch.utils.OcrLanguagePreferences
 import com.akslabs.circletosearch.utils.UIPreferences
 import com.akslabs.circletosearch.ui.components.MoreAppsBottomSheet
 import com.akslabs.circletosearch.ui.components.DonateBottomSheet
@@ -211,69 +241,12 @@ import androidx.compose.material3.dynamicLightColorScheme
 import android.os.Build
 import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.PushPin
-import androidx.compose.material3.Surface
 
 /** Lets the Circle to Search UI finish closing before the translator overlay draws. */
 private const val TRANSLATE_TRIGGER_DELAY_MS = 400L
 
 /** Lets the Circle to Search chrome hide before the translator overlay draws. */
 private const val TRANSLATE_HIDE_DELAY_MS = 150L
-
-/**
- * Runs the translator module's OCR over [bmp] and returns its recognized source words —
- * no translation, no overlay bitmap. [onRegions] fires as soon as detection boxes arrive
- * (for the scan animation). Returns null on failure: missing OCR models and no-text both
- * show a toast.
- */
-private suspend fun runInstantScreenshotOcr(
-    context: android.content.Context,
-    bmp: Bitmap,
-    onRegions: (DetectedRegions) -> Unit,
-): ImageWordSelection? {
-    val app = context.applicationContext as? TranslatorApplication ?: return null
-    val coordinator = runCatching { app.translationCoordinator }.getOrNull() ?: return null
-    // The accessibility service exposes the configured target language when it is
-    // running, but the assistant launch path must also work with accessibility
-    // disabled — resolve the same setting from the translator application directly.
-    val target = CircleToSearchAccessibilityService.instance?.defaultTargetLanguage()
-        ?: runCatching {
-            app.languageCatalog?.languageByCode(
-                app.settingsManager.settings.value.defaultTargetLanguageCode
-            )
-        }.getOrNull()
-        ?: return null
-    var ocrMissing = false
-    var sourceDetectFailed = false
-    val result = coordinator.ocrWordsOnly(
-        bitmap = bmp,
-        to = target,
-        onDetectedRegions = { boxes, w, h -> onRegions(DetectedRegions(w, h, boxes)) },
-        onOcrUnavailable = { ocrMissing = true },
-        onAutoSourceFailed = { sourceDetectFailed = true },
-    )
-    if (result == null) {
-        val messageId =
-            when {
-                ocrMissing -> dev.davidv.translator.R.string.ocr_models_missing
-                sourceDetectFailed -> R.string.label_language_detect_failed
-                else -> R.string.label_no_text_found
-            }
-        withContext(Dispatchers.Main) {
-            android.widget.Toast.makeText(
-                context,
-                context.getString(messageId),
-                android.widget.Toast.LENGTH_SHORT,
-            ).show()
-        }
-        return null
-    }
-    return ImageWordSelection(
-        imageWidth = result.imageWidth,
-        imageHeight = result.imageHeight,
-        sourceWords = result.sourceWords,
-        translatedWords = result.sourceWords,
-    )
-}
 
 /**
  * Fit (contain) mapping for a bitmap centered in a view — the app-side mirror of the
@@ -306,6 +279,146 @@ private fun fitCrop(
         t.unmapX(rect.right.toFloat()).toInt().coerceIn(0, imageW),
         t.unmapY(rect.bottom.toFloat()).toInt().coerceIn(0, imageH),
     )
+
+/**
+ * Smooths raw pointer samples into a flowing curve (Catmull-Rom → cubic bezier),
+ * so the drawn circle reads as a soft neon stroke instead of a jagged polyline.
+ * With fewer than 3 points it falls back to straight segments.
+ */
+private fun buildSmoothPath(points: List<Offset>): Path {
+    val path = Path()
+    val n = points.size
+    if (n == 0) return path
+    if (n < 3) {
+        path.moveTo(points[0].x, points[0].y)
+        for (i in 1 until n) path.lineTo(points[i].x, points[i].y)
+        return path
+    }
+    path.moveTo(points[0].x, points[0].y)
+    for (i in 0 until n - 1) {
+        val p0 = points[if (i - 1 < 0) 0 else i - 1]
+        val p1 = points[i]
+        val p2 = points[i + 1]
+        val p3 = points[if (i + 2 >= n) n - 1 else i + 2]
+        val c1x = p1.x + (p2.x - p0.x) / 6f
+        val c1y = p1.y + (p2.y - p0.y) / 6f
+        val c2x = p2.x - (p3.x - p1.x) / 6f
+        val c2y = p2.y - (p3.y - p1.y) / 6f
+        path.cubicTo(c1x, c1y, c2x, c2y, p2.x, p2.y)
+    }
+    return path
+}
+
+/**
+ * Cyclic interpolation over the Google palette for a flowing border gradient:
+ * t wraps at 1.0 and the palette starts/ends on blue, so the loop is seamless.
+ */
+private fun flowingGoogleColor(t: Float): Color {
+    val p = OverlayGradientColors
+    val x = (((t % 1f) + 1f) % 1f) * (p.size - 1)
+    val i = x.toInt().coerceAtMost(p.size - 2)
+    val f = x - i
+    val a = p[i]
+    val b = p[i + 1]
+    return Color(
+        red = a.red + (b.red - a.red) * f,
+        green = a.green + (b.green - a.green) * f,
+        blue = a.blue + (b.blue - a.blue) * f,
+        alpha = a.alpha + (b.alpha - a.alpha) * f
+    )
+}
+
+/**
+ * Screen-edge border: the classic thin 2dp Google-gradient line over a thin
+ * blurred neon glow whose colors FLOW around the border and breathe in
+ * brightness. Isolated composable so the per-frame animation only
+ * recomputes itself, not the whole overlay screen.
+ */
+@Composable
+private fun AnimatedNeonBorder(
+    visible: Boolean,
+    shape: androidx.compose.ui.graphics.Shape,
+) {
+    androidx.compose.animation.AnimatedVisibility(
+        visible = visible,
+        enter = androidx.compose.animation.fadeIn(animationSpec = tween(700))
+    ) {
+        val transition = rememberInfiniteTransition(label = "BorderGlow")
+        // Colors travel around the border — one full loop every 7s.
+        val flowPhase by transition.animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(7000, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart
+            ),
+            label = "BorderFlow"
+        )
+        // White light-chase racing around the edge, one lap every 2.6s.
+        val chasePhase by transition.animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(2600, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart
+            ),
+            label = "BorderChase"
+        )
+        // Glow brightness breathes. Read inside graphicsLayer = draw phase
+        // only, so the pulse never triggers recomposition by itself.
+        val glowAlpha by transition.animateFloat(
+            initialValue = 0.6f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(1500, easing = androidx.compose.animation.core.EaseInOut),
+                repeatMode = RepeatMode.Reverse
+            ),
+            label = "BorderPulse"
+        )
+        // 33 stops for smooth angular interpolation (17 banded visibly); each
+        // stop blends its flowing Google color toward white under the chase, so
+        // the light reads on BOTH the crisp line and the blurred glow.
+        val borderBrush = Brush.sweepGradient(
+            *Array(33) { i ->
+                val t = i / 32f
+                val base = flowingGoogleColor(t + flowPhase)
+                val raw = kotlin.math.abs(t - chasePhase)
+                val d = minOf(raw, 1f - raw)
+                val c = (1f - d / 0.09f).coerceIn(0f, 1f)
+                val smooth = c * c
+                t to (if (smooth <= 0.001f) base else Color(
+                    red = base.red + (1f - base.red) * smooth,
+                    green = base.green + (1f - base.green) * smooth,
+                    blue = base.blue + (1f - base.blue) * smooth,
+                    alpha = base.alpha + (1f - base.alpha) * smooth
+                ))
+            }
+        )
+        Box(modifier = Modifier.fillMaxSize()) {
+            // Blurred thin glow (API 31+): light emitting from the border line
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            alpha = glowAlpha
+                            renderEffect = android.graphics.RenderEffect
+                                .createBlurEffect(12f, 12f, android.graphics.Shader.TileMode.CLAMP)
+                                .asComposeRenderEffect()
+                            compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen
+                        }
+                        .border(width = 3.dp, brush = borderBrush, shape = shape)
+                )
+            }
+            // Same old thin crisp line on top, flowing with the same colors
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .border(width = 2.dp, brush = borderBrush, shape = shape)
+            )
+        }
+    }
+}
 
 /**
  * The device's physical screen corner radii in px: upper-left, upper-right,
@@ -404,14 +517,25 @@ fun CircleToSearchScreen(
     // that occurs when a write comes from a different activity instance.
     val isGoogleLensOnly by uiPreferences.observeUseGoogleLensOnly()
         .collectAsState(initial = uiPreferences.isUseGoogleLensOnly())
-    
-    // Effective state: use override if provided by trigger, else use global preference
-    val effectiveLensOnly = searchModeOverride ?: isGoogleLensOnly
-    
-    
+
+    // Visual search method: "multi" | "lens" | "ask" | "off" (see UIPreferences).
+    val searchMethodPref by uiPreferences.observeSearchMethod()
+        .collectAsState(initial = uiPreferences.getSearchMethod())
+    val askEveryTime by uiPreferences.observeAskEveryTime()
+        .collectAsState(initial = uiPreferences.isAskEveryTime())
+    val visualSearchOff by uiPreferences.observeVisualSearchOff()
+        .collectAsState(initial = uiPreferences.isVisualSearchOff())
+
+
     // New Sheet States
     var showMoreAppsSheet by remember { mutableStateOf(false) }
     var showDonateSheet by remember { mutableStateOf(false) }
+
+    // Circle to Search's OCR language whitelist (empty = auto-detect all).
+    // Read once per overlay open; writes from the sheet land in the pref store
+    // and this state, so the next screenshot OCR picks them up immediately.
+    var showOcrLangDialog by remember { mutableStateOf(false) }
+    var ocrCheckedLanguages by remember { mutableStateOf(OcrLanguagePreferences.getChecked(context)) }
 
     // Material You logic for colors
     val isDark = isSystemInDarkTheme()
@@ -479,6 +603,11 @@ fun CircleToSearchScreen(
     var selectedQrResult by remember { mutableStateOf<QrResultWithBounds?>(null) }
     
     // Phase 44: Smart Entity Extractor
+    // SmartScan runs automatically: when the instant OCR for a capture finishes, its
+    // words are handed to the entity extractor (see LaunchedEffect below) and chips
+    // appear over the capture. isEntityExtractMode itself stays the MANUAL focused
+    // mode (bottom-bar button, currently commented out) that hides the other UI and
+    // exits on tap — the automatic chips do not need it.
     var isEntityExtractMode by remember { mutableStateOf(false) }
     var detectedEntities by remember { mutableStateOf<List<SmartEntity>>(emptyList()) }
     var isExtractingEntities by remember { mutableStateOf(false) }
@@ -523,6 +652,18 @@ fun CircleToSearchScreen(
     // Track initialized engines for Smart Loading
     val initializedEngines = remember { mutableStateListOf<SearchEngine>() }
 
+    // Multi-search preloading: engines the user turned off don't auto-load —
+    // their tab shows a manual-load placeholder instead. Mirrored in state so
+    // toggling from the placeholder updates the sheet immediately.
+    var preloadEnabled by remember(searchEngines) {
+        mutableStateOf(searchEngines.associateWith { uiPreferences.isPreloadEnabled(it) })
+    }
+
+    // Search-time snapshot of which engines auto-load this session, so a
+    // mid-session preference flip can't leave a pending tab hanging on the
+    // loader with nothing ever initializing it.
+    var autoLoadEngines by remember { mutableStateOf(emptySet<SearchEngine>()) }
+
     // Keep the tab strip background equal to the webpage's own background so
     // the sheet never shows a Material color that clashes with the page.
     fun samplePageBackgroundColor(view: WebView?) {
@@ -535,11 +676,18 @@ fun CircleToSearchScreen(
             if (m != null) {
                 val a = m.groupValues[4].toFloatOrNull() ?: 1f
                 if (a > 0f) {
-                    pageBackgroundColor = Color(
-                        red = m.groupValues[1].toInt() / 255f,
-                        green = m.groupValues[2].toInt() / 255f,
-                        blue = m.groupValues[3].toInt() / 255f
-                    )
+                    val r = m.groupValues[1].toInt() / 255f
+                    val g = m.groupValues[2].toInt() / 255f
+                    val b = m.groupValues[3].toInt() / 255f
+                    val luminance = 0.2126f * r + 0.7152f * g + 0.0722f * b
+                    // Accept the page's own color only when it's clearly white or
+                    // clearly dark. Mid-tones (the "greyish header" cases) fall
+                    // back to a clean white chrome.
+                    pageBackgroundColor = if (luminance > 0.88f || luminance < 0.18f) {
+                        Color(red = r, green = g, blue = b)
+                    } else {
+                        Color.White
+                    }
                 }
             }
         }
@@ -555,6 +703,104 @@ fun CircleToSearchScreen(
     // or we just keep it per session. Let's keep it simple: no auto-save of per-tab state to verify complex persistence yet.
     // simpler: If user toggles, we just update the state.
     
+    // Shared browser-style actions for the search WebViews (visual search + privacy
+    // web search): clipboard, external browser, sharing, image download, and the
+    // positioned long-press menu itself.
+    fun copyText(text: String) {
+        val cm = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager ?: return
+        cm.setPrimaryClip(android.content.ClipData.newPlainText("url", text))
+    }
+
+    fun openExternally(url: String) {
+        runCatching {
+            context.startActivity(
+                android.content.Intent(android.content.Intent.ACTION_VIEW, Uri.parse(url))
+                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+            )
+        }
+    }
+
+    fun shareUrl(url: String) {
+        val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(android.content.Intent.EXTRA_TEXT, url)
+        }
+        runCatching {
+            context.startActivity(android.content.Intent.createChooser(intent, null).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+        }
+    }
+
+    fun downloadImage(url: String, userAgent: String) {
+        val name = url.substringAfterLast('/').substringBefore('?')
+            .ifBlank { "image.jpg" }
+            .let { if ('.' in it) it else "$it.jpg" }
+        val request = android.app.DownloadManager.Request(Uri.parse(url))
+            .setTitle(name)
+            .setDescription("Circle to Search")
+            .setNotificationVisibility(
+                android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED,
+            )
+            .setDestinationInExternalPublicDir(
+                android.os.Environment.DIRECTORY_PICTURES,
+                "CircleToSearch/$name",
+            )
+        android.webkit.CookieManager.getInstance().getCookie(url)?.let { request.addRequestHeader("Cookie", it) }
+        request.addRequestHeader("User-Agent", userAgent)
+        (context.getSystemService(android.content.Context.DOWNLOAD_SERVICE) as? android.app.DownloadManager)
+            ?.enqueue(request)
+        android.widget.Toast.makeText(
+            context,
+            context.getString(R.string.web_menu_image_saved),
+            android.widget.Toast.LENGTH_SHORT,
+        ).show()
+    }
+
+    fun showWebViewMenu(
+        anchor: android.view.View,
+        touchX: Int,
+        touchY: Int,
+        actions: List<Pair<String, () -> Unit>>,
+        onOpenInWebView: (String) -> Unit,
+    ) {
+        val popup = android.widget.ListPopupWindow(context)
+        popup.anchorView = anchor
+        popup.horizontalOffset = touchX
+        popup.verticalOffset = touchY
+        val longest = actions.maxOfOrNull { it.first } ?: ""
+        val item = android.view.LayoutInflater.from(context)
+            .inflate(android.R.layout.simple_list_item_1, null)
+        (item as? android.widget.TextView)?.text = longest
+        item.measure(
+            android.view.View.MeasureSpec.makeMeasureSpec(0, android.view.View.MeasureSpec.UNSPECIFIED),
+            android.view.View.MeasureSpec.makeMeasureSpec(0, android.view.View.MeasureSpec.UNSPECIFIED),
+        )
+        val density = context.resources.displayMetrics.density
+        // Deliberately wider than the longest label (+50% + 48dp): the popup's own
+        // background insets eat into the measured width, and users prefer generous
+        // over truncated.
+        val width = item.measuredWidth +
+            (item.measuredWidth * 0.5f).toInt() +
+            (48 * density).toInt()
+        popup.setContentWidth(width)
+        // Clamp near the right screen edge so the menu never clips off-screen.
+        popup.horizontalOffset =
+            (touchX + width)
+                .coerceAtMost(context.resources.displayMetrics.widthPixels - width - 8)
+                .coerceAtLeast(0)
+        popup.setAdapter(
+            android.widget.ArrayAdapter(
+                context,
+                android.R.layout.simple_list_item_1,
+                actions.map { it.first },
+            )
+        )
+        popup.setOnItemClickListener { _, _, position, _ ->
+            popup.dismiss()
+            actions[position].second()
+        }
+        runCatching { popup.show() }
+    }
+
     // Helper to check desktop mode
     fun isDesktop(engine: SearchEngine) = desktopModeEngines.contains(engine)
     
@@ -575,6 +821,33 @@ fun CircleToSearchScreen(
     
     // WebView Cache
     val webViews = remember { mutableMapOf<SearchEngine, WebView>() }
+
+    // Privacy web search ("Web search" in the text-selection bar): a compact engine picker,
+    // then an in-app results sheet with one tab per privacy engine — same tabular UI as the
+    // visual-search sheet. Tabs are NOT preloaded: a tab's WebView is created and loaded only
+    // when the user opens that tab, then kept alive; each reloads only when the query changes
+    // (never on navigation inside the results).
+    var showWebSearchPicker by remember { mutableStateOf(false) }
+    var webSearchQuery by remember { mutableStateOf<String?>(null) }
+    var webSearchEngine by remember { mutableStateOf<PrivacySearchEngine?>(null) }
+    var webSearchPageBg by remember { mutableStateOf(Color.White) }
+    // Privacy web-search tab order: user-arranged via Additional settings → "Rearrange
+    // web search tabs"; engines missing from the pref keep their default order at the end.
+    val webSearchEngines = remember {
+        val all = PrivacySearchEngine.values()
+        val preferred = uiPreferences.getWebEngineOrder()?.split(",")?.mapNotNull { name ->
+            all.find { it.name == name }
+        } ?: emptyList()
+        preferred + all.filter { !preferred.contains(it) }
+    }
+    val webSearchInitialized = remember { mutableStateListOf<PrivacySearchEngine>() }
+    val webSearchViews = remember { mutableMapOf<PrivacySearchEngine, WebView>() }
+    val webSearchLoadedQuery = remember { mutableMapOf<PrivacySearchEngine, String>() }
+
+    // "Ask every time" state: the dock waits for the user's method pick.
+    var askConfirmVisible by remember { mutableStateOf(false) }
+    var lastRanBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var lastRanMethod by remember { mutableStateOf<String?>(null) }
 
     // Clears the pull-to-refresh spinner once the refreshed tab finishes loading.
     fun clearRefreshIfDone(view: WebView?) {
@@ -653,6 +926,22 @@ fun CircleToSearchScreen(
 
     // Drawing State
     val currentPathPoints = remember { mutableStateListOf<Offset>() }
+    // Glow is motion-bound: it stays lit while the finger moves, then on pause
+    // drains away starting from the TAIL (oldest glow) toward the fingertip —
+    // each tail segment starts dying first, every newer segment 60ms later, so
+    // the glow visibly recedes instead of vanishing all at once.
+    var lastPathMoveAt by remember { mutableStateOf(0L) }
+    var glowPauseMs by remember { mutableStateOf(0L) }
+    LaunchedEffect(currentPathPoints.isNotEmpty()) {
+        if (currentPathPoints.isNotEmpty()) {
+            glowPauseMs = 0L
+            while (currentPathPoints.isNotEmpty()) {
+                val elapsed = android.os.SystemClock.uptimeMillis() - lastPathMoveAt
+                glowPauseMs = if (elapsed <= 150L) 0L else elapsed - 150L
+                delay(32L)
+            }
+        }
+    }
     
     // Selection State
     var selectedBitmap by remember { mutableStateOf<Bitmap?>(null) }
@@ -677,6 +966,74 @@ fun CircleToSearchScreen(
     // Bumped to force the word overlay to drop its selection — text selection and a drawn
     // circle are mutually exclusive, so completing a circle clears any active selection.
     var wordSelectionClearSignal by remember { mutableStateOf(0) }
+    // A degenerate stroke (long-press drift, flat line) mapped into image space: handed to
+    // the word overlay to select the words under it instead of cropping a useless image.
+    var pendingWordSelectRegion by remember { mutableStateOf<android.graphics.Rect?>(null) }
+
+    // Live "already extracted this capture" marker so the SmartScan pass below runs
+    // once per canvas image, not on every recomposition.
+    var lastScanGeneration by remember { mutableStateOf(-1) }
+
+    // SmartScan auto-pass: when the instant OCR for the current capture completes, run
+    // the entity extraction over the ALREADY-recognized words — no second OCR pass and
+    // no extra scan animation; the chips simply appear when the OCR animation finishes.
+    // Pure regex over the word text, fast enough to run inline on the main thread.
+    LaunchedEffect(instantWords, entityScanGeneration) {
+        val sourceWords = instantWords?.sourceWords ?: return@LaunchedEffect
+        if (lastScanGeneration == entityScanGeneration) return@LaunchedEffect
+        lastScanGeneration = entityScanGeneration
+        val entities = mutableListOf<SmartEntity>()
+
+        val urlRegex = android.util.Patterns.WEB_URL.toRegex()
+        val emailRegex = android.util.Patterns.EMAIL_ADDRESS.toRegex()
+        val phoneRegexLine = Regex("""(\+?[\d\s\-\(\).]{9,20})""")
+        val upiRegex = Regex("""[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z]{2,64}""")
+
+        // Group recognized words into lines; phone matches map into
+        // the line's union bounds by character ratio, like before.
+        sourceWords.groupBy { it.lineIndex }.forEach { (_, lineWords) ->
+            val lineText = lineWords.joinToString(" ") { it.text }
+            var left = Float.MAX_VALUE
+            var top = Float.MAX_VALUE
+            var right = -Float.MAX_VALUE
+            var bottom = -Float.MAX_VALUE
+            lineWords.forEach { w ->
+                left = min(left, w.bounds.cx - w.bounds.width / 2f)
+                top = min(top, w.bounds.cy - w.bounds.height / 2f)
+                right = max(right, w.bounds.cx + w.bounds.width / 2f)
+                bottom = max(bottom, w.bounds.cy + w.bounds.height / 2f)
+            }
+            phoneRegexLine.findAll(lineText).forEach { match ->
+                val phoneCandidate = match.value.trim()
+                if (phoneCandidate.count { it.isDigit() } >= 10) {
+                    val startIdx = match.range.first
+                    val endIdx = match.range.last + 1
+                    val ratioStart = startIdx.toFloat() / lineText.length.coerceAtLeast(1)
+                    val ratioEnd = endIdx.toFloat() / lineText.length.coerceAtLeast(1)
+                    val entityBounds = android.graphics.RectF(
+                        left + (ratioStart * (right - left)),
+                        top,
+                        left + (ratioEnd * (right - left)),
+                        bottom
+                    )
+                    entities.add(SmartEntity.Phone(phoneCandidate, entityBounds, context.getString(R.string.entity_type_phone)))
+                }
+            }
+        }
+        sourceWords.forEach { word ->
+            val txt = word.text.trim()
+            val wordBounds = android.graphics.RectF(
+                word.bounds.cx - word.bounds.width / 2f,
+                word.bounds.cy - word.bounds.height / 2f,
+                word.bounds.cx + word.bounds.width / 2f,
+                word.bounds.cy + word.bounds.height / 2f
+            )
+            if (emailRegex.matches(txt)) entities.add(SmartEntity.Email(txt, wordBounds, context.getString(R.string.entity_type_email)))
+            else if (upiRegex.matches(txt)) entities.add(SmartEntity.Upi(txt, wordBounds, context.getString(R.string.entity_type_upi)))
+            else if (urlRegex.matches(txt)) entities.add(SmartEntity.Url(txt, wordBounds, context.getString(R.string.entity_type_link)))
+        }
+        detectedEntities = entities
+    }
 
     // Circle-draw gesture handlers, shared by the drag-detector wrapper above the drawing
     // layer (see "Circle-draw gestures" below). Plain drags draw; handle grabs and taps are
@@ -704,6 +1061,8 @@ fun CircleToSearchScreen(
         // Clear previous state if starting new draw
         currentPathPoints.clear()
         currentPathPoints.add(offset)
+        lastPathMoveAt = android.os.SystemClock.uptimeMillis()
+        glowPauseMs = 0L
         selectionRect = null
         scope.launch { selectionAnim.snapTo(0f) }
         // Text selection and drawing are exclusive from the first moment of the gesture:
@@ -728,7 +1087,14 @@ fun CircleToSearchScreen(
                 selectionRect = newRect
             }
         } else {
-            currentPathPoints.add(change.position)
+            // Movement keeps the glow lit, even below the decimation threshold.
+            lastPathMoveAt = android.os.SystemClock.uptimeMillis()
+            // Thin dense pointer samples (~2.5px): Catmull-Rom smoothing in the
+            // canvas fills the gaps, so this only cuts jitter without hurting shapes.
+            val last = currentPathPoints.lastOrNull()
+            if (last == null || (change.position - last).getDistance() > 2.5f) {
+                currentPathPoints.add(change.position)
+            }
         }
     }
 
@@ -758,24 +1124,45 @@ fun CircleToSearchScreen(
                 maxY = kotlin.math.max(maxY, p.y)
             }
 
-            val border = 20
-            val rect = android.graphics.Rect(
-                (minX - border).toInt().coerceAtLeast(0),
-                (minY - border).toInt().coerceAtLeast(0),
-                (maxX + border).toInt().coerceAtMost(viewW),
-                (maxY + border).toInt().coerceAtMost(viewH)
-            )
+            // Degenerate strokes — a long-press that drifted past slop, or a flat
+            // horizontal line — crop into a uselessly thin image. Select the words under
+            // the stroke instead of searching. Checked on the RAW bounds (the +border
+            // rect below inflates a hairline stroke into something word-sized).
+            val rawW = maxX - minX
+            val rawH = maxY - minY
+            val minDim = with(density) { 16.dp.toPx() }
+            val degenerate =
+                bmp != null && instantWords != null && (rawH < minDim || rawW < minDim)
+            if (degenerate) {
+                currentPathPoints.clear() // Hide the drawn stroke
+                val t = fitMapping(viewW.toFloat(), viewH.toFloat(), bmp.width.toFloat(), bmp.height.toFloat())
+                val pad = with(density) { 8.dp.toPx() }
+                pendingWordSelectRegion = android.graphics.Rect(
+                    t.unmapX(minX - pad).toInt().coerceIn(0, bmp.width),
+                    t.unmapY(minY - pad).toInt().coerceIn(0, bmp.height),
+                    t.unmapX(maxX + pad).toInt().coerceIn(0, bmp.width),
+                    t.unmapY(maxY + pad).toInt().coerceIn(0, bmp.height),
+                )
+            } else {
+                val border = 20
+                val rect = android.graphics.Rect(
+                    (minX - border).toInt().coerceAtLeast(0),
+                    (minY - border).toInt().coerceAtLeast(0),
+                    (maxX + border).toInt().coerceAtMost(viewW),
+                    (maxY + border).toInt().coerceAtMost(viewH)
+                )
 
-            if (rect.width() > 10 && rect.height() > 10) {
-                selectionRect = rect
-                currentPathPoints.clear() // Hide the drawn circle
-                if (bmp != null) {
-                    val t = fitMapping(viewW.toFloat(), viewH.toFloat(), bmp.width.toFloat(), bmp.height.toFloat())
-                    selectedBitmap = ImageUtils.cropBitmap(bmp, fitCrop(rect, t, bmp.width, bmp.height))
-                }
-                scope.launch {
-                    selectionAnim.animateTo(1f, tween(600))
-                    isSearching = true
+                if (rect.width() > 10 && rect.height() > 10) {
+                    selectionRect = rect
+                    currentPathPoints.clear() // Hide the drawn circle
+                    if (bmp != null) {
+                        val t = fitMapping(viewW.toFloat(), viewH.toFloat(), bmp.width.toFloat(), bmp.height.toFloat())
+                        selectedBitmap = ImageUtils.cropBitmap(bmp, fitCrop(rect, t, bmp.width, bmp.height))
+                    }
+                    scope.launch {
+                        selectionAnim.animateTo(1f, tween(600))
+                        isSearching = true
+                    }
                 }
             }
         }
@@ -788,6 +1175,7 @@ fun CircleToSearchScreen(
             selectedBitmap = null
             isSearching = false
             currentPathPoints.clear()
+            pendingWordSelectRegion = null
             selectionAnim.snapTo(0f)
             // The canvas image changed: drop entities extracted for the previous image and
             // invalidate any extraction still in flight.
@@ -836,14 +1224,262 @@ fun CircleToSearchScreen(
         instantOcrDone = false
         wordSelected = false
         val bmp = screenshot ?: return@LaunchedEffect
-        instantWords = runInstantScreenshotOcr(context, bmp) { instantRegions = it }
-        instantOcrDone = true
+        val preScan = InstantOcrStore.stateFor(bmp)
+        if (preScan == null) {
+            // No capture-time scan runs for this image (gallery pick, assistant
+            // capture): scan here, exactly as before.
+            val output = InstantOcrScanner.scan(context, bmp) { instantRegions = it }
+            instantWords = output?.words
+            instantOcrDone = true
+        } else {
+            // Adopt the capture-time scan: it is already running (started when
+            // the screenshot landed, overlapping the overlay launch) — regions
+            // stream in for the scan animation, words land at completion. Never
+            // start a second scan over the same image.
+            while (true) {
+                if (instantRegions == null) {
+                    preScan.regions?.let { instantRegions = it }
+                }
+                val words = preScan.words
+                if (words != null) {
+                    instantWords = words
+                    instantOcrDone = true
+                    break
+                }
+                if (preScan.done) {
+                    instantOcrDone = true
+                    break
+                }
+                delay(32)
+            }
+        }
     }
 
     // The word overlay unmounts in these modes (dropping its selection) - drop ours too so
     // the bottom bar doesn't stay hidden after leaving them.
     LaunchedEffect(isEntityExtractMode, isTranslatorMode) {
         if (isEntityExtractMode || isTranslatorMode) wordSelected = false
+    }
+
+    // Same page-background sampling as the visual search sheet, but scoped to the
+    // web-search sheet's tab strip so the two sheets never fight over the tint.
+    fun sampleWebSearchPageBg(view: WebView?) {
+        if (view == null) return
+        val js = "(function(){var b=getComputedStyle(document.body).backgroundColor;" +
+            "if(b==='rgba(0, 0, 0, 0)'||b==='transparent'){b=getComputedStyle(document.documentElement).backgroundColor;}" +
+            "return b;})()"
+        val parse: (String) -> Unit = { raw ->
+            val m = Regex("""rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([\d.]+))?\s*\)""").find(raw.trim('"'))
+            if (m != null) {
+                val a = m.groupValues[4].toFloatOrNull() ?: 1f
+                if (a > 0f) {
+                    val r = m.groupValues[1].toInt() / 255f
+                    val g = m.groupValues[2].toInt() / 255f
+                    val b = m.groupValues[3].toInt() / 255f
+                    val luminance = 0.2126f * r + 0.7152f * g + 0.0722f * b
+                    webSearchPageBg = if (luminance > 0.88f || luminance < 0.18f) {
+                        Color(red = r, green = g, blue = b)
+                    } else {
+                        Color.White
+                    }
+                }
+            }
+        }
+        try {
+            view.evaluateJavascript(js) { raw -> parse(raw ?: "") }
+            view.postDelayed({
+                try { view.evaluateJavascript(js) { raw -> parse(raw ?: "") } } catch (_: Exception) {}
+            }, 800L)
+        } catch (_: Exception) {}
+    }
+
+            // Runs the visual search with the resolved method ("lens" or "multi").
+            suspend fun runVisualSearchNow(method: String) {
+                val bmp = selectedBitmap ?: return
+                isLoading = true
+
+                if (method == "lens") {
+                    // Save to cache and launch Lens
+                    val path = ImageUtils.saveBitmap(context, bmp)
+                    val uri = android.net.Uri.fromFile(java.io.File(path))
+
+                    val result = searchWithGoogleLens(uri, context)
+                    when (result) {
+                        com.akslabs.circletosearch.ui.components.LensLaunchResult.LAUNCHED_DIRECTLY -> {
+                            // Lens launched directly — safe to dismiss the overlay.
+                            // Lens is launching on top: stop close from reordering
+                            // the previous app back over it.
+                            CircleToSearchAccessibilityService.instance?.suppressNextReturnToApp()
+                            onClose()
+                            return
+                        }
+                        com.akslabs.circletosearch.ui.components.LensLaunchResult.LAUNCHED_VIA_CHOOSER -> {
+                            // Chooser shown — overlay must stay open, user picks the app
+                            isLoading = false
+                            return
+                        }
+                        com.akslabs.circletosearch.ui.components.LensLaunchResult.FAILED -> {
+                            // Fallback to multi-search
+                            android.util.Log.e("CircleToSearch", "Google Lens launch failed, falling back to multi-search")
+                        }
+                    }
+                }
+
+                // Multi-Search Mode: reveal at the half (peek) height, not
+                // fully expanded — the user can swipe up for more.
+                scope.launch { scaffoldState.bottomSheetState.partialExpand() }
+
+                // Upload to host if needed (Multi-Search Mode)
+                if (hostedImageUrl == null) {
+                    val url = ImageSearchUploader.uploadToImageHost(bmp)
+                    if (url != null) {
+                        hostedImageUrl = url
+                    } else {
+                        isLoading = false
+                        return
+                    }
+                }
+
+                // Generate URLs for ALL engines (lightweight string op)
+                searchEngines.forEach { engine ->
+                    if (!preloadedUrls.containsKey(engine)) {
+                        val url = when (engine) {
+                            SearchEngine.Google -> ImageSearchUploader.getGoogleLensUrl(hostedImageUrl!!)
+                            SearchEngine.Bing -> ImageSearchUploader.getBingUrl(hostedImageUrl!!)
+                            SearchEngine.Yandex -> ImageSearchUploader.getYandexUrl(hostedImageUrl!!)
+                            SearchEngine.TinEye -> ImageSearchUploader.getTinEyeUrl(hostedImageUrl!!)
+                            else -> null
+                        }
+                        if (url != null) preloadedUrls[engine] = url
+                    }
+                }
+
+                // Set initial URL
+                if (preloadedUrls.containsKey(selectedEngine)) {
+                     searchUrl = preloadedUrls[selectedEngine]
+                }
+                    
+                // SMART LOADING SEQUENCE
+                // Snapshot which engines auto-load this session — engines with
+                // preloading off stay on the manual placeholder until the user
+                // loads them, even if the preference flips mid-session.
+                autoLoadEngines = searchEngines.filter { preloadEnabled[it] ?: true }.toSet()
+
+                // First, ensure selected engine is initialized
+                if (selectedEngine in autoLoadEngines && !initializedEngines.contains(selectedEngine)) {
+                    initializedEngines.add(selectedEngine)
+                }
+
+                isLoading = false
+
+                // Then, load others sequentially
+                scope.launch {
+                    searchEngines.forEach { engine ->
+                        if (engine != selectedEngine && engine in autoLoadEngines) {
+                            delay(300) // Reduced from 800ms for faster loading
+                            if (!initializedEngines.contains(engine)) {
+                                initializedEngines.add(engine)
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Skip when this capture+method already ran (the multi flow sets
+            // hostedImageUrl, which re-triggers this effect).
+            fun shouldRunVisualSearch(method: String): Boolean {
+                if (lastRanBitmap === selectedBitmap && lastRanMethod == method) return false
+                lastRanBitmap = selectedBitmap
+                lastRanMethod = method
+                return true
+            }
+
+    // Privacy web-search WebView: lean settings, and third-party cookies refused so ad
+    // networks riding on result pages can't track across engines.
+    fun createPrivacyWebView(ctx: android.content.Context): WebView {
+        return WebView(ctx).apply {
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+            setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
+            settings.apply {
+                javaScriptEnabled = true
+                domStorageEnabled = true
+                cacheMode = WebSettings.LOAD_DEFAULT
+                setSupportZoom(true)
+                builtInZoomControls = true
+                displayZoomControls = false
+                useWideViewPort = true
+                loadWithOverviewMode = true
+                userAgentString =
+                    "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+            }
+            isVerticalScrollBarEnabled = false
+            /** Opens inside this results WebView — the default for menu opens. */
+            fun openInWebView(url: String) {
+                loadUrl(url)
+            }
+            // Browser-style long-press menu on links and images, positioned at the pressed
+            // point. The focused node (anchor URL, link text, image source) resolves
+            // asynchronously via requestFocusNodeHref. Plain text falls through so the page's
+            // own text selection keeps working. Shared helpers live at screen scope.
+            var touchX = 0f
+            var touchY = 0f
+            setOnTouchListener { _, event ->
+                touchX = event.x
+                touchY = event.y
+                false
+            }
+
+            setOnLongClickListener {
+                val hit = hitTestResult
+                if (hit.type == android.webkit.WebView.HitTestResult.UNKNOWN_TYPE ||
+                    hit.type == android.webkit.WebView.HitTestResult.EDIT_TEXT_TYPE
+                ) {
+                    return@setOnLongClickListener false
+                }
+                val msg = android.os.Message()
+                msg.target = android.os.Handler(android.os.Looper.getMainLooper()) { m ->
+                    val b = m.data
+                    val linkUrl = b?.getString("url")
+                    val imageUrl = b?.getString("src") ?: hit.extra
+                    val linkText = b?.getString("title")
+                    val actions = mutableListOf<Pair<String, () -> Unit>>()
+                    if (!imageUrl.isNullOrBlank() && imageUrl != linkUrl) {
+                        val img = imageUrl
+                        actions += ctx.getString(R.string.web_menu_open_image) to { openInWebView(img) }
+                        actions += ctx.getString(R.string.web_menu_copy_image) to { copyText(img) }
+                        actions += ctx.getString(R.string.web_menu_save_image) to { downloadImage(img, settings.userAgentString) }
+                    }
+                    if (!linkUrl.isNullOrBlank()) {
+                        val lnk = linkUrl
+                        actions += ctx.getString(R.string.web_menu_open_link) to { openInWebView(lnk) }
+                        actions += ctx.getString(R.string.web_menu_copy_link) to { copyText(lnk) }
+                        if (!linkText.isNullOrBlank()) {
+                            actions += ctx.getString(R.string.web_menu_copy_link_text) to { copyText(linkText) }
+                        }
+                        actions += ctx.getString(R.string.web_menu_share) to { shareUrl(lnk) }
+                        actions += ctx.getString(R.string.web_menu_open_browser) to { openExternally(lnk) }
+                    }
+                    if (actions.isNotEmpty()) {
+                        showWebViewMenu(this, touchX.toInt(), touchY.toInt(), actions) { url -> openInWebView(url) }
+                    }
+                    true
+                }
+                requestFocusNodeHref(msg)
+                true
+            }
+
+            // The tab strip tints itself to the loaded page's background.
+            webViewClient = object : android.webkit.WebViewClient() {
+                override fun onPageFinished(view: WebView?, url: String?) {
+                    super.onPageFinished(view, url)
+                    sampleWebSearchPageBg(view)
+                }
+            }
+            android.webkit.CookieManager.getInstance().setAcceptThirdPartyCookies(this, false)
+        }
     }
 
     // Helper to create and configure WebView
@@ -898,6 +1534,55 @@ fun CircleToSearchScreen(
 
             // Enable Third-Party Cookies
             android.webkit.CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
+
+            // Browser-style long-press menu on links and images, mirroring the privacy
+            // webviews. Plain text falls through for the page's own selection handling.
+            var menuTouchX = 0f
+            var menuTouchY = 0f
+            setOnTouchListener { _, event ->
+                menuTouchX = event.x
+                menuTouchY = event.y
+                false
+            }
+
+            setOnLongClickListener {
+                val hit = hitTestResult
+                if (hit.type == android.webkit.WebView.HitTestResult.UNKNOWN_TYPE ||
+                    hit.type == android.webkit.WebView.HitTestResult.EDIT_TEXT_TYPE
+                ) {
+                    return@setOnLongClickListener false
+                }
+                val msg = android.os.Message()
+                msg.target = android.os.Handler(android.os.Looper.getMainLooper()) { m ->
+                    val b = m.data
+                    val linkUrl = b?.getString("url")
+                    val imageUrl = b?.getString("src") ?: hit.extra
+                    val linkText = b?.getString("title")
+                    val actions = mutableListOf<Pair<String, () -> Unit>>()
+                    if (!imageUrl.isNullOrBlank() && imageUrl != linkUrl) {
+                        val img = imageUrl
+                        actions += ctx.getString(R.string.web_menu_open_image) to { loadUrl(img) }
+                        actions += ctx.getString(R.string.web_menu_copy_image) to { copyText(img) }
+                        actions += ctx.getString(R.string.web_menu_save_image) to { downloadImage(img, settings.userAgentString) }
+                    }
+                    if (!linkUrl.isNullOrBlank()) {
+                        val lnk = linkUrl
+                        actions += ctx.getString(R.string.web_menu_open_link) to { loadUrl(lnk) }
+                        actions += ctx.getString(R.string.web_menu_copy_link) to { copyText(lnk) }
+                        if (!linkText.isNullOrBlank()) {
+                            actions += ctx.getString(R.string.web_menu_copy_link_text) to { copyText(linkText) }
+                        }
+                        actions += ctx.getString(R.string.web_menu_share) to { shareUrl(lnk) }
+                        actions += ctx.getString(R.string.web_menu_open_browser) to { openExternally(lnk) }
+                    }
+                    if (actions.isNotEmpty()) {
+                        showWebViewMenu(this, menuTouchX.toInt(), menuTouchY.toInt(), actions) { url -> loadUrl(url) }
+                    }
+                    true
+                }
+                requestFocusNodeHref(msg)
+                true
+            }
 
             // Instrument fetch/XHR so the Lens results RPC (and its status) is
             // visible even when it fails silently. Injected at page start AND
@@ -1167,7 +1852,23 @@ fun CircleToSearchScreen(
                         .height(800.dp)
                         .background(pageBackgroundColor, RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
                 ) {
-                Spacer(modifier = Modifier.height(16.dp))
+                // Drag pill — visual affordance for the half-expanded sheet
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterHorizontally)
+                        .padding(top = 12.dp)
+                        .width(36.dp)
+                        .height(4.dp)
+                        .background(
+                            color = if (
+                                (0.2126f * pageBackgroundColor.red +
+                                0.7152f * pageBackgroundColor.green +
+                                0.0722f * pageBackgroundColor.blue) > 0.5f
+                            ) Color.Black.copy(alpha = 0.25f) else Color.White.copy(alpha = 0.5f),
+                            shape = RoundedCornerShape(2.dp)
+                        )
+                )
+                Spacer(modifier = Modifier.height(8.dp))
 
                 // Tabs - Polished UI
                 ScrollableTabRow(
@@ -1183,14 +1884,16 @@ fun CircleToSearchScreen(
                         val transition = androidx.compose.animation.core.updateTransition(targetState = selected, label = "TabSelect")
                         val scale by transition.animateFloat(label = "Scale") { if (it) 1.05f else 1f }
                         val alpha by transition.animateFloat(label = "Alpha") { if (it) 1f else 0.7f }
+                        // Quiet cue: tabs of engines with preloading off sit dimmer.
+                        val preloadDim = if (preloadEnabled[engine] == false) 0.55f else 1f
 
                         Tab(
                             selected = selected,
                             onClick = { selectedEngine = engine },
-                            modifier = Modifier.graphicsLayer { 
+                            modifier = Modifier.graphicsLayer {
                                 scaleX = scale
                                 scaleY = scale
-                                this.alpha = alpha
+                                this.alpha = alpha * preloadDim
                             },
                             text = {
                                 Text(
@@ -1223,6 +1926,10 @@ fun CircleToSearchScreen(
                     searchUrl = null
                     preloadedUrls.clear()
                     initializedEngines.clear() // Reset smart loading
+                    autoLoadEngines = emptySet()
+                    // Never carry the previous page's sampled tint into a new
+                    // search — start clean (white) until this page is sampled.
+                    pageBackgroundColor = Color.White
                     // Do NOT destroy webviews here to keep them cached if possible? 
                     // PROBABLY safer to destroy to avoid stale state from previous searches.
                     webViews.values.forEach { 
@@ -1236,93 +1943,33 @@ fun CircleToSearchScreen(
                 }
 
                 LaunchedEffect(selectedBitmap, hostedImageUrl) {
-                    if (selectedBitmap != null) {
-                        isLoading = true
-                        
-                        val effectiveLensOnly = searchModeOverride ?: isGoogleLensOnly
-                        
-                        // 1. Google Lens Only Mode Check
-                        // Use the reactive state (not a direct pref read) so we always
-                        // get the value that was last committed, even from another activity.
-                        if (effectiveLensOnly) {
-                            // Save to cache and launch Lens
-                            val path = ImageUtils.saveBitmap(context, selectedBitmap!!)
-                            val uri = android.net.Uri.fromFile(java.io.File(path))
-                            
-                            val result = searchWithGoogleLens(uri, context)
-                            when (result) {
-                                com.akslabs.circletosearch.ui.components.LensLaunchResult.LAUNCHED_DIRECTLY -> {
-                                    // Lens launched directly — safe to dismiss the overlay
-                                    onClose()
-                                    return@LaunchedEffect
-                                }
-                                com.akslabs.circletosearch.ui.components.LensLaunchResult.LAUNCHED_VIA_CHOOSER -> {
-                                    // Chooser shown — overlay must stay open, user picks the app
-                                    isLoading = false
-                                    return@LaunchedEffect
-                                }
-                                com.akslabs.circletosearch.ui.components.LensLaunchResult.FAILED -> {
-                                    // Fallback to multi-search
-                                    android.util.Log.e("CircleToSearch", "Google Lens launch failed, falling back to multi-search")
-                                }
-                            }
-                        }
-
-                        // 2. Multi-Search Mode (Expanded UI)
-                        scope.launch { scaffoldState.bottomSheetState.expand() }
-
-                        // 3. Upload to host if needed (Multi-Search Mode)
-                        if (hostedImageUrl == null) {
-                            val url = ImageSearchUploader.uploadToImageHost(selectedBitmap!!)
-                            if (url != null) {
-                                hostedImageUrl = url
-                            } else {
-                                isLoading = false
-                                return@LaunchedEffect
-                            }
-                        }
-
-                        // 2. Generate URLs for ALL engines (lightweight string op)
-                        searchEngines.forEach { engine ->
-                            if (!preloadedUrls.containsKey(engine)) {
-                                val url = when (engine) {
-                                    SearchEngine.Google -> ImageSearchUploader.getGoogleLensUrl(hostedImageUrl!!)
-                                    SearchEngine.Bing -> ImageSearchUploader.getBingUrl(hostedImageUrl!!)
-                                    SearchEngine.Yandex -> ImageSearchUploader.getYandexUrl(hostedImageUrl!!)
-                                    SearchEngine.TinEye -> ImageSearchUploader.getTinEyeUrl(hostedImageUrl!!)
-                                    else -> null
-                                }
-                                if (url != null) preloadedUrls[engine] = url
-                            }
-                        }
-
-                        // 3. Set initial URL
-                        if (preloadedUrls.containsKey(selectedEngine)) {
-                             searchUrl = preloadedUrls[selectedEngine]
-                        }
-                        
-                        // 4. SMART LOADING SEQUENCE
-                        // First, ensure selected engine is initialized
-                        if (!initializedEngines.contains(selectedEngine)) {
-                            initializedEngines.add(selectedEngine)
-                        }
-                        
+                    if (selectedBitmap == null) return@LaunchedEffect
+                    // Privacy: "Off" — the crop stays on-device; nothing uploads and
+                    // nothing ever leaves the device.
+                    if (visualSearchOff) {
                         isLoading = false
-                        
-                        // Then, load others sequentially
-                        scope.launch {
-                            searchEngines.forEach { engine ->
-                                if (engine != selectedEngine) {
-                                    delay(300) // Reduced from 800ms for faster loading
-                                    if (!initializedEngines.contains(engine)) {
-                                        initializedEngines.add(engine)
-                                    }
-                                }
-                            }
+                        isSearching = false
+                        return@LaunchedEffect
+                    }
+                    val overrideMethod = searchModeOverride?.let { if (it) "lens" else "multi" }
+                    val method = overrideMethod ?: searchMethodPref
+                    val alreadyRan = lastRanBitmap === selectedBitmap && lastRanMethod == method
+                    if (askEveryTime && overrideMethod == null) {
+                        // "Ask every time": confirm before uploading — until the user
+                        // confirms, nothing leaves the device.
+                        if (!alreadyRan) {
+                            askConfirmVisible = true
+                            isLoading = false
                         }
+                        return@LaunchedEffect
+                    }
+                    if (!alreadyRan) {
+                        lastRanBitmap = selectedBitmap
+                        lastRanMethod = method
+                        runVisualSearchNow(method)
                     }
                 }
-                
+
                 // Update searchUrl when engine changes
                 LaunchedEffect(selectedEngine, preloadedUrls) {
                     if (preloadedUrls.containsKey(selectedEngine)) {
@@ -1350,19 +1997,92 @@ fun CircleToSearchScreen(
                     },
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    // Show loading only if the SELECTED engine isn't ready or just starting
-                    if (isLoading || (preloadedUrls.containsKey(selectedEngine) && !webViews.containsKey(selectedEngine))) {
+                    // Show loading only if the SELECTED engine isn't ready or just starting.
+                    // Engines with preloading off show the manual-load placeholder instead.
+                    val selectedInitialized = initializedEngines.contains(selectedEngine)
+                    val selectedPendingAuto = selectedEngine in autoLoadEngines
+                    val selectedPreloadOn = preloadEnabled[selectedEngine] ?: true
+                    if (isLoading || ((selectedInitialized || selectedPendingAuto) && preloadedUrls.containsKey(selectedEngine) && !webViews.containsKey(selectedEngine))) {
                          // We delay showing the loader slightly to avoid flicker if WebView attaches instantly
                         var showLoader by remember { mutableStateOf(false) }
                         LaunchedEffect(Unit) {
                             kotlinx.coroutines.delay(100)
                             showLoader = true
                         }
-                        
+
                         if (showLoader || isLoading) {
                              Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                 ContainedLoadingIndicatorSample()
                              }
+                        }
+                    } else if (!selectedInitialized && !selectedPendingAuto && preloadedUrls.containsKey(selectedEngine)) {
+                        // Preloading off for this engine: nothing loads until the user acts.
+                        // The sheet column is 800dp tall but peek height shows only its
+                        // upper half — a centered placeholder falls below the fold. Lift
+                        // it into view while not expanded; it eases back to center as
+                        // the sheet expands.
+                        val sheetExpanded = scaffoldState.bottomSheetState.targetValue == SheetValue.Expanded
+                        val placeholderLift by animateFloatAsState(if (sheetExpanded) 0f else 1f, label = "preloadPlaceholderLift")
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                // Other engines' background WebViews stack above this Box
+                                // (alpha 0 but still hit-testable) and swallow every tap —
+                                // draw above them and shield empty areas from touches.
+                                .zIndex(2f)
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null,
+                                ) {}
+                                .padding(32.dp)
+                                .graphicsLayer { translationY = -placeholderLift * 220.dp.toPx() },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Image(
+                                    painter = painterResource(id = selectedEngine.iconRes),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(56.dp),
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Text(
+                                    text = stringResource(R.string.preload_off_title, selectedEngine.getDisplayName(context)),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    textAlign = TextAlign.Center,
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = stringResource(
+                                        if (selectedPreloadOn) R.string.preload_on_note else R.string.preload_off_note
+                                    ),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    textAlign = TextAlign.Center,
+                                )
+                                Spacer(modifier = Modifier.height(20.dp))
+                                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    FilledTonalButton(onClick = {
+                                        if (!initializedEngines.contains(selectedEngine)) {
+                                            initializedEngines.add(selectedEngine)
+                                        }
+                                    }) {
+                                        Text(stringResource(R.string.preload_load_now))
+                                    }
+                                    if (!selectedPreloadOn) {
+                                        OutlinedButton(onClick = {
+                                            uiPreferences.setPreloadEnabled(selectedEngine, true)
+                                            preloadEnabled = preloadEnabled + (selectedEngine to true)
+                                            // Turning it on also loads the tab now — the
+                                            // placeholder's job is done either way.
+                                            if (!initializedEngines.contains(selectedEngine)) {
+                                                initializedEngines.add(selectedEngine)
+                                            }
+                                        }) {
+                                            Text(stringResource(R.string.preload_turn_on))
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
 
@@ -1519,50 +2239,153 @@ fun CircleToSearchScreen(
             // Sibling drawn AFTER the dim/tint layer, so overlay dimness can never
             // wash the border out — it stays at its own alpha regardless of dimAlpha.
             if (showGradientBorder && !isTranslatorMode) {
-                androidx.compose.animation.AnimatedVisibility(
-                    visible = isUIVisible,
-                    enter = androidx.compose.animation.fadeIn(animationSpec = tween(700))
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .border(
-                                width = 2.dp,
-                                brush = Brush.verticalGradient(
-                                    colors = OverlayGradientColors.map { it.copy(alpha = 0.9f) }
-                                ),
-                                shape = deviceCornerShape
-                            )
-                            .clip(deviceCornerShape)
-                    )
-                }
+                AnimatedNeonBorder(visible = isUIVisible, shape = deviceCornerShape)
             }
 
             // 3. Drawing Canvas (Interactive Layer)
-            if (!isTranslatorMode) {                Canvas(
+            if (!isTranslatorMode) {
+                // Neon glow layer: real gaussian blur (API 31+) turns strong
+                // Google-color strokes into a soft cloud that hugs the line.
+                // Composed BELOW the sharp canvas, so the white line drawn later
+                // covers the glow's interior — color only shows around the edges.
+                if (currentPathPoints.size > 1 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    Canvas(
+                        modifier = Modifier.fillMaxSize().graphicsLayer {
+                            renderEffect = android.graphics.RenderEffect
+                                .createBlurEffect(24f, 24f, android.graphics.Shader.TileMode.CLAMP)
+                                .asComposeRenderEffect()
+                            compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen
+                        }
+                    ) {
+                        val glowPath = buildSmoothPath(currentPathPoints)
+                        // Per-segment pause scale: k=0 (tail) fades first, each
+                        // newer segment 60ms later, fingertip last.
+                        val segGlowScale: (Int) -> Float = { k ->
+                            (1f - (glowPauseMs - k * 60L) / 450f).coerceIn(0f, 1f)
+                        }
+                        val glowBrush = Brush.linearGradient(
+                            colors = OverlayGradientColors,
+                            start = Offset.Zero,
+                            end = Offset(size.width, size.height)
+                        )
+                        val measure = androidx.compose.ui.graphics.PathMeasure().apply {
+                            setPath(glowPath, false)
+                        }
+                        val total = measure.length
+                        if (total > 4f) {
+                            val segCount = 6
+                            val segLen = 44.dp.toPx()
+                            val fadeStart = maxOf(0f, total - segLen * segCount)
+                            for (k in 0 until segCount) {
+                                val segStart = maxOf(fadeStart, total - segLen * (segCount - k))
+                                val segEnd = minOf(total, segStart + segLen + 2f)
+                                if (segEnd - segStart < 2f) continue
+                                val frac = (k + 1) / segCount.toFloat()
+                                val seg = androidx.compose.ui.graphics.Path().apply {
+                                    measure.getSegment(segStart, segEnd, this, true)
+                                }
+                                drawPath(path = seg, brush = glowBrush,
+                                    style = Stroke(width = 44f, cap = StrokeCap.Round, join = StrokeJoin.Round),
+                                    alpha = 0.55f * frac * segGlowScale(k))
+                                drawPath(path = seg, brush = glowBrush,
+                                    style = Stroke(width = 28f, cap = StrokeCap.Round, join = StrokeJoin.Round),
+                                    alpha = 0.75f * frac * segGlowScale(k))
+                            }
+                            // Soft fingertip bloom (blurred halo around the line)
+                            drawCircle(
+                                brush = Brush.radialGradient(
+                                    0f to OverlayGradientColors[0].copy(alpha = 0.55f),
+                                    0.5f to OverlayGradientColors[2].copy(alpha = 0.30f),
+                                    1f to Color.Transparent,
+                                    center = currentPathPoints.last(),
+                                    radius = 40.dp.toPx()
+                                ),
+                                alpha = segGlowScale(segCount - 1)
+                            )
+                        }
+                    }
+                }
+                Canvas(
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    // Draw current path (Real-time)
+                    // Draw current path (Real-time): solid white trail with the
+                    // Google-color gradient glow riding the fingertip, exactly like
+                    // the original Circle to Search. This canvas composes AFTER the
+                    // screenshot Box (which holds the dim tint), so the dim can only
+                    // darken the screenshot underneath — the stroke stays vivid.
                     if (currentPathPoints.size > 1) {
-                        val path = Path().apply {
-                            moveTo(currentPathPoints.first().x, currentPathPoints.first().y)
-                            for (i in 1 until currentPathPoints.size) {
-                                lineTo(currentPathPoints[i].x, currentPathPoints[i].y)
-                            }
+                        val path = buildSmoothPath(currentPathPoints)
+                        // Same tail-first stagger as the blur layer
+                        val segGlowScale: (Int) -> Float = { k ->
+                            (1f - (glowPauseMs - k * 60L) / 450f).coerceIn(0f, 1f)
                         }
-                        
-                        // Glow
+                        val strokeCap = StrokeCap.Round
+                        val strokeJoin = StrokeJoin.Round
+                        val glowBrush = Brush.linearGradient(
+                            colors = OverlayGradientColors,
+                            start = Offset.Zero,
+                            end = Offset(size.width, size.height)
+                        )
+
+                        // 1) Neon glow (pure Google colors) drawn UNDER the stroke so
+                        // the color lives AROUND the line, never inside it. Four
+                        // concentric widths (wide→narrow) fake an outward falloff;
+                        // alpha ramps toward the fingertip so the glow rides the finger.
+                        val measure = androidx.compose.ui.graphics.PathMeasure().apply {
+                            setPath(path, false)
+                        }
+                        val total = measure.length
+                        if (total > 4f) {
+                            val segCount = 6
+                            val segLen = 44.dp.toPx()
+                            val fadeStart = maxOf(0f, total - segLen * segCount)
+                            for (k in 0 until segCount) {
+                                val segStart = maxOf(fadeStart, total - segLen * (segCount - k))
+                                val segEnd = minOf(total, segStart + segLen + 2f)
+                                if (segEnd - segStart < 2f) continue
+                                val frac = (k + 1) / segCount.toFloat()
+                                val seg = androidx.compose.ui.graphics.Path().apply {
+                                    measure.getSegment(segStart, segEnd, this, true)
+                                }
+                                drawPath(path = seg, brush = glowBrush,
+                                    style = Stroke(width = 64f, cap = strokeCap, join = strokeJoin),
+                                    alpha = 0.06f * frac * segGlowScale(k))
+                                drawPath(path = seg, brush = glowBrush,
+                                    style = Stroke(width = 52f, cap = strokeCap, join = strokeJoin),
+                                    alpha = 0.10f * frac * segGlowScale(k))
+                                drawPath(path = seg, brush = glowBrush,
+                                    style = Stroke(width = 40f, cap = strokeCap, join = strokeJoin),
+                                    alpha = 0.17f * frac * segGlowScale(k))
+                                drawPath(path = seg, brush = glowBrush,
+                                    style = Stroke(width = 30f, cap = strokeCap, join = strokeJoin),
+                                    alpha = 0.30f * frac * segGlowScale(k))
+                                drawPath(path = seg, brush = glowBrush,
+                                    style = Stroke(width = 24f, cap = strokeCap, join = strokeJoin),
+                                    alpha = 0.45f * frac * segGlowScale(k))
+                            }
+                            // Soft Google-blue bloom around the line at the fingertip
+                            drawCircle(
+                                brush = Brush.radialGradient(
+                                    0f to OverlayGradientColors[0].copy(alpha = 0.35f),
+                                    1f to Color.Transparent,
+                                    center = currentPathPoints.last(),
+                                    radius = 30.dp.toPx()
+                                ),
+                                alpha = segGlowScale(segCount - 1)
+                            )
+                        }
+
+                        // 2) Solid white line drawn ON TOP: the glow only shows
+                        // around its edges and the trail itself stays pure white.
                         drawPath(
                             path = path,
-                            brush = Brush.linearGradient(OverlayGradientColors),
-                            style = Stroke(width = 30f, cap = StrokeCap.Round, join = StrokeJoin.Round),
-                            alpha = 0.6f
+                            color = Color.White.copy(alpha = 0.16f),
+                            style = Stroke(width = 26f, cap = strokeCap, join = strokeJoin)
                         )
-                        // Core
                         drawPath(
                             path = path,
                             color = Color.White,
-                            style = Stroke(width = 12f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+                            style = Stroke(width = 16f, cap = strokeCap, join = strokeJoin)
                         )
                     }
 
@@ -1690,6 +2513,19 @@ fun CircleToSearchScreen(
                                     }
                                 },
                                 clearSelectionSignal = wordSelectionClearSignal,
+                                // Long-press a word to anchor, drag to extend — the circle
+                                // drag must not fire for the same touch once anchored.
+                                longPressDrag = true,
+                                pendingSelectRegion = pendingWordSelectRegion,
+                                onSelectRegionHandled = { pendingWordSelectRegion = null },
+                                // In-app privacy web search instead of the system chooser:
+                                // the query first, then the compact engine dock. Any open
+                                // results sheet closes — the dock sits above the screen.
+                                onWebSearch = { query ->
+                                    webSearchQuery = query
+                                    webSearchEngine = null
+                                    showWebSearchPicker = true
+                                },
                             )
                         } else if (!instantOcrDone) {
                             instantRegions?.let { regions ->
@@ -1712,14 +2548,17 @@ fun CircleToSearchScreen(
                 ),
                 modifier = Modifier.align(Alignment.TopCenter).zIndex(2000f)
             ) {
-                Row(
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .statusBarsPadding()
                         .padding(top = 4.dp, start = 16.dp, end = 16.dp)
                         .align(Alignment.TopCenter),
-                    verticalAlignment = Alignment.CenterVertically
                 ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                     IconButton(
                         onClick =
                             {
@@ -1731,25 +2570,6 @@ fun CircleToSearchScreen(
                             .size(40.dp)
                     ) {
                         Icon(Icons.Default.Close, contentDescription = stringResource(R.string.cd_close), tint = Color.White)
-                    }
-                    Spacer(modifier = Modifier.weight(1f))
-                    if (selectedEngine.name == "Google") {
-                        // Si c'est Google, on affiche ta belle typo officielle
-                        Image(
-                            painter = painterResource(id = com.akslabs.circletosearch.R.drawable.googletypo),
-                            contentDescription = stringResource(R.string.cd_google_search),
-                            modifier = Modifier.height(50.dp), // Hauteur ajustable selon ton PNG
-                            colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(Color.White)
-                        )
-                    } else {
-                        // Si c'est Bing, Yandex, etc., on garde le texte stylé d'origine
-                        Text(
-                            text = selectedEngine.getDisplayName(context),
-                            style = MaterialTheme.typography.headlineMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                        )
                     }
                     Spacer(modifier = Modifier.weight(1f))
 
@@ -1821,6 +2641,30 @@ fun CircleToSearchScreen(
                                     showMenu = false
                                 }
                             )
+                            // OCR language whitelist — mid-list so the bar-adjacent
+                            // toggles stay grouped; the dialog itself shows whether
+                            // detection is restricted or fully automatic.
+                            androidx.compose.material3.DropdownMenuItem(
+                                text = { Text(stringResource(R.string.ocr_lang_title)) },
+                                leadingIcon = {
+                                    // Keep the standard 24dp slot so the text aligns
+                                    // with the other items; center the smaller glyph.
+                                    Box(
+                                        modifier = Modifier.size(24.dp),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        Icon(
+                                            painter = painterResource(id = com.akslabs.circletosearch.R.drawable.ocr),
+                                            contentDescription = null,
+                                            modifier = Modifier.size(18.dp),
+                                        )
+                                    }
+                                },
+                                onClick = {
+                                    showOcrLangDialog = true
+                                    showMenu = false
+                                }
+                            )
                             androidx.compose.material3.DropdownMenuItem(
                                 text = { Text(stringResource(R.string.menu_refresh)) },
                                 leadingIcon = {
@@ -1883,6 +2727,33 @@ fun CircleToSearchScreen(
                                     showSettingsScreen = true
                                     showMenu = false
                                 }
+                            )
+                        }
+                    }
+                    }
+
+                    // Branding is centered on its own layer so the button
+                    // cluster on either side never shifts it off-center.
+                    Box(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (selectedEngine.name == "Google") {
+                            // Si c'est Google, on affiche ta belle typo officielle
+                            Image(
+                                painter = painterResource(id = com.akslabs.circletosearch.R.drawable.googletypo),
+                                contentDescription = stringResource(R.string.cd_google_search),
+                                modifier = Modifier.height(50.dp), // Hauteur ajustable selon ton PNG
+                                colorFilter = androidx.compose.ui.graphics.ColorFilter.tint(Color.White)
+                            )
+                        } else {
+                            // Si c'est Bing, Yandex, etc., on garde le texte stylé d'origine
+                            Text(
+                                text = selectedEngine.getDisplayName(context),
+                                style = MaterialTheme.typography.headlineMedium.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
                             )
                         }
                     }
@@ -2003,6 +2874,9 @@ fun CircleToSearchScreen(
                                                 val path = ImageUtils.saveBitmap(context, screenshot)
                                                 val uri = android.net.Uri.fromFile(java.io.File(path))
                                                 searchWithGoogleLens(uri, context)
+                                                // Lens is launching on top: stop close from
+                                                // reordering the previous app back over it.
+                                                CircleToSearchAccessibilityService.instance?.suppressNextReturnToApp()
                                                 onClose()
                                             }
                                         },
@@ -2134,8 +3008,15 @@ fun CircleToSearchScreen(
                                 // stale touchable result/select window can't intercept
                                 // taps inside the camera screen.
                                 CircleToSearchAccessibilityService.instance?.closeTranslateOverlay()
+                                // Return target: closing the image result re-launches this
+                                // overlay (the original capture stays in BitmapRepository —
+                                // CLEAR_TASK destroys the old instance without finishing it).
                                 val cameraIntent = android.content.Intent(context, dev.davidv.translator.MainActivity::class.java)
                                     .putExtra(dev.davidv.translator.MainActivity.EXTRA_OPEN_LIVE_CAMERA, true)
+                                    .putExtra(
+                                        dev.davidv.translator.MainActivity.EXTRA_CALLER_COMPONENT,
+                                        android.content.ComponentName(context, com.akslabs.circletosearch.OverlayActivity::class.java),
+                                    )
                                     .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK)
                                 runCatching {
                                     context.startActivity(cameraIntent)
@@ -2164,6 +3045,10 @@ fun CircleToSearchScreen(
 
                             // Smart Entity Extractor — instant OCR over the screenshot using
                             // the translator module's recognition (no Tesseract, no re-OCR).
+                            // COMMENTED OUT: SmartScan now runs automatically (default on) —
+                            // extraction now runs automatically when the OCR completes. Restore this
+                            // button to bring back manual triggering:
+                            /*
                             BottomBarButton(stringResource(R.string.label_smartscan), { Icon(Icons.Default.Search, null, modifier = Modifier.size(22.dp)) }) {
                                 isEntityExtractMode = true
                                 if (detectedEntities.isEmpty() && !isExtractingEntities) {
@@ -2172,7 +3057,7 @@ fun CircleToSearchScreen(
                                     val scanGeneration = entityScanGeneration
                                     scope.launch(kotlinx.coroutines.Dispatchers.IO) {
                                         val bmp = screenshot ?: return@launch
-                                        val sourceWords = cachedWords ?: runInstantScreenshotOcr(context, bmp) { }?.sourceWords
+                                        val sourceWords = cachedWords ?: InstantOcrScanner.scan(context, bmp) { }?.words?.sourceWords
                                         if (sourceWords == null) {
                                             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                                                 isExtractingEntities = false
@@ -2239,6 +3124,7 @@ fun CircleToSearchScreen(
                                     }
                                 }
                             }
+                            */
 
                             // Donate
 //                            BottomBarButton("Donate", { Icon(painterResource(id = com.akslabs.circletosearch.R.drawable.donation), null, modifier = Modifier.size(22.dp)) }) {
@@ -2533,7 +3419,7 @@ fun CircleToSearchScreen(
         }
 
         // --- Phase 44: Smart Entity Extractor Overlay Chips ---
-        if (isEntityExtractMode && screenshot != null) {
+        if (detectedEntities.isNotEmpty() && screenshot != null) {
             BoxWithConstraints(modifier = Modifier.fillMaxSize().zIndex(2600f)) {
                 val screenWidth = maxWidth
                 val screenHeight = maxHeight
@@ -2579,6 +3465,7 @@ fun CircleToSearchScreen(
                                     }
                                     intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
                                     context.startActivity(intent)
+                                    detectedEntities = emptyList()
                                     isEntityExtractMode = false
                                 } catch (e: Exception) {}
                             },
@@ -2601,6 +3488,7 @@ fun CircleToSearchScreen(
                                     }
                                     intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
                                     context.startActivity(intent)
+                                    detectedEntities = emptyList()
                                     isEntityExtractMode = false
                                 } catch (e: Exception) {}
                             },
@@ -2689,6 +3577,297 @@ fun CircleToSearchScreen(
             }
         }
 
+        // Privacy web search: a compact floating dock appears centered on screen when the
+        // user taps Web search; picking an engine opens the results sheet. Tabs are lazily
+        // created on first open and reloaded only when the query changes.
+        if (showWebSearchPicker) {
+            // Scrim: tap anywhere outside the dock to dismiss.
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .zIndex(3000f)
+                    .background(Color.Black.copy(alpha = 0.4f))
+                    .pointerInput(Unit) {
+                        detectTapGestures { showWebSearchPicker = false }
+                    },
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .zIndex(3001f)
+                    .pointerInput(Unit) { detectTapGestures { showWebSearchPicker = false } },
+                contentAlignment = Alignment.Center,
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(24.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    shadowElevation = 8.dp,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp)
+                        // Swallow taps inside the dock so they don't dismiss it.
+                        .pointerInput(Unit) { detectTapGestures {} },
+                ) {
+                    Column(modifier = Modifier.padding(vertical = 12.dp)) {
+                        Text(
+                            text = "\"${webSearchQuery}\"",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(20.dp),
+                            contentPadding = PaddingValues(horizontal = 20.dp),
+                        ) {
+                            items(webSearchEngines.size) { index ->
+                                val engine = webSearchEngines[index]
+                                // Launcher-style dock entry: the engine's favicon over its name.
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(16.dp))
+                                        .clickable {
+                                            // Lazy open: the tab's WebView is created on first
+                                            // selection, never before.
+                                            if (!webSearchInitialized.contains(engine)) {
+                                                webSearchInitialized.add(engine)
+                                            }
+                                            webSearchEngine = engine
+                                            showWebSearchPicker = false
+                                        }
+                                        .padding(horizontal = 4.dp, vertical = 6.dp),
+                                ) {
+                                    Image(
+                                        painter = painterResource(engine.iconRes),
+                                        contentDescription = engine.getDisplayName(context),
+                                        modifier = Modifier
+                                            .size(44.dp)
+                                            .clip(RoundedCornerShape(12.dp)),
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = engine.name,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (webSearchEngine != null && webSearchQuery != null) {
+            // In-screen sheet instead of ModalBottomSheet: a modal sheet's drag gesture
+            // scrolls the sheet instead of the results WebView. This sheet has no drag of
+            // its own — the WebView always owns vertical drags. Close via back, scrim tap.
+            // Back mirrors the visual search: webview history first, sheet close only
+            // when there is nothing left to go back to.
+            BackHandler {
+                val currentWebView = webSearchEngine?.let { webSearchViews[it] }
+                if (currentWebView != null && currentWebView.canGoBack()) {
+                    currentWebView.goBack()
+                } else {
+                    webSearchEngine = null
+                }
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .zIndex(2900f)
+                    .background(Color.Black.copy(alpha = 0.4f))
+                    .pointerInput(Unit) { detectTapGestures { webSearchEngine = null } },
+            ) {
+                // The tab strip matches the loaded page's own background, so its text and
+                // borders derive from the page's luminance, NOT the app theme — a dark
+                // results page in a light app theme (or vice versa) would hide the labels.
+                val bgIsDark =
+                    (0.2126f * webSearchPageBg.red +
+                        0.7152f * webSearchPageBg.green +
+                        0.0722f * webSearchPageBg.blue) <= 0.5f
+                val tabTextSelected = if (bgIsDark) Color.White else Color(0xFF1B1B1F)
+                val tabTextUnselected = if (bgIsDark) Color.White.copy(alpha = 0.65f) else Color.Black.copy(alpha = 0.6f)
+                val tabBorderSelected = if (bgIsDark) Color.White.copy(alpha = 0.45f) else Color.Black.copy(alpha = 0.3f)
+
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .fillMaxHeight(0.92f)
+                        .background(webSearchPageBg, RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
+                        // Swallow taps on the chrome so they never reach the scrim.
+                        .pointerInput(Unit) { detectTapGestures {} },
+                ) {
+                    // Drag pill — same visual affordance as the visual-search sheet
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.CenterHorizontally)
+                            .padding(top = 12.dp)
+                            .width(36.dp)
+                            .height(4.dp)
+                            .background(
+                                color = if (bgIsDark) Color.White.copy(alpha = 0.5f) else Color.Black.copy(alpha = 0.25f),
+                                shape = RoundedCornerShape(2.dp)
+                            )
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Tabs — same pill-style strip as the visual search (no default indicator)
+                    ScrollableTabRow(
+                        selectedTabIndex = webSearchEngine?.let { webSearchEngines.indexOf(it) } ?: -1,
+                        edgePadding = 16.dp,
+                        containerColor = Color.Transparent,
+                        contentColor = if (bgIsDark) Color.White else Color.Black,
+                        divider = {},
+                        indicator = {},
+                    ) {
+                        webSearchEngines.forEach { engine ->
+                            val selected = webSearchEngine == engine
+                            val transition = androidx.compose.animation.core.updateTransition(targetState = selected, label = "WebTab")
+                            val scale by transition.animateFloat(label = "Scale") { if (it) 1.05f else 1f }
+                            val alpha by transition.animateFloat(label = "Alpha") { if (it) 1f else 0.7f }
+
+                            Tab(
+                                selected = selected,
+                                onClick = {
+                                    webSearchEngine = engine
+                                    // Lazy open: the tab's WebView is created on first
+                                    // selection, never before.
+                                    if (!webSearchInitialized.contains(engine)) {
+                                        webSearchInitialized.add(engine)
+                                    }
+                                },
+                                modifier = Modifier.graphicsLayer {
+                                    scaleX = scale
+                                    scaleY = scale
+                                    this.alpha = alpha
+                                },
+                                text = {
+                                    Text(
+                                        engine.getDisplayName(context),
+                                        style = MaterialTheme.typography.labelLarge.copy(
+                                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
+                                        ),
+                                        modifier = Modifier
+                                            .background(
+                                                webSearchPageBg,
+                                                RoundedCornerShape(16.dp)
+                                            )
+                                            .border(
+                                                width = 1.dp,
+                                                color = if (selected) tabBorderSelected else Color.Transparent,
+                                                shape = RoundedCornerShape(16.dp)
+                                            )
+                                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                                        color = if (selected) tabTextSelected else tabTextUnselected
+                                    )
+                                }
+                            )
+                        }
+                    }
+
+                    // Results: one (lazily created) WebView per opened tab; reload only when
+                    // the query changes — never on navigation inside the results page.
+                    Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                        val currentQuery = webSearchQuery
+                        webSearchEngines.forEach { engine ->
+                            if (webSearchInitialized.contains(engine) && currentQuery != null) {
+                                key(engine) {
+                                    AndroidView(
+                                        factory = { ctx ->
+                                            val webView = createPrivacyWebView(ctx)
+                                            webSearchViews[engine] = webView
+                                            webSearchLoadedQuery[engine] = currentQuery
+                                            webView.loadUrl(engine.searchUrl(currentQuery))
+                                            webView
+                                        },
+                                        update = { webView ->
+                                            if (webSearchLoadedQuery[engine] != currentQuery) {
+                                                webSearchLoadedQuery[engine] = currentQuery
+                                                webView.loadUrl(engine.searchUrl(currentQuery))
+                                            }
+                                        },
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .zIndex(if (engine == webSearchEngine) 1f else 0f)
+                                            .graphicsLayer {
+                                                alpha = if (engine == webSearchEngine) 1f else 0f
+                                            },
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // "Ask every time": a small confirmation dialog with a dimmed background —
+        // the crop stays on-device until the user confirms.
+        if (askConfirmVisible) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .zIndex(3000f)
+                    .background(Color.Black.copy(alpha = 0.5f))
+                    .pointerInput(Unit) { detectTapGestures { askConfirmVisible = false } },
+                contentAlignment = Alignment.Center,
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    tonalElevation = 6.dp,
+                    shadowElevation = 8.dp,
+                    modifier = Modifier
+                        .padding(horizontal = 40.dp)
+                        .widthIn(max = 320.dp)
+                        // Swallow taps inside the dialog so they don't dismiss it.
+                        .pointerInput(Unit) { detectTapGestures {} },
+                ) {
+                    Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 20.dp)) {
+                        Text(
+                            text = stringResource(R.string.ask_visual_search_prompt),
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.SemiBold
+                            ),
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Spacer(modifier = Modifier.height(20.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            TextButton(onClick = { askConfirmVisible = false }) {
+                                Text(stringResource(R.string.ask_confirm_no))
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            TextButton(onClick = {
+                                askConfirmVisible = false
+                                val overrideMethod = searchModeOverride?.let { if (it) "lens" else "multi" }
+                                val method = overrideMethod ?: searchMethodPref
+                                if (lastRanBitmap !== selectedBitmap || lastRanMethod != method) {
+                                    lastRanBitmap = selectedBitmap
+                                    lastRanMethod = method
+                                    scope.launch { runVisualSearchNow(method) }
+                                }
+                            }) {
+                                Text(
+                                    text = stringResource(R.string.ask_confirm_yes),
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         if (showMoreAppsSheet) {
             MoreAppsBottomSheet(
                 onDismiss = { showMoreAppsSheet = false },
@@ -2713,6 +3892,16 @@ fun CircleToSearchScreen(
             )
         }
 
+        if (showOcrLangDialog) {
+            OcrLanguageDialog(
+                onDismiss = { showOcrLangDialog = false },
+                onCheckedChange = { codes ->
+                    ocrCheckedLanguages = codes
+                    OcrLanguagePreferences.setChecked(context, codes)
+                }
+            )
+        }
+
         if (showSettingsScreen) {
             SettingsScreen(
                 uiPreferences = uiPreferences,
@@ -2722,6 +3911,249 @@ fun CircleToSearchScreen(
     }
 }
 }
+}
+
+/**
+ * Checklist of the app's bundled OCR languages. `Auto-detect (all languages)`
+ * is checked exactly when the whitelist is empty — picking languages unchecks
+ * it, picking it clears everything, and every state persists via
+ * [OcrLanguagePreferences].
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun OcrLanguageDialog(
+    onDismiss: () -> Unit,
+    onCheckedChange: (Set<String>) -> Unit,
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val checked = remember { mutableStateListOf(*OcrLanguagePreferences.getChecked(context).toTypedArray()) }
+    var query by remember { mutableStateOf("") }
+    val isAuto = checked.isEmpty()
+
+    // Bundled/installed OCR languages only: a checked language whose recognizer
+    // pack is missing on this device would be unusable, so it never appears.
+    val languages = remember {
+        runCatching {
+            (context.applicationContext as? TranslatorApplication)
+                ?.languageCatalog
+                ?.languageRows
+                .orEmpty()
+                .filter { it.availability.ocrFiles }
+                .map { it.language }
+                .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.localizedName() })
+        }.getOrDefault(emptyList())
+    }
+    val filtered = remember(languages, query) {
+        if (query.isBlank()) {
+            languages
+        } else {
+            languages.filter {
+                it.localizedName().contains(query, ignoreCase = true) ||
+                    it.code.contains(query, ignoreCase = true)
+            }
+        }
+    }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        // Escape the ~280dp platform default so the picker can use real width.
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        val dialogView = LocalView.current
+        SideEffect {
+            val dialogWindow = (dialogView.parent as? DialogWindowProvider)?.window
+            if (dialogWindow != null) {
+                dialogWindow.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+                dialogWindow.attributes = dialogWindow.attributes.apply { dimAmount = 0.32f }
+            }
+        }
+        Surface(
+            shape = RoundedCornerShape(28.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp,
+            modifier = Modifier
+                .padding(horizontal = 24.dp, vertical = 32.dp)
+                .widthIn(max = 560.dp)
+                .fillMaxWidth(),
+        ) {
+            Column(modifier = Modifier.padding(horizontal = 24.dp, vertical = 20.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        painter = painterResource(id = com.akslabs.circletosearch.R.drawable.ocr),
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp),
+                    )
+                    Spacer(modifier = Modifier.size(12.dp))
+                    Text(
+                        text = stringResource(R.string.ocr_lang_title),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+                Text(
+                    text = stringResource(R.string.ocr_lang_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    placeholder = { Text(stringResource(R.string.ocr_lang_search)) },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                    trailingIcon = {
+                        if (query.isNotEmpty()) {
+                            IconButton(onClick = { query = "" }) {
+                                Icon(Icons.Default.Close, contentDescription = null)
+                            }
+                        }
+                    },
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 16.dp),
+                )
+
+                // Auto-detect: checked exactly when no language is checked.
+                val selectAuto: () -> Unit = {
+                    checked.clear()
+                    onCheckedChange(emptySet())
+                }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 12.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable(onClick = selectAuto)
+                        .padding(vertical = 6.dp),
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.ocr_lang_auto),
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Medium,
+                        )
+                        Text(
+                            text = stringResource(R.string.ocr_lang_auto_subtitle),
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(top = 2.dp),
+                        )
+                    }
+                    Checkbox(
+                        checked = isAuto,
+                        onCheckedChange = { selectAuto() },
+                    )
+                }
+
+                Text(
+                    text = stringResource(R.string.ocr_lang_section),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = 1.5.sp,
+                    modifier = Modifier.padding(top = 16.dp, bottom = 4.dp),
+                )
+
+                // Checked languages sort to the top of the list.
+                val displayed = filtered.sortedWith(
+                    compareBy { if (checked.contains(it.code)) 0 else 1 },
+                )
+                if (filtered.isEmpty()) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(120.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = null,
+                            modifier = Modifier.size(32.dp),
+                        )
+                        Spacer(modifier = Modifier.size(12.dp))
+                        Text(
+                            text = stringResource(R.string.ocr_lang_no_results, query),
+                            style = MaterialTheme.typography.bodyMedium,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(horizontal = 24.dp),
+                        )
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .weight(1f, fill = false)
+                            .heightIn(max = minOf(displayed.size * 48 + 8, 200).dp),
+                    ) {
+                        items(displayed, key = { it.code }) { language ->
+                            val isChecked = language.code in checked
+                            val toggle: () -> Unit = {
+                                if (isChecked) checked.remove(language.code)
+                                else checked.add(language.code)
+                                onCheckedChange(checked.toSet())
+                            }
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable(onClick = toggle)
+                                    .padding(vertical = 6.dp)
+                                    .animateItem(),
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = language.localizedName(),
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        fontWeight = FontWeight.Medium,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    Text(
+                                        text = language.code.uppercase(),
+                                        style = MaterialTheme.typography.labelSmall,
+                                    )
+                                }
+                                Checkbox(
+                                    checked = isChecked,
+                                    onCheckedChange = { toggle() },
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Footer: Reset (only when restricted) + standard Done button.
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                ) {
+                    if (isAuto) {
+                        Spacer(modifier = Modifier.weight(1f))
+                    } else {
+                        TextButton(onClick = selectAuto) {
+                            Text(stringResource(R.string.ocr_lang_reset))
+                        }
+                    }
+                    Button(onClick = onDismiss) {
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(modifier = Modifier.size(8.dp))
+                        Text(
+                            text = stringResource(R.string.ocr_lang_done),
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                }
+            }
+        }
+    }
 }
 
 // --- Phase 44: Smart Entity Extractor Models ---

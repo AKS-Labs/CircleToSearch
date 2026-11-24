@@ -64,6 +64,9 @@ import com.akslabs.circletosearch.data.GestureType
 import com.akslabs.circletosearch.data.OverlayConfigurationManager
 import com.akslabs.circletosearch.data.OverlaySegment
 import com.akslabs.circletosearch.utils.ImageUtils
+import com.akslabs.circletosearch.utils.InstantOcrScanner
+import com.akslabs.circletosearch.utils.InstantOcrStore
+import com.akslabs.circletosearch.utils.UIPreferences
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
 import androidx.compose.animation.core.animate
@@ -119,6 +122,8 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
     private val overlayViews = mutableListOf<View>() // Track all added segment views
     private var statusBarView: View? = null // Dedicated status-bar double-tap strip (independent of segments)
     private val bottomEdgeViews = mutableListOf<BottomEdgeOverlayView>() // Track bottom-edge corner/mid overlays
+    private val notchViews = mutableListOf<View>() // One overlay per display-cutout rect (notch double-tap, off by default)
+    private var bottomEdgeHidden = false // Suppressed while Circle to Search is in front
     private val executor: Executor = Executors.newSingleThreadExecutor()
     private lateinit var configManager: OverlayConfigurationManager
 
@@ -135,6 +140,9 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
     private val prefsListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         if (key == "bubble_enabled") {
             updateBubbleState()
+        }
+        if (key == "trigger_double_tap_notch" || key == "notch_gesture" || key == "notch_preview") {
+            updateNotchOverlay()
         }
     }
     
@@ -181,13 +189,15 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         updateOverlay()
         updateBottomEdgeOverlays()
         updateStatusBarOverlay()
+        updateNotchOverlay()
     }
-    
+
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
         updateOverlay()
         updateBottomEdgeOverlays()
         updateStatusBarOverlay()
+        updateNotchOverlay()
     }
 
     private fun updateBubbleState() {
@@ -339,6 +349,7 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         updateOverlay()
         updateBottomEdgeOverlays()
         updateStatusBarOverlay()
+        updateNotchOverlay()
     }
 
     private fun statusBarPrimaryColor(): Int =
@@ -439,6 +450,111 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         } else {
             view.background = null
             view.setBackgroundColor(Color.TRANSPARENT)
+        }
+    }
+
+    /**
+     * Double-tap-the-notch trigger (off by default). The OS reports every display
+     * cutout with a screen-space bounding rect (DisplayCutout.getBoundingRects), which
+     * gives the notch's exact position and side — no guessing. One small touchable
+     * overlay per cutout rect reuses the status-strip touch contract: double-tap
+     * launches Circle to Search, while single taps / long-presses / drags on the
+     * strip are forwarded to the system UI beneath. Devices without a cutout simply
+     * have nothing to attach (the system returns no rects).
+     */
+    private fun notchTriggerEnabled(): Boolean =
+        prefs.getBoolean("trigger_double_tap_notch", false)
+
+    /** Display cutout rects + side classification, reported by the OS. */
+    private fun notchCutoutRects(): List<Pair<android.graphics.Rect, String>> {
+        val wm = windowManager ?: return emptyList()
+        val screenBounds = android.graphics.Rect()
+        val cutout: android.view.DisplayCutout?
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val metrics = wm.maximumWindowMetrics
+            screenBounds.set(metrics.bounds)
+            cutout = metrics.windowInsets.displayCutout
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            val display = wm.defaultDisplay ?: return emptyList()
+            val real = android.util.DisplayMetrics()
+            display.getRealMetrics(real)
+            screenBounds.set(0, 0, real.widthPixels, real.heightPixels)
+            cutout = display.cutout
+        } else {
+            return emptyList()
+        }
+        val rects = cutout?.boundingRects ?: return emptyList()
+        val half = screenBounds.width() / 2f
+        return rects.map { rect ->
+            val side = when {
+                rect.top <= 0 && rect.width() >= screenBounds.width() -> "top-wide"
+                rect.top <= 0 && rect.left <= 0 && rect.centerX() < half -> "top-left"
+                rect.top <= 0 && rect.right >= screenBounds.width() && rect.centerX() > half -> "top-right"
+                rect.top <= 0 -> "top-center"
+                rect.left <= 0 -> "left"
+                rect.right >= screenBounds.width() -> "right"
+                rect.bottom >= screenBounds.height() -> "bottom"
+                else -> "floating"
+            }
+            android.graphics.Rect(rect) to side
+        }
+    }
+
+    private fun updateNotchOverlay() {
+        val wm = windowManager ?: return
+        notchViews.forEach { view ->
+            try { wm.removeView(view) } catch (_: Exception) {}
+        }
+        notchViews.clear()
+        val preview = prefs.getBoolean("notch_preview", false)
+        if (!notchTriggerEnabled() && !preview) return
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return
+
+        val expand = (6 * resources.displayMetrics.density).toInt()
+        val cutouts = notchCutoutRects()
+        if (cutouts.isEmpty()) {
+            android.util.Log.d("CTS_Notch", "no display cutouts reported — notch trigger idle")
+            return
+        }
+        // Selected gesture → action mapping (double tap default; long press fires via
+        // onLongPress, triple tap via the tap counter in the strip's touch listener).
+        val gestures = when (prefs.getString("notch_gesture", "double_tap")) {
+            "long_press" -> mutableMapOf(GestureType.LONG_PRESS to ActionType.CTS_AUTO)
+            "triple_tap" -> mutableMapOf(GestureType.TRIPLE_TAP to ActionType.CTS_AUTO)
+            else -> mutableMapOf(GestureType.DOUBLE_TAP to ActionType.CTS_AUTO)
+        }
+        cutouts.forEach { (rect, side) ->
+            android.util.Log.d("CTS_Notch", "notch $side at $rect")
+            val view = View(this)
+            val params = WindowManager.LayoutParams(
+                rect.width() + expand * 2,
+                rect.height() + expand * 2,
+                WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                        WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                        WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                        WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                PixelFormat.TRANSLUCENT,
+            )
+            params.gravity = Gravity.TOP or Gravity.START
+            params.x = rect.left - expand
+            params.y = rect.top - expand
+            val segment = OverlaySegment(
+                width = params.width,
+                height = params.height,
+                xOffset = params.x,
+                yOffset = params.y,
+                gestures = gestures,
+            )
+            try {
+                wm.addView(view, params)
+                notchViews.add(view)
+                attachTouchListener(view, segment, -1)
+                applyStatusBarTint(view, preview)
+            } catch (e: Exception) {
+                e.printStackTrace()
+                notchViews.remove(view)
+            }
         }
     }
 
@@ -575,6 +691,18 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
     }
 
     /**
+     * Suppress or restore the bottom-edge long-press triggers. Circle to Search calls
+     * this from its overlay activity's onStart/onStop: while the overlay is in front
+     * the corner arcs would sit on top of its own bottom-bar buttons and eat their
+     * taps, and the trigger itself is pointless when Circle to Search is already open.
+     */
+    fun setBottomEdgeHidden(hidden: Boolean) {
+        if (bottomEdgeHidden == hidden) return
+        bottomEdgeHidden = hidden
+        updateBottomEdgeOverlays()
+    }
+
+    /**
      * Bottom-edge long-press triggers (two corner arcs + optional bottom-centre semicircle).
      * Deliberately kept in their own list and NOT gated by [OverlayConfig.isEnabled], so
      * toggling the status-bar overlay can never add/remove them (previously they shared the
@@ -589,6 +717,11 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
             try { wm.removeView(view) } catch (_: Exception) {}
         }
         bottomEdgeViews.clear()
+
+        // Hidden while Circle to Search is in front (its bottom bar sits where the
+        // corner arcs are, and the arcs' synthetic tap forwarding is unreliable
+        // against the overlay's own windows — taps must go through natively).
+        if (bottomEdgeHidden) return
 
         val dm = resources.displayMetrics
         val density = dm.density
@@ -656,6 +789,7 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         // (notification shade / quick settings on the status bar, the app under a strip).
         var lastScrollForwardAt = 0L
         var scrollForwardedThisGesture = false
+        var shadeOpenedThisGesture = false
         val gestureDetector = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
             override fun onDoubleTap(e: MotionEvent): Boolean {
                 val action = segment.gestures[GestureType.DOUBLE_TAP] ?: ActionType.NONE
@@ -665,7 +799,22 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
             
             override fun onLongPress(e: MotionEvent) {
                 val action = segment.gestures[GestureType.LONG_PRESS] ?: ActionType.NONE
-                if (action != ActionType.NONE) performAction(action, segment)
+                if (action != ActionType.NONE) {
+                    performAction(action, segment)
+                } else {
+                    // No long-press action configured on this strip: forward the hold to the
+                    // system below so native status-bar long-presses still work (recorder
+                    // controls, media chip options, etc.). A held synthetic stroke at the
+                    // point reads as a long-press to the element underneath.
+                    forwardPassthroughGesture(
+                        view,
+                        android.graphics.Path().apply {
+                            moveTo(e.rawX, e.rawY)
+                            lineTo(e.rawX + 1f, e.rawY)
+                        },
+                        550,
+                    )
+                }
             }
 
             override fun onScroll(e1: MotionEvent?, e2: MotionEvent, distanceX: Float, distanceY: Float): Boolean {
@@ -687,6 +836,23 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
                 // A configured custom action wins: don't forward, let the fling handler trigger it.
                 val custom = segment.gestures[direction]
                 if (custom != null && custom != ActionType.NONE) return false
+                // Status-bar strip: a drag here IS the shade pull. Forwarding only replays a
+                // short synthetic stroke — the flag flip cancels the real touch stream, so slow
+                // pulls died mid-way and the shade felt blocked. Open the shade directly
+                // instead (same split as the Smart Swipe fling), once per gesture.
+                val screenWidth = resources.displayMetrics.widthPixels
+                if (direction == GestureType.SWIPE_DOWN && segmentIndex == 0 && segment.width >= screenWidth) {
+                    if (!shadeOpenedThisGesture) {
+                        shadeOpenedThisGesture = true
+                        scrollForwardedThisGesture = true
+                        if (e1.rawX < screenWidth / 2) {
+                            performGlobalAction(GLOBAL_ACTION_NOTIFICATIONS)
+                        } else {
+                            performGlobalAction(GLOBAL_ACTION_QUICK_SETTINGS)
+                        }
+                    }
+                    return true
+                }
                 // Otherwise forward the drag so the system below still tracks it
                 // (e.g. pulling down the notification shade / quick settings on the status bar).
                 val now = android.os.SystemClock.uptimeMillis()
@@ -796,6 +962,7 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         view.setOnTouchListener { _, event ->
              if (event.action == MotionEvent.ACTION_DOWN) {
                 scrollForwardedThisGesture = false
+                shadeOpenedThisGesture = false
                 val currentTime = System.currentTimeMillis()
                 if (currentTime - lastTapTime < 400) {
                     tapCount++
@@ -1031,7 +1198,20 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
                             
                             // Store in Repository (In-Memory)
                             BitmapRepository.setScreenshot(copy)
-                            
+
+                            // Pre-scan: start the instant OCR NOW, in parallel
+                            // with the overlay launch — the overlay adopts it
+                            // through InstantOcrStore when it composes.
+                            val ocrScanState = InstantOcrStore.beginScan(copy)
+                            instantScanJob?.cancel()
+                            instantScanJob = instantOcrScope.launch {
+                                val output = InstantOcrScanner.scan(
+                                    applicationContext,
+                                    copy,
+                                ) { ocrScanState.regions = it }
+                                ocrScanState.words = output?.words
+                                ocrScanState.done = true
+                            }
                             // Launch Overlay Immediately
                             launchOverlay(searchModeOverride)
                             
@@ -1050,6 +1230,9 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
 
     fun launchOverlay(searchModeOverride: Boolean? = null) {
         android.util.Log.d("CircleToSearchAccess", "AccessibilityService launching OverlayActivity")
+        // The active window right now is the app the overlay will cover —
+        // snapshot it so close can bring that exact app back.
+        seedForegroundPackageFromActiveWindow()
         val intent = Intent(this, OverlayActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION) // Disable animation for faster feel
@@ -1123,6 +1306,12 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
 
     private val stickerAnimScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
+    // Capture-time instant-OCR scan: started the moment the screenshot lands so
+    // it overlaps the overlay's launch animation instead of starting from zero
+    // after the overlay composes. Results flow through InstantOcrStore into the
+    // screen; cancelled on the next capture and at overlay close.
+    private val instantOcrScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var instantScanJob: Job? = null
     private val stickerFrameClock = object : MonotonicFrameClock {
         override suspend fun <R> withFrameNanos(onFrame: (Long) -> R): R =
             suspendCoroutine { cont ->
@@ -1760,11 +1949,124 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         }
     }
 
+    /**
+     * Last app (other than our own package or SystemUI) whose window came to the
+     * foreground, tracked from window-state events. The assist pipeline parks the
+     * launcher task directly beneath the overlay's own task, so "back the task out"
+     * alone always lands on the home screen — close instead reorders this app's
+     * existing task back to the front (see [closeOverlay]).
+     */
+    var lastForegroundPackage: String? = null
+        private set
+
+    /**
+     * Last foreground activity of OUR OWN package (e.g. the translator module
+     * screens, which ship inside this APK), tracked from activity lifecycle
+     * callbacks. Window events can't be used here: both the tracking and the
+     * seeding skip our own package so the overlay itself never pollutes them —
+     * but that also meant triggering CTS from the module left a stale cross-app
+     * value, and close then reordered that other app over the module, "closing"
+     * it. The overlay activity itself is excluded so this always names the
+     * screen the user was actually on.
+     */
+    var lastForegroundComponent: android.content.ComponentName? = null
+        private set
+
+    /**
+     * Sees ONLY this package's activities (the process-local lifecycle): records
+     * the exact screen to return to on close. The overlay activity itself is
+     * excluded so this always names the screen the user was actually on.
+     */
+    private val ownActivityTracker = object : android.app.Application.ActivityLifecycleCallbacks {
+        override fun onActivityResumed(activity: android.app.Activity) {
+            if (activity is OverlayActivity) return
+            // Mid-session own-activity launches (the camera deep link into the
+            // translator module) must not repoint the close target: the seed
+            // captured at trigger is the source of truth for the whole session
+            // — the same reason window events are gated on sessionActive below.
+            // Recording the module screen here made close reorder the module's
+            // (already finished) task back over the overlay after a camera
+            // detour — relaunching the module or its download screen instead of
+            // the app the user started from.
+            if (!sessionActive) {
+                lastForegroundComponent = android.content.ComponentName(activity as android.content.Context, activity::class.java)
+            }
+        }
+        override fun onActivityCreated(activity: android.app.Activity, savedInstanceState: android.os.Bundle?) {}
+        override fun onActivityStarted(activity: android.app.Activity) {}
+        override fun onActivityPaused(activity: android.app.Activity) {}
+        override fun onActivityStopped(activity: android.app.Activity) {}
+        override fun onActivitySaveInstanceState(activity: android.app.Activity, outState: android.os.Bundle) {}
+        override fun onActivityDestroyed(activity: android.app.Activity) {}
+    }
+
+    /**
+     * True while an overlay session is open (set at trigger, cleared at close).
+     * Window events are ignored for the duration: launcher/task-transition
+     * flashes fired WHILE THE OVERLAY IS OPEN were overwriting the
+     * trigger-time seed mid-session, so close refused the correct reorder and
+     * fell back to landing on the home screen. The seed captured at trigger is
+     * the source of truth for that whole session.
+     */
+    private var sessionActive = false
+
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         translatorBridge?.onHostAccessibilityEvent(event)
+        if (event != null &&
+            event.eventType == android.view.accessibility.AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
+        ) {
+            val pkg = event.packageName?.toString()
+            if (pkg != null && pkg != packageName && pkg != "com.android.systemui" && !sessionActive) {
+                lastForegroundPackage = pkg
+            }
+        }
+    }
+
+    /**
+     * Snapshots the app the user is currently using into the close-return
+     * tracking, called right before the overlay is launched. Event tracking
+     * alone is racy: a freshly (re)started service has no event history, and
+     * launcher flashes during task transitions can overwrite a real app — both
+     * made close fall back to moveTaskToBack and land on the home screen. At
+     * trigger time the active window IS the app being used, so seed from it;
+     * the event-tracked value only remains as fallback when there is no active
+     * window. Our own overlay window is ignored (pkg == packageName) so a
+     * re-trigger over the open overlay keeps the previous seed.
+     */
+    fun seedForegroundPackageFromActiveWindow() {
+        sessionActive = true
+        val pkg = rootInActiveWindow?.packageName?.toString() ?: return
+        if (pkg == packageName) {
+            // Own package (e.g. the translator module screens which ship inside
+            // this APK): a package-level value can't name which of our activities
+            // the user is on, so rely on the lifecycle-tracked component (never
+            // the overlay itself) and clear the stale cross-app value — keeping
+            // it made close reorder that other app over the module, "closing" it.
+            android.util.Log.d("CircleToSearch", "seedForeground: own $lastForegroundComponent (was pkg=$lastForegroundPackage)")
+            lastForegroundPackage = null
+            return
+        }
+        if (pkg != "com.android.systemui") {
+            android.util.Log.d("CircleToSearch", "seedForeground: $pkg (was $lastForegroundPackage)")
+            lastForegroundPackage = pkg
+            lastForegroundComponent = null
+        }
     }
 
     override fun onInterrupt() {}
+
+    /**
+     * The a11y service keeps this process alive in the background, so anything the
+     * overlay used stays resident unless we release it. React to system pressure:
+     * drop the retained capture and the instant-OCR state.
+     */
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        if (level >= TRIM_MEMORY_BACKGROUND) {
+            BitmapRepository.clear()
+            InstantOcrStore.clear()
+        }
+    }
 
     // --- Hardware button triggers ---
     // Volume-key triggers consume ONLY the events that belong to a trigger
@@ -1814,6 +2116,19 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
 
     override fun onKeyEvent(event: android.view.KeyEvent): Boolean {
         val code = event.keyCode
+        // Diagnostic: proves whether key events reach the service at all. Only the
+        // trigger-relevant keys are logged to keep logcat readable (tag: CTS-HW).
+        if (code == android.view.KeyEvent.KEYCODE_VOLUME_UP ||
+            code == android.view.KeyEvent.KEYCODE_VOLUME_DOWN ||
+            code == android.view.KeyEvent.KEYCODE_HOME
+        ) {
+            android.util.Log.d(
+                "CTS-HW",
+                "onKeyEvent code=$code action=${event.action} repeat=${event.repeatCount} " +
+                    "hasTriggers=${keyHasTriggers(code)} long=${longTriggerFor(code)} " +
+                    "double=${doubleTapTriggerFor(code)} combo=${prefs.getBoolean(KEY_TRIGGER_VOL_UP_DOWN, false)}",
+            )
+        }
         when (event.action) {
             android.view.KeyEvent.ACTION_DOWN -> {
                 val now = android.os.SystemClock.uptimeMillis()
@@ -2064,6 +2379,104 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         translatorBridge?.deactivate()
     }
 
+    private var returnToAppSuppressed = false
+
+    /**
+     * Set by flows that deliberately launch another app right before closing the
+     * overlay (the Lens buttons): the close must not reorder the previous app
+     * back over the app that was just launched. Consumed by the next close.
+     */
+    fun suppressNextReturnToApp() {
+        returnToAppSuppressed = true
+    }
+
+    /**
+     * Closes the overlay by bringing the app in use to the front — never by
+     * parking first: on this device moveTaskToBack revealed the LAUNCHER in
+     * 5/5 observed closes (whatever the stack, home ends up directly beneath
+     * the parked overlay), forcing a home flash plus a repair slide that felt
+     * like an app relaunch. Reordering the app's existing task (state intact)
+     * with the open animation suppressed makes the app's last frame replace
+     * the overlay instantly — "kill the overlay only". The overlay task simply
+     * ends up beneath the app, reused via onNewIntent on the next trigger.
+     */
+    fun closeOverlay(overlay: android.app.Activity) {
+        sessionActive = false
+        // The overlay is going away: stop an in-flight capture-time OCR scan.
+        instantScanJob?.cancel()
+        val own = lastForegroundComponent
+        val pkg = own?.packageName ?: lastForegroundPackage
+        if (returnToAppSuppressed) {
+            // A deliberate external launch (Lens) is coming up: never pull the
+            // previous app back over it.
+            returnToAppSuppressed = false
+            overlay.moveTaskToBack(true)
+            android.util.Log.d("CircleToSearch", "close: parked (external launch takes precedence)")
+            return
+        }
+        android.util.Log.d("CircleToSearch", "close: target=$pkg own=$own")
+        val homePkg = overlay.packageManager
+            .resolveActivity(
+                android.content.Intent(android.content.Intent.ACTION_MAIN)
+                    .addCategory(android.content.Intent.CATEGORY_HOME),
+                android.content.pm.PackageManager.MATCH_DEFAULT_ONLY,
+            )?.activityInfo?.packageName
+        if (pkg == null || pkg == homePkg) {
+            // Opened from the home screen (or nothing tracked): home is the
+            // correct destination — just get out of the way.
+            overlay.moveTaskToBack(true)
+            android.util.Log.d("CircleToSearch", "close: no target, parked")
+            return
+        }
+        // From the overlay's own activity context (proven working for both our
+        // own screens and other apps); reorder alone finds the EXISTING task.
+        val launch = if (own != null) {
+            android.content.Intent().setComponent(own)
+        } else {
+            overlay.packageManager.getLaunchIntentForPackage(pkg)
+        }
+        if (launch == null) {
+            android.util.Log.w("CircleToSearch", "close: no launch intent for $pkg, parked")
+            overlay.moveTaskToBack(true)
+            return
+        }
+        launch.addFlags(
+            android.content.Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or
+                android.content.Intent.FLAG_ACTIVITY_NO_ANIMATION,
+        )
+        try {
+            // Three layers to kill the task-swap transition (the system plays an
+            // app-opening animation on reorder by default, which reads as the
+            // app "relaunching" even though the very same instance resumes):
+            //  1. FLAG_ACTIVITY_NO_ANIMATION on the intent,
+            //  2. ActivityOptions (handled above),
+            //  3. transition overrides (API 34+ replacement + classic fallback),
+            //     set both before and after the start since OEMs differ on the
+            //     honoured call timing.
+            if (android.os.Build.VERSION.SDK_INT >= 34) {
+                overlay.overrideActivityTransition(
+                    android.app.Activity.OVERRIDE_TRANSITION_OPEN, 0, 0,
+                )
+            }
+            overlay.startActivity(
+                launch,
+                android.app.ActivityOptions.makeCustomAnimation(overlay, 0, 0).toBundle(),
+            )
+            if (android.os.Build.VERSION.SDK_INT >= 34) {
+                overlay.overrideActivityTransition(
+                    android.app.Activity.OVERRIDE_TRANSITION_OPEN, 0, 0,
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                overlay.overridePendingTransition(0, 0)
+            }
+            android.util.Log.d("CircleToSearch", "close: brought $pkg to front (no-anim)")
+        } catch (e: Exception) {
+            android.util.Log.e("CircleToSearch", "close: failed to return to $pkg", e)
+            overlay.moveTaskToBack(true)
+        }
+    }
+
     /** Fades translator overlay windows during the system back gesture so the
      *  predictive back arrow (drawn below accessibility overlays) stays visible. */
     fun setTranslatorGestureAlpha(alpha: Float) {
@@ -2096,6 +2509,7 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
     override fun onCreate() {
         super.onCreate()
         instance = this
+        application.registerActivityLifecycleCallbacks(ownActivityTracker)
         // configManager init moved to onServiceConnected or safe lazy? 
         // WindowManager is needed for views which happens in onServiceConnected mostly.
     }
@@ -2103,6 +2517,7 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
     override fun onDestroy() {
         super.onDestroy()
         instance = null
+        runCatching { application.unregisterActivityLifecycleCallbacks(ownActivityTracker) }
         triggerHandler.removeCallbacksAndMessages(null)
         runCatching { translatorBridge?.destroy() }
         translatorBridge = null
@@ -2176,15 +2591,17 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
             // service can't dispatch): restore immediately instead of waiting forever.
             if (!dispatched) restore()
             // Safety net: never leave the window untouchable for more than a moment.
-            handler.postDelayed({ restore() }, durationMs + 1000L)
-        }, 100)
+            handler.postDelayed({ restore() }, durationMs + 600L)
+        }, 40)
     }
 
     /**
-     * A transparent, click-through overlay that sits at a bottom corner (arc) or bottom-centre
-     * (semicircle). It only reacts to a LONG-PRESS (which triggers Circle to Search); taps and
-     * swipes are forwarded to the app underneath so it never blocks normal interaction.
-     * When [isPreview] is true it draws a translucent filled shape so the user can see/size it.
+     * A transparent trigger zone that sits at a bottom corner (arc) or bottom-centre
+     * (semicircle). It is a PURE long-press trigger: every touch inside its box is
+     * consumed and nothing is forwarded to the app underneath — forwarding made the
+     * window briefly untouchable, which transferred long-presses to whatever was
+     * beneath and made the trigger unreliable. When [isPreview] is true it draws a
+     * translucent filled shape so the user can see/size it.
      */
     private inner class BottomEdgeOverlayView(
         context: android.content.Context,
@@ -2199,10 +2616,13 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
 
         private val handler = android.os.Handler(android.os.Looper.getMainLooper())
         private val touchSlop = android.view.ViewConfiguration.get(context).scaledTouchSlop
-        // Long-press stays alive while the finger drifts a little (more tolerant than
-        // the system tap slop) so slight jitter doesn't kill the gesture.
-        private val longPressSlop = touchSlop * 1.5f
-        private val longPressTimeoutMs = 400L
+        // Long-press is the FIRST priority of the arcs: a stationary 500ms hold always
+        // triggers, and drift within tolerance keeps it alive. Only a decisive drag
+        // (beyond swipeHandoffThreshold) hands the gesture to the app beneath — swipes
+        // deliberately lose to the long-press.
+        private val longPressSlop = touchSlop * 2.5f
+        private val swipeHandoffThreshold = touchSlop * 7f
+        private val longPressTimeoutMs = 500L
         // Minimum gap between forwarded scroll segments (each one briefly makes the
         // window untouchable and dispatches a synthetic gesture).
         private val scrollForwardIntervalMs = 180L
@@ -2238,28 +2658,6 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         override fun onDetachedFromWindow() {
             handler.removeCallbacksAndMessages(null)
             super.onDetachedFromWindow()
-        }
-
-        /** Hit test: only the shaped region consumes touches; the bounding-box corners pass through. */
-        private fun hitTest(x: Float, y: Float): Boolean {
-            val w = width.toFloat()
-            val h = height.toFloat()
-            return when (shape) {
-                BottomEdgeShape.ARC_LEFT -> {
-                    // Quarter disc centred at bottom-left corner (0, h), radius = w.
-                    val dx = x; val dy = h - y
-                    dx * dx + dy * dy <= w * w
-                }
-                BottomEdgeShape.ARC_RIGHT -> {
-                    val dx = w - x; val dy = h - y
-                    dx * dx + dy * dy <= w * w
-                }
-                BottomEdgeShape.SEMICIRCLE -> {
-                    // Half disc centred at (w/2, h), radius = h, upper half only.
-                    val dx = x - w / 2f; val dy = h - y
-                    dy >= 0f && dx * dx + dy * dy <= h * h
-                }
-            }
         }
 
         override fun onDraw(canvas: android.graphics.Canvas) {
@@ -2317,9 +2715,8 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
         override fun onTouchEvent(event: MotionEvent): Boolean {
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
-                    // Only the shaped region consumes touches; the bounding-box
-                    // corners pass straight through to the app underneath.
-                    if (!hitTest(event.x, event.y)) return false
+                    // Consume the WHOLE bounding box and arm the long-press — it has
+                    // first priority: a stationary 500ms hold always triggers.
                     downX = event.x
                     downY = event.y
                     lastScrollRawX = event.rawX
@@ -2336,13 +2733,13 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
                     val dx = event.x - downX
                     val dy = event.y - downY
                     val dist = Math.sqrt((dx * dx + dy * dy).toDouble()).toFloat()
-                    if (dist > longPressSlop) {
-                        // Moved like a swipe: cancel the pending long-press and keep
-                        // forwarding the drag so the app underneath still scrolls.
-                        if (!scrollForwarded) {
-                            scrollForwarded = true
-                            handler.removeCallbacks(longPressRunnable)
-                        }
+                    if (dist > swipeHandoffThreshold && !scrollForwarded) {
+                        // Decisive drag (faster/wider than any long-press wobble): cancel
+                        // the trigger and hand the gesture to the app beneath so it scrolls.
+                        scrollForwarded = true
+                        handler.removeCallbacks(longPressRunnable)
+                    }
+                    if (scrollForwarded) {
                         val now = android.os.SystemClock.uptimeMillis()
                         if (now - lastScrollForwardAt >= scrollForwardIntervalMs) {
                             lastScrollForwardAt = now
@@ -2354,15 +2751,21 @@ class CircleToSearchAccessibilityService : AccessibilityService() {
                             lastScrollRawY = event.rawY
                             forwardPath(path, 120)
                         }
+                        return true
                     }
-                    // Small drift keeps the long-press timer running (jitter tolerant).
+                    if (dist > longPressSlop) {
+                        // Drift while holding: re-anchor and keep waiting — long-press wins.
+                        downX = event.x
+                        downY = event.y
+                        lastScrollRawX = event.rawX
+                        lastScrollRawY = event.rawY
+                    }
                     return true
                 }
                 MotionEvent.ACTION_UP -> {
                     handler.removeCallbacks(longPressRunnable)
                     if (!longPressConsumed && !scrollForwarded) {
-                        // Stationary release = tap: forward immediately so taps behave
-                        // exactly like they do without the overlay.
+                        // Tap: forward so buttons beneath stay clickable.
                         forwardPath(android.graphics.Path().apply { moveTo(event.rawX, event.rawY) }, 50)
                     }
                     return true

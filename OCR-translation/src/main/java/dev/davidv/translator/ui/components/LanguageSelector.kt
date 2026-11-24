@@ -73,6 +73,9 @@ fun LanguageSelector(
   marquee: Boolean = true,
   centered: Boolean = true,
   textStyle: TextStyle = MaterialTheme.typography.bodyMedium,
+  // When set, a tap calls this instead of opening the inline dropdown — used
+  // to route the chip to the full-screen language picker dialog.
+  onOverrideClick: (() -> Unit)? = null,
 ) {
   var expanded by remember { mutableStateOf(false) }
   val interactionSource = remember { MutableInteractionSource() }
@@ -97,7 +100,11 @@ fun LanguageSelector(
             interactionSource = interactionSource,
             indication = null,
           ) {
-            expanded = true
+            if (onOverrideClick != null) {
+              onOverrideClick()
+            } else {
+              expanded = true
+            }
           }
           .then(if (centered) Modifier.fillMaxWidth() else Modifier)
           .padding(vertical = 8.dp, horizontal = 4.dp),

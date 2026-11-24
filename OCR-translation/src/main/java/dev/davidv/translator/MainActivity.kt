@@ -44,6 +44,11 @@ class MainActivity : ComponentActivity() {
   companion object {
     const val EXTRA_OPEN_LANGUAGE_MANAGER = "dev.davidv.translator.OPEN_LANGUAGE_MANAGER"
     const val EXTRA_OPEN_LIVE_CAMERA = "dev.davidv.translator.OPEN_LIVE_CAMERA"
+
+    // Optional ComponentName of the screen that deep-linked into this activity
+    // (e.g. Circle to Search's overlay). When present, the image screen's close
+    // action returns there instead of dropping the user on the module home.
+    const val EXTRA_CALLER_COMPONENT = "dev.davidv.translator.CALLER_COMPONENT"
   }
 
   // Identity in production; only the UI-export test flips UiExportRecorder.active to record which
@@ -58,6 +63,7 @@ class MainActivity : ComponentActivity() {
   private var sharedDocumentUri: Uri? = null
   private var openLanguageManager: Boolean = false
   private var openLiveCamera: Boolean = false
+  private var callerComponent: ComponentName? = null
   private lateinit var viewModel: TranslatorViewModel
   private var downloadService: DownloadService? = null
   private lateinit var serviceConnection: ServiceConnection
@@ -93,10 +99,21 @@ class MainActivity : ComponentActivity() {
       viewModel.requestLanguageManager()
       openLanguageManager = false
     }
-    // Captured before it is consumed so MigrationGate can skip its blocking
-    // screen: the camera deep link must show the camera on the first frame.
-    val openedForLiveCamera = openLiveCamera
-    if (openLiveCamera) {
+    // The camera deep link only sets the request; it rides the SAME initialization
+    // as a normal launch (MigrationGate blocking screen and all). Skipping the gate
+    // to show the camera on the first frame composed the app while migration was
+    // still converting models. TranslatorApp starts directly on live_camera for a
+    // pending request — from/to resolve from the bundled catalog even with no
+    // packs downloaded, and the camera's own language picker handles downloads.
+    // Deep-linked camera launch: keep the window background dark (the camera
+    // screen is black — a white first frame flashes otherwise) and let the
+    // migration gate compose the app right away instead of flashing its
+    // blocking screen for the plan check's IO roundtrip.
+    val deepLinkCamera = openLiveCamera
+    if (deepLinkCamera) {
+      window.setBackgroundDrawable(
+        android.graphics.drawable.ColorDrawable(android.graphics.Color.BLACK),
+      )
       viewModel.requestLiveCamera()
       openLiveCamera = false
     }
@@ -105,7 +122,7 @@ class MainActivity : ComponentActivity() {
       TranslatorTheme {
         MigrationGate(
           filePathManager = app.filePathManager,
-          showContentImmediately = openedForLiveCamera,
+          showContentImmediately = deepLinkCamera,
           onMigrated = {
             TranslatorTtsEngine.notifyVoiceDataChanged(applicationContext)
             // The Application holds its own catalog instance (used by e.g. the
@@ -184,6 +201,17 @@ class MainActivity : ComponentActivity() {
     // recreation doesn't yank the user back into the camera screen.
     openLiveCamera = intent?.getBooleanExtra(EXTRA_OPEN_LIVE_CAMERA, false) == true
     intent?.removeExtra(EXTRA_OPEN_LIVE_CAMERA)
+    // The caller component survives recreation (it is who we return to), so it
+    // is only refreshed when the launching intent actually carries it.
+    if (intent?.hasExtra(EXTRA_CALLER_COMPONENT) == true) {
+      callerComponent =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+          intent.getParcelableExtra(EXTRA_CALLER_COMPONENT, ComponentName::class.java)
+        } else {
+          @Suppress("DEPRECATION")
+          intent.getParcelableExtra(EXTRA_CALLER_COMPONENT)
+        }
+    }
     when (intent?.action) {
       Intent.ACTION_SEND -> {
         val text = intent.getStringExtra(Intent.EXTRA_TEXT)
@@ -239,6 +267,26 @@ class MainActivity : ComponentActivity() {
         putExtra(BrowserActivity.EXTRA_URL, url)
       }
     startActivity(browserIntent)
+    finish()
+  }
+
+  // Whether the image screen's close should exit back to the caller (true when
+  // we were deep-linked from e.g. Circle to Search) instead of clearing to the
+  // module's own home screen.
+  val hasReturnTarget: Boolean
+    get() = callerComponent != null
+
+  fun exitToCaller() {
+    callerComponent?.let { target ->
+      runCatching {
+        startActivity(
+          Intent().apply {
+            setComponent(target)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION)
+          },
+        )
+      }
+    }
     finish()
   }
 }

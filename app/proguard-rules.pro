@@ -44,3 +44,22 @@
 # Ignore missing okhttp3 classes since OkHttp is not included as a dependency.
 -dontwarn okhttp3.**
 
+# --- JNA + UniFFI (translator module) --------------------------------------
+# JNA's native initIDs() looks up fields such as Pointer.peer BY NAME via
+# JNI. If R8 renames or strips them, release builds crash at startup with
+# "UnsatisfiedLinkError: Can't obtain peer field ID for class
+# com.sun.jna.Pointer" inside TranslatorApplication.onCreate.
+-keep class com.sun.jna.** { *; }
+-keep interface com.sun.jna.** { *; }
+-keepclassmembers class com.sun.jna.** { *; }
+-keepclasseswithmembernames,includedescriptorclasses class * {
+    native <methods>;
+}
+
+# UniFFI-generated bindings and the translator module's JNI entry points are
+# invoked from native code and must keep their names.
+-keep class uniffi.** { *; }
+-keep class dev.davidv.translator.** { *; }
+-dontwarn java.awt.**
+-dontwarn com.sun.jna.**
+

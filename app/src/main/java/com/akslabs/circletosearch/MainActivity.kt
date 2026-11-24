@@ -77,7 +77,6 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         pendingSettingsPage = intent.getStringExtra(EXTRA_SETTINGS_PAGE)
         forceOnboarding = intent.getBooleanExtra(EXTRA_SHOW_ONBOARDING, false)
-        Toast.makeText(this, getString(R.string.toast_getting_started), Toast.LENGTH_LONG).show()
         setContent {
             CircleToSearchTheme {
                 Surface(

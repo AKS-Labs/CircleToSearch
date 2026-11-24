@@ -67,6 +67,19 @@ class TranslatorApplication : Application() {
 
   private fun isUserUnlocked(): Boolean = getSystemService(UserManager::class.java).isUserUnlocked
 
+  /**
+   * The process hosting the accessibility service never exits, so respond to system
+   * memory pressure: drop the cached catalog handle, which releases the warm OCR
+   * engine (MNN detector + recognizer) if nothing else references it. Models reload
+   * on the next use (~1-2s), trading a slower first search for background RAM.
+   */
+  override fun onTrimMemory(level: Int) {
+    super.onTrimMemory(level)
+    if (this::filePathManager.isInitialized && level >= TRIM_MEMORY_BACKGROUND) {
+      filePathManager.invalidateCatalog()
+    }
+  }
+
   private fun registerUnlockReceiver() {
     val receiver =
       object : BroadcastReceiver() {

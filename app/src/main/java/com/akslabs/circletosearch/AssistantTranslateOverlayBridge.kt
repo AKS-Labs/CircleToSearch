@@ -1,6 +1,7 @@
 package com.akslabs.circletosearch
 
 import android.content.Context
+import com.akslabs.circletosearch.utils.InstantOcrStore
 import android.graphics.Bitmap
 import android.graphics.Rect
 import android.os.Handler
@@ -445,7 +446,21 @@ class AssistantTranslateOverlayBridge(
     capturedScanning = true
     serviceScope.launch {
       try {
-        translateRegionBitmap(cropped, region)
+        // Reuse detection from the capture-time instant scan when [screenshot]
+        // is that scan's bitmap: the store shifts the boxes into this region's
+        // crop coordinates. A different bitmap (select-mode sub-crop, a fresh
+        // re-capture) has no matching scan and detects fresh, as before.
+        translateRegionBitmap(
+          cropped,
+          region,
+          precomputedDetection = InstantOcrStore.detectionForCrop(
+            screenshot,
+            region.left,
+            region.top,
+            region.width(),
+            region.height(),
+          ),
+        )
       } finally {
         capturedScanning = false
       }
@@ -461,7 +476,11 @@ class AssistantTranslateOverlayBridge(
     return Bitmap.createBitmap(full, cropLeft, cropTop, cropWidth, cropHeight)
   }
 
-  private suspend fun translateRegionBitmap(bitmap: Bitmap, region: Rect) {
+  private suspend fun translateRegionBitmap(
+    bitmap: Bitmap,
+    region: Rect,
+    precomputedDetection: List<uniffi.translator_core.DetectedTextBox>? = null,
+  ) {
     val session = overlaySession
     val coordinator = translationCoordinator ?: return
     val sourceLang = ocrSourceLanguage()
@@ -482,6 +501,7 @@ class AssistantTranslateOverlayBridge(
           onDetectedRegions = { boxes, w, h ->
             surfaceState.regions.value = DetectedRegions(w, h, boxes)
           },
+          precomputedDetection = precomputedDetection,
         )
       }
 

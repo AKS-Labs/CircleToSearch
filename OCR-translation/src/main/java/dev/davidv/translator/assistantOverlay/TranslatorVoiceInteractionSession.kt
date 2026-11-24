@@ -692,21 +692,22 @@ class TranslatorVoiceInteractionSession(
         onDelete = { language ->
           langStateManager.deleteLanguage(language)
         },
-      ) { language ->
-        if (isSource) {
-          if (language == null) {
-            isAutoSource = true
+        onPick = { language ->
+          if (isSource) {
+            if (language == null) {
+              isAutoSource = true
+            } else {
+              isAutoSource = false
+              forcedSourceLanguage = language
+            }
+            syncReadingOrderForSource()
           } else {
-            isAutoSource = false
-            forcedSourceLanguage = language
+            forcedTargetLanguage = language
           }
-          syncReadingOrderForSource()
-        } else {
-          forcedTargetLanguage = language
-        }
-        updateToolbarLabels()
-        retranslate()
-      }
+          updateToolbarLabels()
+          retranslate()
+        },
+      )
     }
   }
 

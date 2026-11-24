@@ -4,6 +4,7 @@
 
 package com.akslabs.circletosearch.ui.components
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoFixHigh
@@ -22,14 +23,20 @@ import com.akslabs.circletosearch.R
 import com.akslabs.circletosearch.utils.UIPreferences
 
 /**
- * A unified search method selector component that allows users to switch
- * between Multi-Search and Google Lens modes.
+ * A unified search method selector: the segmented Multi-Search / Google Lens
+ * chooser, plus two separate modes below it — "Ask every time" (a confirm dock
+ * appears before anything is uploaded) and "Off" (visual search disabled; the
+ * crop stays on-device and nothing leaves the phone). The two modes are
+ * mutually exclusive.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchMethodSelector(
-    isLensOnly: Boolean,
-    onMethodChange: (Boolean) -> Unit,
+    method: String,
+    askEveryTime: Boolean,
+    visualSearchOff: Boolean,
+    onMethodChange: (String) -> Unit,
+    onAskEveryTimeChange: (Boolean) -> Unit,
+    onVisualSearchOffChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier) {
@@ -48,9 +55,9 @@ fun SearchMethodSelector(
         ) {
             SegmentedButton(
                 shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
-                onClick = { onMethodChange(false) },
-                selected = !isLensOnly,
-                icon = { SegmentedButtonDefaults.Icon(!isLensOnly) },
+                onClick = { onMethodChange("multi") },
+                selected = method == "multi",
+                icon = { SegmentedButtonDefaults.Icon(method == "multi") },
                 colors = SegmentedButtonDefaults.colors(
                     activeContainerColor = MaterialTheme.colorScheme.primaryContainer,
                     activeContentColor = MaterialTheme.colorScheme.onPrimaryContainer
@@ -68,9 +75,9 @@ fun SearchMethodSelector(
             }
             SegmentedButton(
                 shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
-                onClick = { onMethodChange(true) },
-                selected = isLensOnly,
-                icon = { SegmentedButtonDefaults.Icon(isLensOnly) },
+                onClick = { onMethodChange("lens") },
+                selected = method == "lens",
+                icon = { SegmentedButtonDefaults.Icon(method == "lens") },
                 colors = SegmentedButtonDefaults.colors(
                     activeContainerColor = MaterialTheme.colorScheme.primaryContainer,
                     activeContentColor = MaterialTheme.colorScheme.onPrimaryContainer
@@ -87,12 +94,70 @@ fun SearchMethodSelector(
                 }
             }
         }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Ask every time: confirm before uploading. Turning it on clears Off.
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onAskEveryTimeChange(true) }
+                .padding(horizontal = 4.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.search_method_ask),
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        fontWeight = if (askEveryTime) FontWeight.Bold else FontWeight.Normal
+                    ),
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = stringResource(R.string.search_method_ask_desc),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Switch(
+                checked = askEveryTime,
+                onCheckedChange = { onAskEveryTimeChange(it) }
+            )
+        }
+
+        // Off: visual search disabled. Turning it on clears Ask every time.
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onVisualSearchOffChange(true) }
+                .padding(horizontal = 4.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.search_method_off),
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        fontWeight = if (visualSearchOff) FontWeight.Bold else FontWeight.Normal
+                    ),
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = stringResource(R.string.search_method_off_desc),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Switch(
+                checked = visualSearchOff,
+                onCheckedChange = { onVisualSearchOffChange(it) }
+            )
+        }
     }
 }
 
 /**
  * A reactive wrapper for SearchMethodSelector that observes UIPreferences.
- * Uses the flow as the single source of truth so that all instances
+ * Uses the flows as the single source of truth so that all instances
  * (Home screen and Settings sheet) are always synchronized.
  */
 @Composable
@@ -100,21 +165,26 @@ fun UnifiedSearchMethodSelector(
     uiPreferences: UIPreferences,
     modifier: Modifier = Modifier
 ) {
-    // The flow IS the state — one reactive source drives both Home and Settings.
-    // Writing via setUseGoogleLensOnly() triggers the SharedPreferences listener,
-    // which emits into this flow, which recomposes this composable instantly.
-    val isLensOnly by uiPreferences.observeUseGoogleLensOnly().collectAsState(
-        initial = uiPreferences.isUseGoogleLensOnly()
+    // The flows ARE the state — one reactive source drives both Home and Settings.
+    // Writing via the setters triggers the SharedPreferences listeners, which emit
+    // into these flows, which recompose this composable instantly.
+    val method by uiPreferences.observeSearchMethod().collectAsState(
+        initial = uiPreferences.getSearchMethod()
+    )
+    val askEveryTime by uiPreferences.observeAskEveryTime().collectAsState(
+        initial = uiPreferences.isAskEveryTime()
+    )
+    val visualSearchOff by uiPreferences.observeVisualSearchOff().collectAsState(
+        initial = uiPreferences.isVisualSearchOff()
     )
 
     SearchMethodSelector(
-        isLensOnly = isLensOnly,
-        onMethodChange = { newValue ->
-            // commit() ensures the write is synchronous so the accessibility
-            // service and CircleToSearchScreen both read the updated value
-            // before the search is triggered.
-            uiPreferences.setUseGoogleLensOnly(newValue)
-        },
+        method = method,
+        askEveryTime = askEveryTime,
+        visualSearchOff = visualSearchOff,
+        onMethodChange = { uiPreferences.setSearchMethod(it) },
+        onAskEveryTimeChange = { uiPreferences.setAskEveryTime(it) },
+        onVisualSearchOffChange = { uiPreferences.setVisualSearchOff(it) },
         modifier = modifier
     )
 }

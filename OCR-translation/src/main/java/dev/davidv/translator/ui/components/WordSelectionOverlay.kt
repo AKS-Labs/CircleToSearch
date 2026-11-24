@@ -47,7 +47,9 @@ import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
@@ -89,18 +91,23 @@ private fun copyToClipboard(
 }
 
 private const val MENU_COPY = 1
-private const val MENU_SHARE = 2
-private const val MENU_SEARCH = 3
+private const val MENU_SELECT_ALL = 2
+private const val MENU_SHARE = 3
+private const val MENU_SEARCH = 4
 
 /**
- * A floating text-selection action bar (Copy / Share / Web search) over the image, mirroring the
- * system text toolbar. `textProvider`/`rectProvider` are read live so the bar follows the
- * selection. Returns a callback; the caller drives `startActionMode`.
+ * A floating text-selection action bar (Copy / Select all / Share / Web search) over the image,
+ * mirroring the system text toolbar. `textProvider`/`rectProvider` are read live so the bar
+ * follows the selection; Select all hides itself once everything is selected. Returns a
+ * callback; the caller drives `startActionMode`.
  */
 private class SelectionActionModeCallback(
   private val context: Context,
   private val textProvider: () -> String,
   private val rectProvider: () -> android.graphics.Rect,
+  private val onSelectAll: () -> Unit,
+  private val canSelectAll: () -> Boolean,
+  private val onWebSearch: ((String) -> Unit)?,
   private val onFinished: () -> Unit,
 ) : ActionMode.Callback2() {
   override fun onCreateActionMode(
@@ -108,15 +115,20 @@ private class SelectionActionModeCallback(
     menu: Menu,
   ): Boolean {
     menu.add(0, MENU_COPY, 0, android.R.string.copy)
-    menu.add(0, MENU_SHARE, 1, "Share")
-    menu.add(0, MENU_SEARCH, 2, "Web search")
+    menu.add(0, MENU_SELECT_ALL, 1, R.string.select_all)
+    menu.add(0, MENU_SHARE, 2, "Share")
+    menu.add(0, MENU_SEARCH, 3, "Web search")
     return true
   }
 
   override fun onPrepareActionMode(
     mode: ActionMode,
     menu: Menu,
-  ): Boolean = false
+  ): Boolean {
+    // Recomputed on every invalidateContentRect() — i.e. whenever the selection changes.
+    menu.findItem(MENU_SELECT_ALL)?.isVisible = canSelectAll()
+    return true
+  }
 
   override fun onActionItemClicked(
     mode: ActionMode,
@@ -125,6 +137,12 @@ private class SelectionActionModeCallback(
     val text = textProvider()
     when (item.itemId) {
       MENU_COPY -> copyToClipboard(context, text)
+      MENU_SELECT_ALL -> {
+        onSelectAll()
+        // Keep the mode: the selection just grew; the invalidation from the state
+        // change hides the item and re-anchors the bar over the full selection.
+        return true
+      }
       MENU_SHARE -> {
         val intent =
           Intent(Intent.ACTION_SEND).apply {
@@ -134,12 +152,18 @@ private class SelectionActionModeCallback(
         context.startActivity(Intent.createChooser(intent, null).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
       }
       MENU_SEARCH -> {
-        val intent =
-          Intent(Intent.ACTION_WEB_SEARCH).apply {
-            putExtra(SearchManager.QUERY, text)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-          }
-        runCatching { context.startActivity(intent) }
+        val inAppSearch = onWebSearch
+        if (inAppSearch != null) {
+          // Host takes it (e.g. the in-app privacy-engine results sheet).
+          inAppSearch(text)
+        } else {
+          val intent =
+            Intent(Intent.ACTION_WEB_SEARCH).apply {
+              putExtra(SearchManager.QUERY, text)
+              addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+          runCatching { context.startActivity(intent) }
+        }
       }
       else -> return false
     }
@@ -167,7 +191,9 @@ private enum class DragMode { START, END }
  * starts the selection); tapping another word moves the selection; tapping empty space clears it.
  * The selection stays with draggable end handles, and a floating action bar (Copy / Share / Web
  * search) tracks it. A plain drag is left for the container to pan/zoom; only a drag that grabs a
- * handle edits the selection. Nothing is auto-copied.
+ * handle edits the selection. With [longPressDrag], a long-press on a word anchors the selection
+ * and dragging extends it word-by-word (with loupe) — enabled where the container's plain drag
+ * isn't more valuable, e.g. Circle to Search. Nothing is auto-copied.
  *
  * `words` are in image-pixel space; mapped with the image's ContentScale.Fit transform, so this
  * stays aligned inside the image's transformed (zoom/pan) container. `scale` is the container's
@@ -182,9 +208,24 @@ fun WordSelectionOverlay(
   modifier: Modifier = Modifier,
   onSelectionChanged: (Boolean) -> Unit = {},
   clearSelectionSignal: Int = 0,
+  /** Opt-in native-style selection: holding still on a word past the long-press
+   *  timeout anchors a selection and dragging extends it word-by-word (events are
+   *  consumed from the anchor on, so the container's own drag gesture never fires).
+   *  Off by default — the translator overlays deliberately leave plain drags to
+   *  their containers (pan/zoom). */
+  longPressDrag: Boolean = false,
+  /** Image-space rect handed over by the host to select the words intersecting it
+   *  (Circle to Search turns a degenerate stroke — long-press drift, a flat line —
+   *  into "select the words under it"). Consumed via [onSelectRegionHandled]. */
+  pendingSelectRegion: android.graphics.Rect? = null,
+  onSelectRegionHandled: () -> Unit = {},
+  /** Host-provided handler for the Web-search action (e.g. an in-app results sheet).
+   *  When null, the action falls back to the system ACTION_WEB_SEARCH chooser. */
+  onWebSearch: ((String) -> Unit)? = null,
 ) {
   val context = LocalContext.current
   val view = LocalView.current
+  val haptic = LocalHapticFeedback.current
   val handlePainter = painterResource(R.drawable.selection_handle)
   // Loupe under the dragging finger so the text/handle isn't obscured. Native Magnifier is API
   // 28+; older devices simply get no loupe.
@@ -228,6 +269,55 @@ fun WordSelectionOverlay(
   val selectedText = rememberUpdatedState(selection?.text ?: "")
   val rectState = rememberUpdatedState(contentRect)
 
+  // Content rect for the action bar. Lives at composable scope (not inside the gesture
+  // pointerInput) so programmatic selections — the host-driven region below — can
+  // position it too; layoutCoords.size is the same node as the gesture's `size`.
+  fun recomputeRect() {
+    val s = selStart ?: return
+    val e = selEnd ?: return
+    val coords = layoutCoords ?: return
+    val size = coords.size
+    val t = fitTransform(size.width.toFloat(), size.height.toFloat(), imageWidth, imageHeight)
+    val box = selectionResolve(words, s.toUInt(), e.toUInt())?.bounds ?: return
+    val l = t.mapX(box.left.toFloat())
+    val top = t.mapY(box.top.toFloat())
+    val r = t.mapX(box.right.toFloat())
+    val b = t.mapY(box.bottom.toFloat())
+    // Map the local bounds through the container's zoom/pan to root-view coords.
+    val topLeft = coords.localToRoot(Offset(l, top))
+    val bottomRight = coords.localToRoot(Offset(r, b))
+    contentRect =
+      android.graphics.Rect(
+        topLeft.x.toInt(),
+        topLeft.y.toInt(),
+        bottomRight.x.toInt(),
+        bottomRight.y.toInt(),
+      )
+  }
+
+  // Host-driven region selection: the words whose boxes intersect the region become
+  // the selection (empty region → clears). The host maps the stroke into image space.
+  LaunchedEffect(pendingSelectRegion) {
+    val region = pendingSelectRegion ?: return@LaunchedEffect
+    var first: Int? = null
+    var last: Int? = null
+    words.forEachIndexed { i, w ->
+      val b = w.bounds
+      val l = b.cx - b.width / 2f
+      val r = b.cx + b.width / 2f
+      val tp = b.cy - b.height / 2f
+      val btm = b.cy + b.height / 2f
+      if (r >= region.left && l <= region.right && btm >= region.top && tp <= region.bottom) {
+        if (first == null) first = i
+        last = i
+      }
+    }
+    selStart = first
+    selEnd = last
+    if (first != null) recomputeRect()
+    onSelectRegionHandled()
+  }
+
   // Drive the floating action bar: present while there's a selection and no active drag.
   var actionMode by remember { mutableStateOf<ActionMode?>(null) }
   LaunchedEffect(hasSelection, dragging, selStart, selEnd) {
@@ -239,12 +329,26 @@ fun WordSelectionOverlay(
               context = context,
               textProvider = { selectedText.value },
               rectProvider = { rectState.value },
+              onSelectAll = {
+                if (words.isNotEmpty()) {
+                  selStart = 0
+                  selEnd = words.size - 1
+                  recomputeRect()
+                }
+              },
+              canSelectAll = {
+                words.isNotEmpty() && !(selStart == 0 && selEnd == words.size - 1)
+              },
+              onWebSearch = onWebSearch,
               onFinished = { actionMode = null },
             ),
             ActionMode.TYPE_FLOATING,
           )
       } else {
-        actionMode?.invalidateContentRect()
+        // invalidate() (not invalidateContentRect(), which only re-queries the position)
+        // so onPrepareActionMode re-runs too and Select all hides once everything is
+        // selected — while onGetContentRect still repositions the bar.
+        actionMode?.invalidate()
       }
     } else {
       actionMode?.finish()
@@ -259,32 +363,10 @@ fun WordSelectionOverlay(
     modifier =
       modifier
         .onGloballyPositioned { layoutCoords = it }
-        .pointerInput(words, imageWidth, imageHeight) {
+        .pointerInput(words, imageWidth, imageHeight, longPressDrag) {
           val slop = viewConfiguration.touchSlop
 
           fun transform() = fitTransform(size.width.toFloat(), size.height.toFloat(), imageWidth, imageHeight)
-
-          fun recomputeRect() {
-            val s = selStart ?: return
-            val e = selEnd ?: return
-            val coords = layoutCoords ?: return
-            val t = transform()
-            val box = selectionResolve(words, s.toUInt(), e.toUInt())?.bounds ?: return
-            val l = t.mapX(box.left.toFloat())
-            val top = t.mapY(box.top.toFloat())
-            val r = t.mapX(box.right.toFloat())
-            val b = t.mapY(box.bottom.toFloat())
-            // Map the local bounds through the container's zoom/pan to root-view coords.
-            val topLeft = coords.localToRoot(Offset(l, top))
-            val bottomRight = coords.localToRoot(Offset(r, b))
-            contentRect =
-              android.graphics.Rect(
-                topLeft.x.toInt(),
-                topLeft.y.toInt(),
-                bottomRight.x.toInt(),
-                bottomRight.y.toInt(),
-              )
-          }
 
           // Loupe raised a full bubble-height above the finger so it isn't occluded. The finger's
           // root-view position comes through the container transform, so it tracks under zoom.
@@ -353,14 +435,55 @@ fun WordSelectionOverlay(
             } else {
               // Not a handle: observe without consuming so the container can pan/zoom; a tap (no
               // drag) selects the word under the finger, or clears when it's on empty space.
+              // With [longPressDrag], holding still on a word past the long-press timeout
+              // anchors a selection and dragging then extends it word-by-word — events are
+              // consumed from the anchor on, so the container's own drag gesture (pan/zoom or
+              // circle drawing) never fires, exactly like the handle drags above.
               var moved = false
+              var anchored = false
+              val downWord = wordAt(down.position)
               while (true) {
                 val event = awaitPointerEvent()
                 val change = event.changes.firstOrNull { it.id == down.id } ?: break
                 if (!change.pressed) break
                 if (!moved && (change.position - down.position).getDistance() > slop) moved = true
+                if (!anchored && longPressDrag && !moved &&
+                  downWord != null &&
+                  change.uptimeMillis - down.uptimeMillis >=
+                    android.view.ViewConfiguration.getLongPressTimeout()
+                ) {
+                  // Long-press anchor: select the word under the finger, take over the
+                  // gesture, and let the drag extend the selection.
+                  anchored = true
+                  dragging = true
+                  haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                  selStart = downWord
+                  selEnd = downWord
+                  recomputeRect()
+                }
+                if (!anchored) continue
+                change.consume()
+                val anchor = selStart
+                if (anchor != null) {
+                  val tt = transform()
+                  val axis = selectionWordAxis(words, anchor.toUInt())
+                  selectionNearestWord(
+                    words,
+                    tt.unmapX(change.position.x),
+                    tt.unmapY(change.position.y),
+                    axis,
+                  )?.let { nw ->
+                    selStart = min(anchor, nw.toInt())
+                    selEnd = max(anchor, nw.toInt())
+                    recomputeRect()
+                  }
+                }
+                showMagnifier(change.position)
               }
-              if (!moved) {
+              if (anchored) {
+                dragging = false
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) magnifier?.dismiss()
+              } else if (!moved) {
                 val w = wordAt(down.position)
                 selStart = w
                 selEnd = w

@@ -88,7 +88,10 @@ import dev.davidv.translator.Language
 import dev.davidv.translator.LaunchMode
 import dev.davidv.translator.PcmAudioPlayer
 import dev.davidv.translator.R
+import dev.davidv.translator.LanguageMetadataManager
+import dev.davidv.translator.MainActivity
 import dev.davidv.translator.TranslatorMessage
+import dev.davidv.translator.overlayChrome.ActivityLanguagePicker
 import dev.davidv.translator.encodeVoiceOverride
 import dev.davidv.translator.parseVoiceOverride
 import dev.davidv.translator.ui.DocumentTranslationUiState
@@ -563,19 +566,24 @@ fun TranslatorApp(
   val openLiveCameraRequest by viewModel.openLiveCameraRequest.collectAsState()
 
   // Map navigation state to route. A pending camera deep link (set by MainActivity
-  // before the first frame) becomes the start destination so the home screen is
-  // never composed — navigating main → live_camera would flash it first. Even
-  // while the language check is still LOADING go straight to the camera: it
-  // renders a black placeholder until the languages arrive, which beats the
-  // loading spinner screen for a launch that never wanted the home screen.
+  // before the first frame) starts DIRECTLY on the camera: no loading gate and no
+  // home screen — riding the normal loading flow first is what made the CTS camera
+  // button flash the module before opening the camera. from/to resolve from the
+  // bundled catalog within a frame or two — with zero downloaded packs too
+  // (requestLiveCamera seeds a default source, since the generic resolution only
+  // runs once packs exist) — and the camera composable holds its own spinner until
+  // then. The nav effect below keeps the request alive until the first entry
+  // appears.
   val startDestination =
     remember {
-      when (navigationState) {
-        TranslatorViewModel.NavigationState.NO_LANGUAGES -> "no_languages"
-        TranslatorViewModel.NavigationState.LOADING ->
-          if (openLiveCameraRequest) "live_camera" else "loading"
-        TranslatorViewModel.NavigationState.READY ->
-          if (openLiveCameraRequest) "live_camera" else "main"
+      if (viewModel.openLiveCameraRequest.value) {
+        "live_camera"
+      } else {
+        when (navigationState) {
+          TranslatorViewModel.NavigationState.NO_LANGUAGES -> "no_languages"
+          TranslatorViewModel.NavigationState.LOADING -> "loading"
+          TranslatorViewModel.NavigationState.READY -> "main"
+        }
       }
     }
 
@@ -586,27 +594,31 @@ fun TranslatorApp(
 
   LaunchedEffect(navigationState, currentBackStackEntry, openLiveCameraRequest) {
     val currentRoute = currentBackStackEntry?.destination?.route
+    android.util.Log.d(
+      "CamDeepLink",
+      "nav effect: state=$navigationState route=$currentRoute request=$openLiveCameraRequest",
+    )
     if (openLiveCameraRequest) {
-      if (navigationState == TranslatorViewModel.NavigationState.READY) {
-        // Same as the home screen's camera entry: tear down any lingering
-        // overlay session (floating bubble / screen-translate chrome) — its
-        // touchable result or selection window would sit over the camera and
-        // swallow taps (including the language pills').
-        (dev.davidv.translator.OverlayWindowHosts.primary as? dev.davidv.translator.accessibilityOverlay.TranslatorOverlayHost)
-          ?.deactivate()
-      }
-      // Fold the camera deep link into this one transition so the home screen
-      // is never composed. While the NavHost has no back stack yet
-      // (currentRoute == null) the request must be KEPT — clearing it here
-      // dropped the deep link and left the user on the home screen; this
-      // effect re-runs when the first entry appears.
+      // Tear down any lingering overlay session (floating bubble /
+      // screen-translate chrome) — its touchable result or selection window
+      // would sit over the camera and swallow taps (including the language
+      // pills'). Done for every state: the camera is reachable with zero
+      // downloaded packs as well.
+      (dev.davidv.translator.OverlayWindowHosts.primary as? dev.davidv.translator.accessibilityOverlay.TranslatorOverlayHost)
+        ?.deactivate()
+      // Fold the camera deep link into this one transition so the module's
+      // home/loading/download screens are never composed. While the NavHost
+      // has no back stack yet (currentRoute == null) the request must be KEPT
+      // — clearing it here dropped the deep link and left the user on the
+      // home screen; this effect re-runs when the first entry appears.
       when {
         currentRoute == null -> Unit
-        // Already on the camera (e.g. a repeated deep link) — just consume it.
+        // Already on the camera (start destination or repeated deep link).
         currentRoute == "live_camera" -> viewModel.clearLiveCameraRequest()
-        navigationState == TranslatorViewModel.NavigationState.READY -> {
-          // From the loading gate go straight to the camera so the home screen
-          // is never composed; from anywhere else stack the camera on top.
+        // Navigate from ANY state — including no_languages: the camera works
+        // without downloaded packs (OCR and detection ship in the APK) and its
+        // own language picker handles picking/downloading languages there.
+        else -> {
           if (currentRoute == "loading") {
             navController.navigate("live_camera") {
               popUpTo("loading") { inclusive = true }
@@ -616,20 +628,6 @@ fun TranslatorApp(
           }
           viewModel.clearLiveCameraRequest()
         }
-        navigationState != TranslatorViewModel.NavigationState.LOADING -> {
-          // no_languages (or another terminal state): packs must be downloaded
-          // before the live camera works — drop the request. If the camera
-          // route was the start destination (deep link while still LOADING),
-          // leave it for the download screen.
-          viewModel.clearLiveCameraRequest()
-          if (currentRoute == "live_camera") {
-            navController.navigate("no_languages") {
-              popUpTo("live_camera") { inclusive = true }
-            }
-          }
-        }
-        // else: still loading — keep the request; this effect re-runs when the
-        // navigation state or back stack changes.
       }
       return@LaunchedEffect
     }
@@ -796,6 +794,37 @@ fun TranslatorApp(
             val currentFrom = from
             val currentTo = to
             if (currentFrom != null && currentTo != null) {
+              // The same language picker dialog the camera screen uses, hosted
+              // in this activity. Image mode wires its language chips to it so
+              // a pick downloads missing packs and re-translates the image.
+              val app = context.applicationContext as dev.davidv.translator.TranslatorApplication
+              val activity = context as? Activity
+              val languagePicker =
+                remember(viewModel.languageStateManager, activity) {
+                  activity?.let {
+                    ActivityLanguagePicker(it, viewModel.languageStateManager, LanguageMetadataManager(it, app.languagesFlow))
+                  }
+                }
+              DisposableEffect(languagePicker) {
+                onDispose { languagePicker?.destroy() }
+              }
+              val openLanguagePicker: (Boolean) -> Unit = { isSource ->
+                languagePicker?.show(
+                  isSource = isSource,
+                  allowAuto = isSource && !settings.disableCLD,
+                ) { lang ->
+                  when {
+                    lang != null && isSource -> viewModel.handleMessage(TranslatorMessage.FromLang(lang))
+                    lang != null -> viewModel.handleMessage(TranslatorMessage.ToLang(lang))
+                    isSource -> viewModel.handleMessage(TranslatorMessage.EnableAutoSource)
+                    else -> Unit
+                  }
+                }
+              }
+              // Deep-linked from Circle to Search: the image screen's close
+              // returns to the caller's overlay instead of the module home.
+              val exitToCallerAction =
+                (context as? MainActivity)?.takeIf { it.hasReturnTarget }?.let { m -> { m.exitToCaller() } }
               val availableSourceTtsVoices = ttsVoicesByLanguage[currentFrom.code].orEmpty()
               val selectedSourceTtsVoiceName =
                 parseVoiceOverride(settings.ttsVoiceOverrides[currentFrom.code])
@@ -920,6 +949,8 @@ fun TranslatorApp(
                 launchMode = currentLaunchMode,
                 pendingSharedImage = viewModel.pendingSharedImage,
                 isAutoSource = isAutoSource,
+                onOpenLanguagePicker = { isSource -> openLanguagePicker(isSource) },
+                onExitToCaller = exitToCallerAction,
               )
             }
           }
@@ -1030,18 +1061,33 @@ fun TranslatorApp(
                     (context as? android.app.Activity)?.finish()
                   }
                 },
-                onImageCaptured = viewModel::setSharedImageUri,
+                onImageCaptured = { uri ->
+                  viewModel.setSharedImageUri(uri)
+                  // A capture shows the image on the module's main screen (the
+                  // in-app camera flow pops back to it). When the camera was
+                  // deep-linked from Circle to Search there is no main beneath
+                  // — create it instead of finishing back to the overlay.
+                  if (!navController.popBackStack("main", inclusive = false)) {
+                    navController.navigate("main") {
+                      popUpTo("live_camera") { inclusive = true }
+                    }
+                  }
+                },
               )
             } else {
               // Deep-linked in while the language check is still running: the
               // camera screen needs from/to, so hold a black frame (the camera
               // screen's own background) until they arrive instead of flashing
-              // the loading spinner or an empty white frame.
+              // the loading spinner or an empty white frame — with a spinner so
+              // the wait never reads as a dead/black screen.
               Box(
                 modifier = Modifier
                   .fillMaxSize()
-                  .background(Color.Black)
-              )
+                  .background(Color.Black),
+                contentAlignment = Alignment.Center,
+              ) {
+                androidx.compose.material3.CircularProgressIndicator(color = Color.White)
+              }
             }
           }
         }

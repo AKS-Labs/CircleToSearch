@@ -398,12 +398,32 @@ fun DonateBottomSheet(
                         }
                     )
 
-                    FeedbackChannelOption(
-                        icon = Icons.Default.Payment,
-                        title = stringResource(R.string.donate_paypal),
-                        subtitle = stringResource(R.string.donate_paypal_subtitle),
-                        onClick = { onDonateOptionSelected("https://paypal.me/akslabsOfficial") }
-                    )
+                    Column {
+                        FeedbackChannelOption(
+                            icon = Icons.Default.Payment,
+                            title = stringResource(R.string.donate_paypal),
+                            subtitle = stringResource(R.string.donate_paypal_subtitle),
+                            onClick = { onDonateOptionSelected("https://paypal.me/akslabsOfficial") }
+                        )
+                        // Fee hint: PayPal works but eats ~40% of small donations
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(start = 4.dp, top = 2.dp, end = 4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp),
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = stringResource(R.string.donate_paypal_note),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
                 }
             }
         }

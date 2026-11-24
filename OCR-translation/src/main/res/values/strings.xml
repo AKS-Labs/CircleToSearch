@@ -118,6 +118,8 @@
     <!-- camera / browser / screen translate -->
     <string name="camera_permission_rationale">Camera permission is needed for live translate.</string>
     <string name="camera_need_ocr_models">You need to download the text-recognition models for this language</string>
+    <string name="camera_translation_pack_missing">Download the %1$s translation pack to see translated text</string>
+    <string name="select_all">Select all</string>
     <string name="browser_no_source_language">No source language available. Install one from the main screen first, or set a default source language in settings.</string>
     <string name="browser_reader_unavailable">Reader mode unavailable for this page</string>
     <string name="browser_translate_image">Translate image</string>
@@ -270,6 +272,9 @@
     <string name="a11y_retry_download">Retry Download</string>
     <string name="a11y_download">Download</string>
     <string name="a11y_share_image">Share image</string>
+    <string name="a11y_save_image">Save image to gallery</string>
+    <string name="image_saved_to_gallery">Saved to gallery</string>
+    <string name="image_save_failed">Couldn\'t save to gallery</string>
     <string name="a11y_close_fullscreen">Close full screen view</string>
     <string name="a11y_translation_output">Translation output</string>
     <string name="a11y_output_textview">Output textview</string>

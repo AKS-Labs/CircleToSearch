@@ -166,7 +166,11 @@ pub enum ReadingOrder {
 /// `Auto` runs PPOCR's PULC script classifier per detected strip, then derives a
 /// translation source language with CLD over the recognized text. `Specific`
 /// pins the recognizer to one language and skips classification + detection
-/// post-processing.
+/// post-processing. `Restricted` is the user-checked whitelist (Circle to
+/// Search's OCR language picker): recognition routes like `Auto`, but strips
+/// PULC cannot place or that recognize as garbage are only ever re-read with
+/// the checked languages' recognizers, and CLD only considers the checked
+/// languages.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 #[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 pub enum OcrSourceSelection {
@@ -174,6 +178,9 @@ pub enum OcrSourceSelection {
     Auto,
     Specific {
         language_code: crate::api::LanguageCode,
+    },
+    Restricted {
+        language_codes: Vec<crate::api::LanguageCode>,
     },
 }
 
@@ -186,6 +193,10 @@ impl OcrSourceSelection {
         Self::Specific {
             language_code: language_code.into(),
         }
+    }
+
+    pub fn restricted(language_codes: Vec<crate::api::LanguageCode>) -> Self {
+        Self::Restricted { language_codes }
     }
 }
 

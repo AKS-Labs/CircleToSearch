@@ -56,11 +56,11 @@
     <string name="label_accessibility_active">Accessibility Service Active</string>
     <string name="label_accessibility_active_subtitle">Unlocks every trigger: status bar, bubble &amp; hardware buttons</string>
     <string name="label_enable_accessibility">Enable Accessibility</string>
-    <string name="label_enable_accessibility_subtitle">To do its job properly, the app needs this permission.\nTap allow and we\'re good to go! &#x1F44D;</string>
+    <string name="label_enable_accessibility_subtitle">To do its job properly, the app needs this permission.</string>
     <string name="label_optional_assistant">OPTIONAL: For Home Button Trigger</string>
     <string name="label_default_assistant_set">Default Assistant Set</string>
     <string name="label_set_default_assistant">Set as Default Assistant</string>
-    <string name="label_set_default_assistant_subtitle">Tap to set it up and see how your device launches assistants.</string>
+    <string name="label_set_default_assistant_subtitle">Set app as your default assistant to trigger Circle to Search.</string>
     <string name="section_customization">CUSTOMIZATION</string>
     <string name="info_lens_needs_google">Lens needs Google App Installed. But Degoogled friends can stick with the versatile Multi-Search Engine mode.</string>
     <string name="toast_could_not_open_link">Could not open link</string>
@@ -153,7 +153,16 @@
     <string name="setting_friendly_messages_subtitle">Show random greeting messages on trigger</string>
     <string name="info_lens_mode_note">Lens mode needs the Google App to work its magic! &#x1FA84; Degoogled? Multi-Search mode has your back! &#x1F680;</string>
     <string name="section_search_engines">Search Engines</string>
-    <string name="hint_tab_sequence">Tap arrows to change tab sequence</string>
+    <string name="hint_tab_sequence">Long-press a search engine and drag to reorder</string>
+    <string name="settings_rearrange_tabs_title">Rearrange tabs</string>
+    <string name="settings_rearrange_tabs_subtitle">Long-press a chip and drag to change tab order</string>
+    <string name="settings_tabs_section_multi">Multi-search</string>
+    <string name="settings_tabs_section_web">Web search</string>
+    <string name="settings_dev_title">AKS Labs</string>
+    <string name="settings_dev_subtitle">Maker of Circle to Search</string>
+    <string name="label_github">GitHub</string>
+    <string name="label_telegram">Telegram</string>
+    <string name="label_more_apps">More apps</string>
 
     <!-- Overlay Settings Screen -->
     <string name="title_overlay_settings">Overlay Settings</string>
@@ -223,27 +232,39 @@
     <string name="donate_upi">UPI (India) akslabs@upi</string>
     <string name="donate_upi_subtitle">Instant \u2022 No fees \u2022 Pay via UPI</string>
     <string name="donate_paypal">PayPal</string>
-    <string name="donate_paypal_subtitle" formatted="false">Fixed fee up to 5% \u2022 Conversion loss \u2248 5% per dollar</string>
+    <string name="donate_paypal_subtitle">Works, but not recommended</string>
+    <string name="donate_paypal_note" formatted="false">PayPal cuts heavy fees on small donations — e.g. $1 sent arrives as about ₹53 ($0.60); roughly 40% is lost to fees &amp; conversion</string>
     <string name="label_foss">FOSS</string>
+    <!-- Circle to Search OCR language picker -->
+    <string name="ocr_lang_button_cd">OCR language</string>
+    <string name="ocr_lang_title">OCR languages</string>
+    <string name="ocr_lang_hint">Circle to Search will only try to detect the languages you check here. Leave Auto-detect checked to try all bundled languages — but note that auto-detect can sometimes fail to identify the language, so check a language manually if detection is unreliable.</string>
+    <string name="ocr_lang_auto">Auto-detect (all languages)</string>
+    <string name="ocr_lang_search">Search languages</string>
+    <string name="ocr_lang_section">LANGUAGES</string>
+    <string name="ocr_lang_auto_subtitle">Detects the script automatically using every bundled pack</string>
+    <string name="ocr_lang_no_results">No languages match \"%1$s\"</string>
+    <string name="ocr_lang_reset">Reset</string>
+    <string name="ocr_lang_done">Done</string>
 
     <!-- Privacy Dialog -->
-    <string name="title_privacy">Privacy &amp; Data Usage Transparency</string>
-    <string name="privacy_q_upload">Does this app upload my searched images anywhere other than search engines?</string>
-    <string name="privacy_a_upload">Yes.\n\nYour image is uploaded to a temporary host to create a usable link:\n\n\u2022 ImageDB (imgdb.io) \u2192 Primary \u2014 the image expires after 1 hour\n\u2022 Litterbox \u2192 Backup when ImageDB is unavailable \u2014 also expires after 1 hour\n\nBy default, uploaded images are automatically deleted after 1 hour.</string>
-    <string name="privacy_q_why_upload">Why does this app upload my image at all?</string>
-    <string name="privacy_a_why_upload">Search engines don\'t allow apps to directly upload images Programmatically (to prevent misuse &amp; abuse). So the app uploads your image first to create a safe, usable link/url of image.</string>
-    <string name="privacy_q_device">Does anything leave my device on its own?</string>
-    <string name="privacy_a_device">No. Nothing leaves your device without an explicit action from you — and even then, only the image you draw a circle around is uploaded. No other screen content, files, or personal data ever leaves your device.</string>
-    <string name="privacy_q_safe">Are ImageDB and Litterbox safe?</string>
-    <string name="privacy_a_safe">The app uses this file hosting because:\n\n\u2022 No account or API key required\n\u2022 Anonymous uploads supported\n\u2022 Fast, simple and reliable\n\u2022 Both delete your image after 1 hour\n\nThis app is not associated with these platforms in any way. The hosting services may change in future releases if better privacy-first options are found.\n\nPlease read their policies before use: ImageDB and Litterbox.</string>
-    <string name="privacy_q_personal">Should I search personal or private images?</string>
-    <string name="privacy_a_personal">Please don\'t.\n\nAvoid uploading personal photos, private documents, IDs, or anything sensitive. Only search images that are safe and non-personal.</string>
-    <string name="privacy_q_store">Does the app store my images or links?</string>
-    <string name="privacy_a_store">No.\n\nYour images and URLs are not stored, tracked, or logged by this app.</string>
-    <string name="privacy_q_developer">Can the developer see my images or links?</string>
-    <string name="privacy_a_developer">No. Never.\n\nThis app:\n\u2022 Has no server\n\u2022 Does not store images\n\u2022 Does not store image URLs\n\u2022 Does not track what you search\n\u2022 Does not collect data\n\nYour data stays between you \u2192 ImageDB/Litterbox \u2192 the search engine.</string>
-    <string name="privacy_reminder_title">Important reminder</string>
-    <string name="privacy_reminder_body">Your searched images can remain on search engine servers, image host servers, caches, and backups. This is why you should never upload private or personal images.</string>
+        <string name="title_privacy">Privacy &amp; data use</string>
+        <string name="privacy_q_upload">Is my image uploaded anywhere besides the search engine?</string>
+        <string name="privacy_a_upload">Yes, temporarily. The cropped image is uploaded to a temporary host to create a link the search engine can read:\n\n\u2022 ImageDB (imgdb.io) \u2014 primary host, auto-deleted after 1 hour\n\u2022 Litterbox \u2014 backup host, also auto-deleted after 1 hour</string>
+        <string name="privacy_q_why_upload">Why is an upload needed?</string>
+        <string name="privacy_a_why_upload">Search engines don\'t accept image uploads directly from apps. The image is uploaded first to get a link the search engine can read.</string>
+        <string name="privacy_q_device">Does anything leave my device without my action?</string>
+        <string name="privacy_a_device">No. Nothing is sent unless you trigger a search, and only the circled area is uploaded. Nothing else on the screen is read or sent.</string>
+        <string name="privacy_q_safe">Are ImageDB and Litterbox safe?</string>
+        <string name="privacy_a_safe">They need no account, allow anonymous uploads, and delete files automatically after 1 hour. This app is not affiliated with either service; if better privacy-first hosts are found, they may be replaced in a future release.\n\nRead their policies before use: ImageDB, Litterbox.</string>
+        <string name="privacy_q_personal">Can I search personal content?</string>
+        <string name="privacy_a_personal">No. Don\'t search IDs, private documents, or anything sensitive — once uploaded, the host and the search engine have it.</string>
+        <string name="privacy_q_store">Does the app store my images or links?</string>
+        <string name="privacy_a_store">No. Images and URLs are never stored, tracked, or logged by this app.</string>
+        <string name="privacy_q_developer">Can the developer see my images or links?</string>
+        <string name="privacy_a_developer">No. The app has no server and collects no data — no stored images, no URLs, no search history.</string>
+        <string name="privacy_reminder_title">Keep in mind</string>
+        <string name="privacy_reminder_body">Uploaded images can remain on the host\'s and search engine\'s servers, caches, and backups. Never search private content.</string>
     <string name="btn_privacy_accept">I Understand &amp; Accept</string>
 
     <!-- Accessibility Disclosure Dialog -->
@@ -266,6 +287,13 @@
     <string name="section_search_method">SEARCH METHOD</string>
     <string name="search_method_multi">Multi-Search</string>
     <string name="search_method_lens">Google Lens</string>
+    <string name="search_method_ask">Ask every time</string>
+    <string name="search_method_off">Off</string>
+    <string name="ask_visual_search_prompt">Are you sure you want to search the circled area?</string>
+    <string name="ask_confirm_yes">Yes</string>
+    <string name="ask_confirm_no">No</string>
+    <string name="search_method_ask_desc">Ask before uploading a capture</string>
+    <string name="search_method_off_desc">Visual search disabled — nothing leaves your device</string>
 
     <!-- Google Lens Helper -->
     <string name="chooser_google_lens">Search with Google Lens</string>
@@ -347,6 +375,34 @@
     <string name="engine_yandex">Yandex</string>
     <string name="engine_tineye">TinEye</string>
 
+    <!-- Multi-search preloading -->
+    <string name="settings_preload_title">Preload search engines</string>
+    <string name="preload_sub_on">Preloads automatically in multi-search</string>
+    <string name="preload_sub_off">Loads only when you open its tab</string>
+    <string name="preload_off_title">Preloading is off for %1$s</string>
+    <string name="preload_off_note">This tab stays empty until you load it.</string>
+    <string name="preload_on_note">This tab will preload from your next search.</string>
+    <string name="preload_load_now">Load now</string>
+    <string name="preload_turn_on">Turn on preloading</string>
+
+    <!-- Privacy web-search engines (text-selection "Web search" sheet) -->
+    <string name="engine_duckduckgo">DuckDuckGo</string>
+    <string name="engine_brave">Brave Search</string>
+    <string name="engine_startpage">Startpage</string>
+    <string name="engine_mojeek">Mojeek</string>
+    <string name="engine_duckai">Duck.ai</string>
+    <!-- Web results long-press menu -->
+    <string name="web_menu_copy_link">Copy link URL</string>
+    <string name="web_menu_open_browser">Open in browser</string>
+    <string name="web_menu_share">Share</string>
+    <string name="web_menu_copy_image">Copy image URL</string>
+    <string name="web_menu_save_image">Save image</string>
+    <string name="web_menu_image_saved">Image saved to Pictures/CircleToSearch</string>
+    <string name="web_menu_copy_link_text">Copy link text</string>
+    <string name="web_menu_open_link">Open link</string>
+    <string name="web_menu_open_image">Open image</string>
+    <string name="engine_braveai">Brave AI</string>
+
     <!-- Quick Settings Tile -->
     <string name="qs_tile_label">CTS</string>
 
@@ -368,7 +424,7 @@
     <string name="settings_cat_search_subtitle">Lens or Multi-Search launch mode</string>
     <string name="settings_cat_general_subtitle">Offline translator &amp; app options</string>
     <string name="settings_cat_about">About</string>
-    <string name="settings_cat_about_subtitle">Version, source code &amp; credits</string>
+    <string name="settings_cat_about_subtitle">Version, licenses &amp; credits</string>
     <string name="section_launch_methods">LAUNCH METHODS</string>
     <string name="section_behavior">BEHAVIOR</string>
     <string name="about_version">Version</string>
@@ -390,14 +446,14 @@
     <string name="home_custom_overlay">Custom overlay</string>
     <string name="home_additional_settings">Additional settings</string>
     <string name="home_bottom_edge_title">Bottom edge long-press</string>
-    <string name="home_bottom_edge_subtitle">Hold a bottom corner or the centre to search</string>
+    <string name="home_bottom_edge_subtitle">Hold a bottom corner or the centre to start</string>
     <string name="home_corner_left">Left</string>
     <string name="home_corner_right">Right</string>
     <string name="home_bottom_mid_title">Mid</string>
     <string name="home_corner_size">Corner size</string>
     <string name="home_mid_size">Mid size</string>
     <string name="home_assistant_setup_subtitle">Set as default assistant, then long-press the Home button to launch Circle to Search</string>
-    <string name="home_assistant_ready_subtitle">Long-press the Home button (or hold the gesture bar) to launch Circle to Search</string>
+    <string name="home_assistant_ready_subtitle">Use as your default assistant to launch Circle to Search</string>
     <string name="home_ready">Ready</string>
     <string name="home_set_up">Set up</string>
     <string name="home_hw_title">Hardware buttons</string>
@@ -422,10 +478,22 @@
     <string name="trigger_name_assistant">Home button</string>
     <string name="trigger_statusbar_title">Status bar double-tap</string>
     <string name="trigger_statusbar_subtitle">Double-tap the status bar area to start</string>
+    <string name="trigger_notch_title">Double-tap Notch</string>
+    <string name="label_email">Email</string>
+    <string name="settings_made_by">Made by</string>
+    <string name="label_source_code">Source code</string>
+    <string name="settings_section_behavior">Behavior</string>
+    <string name="notch_gesture_label">Gesture</string>
+    <string name="notch_gesture_double_tap">Double tap</string>
+    <string name="notch_gesture_long_press">Long press</string>
+    <string name="notch_gesture_triple_tap">Triple tap</string>
+    <string name="notch_hint_double_tap">Double-tap the notch to start</string>
+    <string name="notch_hint_long_press">Long-press the notch to start</string>
+    <string name="notch_hint_triple_tap">Triple-tap the notch to start</string>
     <string name="home_statusbar_width">Width</string>
     <string name="home_statusbar_height">Height</string>
     <string name="home_statusbar_ypos">Vertical position</string>
-    <string name="trigger_bubble_subtitle">Floating button you can drag anywhere tap to start</string>
+    <string name="trigger_bubble_subtitle">Tap floating button to start</string>
     <string name="trigger_double_vol_up_title">Double-tap Volume Up</string>
     <string name="trigger_double_vol_down_title">Double-tap Volume Down</string>
     <string name="trigger_long_vol_up_title">Hold Volume Up</string>

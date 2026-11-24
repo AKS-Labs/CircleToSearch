@@ -1,6 +1,6 @@
 {
   "formatVersion": 6,
-  "generatedAt": 1788658816,
+  "generatedAt": 1794646849,
   "dictionaryVersion": 1,
   "sources": {
     "languageIndexVersion": 1,
@@ -12410,22 +12410,6 @@
       "role": "detector",
       "files": [
         {
-          "name": "PP-OCRv5_mobile_det_int8.mnn",
-          "sizeBytes": 1324660,
-          "installPath": "ppocr/PP-OCRv5/PP-OCRv5_mobile_det_int8.mnn",
-          "url": "https://offline-translator.davidv.dev/ocr/1/PP-OCRv5/PP-OCRv5_mobile_det_int8.mnn",
-          "role": "detector",
-          "priority": 0
-        },
-        {
-          "name": "PP-OCRv6_tiny_det_half_int8.mnn",
-          "sizeBytes": 543128,
-          "installPath": "ppocr/PP-OCRv6/PP-OCRv6_tiny_det_half_int8.mnn",
-          "url": "https://offline-translator.davidv.dev/ocr/1/PP-OCRv6/PP-OCRv6_tiny_det_half_int8.mnn",
-          "role": "detector",
-          "priority": 1
-        },
-        {
           "name": "PP-OCRv6_tiny_det_int8.mnn",
           "sizeBytes": 543176,
           "installPath": "ppocr/PP-OCRv6/PP-OCRv6_tiny_det_int8.mnn",
@@ -12475,6 +12459,14 @@
           "role": "ink",
           "priority": 2,
           "optional": true
+        },
+        {
+          "name": "PP-OCRv6_small_det_int8.mnn",
+          "sizeBytes": 2643148,
+          "installPath": "ppocr/PP-OCRv6/PP-OCRv6_small_det_int8.mnn",
+          "url": "https://offline-translator.davidv.dev/ocr/1/PP-OCRv6/PP-OCRv6_small_det_int8.mnn",
+          "role": "detector",
+          "priority": 3
         }
       ],
       "dependsOn": []
@@ -12495,7 +12487,7 @@
         },
         {
           "name": "arabic_PP-OCRv5_keys.txt",
-          "sizeBytes": 2369,
+          "sizeBytes": 3116,
           "installPath": "ppocr/PP-OCRv5/arabic_PP-OCRv5_keys.txt",
           "url": "https://offline-translator.davidv.dev/ocr/1/PP-OCRv5/arabic_PP-OCRv5_keys.txt",
           "role": "keys",
@@ -12523,7 +12515,7 @@
         },
         {
           "name": "cyrillic_PP-OCRv5_keys.txt",
-          "sizeBytes": 2781,
+          "sizeBytes": 3631,
           "installPath": "ppocr/PP-OCRv5/cyrillic_PP-OCRv5_keys.txt",
           "url": "https://offline-translator.davidv.dev/ocr/1/PP-OCRv5/cyrillic_PP-OCRv5_keys.txt",
           "role": "keys",
@@ -12551,7 +12543,7 @@
         },
         {
           "name": "devanagari_PP-OCRv5_keys.txt",
-          "sizeBytes": 1943,
+          "sizeBytes": 2511,
           "installPath": "ppocr/PP-OCRv5/devanagari_PP-OCRv5_keys.txt",
           "url": "https://offline-translator.davidv.dev/ocr/1/PP-OCRv5/devanagari_PP-OCRv5_keys.txt",
           "role": "keys",
@@ -12579,7 +12571,7 @@
         },
         {
           "name": "el_PP-OCRv5_keys.txt",
-          "sizeBytes": 1103,
+          "sizeBytes": 1457,
           "installPath": "ppocr/PP-OCRv5/el_PP-OCRv5_keys.txt",
           "url": "https://offline-translator.davidv.dev/ocr/1/PP-OCRv5/el_PP-OCRv5_keys.txt",
           "role": "keys",
@@ -12607,7 +12599,7 @@
         },
         {
           "name": "eslav_PP-OCRv5_keys.txt",
-          "sizeBytes": 1663,
+          "sizeBytes": 2180,
           "installPath": "ppocr/PP-OCRv5/eslav_PP-OCRv5_keys.txt",
           "url": "https://offline-translator.davidv.dev/ocr/1/PP-OCRv5/eslav_PP-OCRv5_keys.txt",
           "role": "keys",
@@ -12635,7 +12627,7 @@
         },
         {
           "name": "georgian_keys.txt",
-          "sizeBytes": 456,
+          "sizeBytes": 611,
           "installPath": "ppocr/PP-OCRv6/georgian_keys.txt",
           "url": "https://offline-translator.davidv.dev/ocr/1/PP-OCRv6/georgian_keys.txt",
           "role": "keys",
@@ -12663,7 +12655,7 @@
         },
         {
           "name": "hebrew_keys.txt",
-          "sizeBytes": 262,
+          "sizeBytes": 376,
           "installPath": "ppocr/PP-OCRv6/hebrew_keys.txt",
           "url": "https://offline-translator.davidv.dev/ocr/1/PP-OCRv6/hebrew_keys.txt",
           "role": "keys",
@@ -12691,7 +12683,7 @@
         },
         {
           "name": "indic_keys.txt",
-          "sizeBytes": 1513,
+          "sizeBytes": 1931,
           "installPath": "ppocr/PP-OCRv6/indic_keys.txt",
           "url": "https://offline-translator.davidv.dev/ocr/1/PP-OCRv6/indic_keys.txt",
           "role": "keys",
@@ -12719,7 +12711,7 @@
         },
         {
           "name": "korean_PP-OCRv5_keys.txt",
-          "sizeBytes": 47451,
+          "sizeBytes": 59396,
           "installPath": "ppocr/PP-OCRv5/korean_PP-OCRv5_keys.txt",
           "url": "https://offline-translator.davidv.dev/ocr/1/PP-OCRv5/korean_PP-OCRv5_keys.txt",
           "role": "keys",
@@ -12747,27 +12739,27 @@
         },
         {
           "name": "latin_PP-OCRv5_keys.txt",
-          "sizeBytes": 2616,
+          "sizeBytes": 3452,
           "installPath": "ppocr/PP-OCRv5/latin_PP-OCRv5_keys.txt",
           "url": "https://offline-translator.davidv.dev/ocr/1/PP-OCRv5/latin_PP-OCRv5_keys.txt",
           "role": "keys",
           "priority": 0
         },
         {
-          "name": "PP-OCRv6_tiny_rec_int8.mnn",
-          "sizeBytes": 1262568,
-          "installPath": "ppocr/PP-OCRv6/PP-OCRv6_tiny_rec_int8.mnn",
-          "url": "https://offline-translator.davidv.dev/ocr/1/PP-OCRv6/PP-OCRv6_tiny_rec_int8.mnn",
+          "name": "PP-OCRv6_small_rec_int8.mnn",
+          "sizeBytes": 5691768,
+          "installPath": "ppocr/PP-OCRv6/PP-OCRv6_small_rec_int8.mnn",
+          "url": "https://offline-translator.davidv.dev/ocr/1/PP-OCRv6/PP-OCRv6_small_rec_int8.mnn",
           "role": "recognizer",
-          "priority": 1
+          "priority": 2
         },
         {
-          "name": "PP-OCRv6_tiny_keys.txt",
-          "sizeBytes": 27156,
-          "installPath": "ppocr/PP-OCRv6/PP-OCRv6_tiny_keys.txt",
-          "url": "https://offline-translator.davidv.dev/ocr/1/PP-OCRv6/PP-OCRv6_tiny_keys.txt",
+          "name": "PP-OCRv6_small_keys.txt",
+          "sizeBytes": 93655,
+          "installPath": "ppocr/PP-OCRv6/PP-OCRv6_small_keys.txt",
+          "url": "https://offline-translator.davidv.dev/ocr/1/PP-OCRv6/PP-OCRv6_small_keys.txt",
           "role": "keys",
-          "priority": 1
+          "priority": 2
         }
       ],
       "dependsOn": [
@@ -12790,7 +12782,7 @@
         },
         {
           "name": "ta_PP-OCRv5_keys.txt",
-          "sizeBytes": 1723,
+          "sizeBytes": 2236,
           "installPath": "ppocr/PP-OCRv5/ta_PP-OCRv5_keys.txt",
           "url": "https://offline-translator.davidv.dev/ocr/1/PP-OCRv5/ta_PP-OCRv5_keys.txt",
           "role": "keys",
@@ -12818,7 +12810,7 @@
         },
         {
           "name": "te_PP-OCRv5_keys.txt",
-          "sizeBytes": 1831,
+          "sizeBytes": 2371,
           "installPath": "ppocr/PP-OCRv5/te_PP-OCRv5_keys.txt",
           "url": "https://offline-translator.davidv.dev/ocr/1/PP-OCRv5/te_PP-OCRv5_keys.txt",
           "role": "keys",
@@ -12846,7 +12838,7 @@
         },
         {
           "name": "th_PP-OCRv5_keys.txt",
-          "sizeBytes": 1767,
+          "sizeBytes": 2291,
           "installPath": "ppocr/PP-OCRv5/th_PP-OCRv5_keys.txt",
           "url": "https://offline-translator.davidv.dev/ocr/1/PP-OCRv5/th_PP-OCRv5_keys.txt",
           "role": "keys",
@@ -12874,7 +12866,7 @@
         },
         {
           "name": "cj_PP-OCRv5_keys.txt",
-          "sizeBytes": 74012,
+          "sizeBytes": 92395,
           "installPath": "ppocr/PP-OCRv5/cj_PP-OCRv5_keys.txt",
           "url": "https://offline-translator.davidv.dev/ocr/1/PP-OCRv5/cj_PP-OCRv5_keys.txt",
           "role": "keys",
@@ -12890,7 +12882,7 @@
         },
         {
           "name": "PP-OCRv6_small_keys.txt",
-          "sizeBytes": 74947,
+          "sizeBytes": 93655,
           "installPath": "ppocr/PP-OCRv6/PP-OCRv6_small_keys.txt",
           "url": "https://offline-translator.davidv.dev/ocr/1/PP-OCRv6/PP-OCRv6_small_keys.txt",
           "role": "keys",

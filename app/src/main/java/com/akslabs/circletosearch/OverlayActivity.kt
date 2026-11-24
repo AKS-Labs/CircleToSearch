@@ -39,6 +39,17 @@ class OverlayActivity : ComponentActivity() {
     private val searchModeOverride = androidx.compose.runtime.mutableStateOf<Boolean?>(null)
     private var translateBridge: AssistantTranslateOverlayBridge? = null
 
+    // Full-kill close: closeOverlay parks this task instead of finishing it
+    // (finishing while front-most is what surfaced the launcher). But the parked
+    // instance keeps its last rendered frame, so the next trigger resumed the
+    // OLD capture for a frame before onNewIntent swapped it — a visible flash.
+    // Once the close has fully hidden us (onStop), finish for real so the next
+    // trigger starts from a fresh onCreate, whose first frame already carries
+    // the new capture. Cancelled if we are re-triggered before it fires.
+    private var killWhenHidden = false
+    private val killHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val finishWhenHidden = Runnable { finish() }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         window.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(0))
         enableEdgeToEdge()
@@ -82,9 +93,24 @@ class OverlayActivity : ComponentActivity() {
                     CircleToSearchScreen(
                         capturedScreenshot = screenshotBitmap.value,
                         searchModeOverride = searchModeOverride.value,
-                        onClose = { 
+                        onClose = {
                             BitmapRepository.clear()
-                            finish() 
+                            com.akslabs.circletosearch.utils.InstantOcrStore.clear()
+                            killWhenHidden = true
+                            // Kill only the overlay: park this task behind the
+                            // app in use (instant reveal, no launch animation),
+                            // then verify what surfaced and repair to the seeded
+                            // app if the stack beneath was wrong (see
+                            // closeOverlay). Never finish — the parked task is
+                            // reused via onNewIntent on the next trigger.
+                            val svc = com.akslabs.circletosearch.CircleToSearchAccessibilityService.instance
+                            if (svc != null) {
+                                svc.closeOverlay(this@OverlayActivity)
+                            } else {
+                                // Accessibility service not running: we have no
+                                // seeded target — park only, never finish.
+                                moveTaskToBack(true)
+                            }
                         }
                     )
                 }
@@ -106,6 +132,10 @@ class OverlayActivity : ComponentActivity() {
         super.onNewIntent(intent)
         android.util.Log.d("CircleToSearch", "OverlayActivity onNewIntent - Resetting state")
         setIntent(intent)
+
+        // Re-triggered before the pending kill fired: this instance stays.
+        killWhenHidden = false
+        killHandler.removeCallbacks(finishWhenHidden)
         
         // IMMEDIATE NULLING to prevent flash of previous screen
         screenshotBitmap.value = null
@@ -133,8 +163,45 @@ class OverlayActivity : ComponentActivity() {
         }
     }
     
+    override fun onStart() {
+        super.onStart()
+        // While Circle to Search is in front, park the bottom-edge long-press
+        // triggers: they are TYPE_ACCESSIBILITY_OVERLAY windows that float above
+        // this activity and their corner arcs overlap the bottom bar's outer
+        // buttons, swallowing taps (the trigger is pointless while CTS is open).
+        com.akslabs.circletosearch.CircleToSearchAccessibilityService.instance
+            ?.setBottomEdgeHidden(true)
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // Overlay left the foreground (closed or backgrounded): bring the triggers
+        // back so they work again over regular apps.
+        com.akslabs.circletosearch.CircleToSearchAccessibilityService.instance
+            ?.setBottomEdgeHidden(false)
+
+        // The close has fully hidden us: nobody can see the task end, so kill
+        // the parked instance (a beat past the task transition) instead of
+        // keeping it around — the next trigger then starts fresh instead of
+        // flashing this session's capture. Removing a background task cannot
+        // surface the launcher over the app just brought to front.
+        if (killWhenHidden) {
+            killWhenHidden = false
+            killHandler.postDelayed(finishWhenHidden, KILL_AFTER_HIDE_DELAY_MS)
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Belt-and-braces alongside onNewIntent: if we are visible again the
+        // parked kill must never fire.
+        killWhenHidden = false
+        killHandler.removeCallbacks(finishWhenHidden)
+    }
+
     override fun onDestroy() {
         super.onDestroy()
+        killHandler.removeCallbacks(finishWhenHidden)
         translateBridge?.let {
             AssistantTranslateOverlay.detach(it)
             it.destroy()
@@ -142,7 +209,14 @@ class OverlayActivity : ComponentActivity() {
         translateBridge = null
         if (isFinishing) {
              com.akslabs.circletosearch.data.BitmapRepository.clear()
+             com.akslabs.circletosearch.utils.InstantOcrStore.clear()
              com.akslabs.circletosearch.utils.StorageUtils.clearAppCache(this)
         }
+    }
+
+    companion object {
+        /** Grace after being hidden before the parked task is finished, so the
+         *  kill never lands mid task-transition. */
+        private const val KILL_AFTER_HIDE_DELAY_MS = 500L
     }
 }

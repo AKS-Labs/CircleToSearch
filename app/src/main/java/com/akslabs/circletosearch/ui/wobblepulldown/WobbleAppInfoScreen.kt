@@ -121,6 +121,7 @@ private data class AppInfoData(
 )
 
 private val HW_TRIGGER_KEYS = listOf(
+    "trigger_double_tap_notch",
     "trigger_double_vol_up",
     "trigger_double_vol_down",
     "trigger_long_vol_up",

@@ -20,14 +20,15 @@
 package com.akslabs.circletosearch.data
 
 import android.content.Context
+import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import com.akslabs.circletosearch.R
 
-sealed class SearchEngine(@StringRes val displayNameRes: Int) {
-    object Google : SearchEngine(R.string.engine_google)
-    object Bing : SearchEngine(R.string.engine_bing)
-    object Yandex : SearchEngine(R.string.engine_yandex)
-    object TinEye : SearchEngine(R.string.engine_tineye)
+sealed class SearchEngine(@StringRes val displayNameRes: Int, @DrawableRes val iconRes: Int) {
+    object Google : SearchEngine(R.string.engine_google, R.drawable.ic_engine_google)
+    object Bing : SearchEngine(R.string.engine_bing, R.drawable.ic_engine_bing)
+    object Yandex : SearchEngine(R.string.engine_yandex, R.drawable.ic_engine_yandex)
+    object TinEye : SearchEngine(R.string.engine_tineye, R.drawable.ic_engine_tineye)
 
     companion object {
         fun values(): List<SearchEngine> = listOf(Google, Bing, Yandex, TinEye)

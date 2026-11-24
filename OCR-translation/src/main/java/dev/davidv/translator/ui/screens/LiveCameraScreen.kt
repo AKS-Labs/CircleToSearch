@@ -237,6 +237,15 @@ fun LiveCameraScreen(
           onRequest = { requestPermission.launch(Manifest.permission.CAMERA) },
           onCancel = onClose,
         )
+      else ->
+        // Permission dialog in flight (or its launch failed): show a spinner
+        // instead of a dead black frame so the screen never looks frozen.
+        Box(
+          modifier = Modifier.fillMaxSize(),
+          contentAlignment = Alignment.Center,
+        ) {
+          androidx.compose.material3.CircularProgressIndicator(color = Color.White)
+        }
     }
   }
 }
@@ -808,19 +817,46 @@ private fun CameraSurface(
       )
     }
 
-    TopLanguagePills(
-      from = from,
-      to = to,
-      isAutoSource = isAutoSource,
-      canSwap = canSwap,
-      onMessage = onMessage,
-      onOpenLanguagePicker = openLanguagePicker,
+    Column(
       modifier =
         Modifier
           .fillMaxWidth()
           .statusBarsPadding()
           .padding(horizontal = 8.dp, vertical = 4.dp),
-    )
+      horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+      TopLanguagePills(
+        from = from,
+        to = to,
+        isAutoSource = isAutoSource,
+        canSwap = canSwap,
+        onMessage = onMessage,
+        onOpenLanguagePicker = openLanguagePicker,
+        modifier = Modifier.fillMaxWidth(),
+      )
+
+      // OCR and language detection ship in the APK, but showing translated text
+      // needs the target language's translation pack. Without one the live
+      // overlay would only ever show recognized text — say so, and open the
+      // picker (which downloads) on tap.
+      if (languageState.availabilityFor(to)?.translatorFiles != true) {
+        Box(
+          modifier =
+            Modifier
+              .padding(top = 6.dp)
+              .clip(RoundedCornerShape(50))
+              .background(Color.Black.copy(alpha = 0.5f))
+              .clickable { openLanguagePicker(false) }
+              .padding(horizontal = 14.dp, vertical = 6.dp),
+        ) {
+          Text(
+            text = stringResource(R.string.camera_translation_pack_missing, to.localizedName()),
+            color = Color.White,
+            style = MaterialTheme.typography.bodySmall,
+          )
+        }
+      }
+    }
 
     BottomControls(
       torchOn = torchOn,
@@ -860,8 +896,12 @@ private fun CameraSurface(
                   outputFile,
                 )
               isCapturing = false
+              // No onClose() here: the caller decides where the captured image
+              // goes (TranslatorApp pops to main, creating it when the camera
+              // was deep-linked). Closing here finished the activity when no
+              // main sat beneath the deep-linked camera, bouncing the user
+              // straight back to Circle to Search mid-capture.
               onImageCaptured(uri)
-              onClose()
             }
 
             override fun onError(exception: ImageCaptureException) {
@@ -1002,16 +1042,9 @@ private fun BottomControls(
       )
     }
 
-    Box(
-      modifier =
-        Modifier
-          .size(72.dp)
-          .clip(CircleShape)
-          .border(4.dp, Color.White, CircleShape)
-          .padding(6.dp)
-          .clip(CircleShape)
-          .background(if (isCapturing) Color.White.copy(alpha = 0.5f) else Color.White)
-          .clickable(enabled = !isCapturing, onClick = onCapture),
+    ScallopedCaptureButton(
+      isCapturing = isCapturing,
+      onClick = onCapture,
     )
 
     IconButton(onClick = onLiveOverlayToggle) {

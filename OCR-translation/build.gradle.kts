@@ -184,6 +184,17 @@ val abiToBindingsTask =
             inputs.file(bindingsRootDir.resolve("Cargo.lock"))
             inputs.file(bindingsRootDir.resolve(".cargo/config.toml"))
             inputs.dir(bindingsRootDir.resolve("src"))
+            // The actual Rust implementation lives in the vendored workspace.
+            // Without these, edits under vendor/translator-rs never invalidate
+            // this task, cargo is skipped as UP-TO-DATE, and libbindings.so (+
+            // the uniffi metadata inside it) goes stale — e.g. a newly added
+            // OcrSourceSelection variant never reaches the Kotlin bindings.
+            inputs.dir(bindingsRootDir.resolve("vendor/translator-rs/crates"))
+            inputs.dir(bindingsRootDir.resolve("vendor/translator-rs/src"))
+            inputs.dir(bindingsRootDir.resolve("vendor/translator-rs/tests"))
+            inputs.dir(bindingsRootDir.resolve("vendor/translator-rs/data"))
+            inputs.file(bindingsRootDir.resolve("vendor/translator-rs/Cargo.toml"))
+            inputs.file(bindingsRootDir.resolve("vendor/translator-rs/Cargo.lock"))
             inputs.property("cargoTarget", cargoTarget)
             inputs.property("androidApi", bindingsAndroidApi)
             inputs.property("androidNdkRoot", ndkDir)

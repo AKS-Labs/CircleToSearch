@@ -164,6 +164,10 @@ class TranslationCoordinator(
     onMissingDetectedLanguage: (Language) -> Unit = {},
     onOcrUnavailable: () -> Unit = {},
     onDetectedRegions: (List<uniffi.translator_core.OrientedRect>, Int, Int) -> Unit = { _, _, _ -> },
+    /** Boxes already detected for THIS bitmap (e.g. reused from the Circle to
+     *  Search capture-time scan, remapped into its coordinates) — skips the
+     *  detector run. Null re-detects, as before. */
+    precomputedDetection: List<uniffi.translator_core.DetectedTextBox>? = null,
   ): ProcessedImageResult? =
     withContext(Dispatchers.IO) {
       _isTranslating.value = true
@@ -199,12 +203,13 @@ class TranslationCoordinator(
         NativeBitmap.unlockPixels(finalBitmap)
 
         val detection =
-          try {
-            catalog.ocrImageDetect(ocrImage, maxImageSize)
-          } catch (e: uniffi.bindings.CatalogException) {
-            Log.d("OCR", "detect failed: ${e.message}")
-            null
-          }
+          precomputedDetection
+            ?: try {
+              catalog.ocrImageDetect(ocrImage, maxImageSize, sourceSelection)
+            } catch (e: uniffi.bindings.CatalogException) {
+              Log.d("OCR", "detect failed: ${e.message}")
+              null
+            }
         detection?.let { boxes ->
           onDetectedRegions(boxes.map { it.orientedBox }, finalBitmap.width, finalBitmap.height)
         }
@@ -339,7 +344,7 @@ class TranslationCoordinator(
 
         val detection =
           try {
-            catalog.ocrImageDetect(ocrImage, maxImageSize)
+            catalog.ocrImageDetect(ocrImage, maxImageSize, sourceSelection)
           } catch (e: uniffi.bindings.CatalogException) {
             Log.d("OCR", "detect failed: ${e.message}")
             null
@@ -348,12 +353,12 @@ class TranslationCoordinator(
           onDetectedRegions(boxes.map { it.orientedBox }, bitmap.width, bitmap.height)
         }
 
-        val planCall = { sel: OcrSourceSelection ->
+        val planCall = { sel: OcrSourceSelection, target: Language ->
           catalog.ocrImagePlan(
             ocrImage,
             maxImageSize,
             sel,
-            to,
+            target,
             minConfidence,
             readingOrder,
             backgroundMode,
@@ -362,7 +367,7 @@ class TranslationCoordinator(
         }
         val plan =
           try {
-            planCall(sourceSelection)
+            planCall(sourceSelection, to)
           } catch (e: uniffi.bindings.CatalogException) {
             // Auto's CLD pass declines on short/ambiguous text or an uninstalled
             // detected->target pair, both reported as the same error. Callers that only
@@ -373,21 +378,44 @@ class TranslationCoordinator(
             val detectedSourceFailed =
               sourceSelection is OcrSourceSelection.Auto &&
                 e.message.orEmpty().contains("could not detect image source language")
-            if (!detectedSourceFailed) {
+            // A MissingAsset naming a `from->to` pair means the *translation* pack is
+            // missing (only OCR packs are bundled), not the OCR models: recognition
+            // already succeeded, and this words-only caller discards the translation
+            // result. Retry with the missing pair's source as the target — source ==
+            // target makes the translation stage an identity pass over the same
+            // correctly recognized words.
+            val identityTarget =
+              if (e is uniffi.bindings.CatalogException.MissingAsset) {
+                detectedLanguageCodeFromMissingAsset(e.message)?.let(catalog::languageByCode)
+              } else {
+                null
+              }
+            if (!detectedSourceFailed && identityTarget != null) {
+              Log.d("OCR", "missing translation pair to ${to.code}; retrying identity source=${identityTarget.code}: ${e.message}")
+              try {
+                planCall(sourceSelection, identityTarget)
+              } catch (identityRetry: uniffi.bindings.CatalogException) {
+                Log.d("OCR", "ocr plan failed: ${identityRetry.message}")
+                if (identityRetry is uniffi.bindings.CatalogException.MissingAsset) onOcrUnavailable()
+                ocrImage.close()
+                return@withContext null
+              }
+            } else if (!detectedSourceFailed) {
               Log.d("OCR", "ocr plan failed: ${e.message}")
               if (e is uniffi.bindings.CatalogException.MissingAsset) onOcrUnavailable()
               ocrImage.close()
               return@withContext null
-            }
-            Log.d("OCR", "auto source detect failed, retrying as source=${to.code}: ${e.message}")
-            try {
-              planCall(OcrSourceSelection.Specific(uniffi.translator_core.LanguageCode(to.code)))
-            } catch (retry: uniffi.bindings.CatalogException) {
-              Log.d("OCR", "ocr plan failed: ${retry.message}")
-              if (retry is uniffi.bindings.CatalogException.MissingAsset) onOcrUnavailable()
-              onAutoSourceFailed()
-              ocrImage.close()
-              return@withContext null
+            } else {
+              Log.d("OCR", "auto source detect failed, retrying as source=${to.code}: ${e.message}")
+              try {
+                planCall(OcrSourceSelection.Specific(uniffi.translator_core.LanguageCode(to.code)), to)
+              } catch (retry: uniffi.bindings.CatalogException) {
+                Log.d("OCR", "ocr plan failed: ${retry.message}")
+                if (retry is uniffi.bindings.CatalogException.MissingAsset) onOcrUnavailable()
+                onAutoSourceFailed()
+                ocrImage.close()
+                return@withContext null
+              }
             }
           }
         Log.i("TranslationCoordinator", "ocrWordsOnly: ${System.currentTimeMillis() - ocrStart}ms")
@@ -397,6 +425,7 @@ class TranslationCoordinator(
             extractedText = plan.extractedText,
             imageWidth = bitmap.width,
             imageHeight = bitmap.height,
+            detection = detection ?: emptyList(),
           )
         ocrImage.close()
         result
@@ -560,4 +589,7 @@ data class OcrWordsResult(
   val extractedText: String,
   val imageWidth: Int,
   val imageHeight: Int,
+  /** Full-resolution detection boxes from the same scan — lets callers skip a
+   *  redundant detector run when translating the exact same image later. */
+  val detection: List<uniffi.translator_core.DetectedTextBox> = emptyList(),
 )
