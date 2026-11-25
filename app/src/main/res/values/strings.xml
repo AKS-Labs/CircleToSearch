@@ -99,6 +99,13 @@
     <string name="label_camera">Camera</string>
     <string name="label_translate_screen">Screen</string>
     <string name="toast_image_load_failed">Unable to load that image</string>
+    <string name="picker_title">Add an image</string>
+    <string name="picker_subtitle">Take a new photo, or pick one you already have.</string>
+    <string name="picker_camera_caption">Take a photo</string>
+    <string name="picker_gallery_caption">Choose existing</string>
+    <string name="picker_no_camera">No camera app found</string>
+    <string name="picker_camera_permission_denied">Camera access is needed to take a photo</string>
+    <string name="picker_camera_unavailable">Could not open the camera</string>
     <string name="label_share">Share</string>
     <string name="label_extracting_entities">Extracting links &amp; info\u2026</string>
     <string name="label_open_app">Open: %1$s</string>

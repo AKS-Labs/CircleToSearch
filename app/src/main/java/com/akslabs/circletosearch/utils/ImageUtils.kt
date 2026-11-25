@@ -109,6 +109,35 @@ object ImageUtils {
      * keeps its original dimensions and proportions — the display fits it to the screen
      * (ContentScale.Fit) instead of cropping or stretching it.
      */
+    /**
+     * The photo a camera handed back inside its result intent.
+     *
+     * `ACTION_IMAGE_CAPTURE` asks the camera to write to `EXTRA_OUTPUT`, but some OEM
+     * cameras ignore that and deliver the photo themselves instead: the image as a
+     * `data` URI, or a small thumbnail as a `"data"` Bitmap extra. Neither is reachable
+     * from the output file, so without this a just-taken photo would be thrown away as
+     * "nothing was written".
+     *
+     * Returns null when the intent carries neither, so the caller can keep treating
+     * the capture as empty.
+     */
+    fun extractPhotoUri(context: Context, intent: android.content.Intent): android.net.Uri? {
+        // A data URI is the good case: it is the real, full-size photo.
+        intent.data?.let { return it }
+        // Fall back to the thumbnail some cameras return. It is small, but it is the
+        // only image there is, and Circle to Search still works on it.
+        @Suppress("DEPRECATION")
+        val thumbnail = intent.getParcelableExtra<Bitmap>("data") ?: return null
+        return try {
+            val file = File(context.cacheDir, "camera_thumb_${System.currentTimeMillis()}.jpg")
+            FileOutputStream(file).use { thumbnail.compress(Bitmap.CompressFormat.JPEG, 95, it) }
+            android.net.Uri.fromFile(file)
+        } catch (e: Exception) {
+            android.util.Log.e("ImageUtils", "Failed to persist camera thumbnail", e)
+            null
+        }
+    }
+
     fun loadImageUri(context: Context, uri: android.net.Uri, maxPixels: Int): Bitmap? =
         try {
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
