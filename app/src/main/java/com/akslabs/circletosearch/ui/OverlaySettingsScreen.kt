@@ -23,6 +23,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -43,6 +44,7 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.Outline
@@ -377,7 +379,7 @@ private fun SettingsRootScreen(
                 .background(MaterialTheme.colorScheme.surfaceContainerLowest, RoundedCornerShape(28.dp)),
         ) {
             SettingsItemRow(
-                icon = Icons.Default.Bolt,
+                icon = { PreloadSpinnerGlyph() },
                 title = stringResource(R.string.settings_preload_title),
                 subtitle = stringResource(R.string.settings_preload_subtitle),
                 arrowRotation = preloadArrowRotation,
@@ -404,7 +406,14 @@ private fun SettingsRootScreen(
             }
             SettingsGroupDivider()
             SettingsItemRow(
-                icon = Icons.Default.DragHandle,
+                icon = {
+                    Icon(
+                        imageVector = Icons.Default.DragIndicator,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp),
+                    )
+                },
                 title = stringResource(R.string.settings_rearrange_tabs_title),
                 subtitle = stringResource(R.string.settings_rearrange_tabs_subtitle),
                 arrowRotation = arrowRotation,
@@ -1109,31 +1118,12 @@ private fun GeneralSettingsScreen(onBack: () -> Unit) {
     }
 }
 
-/** Tonal 32dp icon tile for a settings row: rounded container with a
- *  primary-tinted glyph — the leading visual anchor of a row item. */
-@Composable
-private fun SettingsRowIcon(icon: ImageVector) {
-    Box(
-        modifier = Modifier
-            .size(32.dp)
-            .clip(RoundedCornerShape(10.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(18.dp),
-        )
-    }
-}
-
-/** A settings row item inside a group: tonal icon tile, title + supporting
- *  text and a rotating chevron — tap toggles the row's expandable section. */
+/** A settings row item inside a group: tonal 32dp icon tile (rendering the
+ *  [icon] glyph slot), title + supporting text and a rotating chevron — tap
+ *  toggles the row's expandable section. */
 @Composable
 private fun SettingsItemRow(
-    icon: ImageVector,
+    icon: @Composable () -> Unit,
     title: String,
     subtitle: String,
     arrowRotation: Float,
@@ -1146,7 +1136,15 @@ private fun SettingsItemRow(
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        SettingsRowIcon(icon)
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+            contentAlignment = Alignment.Center,
+        ) {
+            icon()
+        }
         Spacer(modifier = Modifier.width(16.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(text = title, style = MaterialTheme.typography.bodyLarge)
@@ -1163,6 +1161,32 @@ private fun SettingsItemRow(
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.rotate(arrowRotation),
         )
+    }
+}
+
+/** Static activity-spinner glyph for the preload row: 6 primary-tinted
+ *  round-capped dashes fading clockwise from the head at 12 o'clock. The color
+ *  is hoisted out of the Canvas — composable reads are illegal inside DrawScope. */
+@Composable
+private fun PreloadSpinnerGlyph() {
+    val primaryColor = MaterialTheme.colorScheme.primary
+    Canvas(modifier = Modifier.size(20.dp)) {
+        val dashCount = 8
+        val strokeWidth = 2.dp.toPx()
+        val outerRadius = size.minDimension / 2f - strokeWidth / 2f
+        val innerRadius = outerRadius - 4.5.dp.toPx()
+        for (i in 0 until dashCount) {
+            val angle = Math.toRadians(i * (360.0 / dashCount) - 90.0)
+            val dirX = cos(angle).toFloat()
+            val dirY = sin(angle).toFloat()
+            drawLine(
+                color = primaryColor.copy(alpha = 0.15f + 0.85f * (1f - i / dashCount.toFloat())),
+                start = Offset(center.x + innerRadius * dirX, center.y + innerRadius * dirY),
+                end = Offset(center.x + outerRadius * dirX, center.y + outerRadius * dirY),
+                strokeWidth = strokeWidth,
+                cap = StrokeCap.Round,
+            )
+        }
     }
 }
 
