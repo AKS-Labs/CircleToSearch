@@ -77,14 +77,24 @@ val bindingsAndroidApi = 29
 
 fun jniLibAbiDir(abi: String) = File(jniLibsRootDir, abi)
 
+val isWindows = org.gradle.internal.os.OperatingSystem.current().isWindows
+
+// NDK prebuilt host tag differs per host OS; CI runs linux-x86_64.
+val ndkHostTag =
+    when {
+        isWindows -> "windows-x86_64"
+        org.gradle.internal.os.OperatingSystem.current().isMacOsX -> "darwin-x86_64"
+        else -> "linux-x86_64"
+    }
+
 // Short, space-free cargo home + target dir: absolute host paths get baked
 // into ninja object dirs (260-char Windows limit), so both must stay short.
-val shortCargoHome = "C:/cgo"
-val shortCargoTargetDir = "C:/ct"
+val shortCargoHome = if (isWindows) "C:/cgo" else "/tmp/cgo"
+val shortCargoTargetDir = if (isWindows) "C:/ct" else "/tmp/ct"
 
-val ndkLlvmPrebuiltFw = "$ndkDir/toolchains/llvm/prebuilt/windows-x86_64".replace('\\', '/')
+val ndkLlvmPrebuiltFw = "$ndkDir/toolchains/llvm/prebuilt/$ndkHostTag".replace('\\', '/')
 val ndkClangIncludeFw =
-    fileTree("$ndkDir/toolchains/llvm/prebuilt/windows-x86_64") {
+    fileTree("$ndkDir/toolchains/llvm/prebuilt/$ndkHostTag") {
         include("lib/clang/*/include/stddef.h")
     }.files.firstOrNull()?.parent?.replace('\\', '/')
         ?: error("clang include dir not found under $ndkDir")
@@ -110,17 +120,11 @@ fun clangRtLib(abi: String): String {
             "x86_64" -> "x86_64-android"
             else -> error("Unknown abi $abi")
         }
-    val hostOs =
-        when {
-            org.gradle.internal.os.OperatingSystem.current().isWindows -> "windows-x86_64"
-            org.gradle.internal.os.OperatingSystem.current().isMacOsX -> "darwin-x86_64"
-            else -> "linux-x86_64"
-        }
     val hits =
-        fileTree("$ndkDir/toolchains/llvm/prebuilt/$hostOs") {
-            include("lib/clang/*/lib/$hostOs/libclang_rt.builtins-$rtArch.a")
+        fileTree("$ndkDir/toolchains/llvm/prebuilt/$ndkHostTag") {
+            include("lib/clang/*/lib/$ndkHostTag/libclang_rt.builtins-$rtArch.a")
         }.files +
-            fileTree("$ndkDir/toolchains/llvm/prebuilt/$hostOs") {
+            fileTree("$ndkDir/toolchains/llvm/prebuilt/$ndkHostTag") {
                 include("lib/clang/*/lib/linux/libclang_rt.builtins-$rtArch.a")
             }.files
     return (hits.firstOrNull()?.absolutePath
@@ -208,7 +212,12 @@ val abiToBindingsTask =
                     workingDir = bindingsRootDir
                     environment("ANDROID_NDK_ROOT", ndkDir)
                     environment("ANDROID_NDK_HOME", ndkDir)
-                    environment("LIBCLANG_PATH", llvmDllDir)
+                    // bindgen's libclang.dll only exists on Windows dev machines;
+                    // on CI, bindgen resolves the system libclang instead, so
+                    // don't point it at a nonexistent dir.
+                    File(llvmDllDir).takeIf { it.exists() }?.let {
+                        environment("LIBCLANG_PATH", it.absolutePath)
+                    }
                     environment("CARGO_HOME", shortCargoHome)
                     environment("CARGO_TARGET_DIR", shortCargoTargetDir)
                     environment("BINDGEN_EXTRA_CLANG_ARGS_aarch64-linux-android", bindgenExtraArgs)
