@@ -196,7 +196,12 @@ val abiToBindingsTask =
             inputs.dir(bindingsRootDir.resolve("vendor/translator-rs/crates"))
             inputs.dir(bindingsRootDir.resolve("vendor/translator-rs/src"))
             inputs.dir(bindingsRootDir.resolve("vendor/translator-rs/tests"))
-            inputs.dir(bindingsRootDir.resolve("vendor/translator-rs/data"))
+            // data/ holds gitignored test assets (sample images/texts), so it only
+            // exists on dev machines — git never creates empty dirs on checkout,
+            // and declaring the missing dir fails task validation on CI.
+            bindingsRootDir.resolve("vendor/translator-rs/data")
+                .takeIf { it.exists() }
+                ?.let { inputs.dir(it) }
             inputs.file(bindingsRootDir.resolve("vendor/translator-rs/Cargo.toml"))
             inputs.file(bindingsRootDir.resolve("vendor/translator-rs/Cargo.lock"))
             inputs.property("cargoTarget", cargoTarget)
