@@ -69,7 +69,15 @@ val sdkCmakeBinDir =
         System.getenv("ANDROID_SDK_ROOT"),
         File(ndkDir).parentFile?.parentFile?.absolutePath,
     ).asSequence()
-        .map { File(File(it, "cmake"), "").listFiles()?.maxByOrNull { f -> f.name } }
+        .map { File(File(it, "cmake"), "").listFiles()?.toList().orEmpty() }
+        .map { versions ->
+            // Prefer CMake 3.x: CMake 4.x removed support for the legacy
+            // cmake_minimum_required the vendored C++ deps declare (CI's SDK
+            // ships 4.x). Fall back to whatever is there if only 4.x exists.
+            versions.filter { !it.name.startsWith("4") }
+                .ifEmpty { versions }
+                .maxByOrNull { f -> f.name }
+        }
         .filterNotNull()
         .map { File(it, "bin").absolutePath }
         .firstOrNull { File(it).exists() }
@@ -246,6 +254,11 @@ val abiToBindingsTask =
                     environment("ANDROID_ABI", abi)
                     environment("ANDROID_PLATFORM", "android-$bindingsAndroidApi")
                     environment("CMAKE_GENERATOR", "Ninja")
+                    // CMake 4.x (current CI SDK) removed support for
+                    // cmake_minimum_required < 3.5 and the vendored
+                    // slimt/sentencepiece predate that. The escape-hatch env var
+                    // lets them configure anyway; CMake < 4 ignores it.
+                    environment("CMAKE_POLICY_VERSION_MINIMUM", "3.5")
                     commandLine(
                         "cargo",
                         "ndk",
