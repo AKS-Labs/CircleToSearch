@@ -330,25 +330,24 @@ private fun SettingsRootScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = stringResource(R.string.settings_section_behavior).uppercase(),
-            style = MaterialTheme.typography.labelLarge,
-            letterSpacing = 1.2.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(modifier = Modifier.height(10.dp))
-
         // Multi-search preloading lives directly on this screen: which engines
         // load their result tabs automatically and which wait for a manual load.
-        PreloadEnginesCard(uiPreferences = state.uiPreferences)
+        var preloadExpanded by remember { mutableStateOf(false) }
+        val preloadArrowRotation by animateFloatAsState(
+            if (preloadExpanded) 180f else 0f,
+            label = "preloadArrow",
+        )
+        var preloadMap by remember {
+            mutableStateOf(
+                SearchEngine.values().associateWith { state.uiPreferences.isPreloadEnabled(it) },
+            )
+        }
 
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // Rearrange tabs — M3 expressive expandable card: the header toggles it and the
-        // arrow flips; expanded shows BOTH tab strips (multi-search engines + Web-search
-        // engines). The card is drawn with a background shape instead of a clipping
-        // Surface so dragged chips stay visible outside its bounds.
+        // Rearrange tabs — M3 expressive expandable settings rows: each header toggles
+        // its section and the arrow flips; expanded shows the favicon chips (preload)
+        // or BOTH tab strips (multi-search engines + Web-search engines). The group is
+        // drawn with a background shape instead of a clipping Surface so dragged chips
+        // stay visible outside its bounds.
         var tabReorderExpanded by remember { mutableStateOf(false) }
         val arrowRotation by animateFloatAsState(if (tabReorderExpanded) 180f else 0f, label = "rearrangeArrow")
         val imageOrder = remember {
@@ -377,47 +376,47 @@ private fun SettingsRootScreen(
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.surfaceContainerLowest, RoundedCornerShape(28.dp)),
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { tabReorderExpanded = !tabReorderExpanded }
-                    .padding(horizontal = 20.dp, vertical = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(
-                    imageVector = Icons.Default.DragHandle,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(22.dp),
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = stringResource(R.string.settings_rearrange_tabs_title),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = stringResource(R.string.settings_rearrange_tabs_subtitle),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+            SettingsItemRow(
+                icon = Icons.Default.Bolt,
+                title = stringResource(R.string.settings_preload_title),
+                subtitle = stringResource(R.string.settings_preload_subtitle),
+                arrowRotation = preloadArrowRotation,
+                onClick = { preloadExpanded = !preloadExpanded },
+            )
+            AnimatedVisibility(visible = preloadExpanded) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                ) {
+                    SearchEngine.values().forEach { engine ->
+                        EnginePreloadChip(
+                            engine = engine,
+                            enabled = preloadMap[engine] ?: true,
+                            onToggle = { on ->
+                                state.uiPreferences.setPreloadEnabled(engine, on)
+                                preloadMap = preloadMap + (engine to on)
+                            },
+                        )
+                    }
                 }
-                Icon(
-                    imageVector = Icons.Default.KeyboardArrowDown,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.rotate(arrowRotation),
-                )
             }
+            SettingsGroupDivider()
+            SettingsItemRow(
+                icon = Icons.Default.DragHandle,
+                title = stringResource(R.string.settings_rearrange_tabs_title),
+                subtitle = stringResource(R.string.settings_rearrange_tabs_subtitle),
+                arrowRotation = arrowRotation,
+                onClick = { tabReorderExpanded = !tabReorderExpanded },
+            )
             AnimatedVisibility(visible = tabReorderExpanded) {
                 Column {
                     Text(
                         text = stringResource(R.string.settings_tabs_section_multi),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+                        modifier = Modifier.padding(start = 64.dp, end = 16.dp, top = 4.dp, bottom = 4.dp),
                     )
                     EngineOrderChipsRow(
                         imageOrder,
@@ -429,7 +428,7 @@ private fun SettingsRootScreen(
                         text = stringResource(R.string.settings_tabs_section_web),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+                        modifier = Modifier.padding(start = 64.dp, end = 16.dp, top = 4.dp, bottom = 4.dp),
                     )
                     EngineOrderChipsRow(
                         webOrder,
@@ -753,54 +752,6 @@ private fun SettingsRootScreen(
         }
     }
 
-
-/** Per-engine preloading for multi-search as a compact M3 expressive card: the
- *  engines' favicons in one row, each acting as a switch — desaturated and
- *  dimmed when preloading is off for that engine. */
-@Composable
-private fun PreloadEnginesCard(uiPreferences: UIPreferences) {
-    var preloadMap by remember {
-        mutableStateOf(SearchEngine.values().associateWith { uiPreferences.isPreloadEnabled(it) })
-    }
-    Card(
-        shape = RoundedCornerShape(28.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Default.Refresh,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp),
-                )
-                Spacer(modifier = Modifier.width(10.dp))
-                Text(
-                    text = stringResource(R.string.settings_preload_title),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
-            Spacer(modifier = Modifier.height(14.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-            ) {
-                SearchEngine.values().forEach { engine ->
-                    EnginePreloadChip(
-                        engine = engine,
-                        enabled = preloadMap[engine] ?: true,
-                        onToggle = { on ->
-                            uiPreferences.setPreloadEnabled(engine, on)
-                            preloadMap = preloadMap + (engine to on)
-                        },
-                    )
-                }
-            }
-        }
-    }
-}
 
 /** One engine favicon acting as a switch: tap toggles preloading. On chips
  *  show the full-color favicon; off chips desaturate, dim and shrink it. */
@@ -1158,6 +1109,63 @@ private fun GeneralSettingsScreen(onBack: () -> Unit) {
     }
 }
 
+/** Tonal 32dp icon tile for a settings row: rounded container with a
+ *  primary-tinted glyph — the leading visual anchor of a row item. */
+@Composable
+private fun SettingsRowIcon(icon: ImageVector) {
+    Box(
+        modifier = Modifier
+            .size(32.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(18.dp),
+        )
+    }
+}
+
+/** A settings row item inside a group: tonal icon tile, title + supporting
+ *  text and a rotating chevron — tap toggles the row's expandable section. */
+@Composable
+private fun SettingsItemRow(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    arrowRotation: Float,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        SettingsRowIcon(icon)
+        Spacer(modifier = Modifier.width(16.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = title, style = MaterialTheme.typography.bodyLarge)
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Icon(
+            imageVector = Icons.Default.KeyboardArrowDown,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.rotate(arrowRotation),
+        )
+    }
+}
+
 @Composable
 private fun SettingsGroup(
     modifier: Modifier = Modifier,
@@ -1175,7 +1183,7 @@ private fun SettingsGroup(
 @Composable
 private fun SettingsGroupDivider() {
     HorizontalDivider(
-        modifier = Modifier.padding(start = 56.dp),
+        modifier = Modifier.padding(start = 64.dp),
         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.1f),
     )
 }

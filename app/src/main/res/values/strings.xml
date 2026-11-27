@@ -384,6 +384,7 @@
 
     <!-- Multi-search preloading -->
     <string name="settings_preload_title">Preload search engines</string>
+    <string name="settings_preload_subtitle">Choose which engines preload automatically</string>
     <string name="preload_sub_on">Preloads automatically in multi-search</string>
     <string name="preload_sub_off">Loads only when you open its tab</string>
     <string name="preload_off_title">Preloading is off for %1$s</string>
@@ -489,7 +490,6 @@
     <string name="label_email">Email</string>
     <string name="settings_made_by">Made by</string>
     <string name="label_source_code">Source code</string>
-    <string name="settings_section_behavior">Behavior</string>
     <string name="notch_gesture_label">Gesture</string>
     <string name="notch_gesture_double_tap">Double tap</string>
     <string name="notch_gesture_long_press">Long press</string>
