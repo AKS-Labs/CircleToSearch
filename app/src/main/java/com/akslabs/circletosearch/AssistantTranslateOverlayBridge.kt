@@ -426,7 +426,10 @@ class AssistantTranslateOverlayBridge(
   }
 
   private fun fullCaptureRegion(): Rect =
-    dev.davidv.translator.overlayChrome.OverlayInsets.contentBounds(windowManager)
+    dev.davidv.translator.overlayChrome.OverlayInsets.contentBoundsCompat(
+      windowManager,
+      activity.resources,
+    )
 
   private fun beginProvidedTranslation(screenshot: Bitmap) {
     ui.removeTranslationOverlays()

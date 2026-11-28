@@ -27,6 +27,20 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - name: Install cargo-ndk
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-ndk
+
+      # bindgen (via espeak-rs-sys) needs system libclang; cmake checks use ninja
+      - name: Install native build deps
+        run: sudo apt-get update && sudo apt-get install -y libclang-dev ninja-build
+
       - name: Make gradlew executable
         run: chmod +x gradlew
 

@@ -23,6 +23,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -43,6 +44,7 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.Outline
@@ -330,25 +332,24 @@ private fun SettingsRootScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = stringResource(R.string.settings_section_behavior).uppercase(),
-            style = MaterialTheme.typography.labelLarge,
-            letterSpacing = 1.2.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(modifier = Modifier.height(10.dp))
-
         // Multi-search preloading lives directly on this screen: which engines
         // load their result tabs automatically and which wait for a manual load.
-        PreloadEnginesCard(uiPreferences = state.uiPreferences)
+        var preloadExpanded by remember { mutableStateOf(false) }
+        val preloadArrowRotation by animateFloatAsState(
+            if (preloadExpanded) 180f else 0f,
+            label = "preloadArrow",
+        )
+        var preloadMap by remember {
+            mutableStateOf(
+                SearchEngine.values().associateWith { state.uiPreferences.isPreloadEnabled(it) },
+            )
+        }
 
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // Rearrange tabs — M3 expressive expandable card: the header toggles it and the
-        // arrow flips; expanded shows BOTH tab strips (multi-search engines + Web-search
-        // engines). The card is drawn with a background shape instead of a clipping
-        // Surface so dragged chips stay visible outside its bounds.
+        // Rearrange tabs — M3 expressive expandable settings rows: each header toggles
+        // its section and the arrow flips; expanded shows the favicon chips (preload)
+        // or BOTH tab strips (multi-search engines + Web-search engines). The group is
+        // drawn with a background shape instead of a clipping Surface so dragged chips
+        // stay visible outside its bounds.
         var tabReorderExpanded by remember { mutableStateOf(false) }
         val arrowRotation by animateFloatAsState(if (tabReorderExpanded) 180f else 0f, label = "rearrangeArrow")
         val imageOrder = remember {
@@ -377,47 +378,54 @@ private fun SettingsRootScreen(
                 .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.surfaceContainerLowest, RoundedCornerShape(28.dp)),
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { tabReorderExpanded = !tabReorderExpanded }
-                    .padding(horizontal = 20.dp, vertical = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(
-                    imageVector = Icons.Default.DragHandle,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(22.dp),
-                )
-                Spacer(modifier = Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = stringResource(R.string.settings_rearrange_tabs_title),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = stringResource(R.string.settings_rearrange_tabs_subtitle),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+            SettingsItemRow(
+                icon = { PreloadSpinnerGlyph() },
+                title = stringResource(R.string.settings_preload_title),
+                subtitle = stringResource(R.string.settings_preload_subtitle),
+                arrowRotation = preloadArrowRotation,
+                onClick = { preloadExpanded = !preloadExpanded },
+            )
+            AnimatedVisibility(visible = preloadExpanded) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                ) {
+                    SearchEngine.values().forEach { engine ->
+                        EnginePreloadChip(
+                            engine = engine,
+                            enabled = preloadMap[engine] ?: true,
+                            onToggle = { on ->
+                                state.uiPreferences.setPreloadEnabled(engine, on)
+                                preloadMap = preloadMap + (engine to on)
+                            },
+                        )
+                    }
                 }
-                Icon(
-                    imageVector = Icons.Default.KeyboardArrowDown,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.rotate(arrowRotation),
-                )
             }
+            SettingsGroupDivider()
+            SettingsItemRow(
+                icon = {
+                    Icon(
+                        imageVector = Icons.Default.DragIndicator,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp),
+                    )
+                },
+                title = stringResource(R.string.settings_rearrange_tabs_title),
+                subtitle = stringResource(R.string.settings_rearrange_tabs_subtitle),
+                arrowRotation = arrowRotation,
+                onClick = { tabReorderExpanded = !tabReorderExpanded },
+            )
             AnimatedVisibility(visible = tabReorderExpanded) {
                 Column {
                     Text(
                         text = stringResource(R.string.settings_tabs_section_multi),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+                        modifier = Modifier.padding(start = 64.dp, end = 16.dp, top = 4.dp, bottom = 4.dp),
                     )
                     EngineOrderChipsRow(
                         imageOrder,
@@ -429,7 +437,7 @@ private fun SettingsRootScreen(
                         text = stringResource(R.string.settings_tabs_section_web),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+                        modifier = Modifier.padding(start = 64.dp, end = 16.dp, top = 4.dp, bottom = 4.dp),
                     )
                     EngineOrderChipsRow(
                         webOrder,
@@ -753,54 +761,6 @@ private fun SettingsRootScreen(
         }
     }
 
-
-/** Per-engine preloading for multi-search as a compact M3 expressive card: the
- *  engines' favicons in one row, each acting as a switch — desaturated and
- *  dimmed when preloading is off for that engine. */
-@Composable
-private fun PreloadEnginesCard(uiPreferences: UIPreferences) {
-    var preloadMap by remember {
-        mutableStateOf(SearchEngine.values().associateWith { uiPreferences.isPreloadEnabled(it) })
-    }
-    Card(
-        shape = RoundedCornerShape(28.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLowest),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Default.Refresh,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(20.dp),
-                )
-                Spacer(modifier = Modifier.width(10.dp))
-                Text(
-                    text = stringResource(R.string.settings_preload_title),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
-            Spacer(modifier = Modifier.height(14.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-            ) {
-                SearchEngine.values().forEach { engine ->
-                    EnginePreloadChip(
-                        engine = engine,
-                        enabled = preloadMap[engine] ?: true,
-                        onToggle = { on ->
-                            uiPreferences.setPreloadEnabled(engine, on)
-                            preloadMap = preloadMap + (engine to on)
-                        },
-                    )
-                }
-            }
-        }
-    }
-}
 
 /** One engine favicon acting as a switch: tap toggles preloading. On chips
  *  show the full-color favicon; off chips desaturate, dim and shrink it. */
@@ -1158,6 +1118,78 @@ private fun GeneralSettingsScreen(onBack: () -> Unit) {
     }
 }
 
+/** A settings row item inside a group: tonal 32dp icon tile (rendering the
+ *  [icon] glyph slot), title + supporting text and a rotating chevron — tap
+ *  toggles the row's expandable section. */
+@Composable
+private fun SettingsItemRow(
+    icon: @Composable () -> Unit,
+    title: String,
+    subtitle: String,
+    arrowRotation: Float,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+            contentAlignment = Alignment.Center,
+        ) {
+            icon()
+        }
+        Spacer(modifier = Modifier.width(16.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = title, style = MaterialTheme.typography.bodyLarge)
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Icon(
+            imageVector = Icons.Default.KeyboardArrowDown,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.rotate(arrowRotation),
+        )
+    }
+}
+
+/** Static activity-spinner glyph for the preload row: 6 primary-tinted
+ *  round-capped dashes fading clockwise from the head at 12 o'clock. The color
+ *  is hoisted out of the Canvas — composable reads are illegal inside DrawScope. */
+@Composable
+private fun PreloadSpinnerGlyph() {
+    val primaryColor = MaterialTheme.colorScheme.primary
+    Canvas(modifier = Modifier.size(20.dp)) {
+        val dashCount = 8
+        val strokeWidth = 2.dp.toPx()
+        val outerRadius = size.minDimension / 2f - strokeWidth / 2f
+        val innerRadius = outerRadius - 4.5.dp.toPx()
+        for (i in 0 until dashCount) {
+            val angle = Math.toRadians(i * (360.0 / dashCount) - 90.0)
+            val dirX = cos(angle).toFloat()
+            val dirY = sin(angle).toFloat()
+            drawLine(
+                color = primaryColor.copy(alpha = 0.15f + 0.85f * (1f - i / dashCount.toFloat())),
+                start = Offset(center.x + innerRadius * dirX, center.y + innerRadius * dirY),
+                end = Offset(center.x + outerRadius * dirX, center.y + outerRadius * dirY),
+                strokeWidth = strokeWidth,
+                cap = StrokeCap.Round,
+            )
+        }
+    }
+}
+
 @Composable
 private fun SettingsGroup(
     modifier: Modifier = Modifier,
@@ -1175,7 +1207,7 @@ private fun SettingsGroup(
 @Composable
 private fun SettingsGroupDivider() {
     HorizontalDivider(
-        modifier = Modifier.padding(start = 56.dp),
+        modifier = Modifier.padding(start = 64.dp),
         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.1f),
     )
 }

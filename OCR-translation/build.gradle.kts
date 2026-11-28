@@ -44,6 +44,10 @@ android {
 
     lint {
         disable += "MissingTranslation"
+        // The vendored dev.davidv.translator sources stay frozen (see the header
+        // note), so their pre-existing lint debt lives in a baseline file and CI
+        // fails only on NEW issues in this module.
+        baseline = file("lint-baseline.xml")
     }
 }
 
@@ -69,7 +73,15 @@ val sdkCmakeBinDir =
         System.getenv("ANDROID_SDK_ROOT"),
         File(ndkDir).parentFile?.parentFile?.absolutePath,
     ).asSequence()
-        .map { File(File(it, "cmake"), "").listFiles()?.maxByOrNull { f -> f.name } }
+        .map { File(File(it, "cmake"), "").listFiles()?.toList().orEmpty() }
+        .map { versions ->
+            // Prefer CMake 3.x: CMake 4.x removed support for the legacy
+            // cmake_minimum_required the vendored C++ deps declare (CI's SDK
+            // ships 4.x). Fall back to whatever is there if only 4.x exists.
+            versions.filter { !it.name.startsWith("4") }
+                .ifEmpty { versions }
+                .maxByOrNull { f -> f.name }
+        }
         .filterNotNull()
         .map { File(it, "bin").absolutePath }
         .firstOrNull { File(it).exists() }
@@ -77,14 +89,24 @@ val bindingsAndroidApi = 29
 
 fun jniLibAbiDir(abi: String) = File(jniLibsRootDir, abi)
 
+val isWindows = org.gradle.internal.os.OperatingSystem.current().isWindows
+
+// NDK prebuilt host tag differs per host OS; CI runs linux-x86_64.
+val ndkHostTag =
+    when {
+        isWindows -> "windows-x86_64"
+        org.gradle.internal.os.OperatingSystem.current().isMacOsX -> "darwin-x86_64"
+        else -> "linux-x86_64"
+    }
+
 // Short, space-free cargo home + target dir: absolute host paths get baked
 // into ninja object dirs (260-char Windows limit), so both must stay short.
-val shortCargoHome = "C:/cgo"
-val shortCargoTargetDir = "C:/ct"
+val shortCargoHome = if (isWindows) "C:/cgo" else "/tmp/cgo"
+val shortCargoTargetDir = if (isWindows) "C:/ct" else "/tmp/ct"
 
-val ndkLlvmPrebuiltFw = "$ndkDir/toolchains/llvm/prebuilt/windows-x86_64".replace('\\', '/')
+val ndkLlvmPrebuiltFw = "$ndkDir/toolchains/llvm/prebuilt/$ndkHostTag".replace('\\', '/')
 val ndkClangIncludeFw =
-    fileTree("$ndkDir/toolchains/llvm/prebuilt/windows-x86_64") {
+    fileTree("$ndkDir/toolchains/llvm/prebuilt/$ndkHostTag") {
         include("lib/clang/*/include/stddef.h")
     }.files.firstOrNull()?.parent?.replace('\\', '/')
         ?: error("clang include dir not found under $ndkDir")
@@ -110,17 +132,11 @@ fun clangRtLib(abi: String): String {
             "x86_64" -> "x86_64-android"
             else -> error("Unknown abi $abi")
         }
-    val hostOs =
-        when {
-            org.gradle.internal.os.OperatingSystem.current().isWindows -> "windows-x86_64"
-            org.gradle.internal.os.OperatingSystem.current().isMacOsX -> "darwin-x86_64"
-            else -> "linux-x86_64"
-        }
     val hits =
-        fileTree("$ndkDir/toolchains/llvm/prebuilt/$hostOs") {
-            include("lib/clang/*/lib/$hostOs/libclang_rt.builtins-$rtArch.a")
+        fileTree("$ndkDir/toolchains/llvm/prebuilt/$ndkHostTag") {
+            include("lib/clang/*/lib/$ndkHostTag/libclang_rt.builtins-$rtArch.a")
         }.files +
-            fileTree("$ndkDir/toolchains/llvm/prebuilt/$hostOs") {
+            fileTree("$ndkDir/toolchains/llvm/prebuilt/$ndkHostTag") {
                 include("lib/clang/*/lib/linux/libclang_rt.builtins-$rtArch.a")
             }.files
     return (hits.firstOrNull()?.absolutePath
@@ -192,7 +208,12 @@ val abiToBindingsTask =
             inputs.dir(bindingsRootDir.resolve("vendor/translator-rs/crates"))
             inputs.dir(bindingsRootDir.resolve("vendor/translator-rs/src"))
             inputs.dir(bindingsRootDir.resolve("vendor/translator-rs/tests"))
-            inputs.dir(bindingsRootDir.resolve("vendor/translator-rs/data"))
+            // data/ holds gitignored test assets (sample images/texts), so it only
+            // exists on dev machines — git never creates empty dirs on checkout,
+            // and declaring the missing dir fails task validation on CI.
+            bindingsRootDir.resolve("vendor/translator-rs/data")
+                .takeIf { it.exists() }
+                ?.let { inputs.dir(it) }
             inputs.file(bindingsRootDir.resolve("vendor/translator-rs/Cargo.toml"))
             inputs.file(bindingsRootDir.resolve("vendor/translator-rs/Cargo.lock"))
             inputs.property("cargoTarget", cargoTarget)
@@ -208,7 +229,12 @@ val abiToBindingsTask =
                     workingDir = bindingsRootDir
                     environment("ANDROID_NDK_ROOT", ndkDir)
                     environment("ANDROID_NDK_HOME", ndkDir)
-                    environment("LIBCLANG_PATH", llvmDllDir)
+                    // bindgen's libclang.dll only exists on Windows dev machines;
+                    // on CI, bindgen resolves the system libclang instead, so
+                    // don't point it at a nonexistent dir.
+                    File(llvmDllDir).takeIf { it.exists() }?.let {
+                        environment("LIBCLANG_PATH", it.absolutePath)
+                    }
                     environment("CARGO_HOME", shortCargoHome)
                     environment("CARGO_TARGET_DIR", shortCargoTargetDir)
                     environment("BINDGEN_EXTRA_CLANG_ARGS_aarch64-linux-android", bindgenExtraArgs)
@@ -232,6 +258,11 @@ val abiToBindingsTask =
                     environment("ANDROID_ABI", abi)
                     environment("ANDROID_PLATFORM", "android-$bindingsAndroidApi")
                     environment("CMAKE_GENERATOR", "Ninja")
+                    // CMake 4.x (current CI SDK) removed support for
+                    // cmake_minimum_required < 3.5 and the vendored
+                    // slimt/sentencepiece predate that. The escape-hatch env var
+                    // lets them configure anyway; CMake < 4 ignores it.
+                    environment("CMAKE_POLICY_VERSION_MINIMUM", "3.5")
                     commandLine(
                         "cargo",
                         "ndk",

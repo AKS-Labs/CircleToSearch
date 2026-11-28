@@ -128,7 +128,6 @@ private val HW_TRIGGER_KEYS = listOf(
     "trigger_long_vol_up",
     "trigger_long_vol_down",
     "trigger_vol_up_down",
-    "trigger_double_tap_notch",
 )
 
 private val HW_TRIGGER_TITLES = listOf(

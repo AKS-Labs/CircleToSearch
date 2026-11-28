@@ -130,7 +130,12 @@ internal object InstantOcrStore {
     /** Live state of one capture's scan; [regions] lands at detection time (the
      *  screen adopts it for the scan animation), [words] and [detection] at
      *  completion. */
-    class ScanState internal constructor(val bitmap: Bitmap) {
+    class ScanState internal constructor(
+        val bitmap: Bitmap,
+        /** OCR whitelist generation this scan ran under; compared against
+         *  [generation] so a scan that predates a language change is never adopted. */
+        internal val langGeneration: Int,
+    ) {
         @Volatile var regions: DetectedRegions? = null
         @Volatile var words: ImageWordSelection? = null
         @Volatile var detection: List<uniffi.translator_core.DetectedTextBox> = emptyList()
@@ -141,17 +146,30 @@ internal object InstantOcrStore {
     }
 
     @Volatile private var current: ScanState? = null
+    /** Bumped whenever the OCR language whitelist changes. */
+    @Volatile private var generation: Int = 0
 
     /** Marks [bitmap] as the capture being scanned; the previous state is dropped. */
     fun beginScan(bitmap: Bitmap): ScanState {
-        val state = ScanState(bitmap)
+        val state = ScanState(bitmap, generation)
         current = state
         return state
     }
 
+    /**
+     * Invalidates every scan started under an earlier language whitelist. Called
+     * when the user picks different OCR languages: the scan for the current capture
+     * recognized text under the old languages, so neither its words nor its
+     * detection boxes may be reused. Scans begun afterwards adopt normally.
+     */
+    fun invalidateScansForLanguageChange() {
+        generation++
+    }
+
     /** The scan started for this exact bitmap instance, or null when the capture
-     *  did not come from the pre-scan path. */
-    fun stateFor(bitmap: Bitmap): ScanState? = current?.takeIf { it.bitmap === bitmap }
+     *  did not come from the pre-scan path (or its scan used older OCR languages). */
+    fun stateFor(bitmap: Bitmap): ScanState? =
+        current?.takeIf { it.bitmap === bitmap && it.langGeneration == generation }
 
     fun clear() {
         current = null

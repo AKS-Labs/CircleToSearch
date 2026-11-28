@@ -19,6 +19,8 @@
 
 package com.akslabs.circletosearch.ui
 
+import android.Manifest
+import android.content.ActivityNotFoundException
 import android.graphics.Bitmap
 import android.graphics.Rect
 import com.akslabs.circletosearch.AssistSessionService
@@ -215,10 +217,13 @@ import com.akslabs.circletosearch.utils.QrScanner
 import com.akslabs.circletosearch.ui.qrResultShortLabel
 import com.akslabs.circletosearch.utils.InstantOcrScanner
 import com.akslabs.circletosearch.utils.InstantOcrStore
+import com.akslabs.circletosearch.utils.CameraCaptureContract
 import com.akslabs.circletosearch.utils.OcrLanguagePreferences
+import com.akslabs.circletosearch.utils.PendingCameraCapture
 import com.akslabs.circletosearch.utils.UIPreferences
 import com.akslabs.circletosearch.ui.components.MoreAppsBottomSheet
 import com.akslabs.circletosearch.ui.components.DonateBottomSheet
+import com.akslabs.circletosearch.ui.components.ImageSourceSheet
 import dev.davidv.translator.TranslatorApplication
 import dev.davidv.translator.ui.components.DetectedRegions
 import dev.davidv.translator.ui.components.ImageWordSelection
@@ -239,6 +244,8 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import android.os.Build
+import android.util.Log
+import android.widget.Toast
 import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.PushPin
 
@@ -247,6 +254,17 @@ private const val TRANSLATE_TRIGGER_DELAY_MS = 400L
 
 /** Lets the Circle to Search chrome hide before the translator overlay draws. */
 private const val TRANSLATE_HIDE_DELAY_MS = 150L
+
+/**
+ * How long a launched camera capture is waited on for bytes.
+ *
+ * Generous on purpose: cameras that show a close/check preview keep the shot in
+ * memory and only write it to our URI when the user taps check, which is easily a
+ * minute after launch. Giving up early is what used to drop the photo — and the wait
+ * is cheap, because a poll that ends without bytes now leaves the slot intact for
+ * the next resume instead of destroying it.
+ */
+private const val CAPTURE_WAIT_MS = 120_000L
 
 /**
  * Fit (contain) mapping for a bitmap centered in a view — the app-side mirror of the
@@ -484,29 +502,245 @@ fun CircleToSearchScreen(
     // Pixel size of the canvas layer — the image-fit mapping (crop-to-search, chips) needs it.
     var canvasSizePx by remember { mutableStateOf(IntSize.Zero) }
 
-    val pickImageLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.PickVisualMedia()
-    ) { uri ->
-        if (uri != null) {
-            // Decode at original proportions (EXIF-rotated, only sampled past a 12 MP budget).
-            // The display fits the bitmap to the screen, so nothing is cropped or stretched.
-            val maxPixels = 12 * 1000 * 1000
-            scope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                val picked = ImageUtils.loadImageUri(context, uri, maxPixels)
-                if (picked != null) {
+    // Camera-or-gallery sheet behind the Gallery button.
+    var showImageSource by remember { mutableStateOf(false) }
+
+    /** Decodes a picked/captured image into the canvas. Shared by the sheet, the
+     *  system picker and the camera so all three behave identically.
+     *  [deleteAfter] is the camera's temp file: released once decoded, since the
+     *  bitmap is already in memory and the file would otherwise linger in cache. */
+    fun loadPickedImage(uri: android.net.Uri, deleteAfter: java.io.File? = null) {
+        val maxPixels = 12 * 1000 * 1000
+        scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            val picked = ImageUtils.loadImageUri(context, uri, maxPixels)
+            deleteAfter?.delete()
+            if (picked != null) {
+                withContext(Dispatchers.Main) {
+                    showImageSource = false
                     uploadedImage = picked
-                } else {
-                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                        android.widget.Toast.makeText(
-                            context,
-                            context.getString(R.string.toast_image_load_failed),
-                            android.widget.Toast.LENGTH_SHORT,
-                        ).show()
-                    }
+                }
+            } else {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    android.widget.Toast.makeText(
+                        context,
+                        context.getString(R.string.toast_image_load_failed),
+                        android.widget.Toast.LENGTH_SHORT,
+                    ).show()
                 }
             }
         }
     }
+
+    val pickImageLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) {
+            loadPickedImage(uri)
+        }
+    }
+
+    // The APK declares CAMERA — inherited from the bundled translator module's
+    // CameraX live camera — so the row-2 Camera button can only use the module's
+    // live camera once that grant exists.
+    fun hasCameraPermission(): Boolean =
+        androidx.core.content.ContextCompat.checkSelfPermission(
+            context, android.Manifest.permission.CAMERA
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+    // True once a capture has reached the canvas. A camera can deliver its photo
+    // through two channels (the file it wrote, or the result intent); this keeps
+    // the first one from being replaced by the second.
+    var captureDelivered by remember { mutableStateOf(false) }
+
+    // Guards against two poll loops racing over the same slot (resume fires often:
+    // the camera covers this window and hands it back through a stop/start cycle).
+    // An AtomicBoolean rather than Compose state: this is bookkeeping, and flipping it
+    // must not schedule a recomposition from a background thread.
+    val capturePollActive = remember { java.util.concurrent.atomic.AtomicBoolean(false) }
+
+    /**
+     * Collects the photo the camera wrote into our FileProvider slot.
+     *
+     * This overlay is `singleInstance`, so the platform starts the camera in a task
+     * of its own and answers the result request immediately with `RESULT_CANCELED`,
+     * before any photo exists (see `ActivityStarter.sendNewTaskResultRequestIfNeeded`).
+     * The file is therefore the only channel, and it is written *very* late on some
+     * cameras: the LineageOS camera keeps the shot in memory and only copies it into
+     * our URI when the user taps the check button, which can be a minute after launch
+     * and long after this overlay resumed.
+     *
+     * Two things follow, and both are load-bearing:
+     *
+     *  - The slot must be re-granted while waiting. The URI grant is what lets the
+     *    camera open our FileProvider at all, and it does not survive the overlay
+     *    being recreated in the background. Without the re-grant the camera crashes
+     *    on confirm with `Permission Denial: writing ...fileprovider...`.
+     *  - The slot must NOT be torn down for being empty. 0 bytes is the normal state
+     *    until the user confirms; deleting it then is what silently lost the photo
+     *    and dropped the user back on the image-source sheet.
+     *
+     * So: poll while a capture is in flight, re-granting each tick, and only stop when
+     * bytes appear (decode them) or the wait expires (leave the slot alone — a later
+     * resume picks it up again).
+     */
+    fun collectPendingCapture() {
+        val (uri, file) = PendingCameraCapture.peek(context) ?: return
+        if (file == null) return
+        // Another poll loop may already be waiting on this same slot.
+        if (!capturePollActive.compareAndSet(false, true)) return
+        scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                // Poll until the file stops growing: a camera that is still saving
+                // produces a lengthening file, a settled one is safe to decode. The
+                // slot is left untouched throughout, so the camera never loses its
+                // target.
+                var lastLength = -1L
+                var stablePolls = 0
+                val deadline = System.currentTimeMillis() + CAPTURE_WAIT_MS
+                while (System.currentTimeMillis() < deadline) {
+                    // Abandon if the slot was consumed or replaced (a second capture
+                    // was started while this one was still waiting) — the newer one
+                    // owns the slot.
+                    if (PendingCameraCapture.peek(context)?.first?.toString() != uri.toString()) return@launch
+                    // Keep the camera's write access alive: it may not save for a
+                    // minute, and this overlay was recreated in the meantime.
+                    PendingCameraCapture.regrant(context)
+                    val length = file.length()
+                    if (length > 0L) {
+                        if (length == lastLength) {
+                            if (++stablePolls >= 2) break
+                        } else {
+                            stablePolls = 0
+                        }
+                        lastLength = length
+                    }
+                    kotlinx.coroutines.delay(200)
+                }
+                val written = PendingCameraCapture.takeWritten(context)
+                if (written == null) {
+                    // Not a failure — the camera simply has not written yet. Keep the
+                    // slot so the photo is still collected once it lands (this loop
+                    // or the next resume will find it).
+                    android.util.Log.d(
+                        "CircleToSearch",
+                        "Camera capture still empty at ${file.absolutePath}; keeping slot",
+                    )
+                    return@launch
+                }
+                android.util.Log.d(
+                    "CircleToSearch",
+                    "Camera capture collected from disk: ${written.second.length()} bytes",
+                )
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    // A capture means the picker is done; make sure the sheet can't be
+                    // sitting on screen over the new image.
+                    showImageSource = false
+                    captureDelivered = true
+                    loadPickedImage(Uri.fromFile(written.second), deleteAfter = written.second)
+                }
+            } finally {
+                capturePollActive.set(false)
+            }
+        }
+    }
+
+    // Runs on every return to the foreground (the camera covers this window and hands
+    // it back through a stop/start cycle) and once when the overlay is first composed
+    // — which also covers the activity being recreated while the camera was up.
+    //
+    // The grant is re-applied FIRST, before anything looks at the file: recreation
+    // drops it, and the camera cannot save without it (it crashes on confirm with
+    // `Permission Denial: writing ...fileprovider...`). Doing this on resume means the
+    // window is reopened before the user can even reach the camera's check button.
+    androidx.lifecycle.compose.LifecycleResumeEffect(Unit) {
+        if (PendingCameraCapture.hasPending(context)) {
+            PendingCameraCapture.regrant(context)
+            collectPendingCapture()
+        }
+        onPauseOrDispose { }
+    }
+
+    // Held outside the launcher so the permission answer can resume the capture the
+    // user asked for, in the same tap.
+    var captureAfterPermission by remember { mutableStateOf(false) }
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            captureAfterPermission = true
+        } else {
+            showImageSource = false
+            android.widget.Toast.makeText(
+                context,
+                context.getString(R.string.picker_camera_permission_denied),
+                android.widget.Toast.LENGTH_SHORT,
+            ).show()
+        }
+    }
+
+    // The output URI/file live in PendingCameraCapture, NOT in remember: launching a
+    // camera app puts this bitmap-heavy overlay in the background and the activity is
+    // routinely recreated while the user frames the shot. A `remember`-ed URI would
+    // die with that recreation, so the slot is persisted instead.
+    //
+    // This launcher can never be the main path here: because the overlay is
+    // `singleInstance`, the platform starts the camera in its own task and answers
+    // this request with RESULT_CANCELED *immediately*, while the camera is still on
+    // screen and has written nothing. Consuming the slot on that answer — which an
+    // earlier version did — unlinked the 0-byte temp file a moment before the camera
+    // saved into it, so the photo vanished and the user only saw the picker again.
+    // A non-OK answer therefore never touches the slot; only [collectPendingCapture]
+    // reads it, once there are bytes on disk. What remains here is the RESULT_OK
+    // path for cameras that do return a result and for photos returned in the intent.
+    val cameraPreviewLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.TakePicturePreview()
+    ) { bitmap ->
+        showImageSource = false
+        if (bitmap != null) {
+            uploadedImage = bitmap
+        } else {
+            Toast.makeText(
+                context,
+                context.getString(R.string.toast_image_load_failed),
+                Toast.LENGTH_SHORT,
+            ).show()
+        }
+    }
+
+    /** Starts the system camera to capture a preview bitmap. */
+    fun launchSystemCapture() {
+        showImageSource = false
+        try {
+            cameraPreviewLauncher.launch(null)
+        } catch (e: SecurityException) {
+            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+        } catch (e: ActivityNotFoundException) {
+            showImageSource = false
+            android.widget.Toast.makeText(
+                context,
+                context.getString(R.string.picker_no_camera),
+                android.widget.Toast.LENGTH_SHORT,
+            ).show()
+            pickImageLauncher.launch(
+                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+            )
+        } catch (e: Exception) {
+            showImageSource = false
+            android.widget.Toast.makeText(
+                context,
+                context.getString(R.string.picker_camera_unavailable),
+                android.widget.Toast.LENGTH_SHORT,
+            ).show()
+        }
+    }
+
+    LaunchedEffect(captureAfterPermission) {
+        if (captureAfterPermission) {
+            captureAfterPermission = false
+            launchSystemCapture()
+        }
+    }
+
     
     // Initialize preferences
     val uiPreferences = remember { UIPreferences(context) }
@@ -536,6 +770,10 @@ fun CircleToSearchScreen(
     // and this state, so the next screenshot OCR picks them up immediately.
     var showOcrLangDialog by remember { mutableStateOf(false) }
     var ocrCheckedLanguages by remember { mutableStateOf(OcrLanguagePreferences.getChecked(context)) }
+    // Bumped when the user closes the language picker with a changed selection:
+    // the instant OCR must re-run over the current capture with the new
+    // whitelist instead of keeping words recognized under the old one.
+    var ocrScanGeneration by remember { mutableStateOf(0) }
 
     // Material You logic for colors
     val isDark = isSystemInDarkTheme()
@@ -1218,12 +1456,17 @@ fun CircleToSearchScreen(
 
     // Instant OCR: recognize the screenshot's words as soon as it arrives (module
     // pipeline, no translation) — shown as tappable words over the frozen capture.
-    LaunchedEffect(screenshot) {
+    // Keyed on [ocrScanGeneration] too: picking different OCR languages re-runs the
+    // recognition over the same capture with the new whitelist.
+    LaunchedEffect(screenshot, ocrScanGeneration) {
         instantWords = null
         instantRegions = null
         instantOcrDone = false
         wordSelected = false
         val bmp = screenshot ?: return@LaunchedEffect
+        // A pre-scan that started BEFORE the last language change ran under the
+        // previous whitelist; InstantOcrStore already filters those out in stateFor(),
+        // so a null here means "scan inline with the current languages".
         val preScan = InstantOcrStore.stateFor(bmp)
         if (preScan == null) {
             // No capture-time scan runs for this image (gallery pick, assistant
@@ -2998,30 +3241,41 @@ fun CircleToSearchScreen(
                                 }
                             }
 
-                            // Camera — open the translator module's live camera directly.
-                            // CLEAR_TASK so backing out of the camera returns here instead
-                            // of any module screen left over from a previous session.
+                            // Camera — needs no dialog when access is already there.
+                            // Granted → the module's live camera (full live-translate
+                            // experience). Not granted → the system camera via
+                            // ACTION_IMAGE_CAPTURE, which never prompts, instead of
+                            // dropping the user into the module just to hit a
+                            // permission dialog they did not ask for.
                             BottomBarButton(stringResource(R.string.label_camera), {
                                 Icon(painterResource(id = dev.davidv.translator.R.drawable.camera), null, modifier = Modifier.size(22.dp))
                             }) {
-                                // Clear any lingering translator overlay windows so a
-                                // stale touchable result/select window can't intercept
-                                // taps inside the camera screen.
-                                CircleToSearchAccessibilityService.instance?.closeTranslateOverlay()
-                                // Return target: closing the image result re-launches this
-                                // overlay (the original capture stays in BitmapRepository —
-                                // CLEAR_TASK destroys the old instance without finishing it).
-                                val cameraIntent = android.content.Intent(context, dev.davidv.translator.MainActivity::class.java)
-                                    .putExtra(dev.davidv.translator.MainActivity.EXTRA_OPEN_LIVE_CAMERA, true)
-                                    .putExtra(
-                                        dev.davidv.translator.MainActivity.EXTRA_CALLER_COMPONENT,
-                                        android.content.ComponentName(context, com.akslabs.circletosearch.OverlayActivity::class.java),
-                                    )
-                                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK)
-                                runCatching {
-                                    context.startActivity(cameraIntent)
-                                }.onFailure {
-                                    android.widget.Toast.makeText(context, context.getString(R.string.toast_translate_unavailable), android.widget.Toast.LENGTH_SHORT).show()
+                                if (!hasCameraPermission()) {
+                                    // No access yet: the module's live camera would only
+                                    // greet the user with a permission dialog they never
+                                    // asked for, so take the photo with the system camera
+                                    // instead (which asks only if the platform demands it).
+                                    launchSystemCapture()
+                                } else {
+                                    // Clear any lingering translator overlay windows so a
+                                    // stale touchable result/select window can't intercept
+                                    // taps inside the camera screen.
+                                    CircleToSearchAccessibilityService.instance?.closeTranslateOverlay()
+                                    // Return target: closing the image result re-launches this
+                                    // overlay (the original capture stays in BitmapRepository —
+                                    // CLEAR_TASK destroys the old instance without finishing it).
+                                    val cameraIntent = android.content.Intent(context, dev.davidv.translator.MainActivity::class.java)
+                                        .putExtra(dev.davidv.translator.MainActivity.EXTRA_OPEN_LIVE_CAMERA, true)
+                                        .putExtra(
+                                            dev.davidv.translator.MainActivity.EXTRA_CALLER_COMPONENT,
+                                            android.content.ComponentName(context, com.akslabs.circletosearch.OverlayActivity::class.java),
+                                        )
+                                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                                    runCatching {
+                                        context.startActivity(cameraIntent)
+                                    }.onFailure {
+                                        android.widget.Toast.makeText(context, context.getString(R.string.toast_translate_unavailable), android.widget.Toast.LENGTH_SHORT).show()
+                                    }
                                 }
                             }
 
@@ -3154,11 +3408,11 @@ fun CircleToSearchScreen(
                                 }
                             }
 
-                            // Gallery — pick an image and run Circle to Search on it
+                            // Gallery — camera-or-gallery sheet. Neither tile needs a
+                            // permission: the camera writes into our FileProvider, and
+                            // the gallery tile opens the system photo picker.
                             BottomBarButton(stringResource(R.string.label_gallery), { Icon(painterResource(id = com.akslabs.circletosearch.R.drawable.ic_gallery), null, modifier = Modifier.size(22.dp)) }) {
-                                pickImageLauncher.launch(
-                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                                )
+                                showImageSource = true
                             }
 
                             // Screen — translate the current live screen (same as long-pressing
@@ -3868,6 +4122,19 @@ fun CircleToSearchScreen(
             }
         }
 
+        if (showImageSource) {
+            ImageSourceSheet(
+                onDismiss = { showImageSource = false },
+                onOpenCamera = { launchSystemCapture() },
+                onOpenGallery = {
+                    showImageSource = false
+                    pickImageLauncher.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                    )
+                },
+            )
+        }
+
         if (showMoreAppsSheet) {
             MoreAppsBottomSheet(
                 onDismiss = { showMoreAppsSheet = false },
@@ -3894,9 +4161,25 @@ fun CircleToSearchScreen(
 
         if (showOcrLangDialog) {
             OcrLanguageDialog(
-                onDismiss = { showOcrLangDialog = false },
+                // Selection is applied when the picker closes, not per checkbox:
+                // re-running OCR on every toggle would clear the word overlay
+                // behind the dialog on each tap.
+                onDismiss = {
+                    showOcrLangDialog = false
+                    val applied = OcrLanguagePreferences.getChecked(context)
+                    if (applied != ocrCheckedLanguages) {
+                        ocrCheckedLanguages = applied
+                        // Stale detection boxes from the previous recognition must not
+                        // be reused by a later translate of this same capture.
+                        InstantOcrStore.invalidateScansForLanguageChange()
+                        ocrScanGeneration++
+                        // The entity chips were extracted from the previous
+                        // recognition; drop them and let the re-scan refill them.
+                        detectedEntities = emptyList()
+                        entityScanGeneration++
+                    }
+                },
                 onCheckedChange = { codes ->
-                    ocrCheckedLanguages = codes
                     OcrLanguagePreferences.setChecked(context, codes)
                 }
             )

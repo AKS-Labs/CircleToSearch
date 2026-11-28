@@ -1,6 +1,7 @@
 package dev.davidv.translator.overlayChrome
 
 import android.content.res.Resources
+import android.graphics.Point
 import android.graphics.Rect
 import android.os.Build
 import android.view.WindowInsets
@@ -50,6 +51,27 @@ object OverlayInsets {
         WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout(),
       )
     return contentBounds(metrics.bounds, Insets.of(insets.left, insets.top, insets.right, insets.bottom))
+  }
+
+  /** API-29-tolerant [contentBounds]: currentWindowMetrics on R+, real display
+   *  size with status/navigation bar offsets below (Android 10 has neither
+   *  WindowMetrics nor per-window insets). */
+  fun contentBoundsCompat(
+    windowManager: WindowManager,
+    resources: Resources,
+  ): Rect {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+      return contentBounds(windowManager)
+    }
+    val size = Point()
+    @Suppress("DEPRECATION")
+    windowManager.defaultDisplay.getRealSize(size)
+    return Rect(
+      0,
+      statusBarHeight(resources),
+      size.x,
+      size.y - bottomInset(windowManager, resources),
+    )
   }
 
   fun statusBarHeight(resources: Resources): Int {
