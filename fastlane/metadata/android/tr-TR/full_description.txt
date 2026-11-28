@@ -1,0 +1,65 @@
+- DAİREYLE ARA (CIRCLE TO SEARCH) NEDİR?
+
+Telefon ekranınızda gördüğünüz bir şeyi aramak istediniz mi hiç? DaireyleAra, bu gücü herhangi bir Android cihazda parmaklarınızın ucuna getiriyor. Aradığınız şeyin etrafına bir daire çizin ve en sevdiğiniz arama motorundan anında sonuçlar alın.
+
+Bunu Google Lens, Bing Görsel Arama, Yandex ve TinEye'ın hepsinin tek bir yerde olması gibi düşünün—ve her yerde çalışıyor.
+
+NEDEN BU DAİREYLEARA UYGULAMASINI KULLANMALISINIZ?
+
+GOOGLE'IN CTS SÜRÜMÜNÜN SORUNU
+• Zorunlu Bulut Senkronizasyonu: Sadece metni kopyalamak istediğinizde bile seçiminizi sunuculara yükler.
+
+• Sık sık yanlışlıkla tetiklenir ve hassas verileri anında Google'a ifşa eder.
+
+• Ekosistem Kilitlenmesi: Google Arama ile sınırlıdır—Bing, Yandex veya yapay zeka modelleri için destek yoktur.
+
+• Eksik Özellikler: "Paylaş" ve "Kaydet" gibi kullanışlı özellikler kaldırılmıştır.
+
+• Donanım Ayrıcalığı: Sadece pahalı amiral gemisi cihazlarda (Pixel 8, Galaxy S24+) mevcuttur.
+
+FARKLI OLAN NELER?
+• Sıkı Gizlilik: Sadece işaretlediğiniz metin işlenir—başka hiçbir şey.
+
+• Gerçek Çevrimdışı OCR: Metin tanıma %100 cihazınızda yerel olarak çalışır—internet gerekmez.
+
+• Çevrimdışı QR algılama, çevrimdışı Akıllı Tarama—gereksiz sunucular yok.
+
+• Evrensel Uyumluluk: Herhangi bir arama motoruyla çalışır (Google, Bing, Yandex, TinEye, ChatGPT).
+
+• Geri Getirilen Kullanışlılık: Google'ın kaldırdığı "Paylaş" ve "Kaydet" özelliklerini geri getirdik.
+
+• Sadece pahalı amiral gemisi cihazlarda değil, herhangi bir Android cihazda çalışır.
+
+• Google'sız Cihazlarda Çalışır: Google programlarına gerek yok.
+
+%100 Bağımsız: Google Play Hizmetleri veya OEM'e özgü yazılım gerektirmeden herhangi bir Android telefonda (Android 10+) kusursuz çalışır.
+
+Gizlilik Önceliği: Arka plan izleme veya kayıt yok—sadece cihaz üzerinde saf seçim. **TEMEL ÖZELLİKLER**
+
+**AKILLI ARAMA VE YAPAY ZEKÂ**
+• Çoklu Motor Desteği: Google Lens, Bing, Yandex, TinEye, ChatGPT ve Perplexity kullanarak anında ters görsel arama.
+
+• Akıllı Yerel "Metin Kopyala": Çevrimdışı OCR (Tesseract) veya Hibrit Yardım Modu kullanarak herhangi bir ekrandan metin çıkarın ve kopyalayın.
+
+• Özelleştirilebilir OCR Modelleri: Özel algılama için harici yüksek doğruluklu Tesseract dil modellerini içe aktarın.
+
+• Akıllı Varlık Çıkarma: Akıllı içeriği (barkodlar veya anahtar bilgileri gibi) sorunsuz bir şekilde algılamak ve yönetmek için akıllı cihaz içi tarama.
+
+**SORUNSUZ İŞLETİM SİSTEMİ ENTEGRASYONU**
+• Evrensel Tetikleyici: Herhangi bir uygulamada anında tetiklemek için durum çubuğuna çift dokunun veya kayan balonu yapılandırın.
+
+• Varsayılan Asistan Olarak Ayarla: Ana düğmeye uzun basarak veya çapraz kaydırma yaparak doğrudan tetiklemek için sisteminizin varsayılan Android Asistanı olarak yapılandırın.
+
+• Akıllı Seçim: Aramak istediğiniz şeyi sorunsuz bir şekilde kırpmak ve seçmek için ekranda bir daire çizin veya karalayın.
+
+**GÜZEL VE ÖZELLEŞTİRİLEBİLİR ARAYÜZ**
+• Modern Tasarım: Zarif Material 3 bileşenleri, akıcı animasyonlar ve son derece şık bir arayüzle sıfırdan inşa edilmiştir.
+
+• Eğlenceli Etkileşimler: Uygulamayı her kullandığınızda arkadaş canlısı, eğlenceli ve mizahi mesajlar gösterir.
+
+• Özelleştirilebilir Estetik: Arama sonuçlarını görüntülemek için arayüz öğelerini, degrade kenarlıkları, Karanlık Modu ve Masaüstü Modunu açıp kapatın.
+
+**HIZLI İŞLEMLER**
+• Hızlı Paylaşım: Arama sonuçlarının URL'lerini anında kopyalayın.
+
+• Tarayıcıda Aç: Tek dokunuşla doğrudan uygulama içi görüntüleyiciden favori harici tarayıcınıza geçin.

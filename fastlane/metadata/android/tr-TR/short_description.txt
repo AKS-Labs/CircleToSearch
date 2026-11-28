@@ -1,0 +1,1 @@
+Tüm Android cihazlar için çoklu arama motoru desteği ile DaireyleAra (CircleToSearch)
