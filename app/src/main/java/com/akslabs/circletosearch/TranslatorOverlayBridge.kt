@@ -441,7 +441,8 @@ class TranslatorOverlayBridge(
 
   /** The screen area above the bottom toolbar — capture and overlay region. */
   private fun currentCaptureRegion(): Rect {
-    val content = dev.davidv.translator.overlayChrome.OverlayInsets.contentBounds(windowManager)
+    val content =
+      dev.davidv.translator.overlayChrome.OverlayInsets.contentBoundsCompat(windowManager, host.resources)
     return Rect(
       content.left,
       content.top,
@@ -453,7 +454,7 @@ class TranslatorOverlayBridge(
   /** Full content area — for a provided capture the result also fills the zone behind
    *  the translucent toolbar, so translated UI shows through it. */
   private fun fullCaptureRegion(): Rect =
-    dev.davidv.translator.overlayChrome.OverlayInsets.contentBounds(windowManager)
+    dev.davidv.translator.overlayChrome.OverlayInsets.contentBoundsCompat(windowManager, host.resources)
 
   /** Crops the provided capture and starts OCR/translate immediately — no UI here;
    *  the caller draws the scan overlay and chrome separately (they may be delayed). */
@@ -511,6 +512,12 @@ class TranslatorOverlayBridge(
     // SCREENSHOT_RENDER_DELAY_MS so they aren't in the capture (the toolbar sits
     // above `region`). Re-translating the original provided screenshot here made
     // refresh a no-op after the underlying screen changed.
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+      // The a11y screenshot API doesn't exist on Android 10; keep the current
+      // overlays rather than crashing.
+      Log.w(tag, "takeScreenshot requires API 30; skipping live re-capture")
+      return
+    }
     host.takeScreenshot(
       Display.DEFAULT_DISPLAY,
       host.mainExecutor,

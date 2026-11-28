@@ -19,6 +19,10 @@ import com.akslabs.circletosearch.R
 
 class CircleToSearchTileService : TileService() {
 
+    // The API 34+ path uses the PendingIntent overload; the legacy branch below
+    // is intentional (minSdk 29) and needs this lint-only suppressor —
+    // @Suppress("DEPRECATION") does not cover the StartActivityAndCollapseDeprecated check.
+    @Suppress("StartActivityAndCollapseDeprecated")
     override fun onClick() {
         super.onClick()
         

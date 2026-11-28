@@ -44,6 +44,10 @@ android {
 
     lint {
         disable += "MissingTranslation"
+        // The vendored dev.davidv.translator sources stay frozen (see the header
+        // note), so their pre-existing lint debt lives in a baseline file and CI
+        // fails only on NEW issues in this module.
+        baseline = file("lint-baseline.xml")
     }
 }
 
